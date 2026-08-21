@@ -1,0 +1,49 @@
+# Local-only stack: the coordination service, a network emulator, and the demo.
+# The browser reaches the service through Toxiproxy, so latency, jitter, and
+# connection drops can be injected without changing any code.
+services:
+  canvasd:
+    build:
+      context: .
+      dockerfile: docker/canvasd.Dockerfile
+    container_name: canvas-physics-canvasd
+    environment:
+      CANVASD_LOG_LEVEL: info
+      CANVASD_ALLOWED_ORIGINS: "*"
+    expose:
+      - "8080"
+    ports:
+      # Direct port, for a run with no impairment.
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    container_name: canvas-physics-toxiproxy
+    command: ["-host=0.0.0.0", "-config=/etc/toxiproxy/toxiproxy.json"]
+    volumes:
+      - ./docker/toxiproxy.json:/etc/toxiproxy/toxiproxy.json:ro
+    ports:
+      # Impaired path the demo uses by default.
+      - "8081:8081"
+      # Toxiproxy control API.
+      - "8474:8474"
+    depends_on:
+      canvasd:
+        condition: service_healthy
+
+  demo:
+    build:
+      context: .
+      dockerfile: docker/demo.Dockerfile
+      args:
+        VITE_SERVER_URL: http://localhost:8081
+    container_name: canvas-physics-demo
+    ports:
+      - "5173:80"
+    depends_on:
+      - toxiproxy

@@ -235,6 +235,8 @@ export interface EntityState {
   /** JSON behavior state, sent only when it changed. */
   behaviorStateJson: Uint8Array;
   quarantined: boolean;
+  /** Lets a client that never held the item pick the right visual. */
+  definitionId: string;
 }
 
 export interface StateDelta {
@@ -1975,6 +1977,7 @@ function createBaseEntityState(): EntityState {
     spriteVariant: "",
     behaviorStateJson: new Uint8Array(0),
     quarantined: false,
+    definitionId: "",
   };
 }
 
@@ -2012,6 +2015,9 @@ export const EntityState: MessageFns<EntityState> = {
     }
     if (message.quarantined !== false) {
       writer.uint32(88).bool(message.quarantined);
+    }
+    if (message.definitionId !== "") {
+      writer.uint32(98).string(message.definitionId);
     }
     return writer;
   },
@@ -2117,6 +2123,14 @@ export const EntityState: MessageFns<EntityState> = {
             message.quarantined = reader.bool();
             continue;
           }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.definitionId = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2162,6 +2176,11 @@ export const EntityState: MessageFns<EntityState> = {
         ? bytesFromBase64(object.behavior_state_json)
         : new Uint8Array(0),
       quarantined: isSet(object.quarantined) ? globalThis.Boolean(object.quarantined) : false,
+      definitionId: isSet(object.definitionId)
+        ? globalThis.String(object.definitionId)
+        : isSet(object.definition_id)
+        ? globalThis.String(object.definition_id)
+        : "",
     };
   },
 
@@ -2200,6 +2219,9 @@ export const EntityState: MessageFns<EntityState> = {
     if (message.quarantined !== false) {
       obj.quarantined = message.quarantined;
     }
+    if (message.definitionId !== "") {
+      obj.definitionId = message.definitionId;
+    }
     return obj;
   },
 
@@ -2223,6 +2245,7 @@ export const EntityState: MessageFns<EntityState> = {
     message.spriteVariant = object.spriteVariant ?? "";
     message.behaviorStateJson = object.behaviorStateJson ?? new Uint8Array(0);
     message.quarantined = object.quarantined ?? false;
+    message.definitionId = object.definitionId ?? "";
     return message;
   },
 };

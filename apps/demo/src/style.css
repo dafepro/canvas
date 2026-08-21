@@ -1,0 +1,141 @@
+:root {
+  color-scheme: dark;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg: #080c1a;
+  --panel: #101733;
+  --line: #26315e;
+  --text: #dbe4ff;
+  --accent: #4cc9f0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  height: 100vh;
+}
+
+#stage {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#panel {
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  padding: 16px;
+  overflow-y: auto;
+}
+
+h1 {
+  font-size: 16px;
+  margin: 0 0 16px;
+  color: var(--accent);
+}
+
+h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b97c9;
+  margin: 20px 0 8px;
+}
+
+section {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+label {
+  display: block;
+  font-size: 11px;
+  color: #8b97c9;
+  margin-bottom: 4px;
+}
+
+input {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: #0a1024;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+}
+
+button {
+  padding: 6px 10px;
+  margin: 0 6px 6px 0;
+  background: #1b2450;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 11px;
+  color: #8b97c9;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+#diagnostics {
+  width: 100%;
+  font-size: 11px;
+  border-collapse: collapse;
+}
+
+#diagnostics td {
+  padding: 2px 0;
+}
+
+#diagnostics td:first-child {
+  color: #8b97c9;
+}
+
+#diagnostics td:last-child {
+  text-align: right;
+}
+
+.host-badge {
+  color: #9bf6a0;
+}
+
+@media (max-width: 820px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 60vh 40vh;
+  }
+  #panel {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}

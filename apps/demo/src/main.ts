@@ -1,0 +1,103 @@
+import {
+  CanvasRuntime,
+  rocketCanvasDefinitions,
+  type RuntimeDiagnostics,
+} from "@canvas-physics/client";
+
+const serverUrl =
+  import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:8080`;
+
+const stage = document.querySelector<HTMLElement>("#stage")!;
+const userInput = document.querySelector<HTMLInputElement>("#user")!;
+const joinButton = document.querySelector<HTMLButtonElement>("#join")!;
+const leaveButton = document.querySelector<HTMLButtonElement>("#leave")!;
+const diagnosticsTable = document.querySelector<HTMLTableElement>("#diagnostics")!;
+
+userInput.value =
+  new URLSearchParams(location.search).get("user") ??
+  `player-${Math.random().toString(36).slice(2, 6)}`;
+
+let runtime: CanvasRuntime | undefined;
+
+const renderDiagnostics = (diagnostics: RuntimeDiagnostics): void => {
+  const rows: [string, string][] = [
+    ["role", diagnostics.isHost ? "simulation host" : "peer"],
+    ["client", diagnostics.clientId || "-"],
+    ["host epoch", String(diagnostics.hostEpoch)],
+    ["peers", String(diagnostics.peers)],
+    ["tick", String(diagnostics.tick)],
+    ["sim Hz", diagnostics.simulationHz.toFixed(1)],
+    ["worker drift", `${diagnostics.driftMs.toFixed(1)} ms`],
+    ["worst step", `${diagnostics.worstStepMs.toFixed(2)} ms`],
+    ["awake bodies", String(diagnostics.awakeBodies)],
+    ["render FPS", diagnostics.renderFps.toFixed(0)],
+    ["interp depth", String(diagnostics.interpolationDepth)],
+    ["extrapolations", String(diagnostics.extrapolations)],
+    ["reconcile error", diagnostics.reconcileError.toFixed(3)],
+    ["scene revision", String(diagnostics.sceneRevision)],
+    ["items", String(diagnostics.itemCount)],
+  ];
+  if (diagnostics.lastRejection) rows.push(["last reject", diagnostics.lastRejection]);
+
+  diagnosticsTable.innerHTML = rows
+    .map(
+      ([key, value]) =>
+        `<tr><td>${key}</td><td class="${
+          key === "role" && diagnostics.isHost ? "host-badge" : ""
+        }">${value}</td></tr>`,
+    )
+    .join("");
+};
+
+// Throttle the diagnostics repaint so it does not compete with rendering.
+let lastPaintMs = 0;
+
+const join = async (): Promise<void> => {
+  if (runtime) return;
+  joinButton.disabled = true;
+  runtime = new CanvasRuntime({
+    canvasId: "rocket-canvas",
+    serverUrl,
+    userId: userInput.value,
+    displayName: userInput.value,
+    mount: stage,
+    definitions: rocketCanvasDefinitions,
+    scene: { debug: new URLSearchParams(location.search).has("debug") },
+    onDiagnostics: (diagnostics) => {
+      const now = performance.now();
+      if (now - lastPaintMs < 250) return;
+      lastPaintMs = now;
+      renderDiagnostics(diagnostics);
+    },
+  });
+  try {
+    await runtime.start();
+    leaveButton.disabled = false;
+  } catch (error) {
+    joinButton.disabled = false;
+    runtime = undefined;
+    diagnosticsTable.innerHTML = `<tr><td>error</td><td>${String(error)}</td></tr>`;
+  }
+};
+
+const leave = (): void => {
+  runtime?.stop();
+  runtime = undefined;
+  stage.innerHTML = "";
+  joinButton.disabled = false;
+  leaveButton.disabled = true;
+};
+
+joinButton.addEventListener("click", () => void join());
+leaveButton.addEventListener("click", leave);
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-spawn]")) {
+  button.addEventListener("click", () => {
+    const definitionId = button.dataset.spawn!;
+    // Spawn near the launch pad for the rocket, mid-canvas for the rest.
+    const at = definitionId === "rocket" ? { x: 70, y: 62 } : { x: 40 + Math.random() * 20, y: 30 };
+    runtime?.spawnItem(definitionId, at);
+  });
+}
+
+if (new URLSearchParams(location.search).has("autojoin")) void join();

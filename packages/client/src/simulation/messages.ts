@@ -1,0 +1,81 @@
+import type {
+  CanvasDefinition,
+  CanvasSnapshot,
+  EffectEmission,
+  ItemDefinition,
+  ItemInstance,
+  Transform,
+  Vec2,
+} from "@canvas-physics/core";
+import type { AvatarSpawn } from "./rapier-world.js";
+
+/** Messages the main thread sends to the simulation worker. */
+export type SimulationRequest =
+  | {
+      type: "init";
+      canvas: CanvasDefinition;
+      definitions: ItemDefinition[];
+      tickRate: number;
+      /** True when this client holds the host lease. */
+      isHost: boolean;
+      snapshot?: CanvasSnapshot;
+      localAvatar?: AvatarSpawn;
+    }
+  | { type: "setHost"; isHost: boolean; snapshot?: CanvasSnapshot }
+  | { type: "addItem"; instance: ItemInstance }
+  | { type: "removeItem"; entityId: string }
+  | { type: "addAvatar"; spawn: AvatarSpawn }
+  | { type: "removeAvatar"; entityId: string }
+  | {
+      type: "input";
+      entityId: string;
+      direction: Vec2;
+      intensity: number;
+      inputSequence: number;
+    }
+  | { type: "ownerAction"; entityId: string; action: string; userId: string }
+  | { type: "moveItem"; entityId: string; transform: Transform; preview: boolean }
+  | { type: "requestSnapshot"; final: boolean }
+  | { type: "stop" };
+
+export interface RenderEntity {
+  id: string;
+  kind: "avatar" | "item" | "static" | "region";
+  definitionId: string;
+  x: number;
+  y: number;
+  rotation: number;
+  z?: number;
+  vx: number;
+  vy: number;
+  angularVelocity: number;
+  variant?: string;
+  animation?: string;
+  userId?: string;
+  ownerUserId?: string;
+  lastProcessedInputSequence?: number;
+  behaviorState?: unknown;
+  quarantined?: boolean;
+}
+
+export interface SimulationStats {
+  hz: number;
+  driftMs: number;
+  worstStepMs: number;
+  awakeBodies: number;
+  behaviorErrors: number;
+}
+
+/** Messages the simulation worker sends back to the main thread. */
+export type SimulationResponse =
+  | { type: "ready" }
+  | {
+      type: "render";
+      tick: number;
+      isHost: boolean;
+      entities: RenderEntity[];
+      stats: SimulationStats;
+    }
+  | { type: "effects"; tick: number; effects: EffectEmission[] }
+  | { type: "snapshot"; snapshot: CanvasSnapshot; final: boolean }
+  | { type: "error"; message: string };

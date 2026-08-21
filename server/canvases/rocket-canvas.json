@@ -1,0 +1,172 @@
+{
+  "id": "rocket-canvas",
+  "version": 1,
+  "size": {
+    "width": 100,
+    "height": 70
+  },
+  "orientation": "side",
+  "edges": {
+    "top": "wrap",
+    "right": "solid",
+    "bottom": "solid",
+    "left": "solid"
+  },
+  "staticGeometry": [
+    {
+      "id": "ground",
+      "shape": {
+        "type": "rect",
+        "width": 100,
+        "height": 4
+      },
+      "position": {
+        "x": 50,
+        "y": 68
+      },
+      "tags": [
+        "ground",
+        "floor"
+      ],
+      "friction": 0.9
+    },
+    {
+      "id": "hill",
+      "shape": {
+        "type": "polygon",
+        "vertices": [
+          {
+            "x": -14,
+            "y": 6
+          },
+          {
+            "x": 14,
+            "y": 6
+          },
+          {
+            "x": 0,
+            "y": -8
+          }
+        ]
+      },
+      "position": {
+        "x": 22,
+        "y": 60
+      },
+      "tags": [
+        "ground",
+        "hill"
+      ],
+      "friction": 0.7
+    },
+    {
+      "id": "launch-pad",
+      "shape": {
+        "type": "rect",
+        "width": 12,
+        "height": 1.5
+      },
+      "position": {
+        "x": 70,
+        "y": 65.5
+      },
+      "tags": [
+        "ground",
+        "launchPad"
+      ],
+      "friction": 1
+    },
+    {
+      "id": "pad-zone",
+      "shape": {
+        "type": "rect",
+        "width": 12,
+        "height": 6
+      },
+      "position": {
+        "x": 70,
+        "y": 61
+      },
+      "role": "regionSensor",
+      "tags": [
+        "launchPadZone"
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "space",
+      "shape": {
+        "type": "rect",
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 40
+      },
+      "tags": [
+        "space"
+      ],
+      "emitEvents": true
+    }
+  ],
+  "environment": {
+    "base": {
+      "gravityXY": {
+        "x": 0,
+        "y": 20
+      },
+      "linearDrag": 0.1,
+      "angularDrag": 0.2
+    },
+    "regions": [
+      {
+        "id": "space-gradient",
+        "shape": {
+          "type": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 100,
+          "h": 40
+        },
+        "blend": "linear",
+        "axis": "y",
+        "from": 40,
+        "to": 10,
+        "priority": 0,
+        "gravityScale": [
+          1,
+          0.1
+        ],
+        "linearDrag": [
+          0.1,
+          0.45
+        ],
+        "softSpeedLimit": [
+          null,
+          12
+        ]
+      }
+    ]
+  },
+  "spawnPoints": [
+    {
+      "id": "centre",
+      "position": {
+        "x": 50,
+        "y": 62
+      }
+    },
+    {
+      "id": "pad",
+      "position": {
+        "x": 70,
+        "y": 62
+      }
+    }
+  ],
+  "limits": {
+    "maxAvatars": 20,
+    "maxItems": 50,
+    "maxComplexPhysicsItems": 5
+  }
+}

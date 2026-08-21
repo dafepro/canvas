@@ -130,6 +130,8 @@ message EntityState {
   // JSON behavior state, sent only when it changed.
   bytes behavior_state_json = 10;
   bool quarantined = 11;
+  // Lets a client that never held the item pick the right visual.
+  string definition_id = 12;
 }
 
 message StateDelta {

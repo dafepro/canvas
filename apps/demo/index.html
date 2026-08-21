@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>Canvas Physics demo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage"></div>
+      <aside id="panel">
+        <h1>Canvas Physics</h1>
+        <section>
+          <label for="user">User</label>
+          <input id="user" value="" />
+          <button id="join">Join canvas</button>
+          <button id="leave" disabled>Leave</button>
+        </section>
+        <section>
+          <h2>Spawn</h2>
+          <button data-spawn="rocket">Rocket</button>
+          <button data-spawn="ball">Ball</button>
+          <button data-spawn="crate">Crate</button>
+          <p class="hint">
+            You own what you spawn. Only the owner may move or delete it.
+          </p>
+        </section>
+        <section>
+          <h2>Controls</h2>
+          <p class="hint">
+            Drag on the canvas or use WASD to move. Touch the rocket to arm it.
+          </p>
+        </section>
+        <section>
+          <h2>Diagnostics</h2>
+          <table id="diagnostics"></table>
+        </section>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

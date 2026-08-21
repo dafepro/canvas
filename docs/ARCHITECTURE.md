@@ -1,0 +1,141 @@
+# Architecture
+
+This file explains how the pieces fit together. The specification in
+`docs/spec.txt` explains why.
+
+## The three layers
+
+```
+   browser client                          browser client
++-------------------------+            +-------------------------+
+| main thread             |            | main thread             |
+|  PixiScene              |            |  PixiScene              |
+|  PointerDragController  |            |  InterpolationBuffer    |
+|  CanvasRuntime          |            |  AvatarReconciler       |
+|  RoomClient + transport |            |  RoomClient + transport |
++-----------+-------------+            +-----------+-------------+
+            |                                     |
+   worker boundary                        worker boundary
+            |                                     |
++-----------v-------------+            +-----------v-------------+
+| simulation worker       |            | simulation worker       |
+|  RapierWorld (all)      |            |  RapierWorld (static +  |
+|  BehaviorRuntime        |            |  local avatar only)     |
+|  HostSimulation         |            |                         |
++-----------+-------------+            +-----------+-------------+
+            |  canonical state, effects, checkpoints             |
+            +---------------------+-------------------------------+
+                                  |
+                        +---------v----------+
+                        |  Toxiproxy         |  local only
+                        +---------+----------+
+                                  |
+                        +---------v----------+
+                        |  canvasd           |
+                        |   roomsdk.Server   |
+                        |   host lease        |
+                        |   ownership         |
+                        |   relay             |
+                        |   snapshot store    |
+                        +--------------------+
+```
+
+## Who owns what
+
+| Concern | Owner |
+| --- | --- |
+| Stepping physics | The simulation host client, in its worker |
+| Running item behaviors | The simulation host client |
+| Predicting the local avatar | Every client |
+| Rendering | Every client, main thread |
+| Granting the host lease | The Go server |
+| Validating an owner edit | The Go server |
+| Storing a checkpoint | The Go server |
+| Relaying realtime packets | The Go server, in V1 |
+
+## The behavior boundary
+
+This is the most important extensibility decision. A behavior is a pure
+function of `(context, config, state, event)` returning `{ state, commands }`.
+It cannot reach PixiJS, the transport, or persistence.
+
+```
+physics step  ->  normalized events  ->  behavior.onEvent  ->  commands
+                        ^                                          |
+                        |                                          v
+                  contacts, regions,                      BehaviorHost applies
+                  timers, ticks                           them to the world
+```
+
+Two rules make a host reproducible and a behavior testable:
+
+1. Events run in a fixed order inside one tick. See `eventOrder` in
+   `packages/core/src/behavior/events.ts`.
+2. Commands are applied only after every handler for the tick has run. A
+   handler therefore never sees a world half-changed by another handler.
+
+`BehaviorHost` is the only interface between a behavior and the world.
+`RapierWorld` implements it for real physics; `BehaviorTestHost` implements it
+with plain objects, so a behavior test needs no engine and no browser.
+
+## Forces are one-tick impulses
+
+Rapier keeps a force added with `addForce` until the force is reset. Applying
+gravity that way accumulates it across ticks. `RapierWorld` therefore converts
+every per-tick force into an impulse of `force * mass * dt`. `applyForce` in a
+behavior means "apply this force for one tick".
+
+## The environment field
+
+Canvas physics is not one global gravity vector. `EnvironmentField.sample`
+returns gravity, drag, a soft speed limit, friction, and the elevation channel
+for one point. Region modifiers blend in by priority. This is why the rocket
+needs no special gravity code: the canvas supplies a gradient that reduces
+gravity and raises drag with height.
+
+A soft speed limit adds drag only to the velocity above the threshold. It never
+clamps, so motion stays smooth across the network.
+
+## Host lease and epoch fencing
+
+Every canonical packet carries `host_epoch`. The server increments the epoch
+before it grants a lease. A client drops any state packet whose epoch is not the
+one it knows, so an old host that reconnects cannot publish. The server refuses
+state and checkpoints from a client without the active lease.
+
+The heartbeat is the real health signal. A visibility event is a hint, because a
+crashed tab sends no event.
+
+## Durable versus canonical
+
+Two different kinds of authority, easy to confuse:
+
+- **Canonical simulation** is the host's. It decides where a body is this tick.
+- **Durable ownership** is the server's. It decides whether an owner may move,
+  configure, or delete an item.
+
+A host that lies about physics cannot grant itself edit rights. The server sets
+`ownerUserId` from the authenticated session, never from the client payload.
+
+## Rates
+
+| Loop | Rate | Set in |
+| --- | --- | --- |
+| Physics and behavior tick | 60 Hz fixed | `HostSimulation` |
+| Render | Up to 60 FPS | Pixi ticker |
+| Input to the host | 30 Hz | `CanvasRuntime` |
+| Host state delta | 15 Hz | `CanvasRuntime` |
+| Host keyframe | 2 Hz | `CanvasRuntime` |
+| Checkpoint to the server | 1 Hz | `CanvasRuntime` |
+| Host heartbeat | 2 Hz | `RoomClient` |
+
+## Extending the system
+
+| Goal | Where to work |
+| --- | --- |
+| A new interactive item | Register an `ItemBehavior`, then add an `ItemDefinition`. Touch no protocol code. |
+| A new canvas | Write a `CanvasDefinition` and export it with `make export-canvases`. |
+| A different transport | Implement `RoomTransport`. Nothing in the runtime or behaviors changes. |
+| A real database | Implement `roomsdk.Store`. |
+| A real session check | Implement `roomsdk.Authenticator`. |
+| A new wire field | Edit `room.proto`, then run `make generate`. |

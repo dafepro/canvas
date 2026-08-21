@@ -1,0 +1,8 @@
+[
+  {
+    "name": "canvasd",
+    "listen": "0.0.0.0:8081",
+    "upstream": "canvasd:8080",
+    "enabled": true
+  }
+]

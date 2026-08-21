@@ -1095,8 +1095,10 @@ type EntityState struct {
 	// JSON behavior state, sent only when it changed.
 	BehaviorStateJson []byte `protobuf:"bytes,10,opt,name=behavior_state_json,json=behaviorStateJson,proto3" json:"behavior_state_json,omitempty"`
 	Quarantined       bool   `protobuf:"varint,11,opt,name=quarantined,proto3" json:"quarantined,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Lets a client that never held the item pick the right visual.
+	DefinitionId  string `protobuf:"bytes,12,opt,name=definition_id,json=definitionId,proto3" json:"definition_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EntityState) Reset() {
@@ -1204,6 +1206,13 @@ func (x *EntityState) GetQuarantined() bool {
 		return x.Quarantined
 	}
 	return false
+}
+
+func (x *EntityState) GetDefinitionId() string {
+	if x != nil {
+		return x.DefinitionId
+	}
+	return ""
 }
 
 type StateDelta struct {
@@ -1882,7 +1891,7 @@ const file_room_proto_rawDesc = "" +
 	"\tdirection\x18\x02 \x01(\v2\x16.canvasphysics.v1.Vec2R\tdirection\x12\x1c\n" +
 	"\tintensity\x18\x03 \x01(\x02R\tintensity\x12-\n" +
 	"\x13client_time_unix_ms\x18\x04 \x01(\x04R\x10clientTimeUnixMs\x12\x12\n" +
-	"\x04held\x18\x05 \x01(\bR\x04held\"\xb3\x03\n" +
+	"\x04held\x18\x05 \x01(\bR\x04held\"\xd8\x03\n" +
 	"\vEntityState\x12\x1b\n" +
 	"\tentity_id\x18\x01 \x01(\tR\bentityId\x122\n" +
 	"\bposition\x18\x02 \x01(\v2\x16.canvasphysics.v1.Vec2R\bposition\x12\x1a\n" +
@@ -1895,7 +1904,8 @@ const file_room_proto_rawDesc = "" +
 	"\x0esprite_variant\x18\t \x01(\tR\rspriteVariant\x12.\n" +
 	"\x13behavior_state_json\x18\n" +
 	" \x01(\fR\x11behaviorStateJson\x12 \n" +
-	"\vquarantined\x18\v \x01(\bR\vquarantined\"\x9c\x01\n" +
+	"\vquarantined\x18\v \x01(\bR\vquarantined\x12#\n" +
+	"\rdefinition_id\x18\f \x01(\tR\fdefinitionId\"\x9c\x01\n" +
 	"\n" +
 	"StateDelta\x129\n" +
 	"\bentities\x18\x01 \x03(\v2\x1d.canvasphysics.v1.EntityStateR\bentities\x12,\n" +
