@@ -1,0 +1,710 @@
+Physics-Based RealtimeMultiplayer 2D Canvas
+Product specification and technical implementation plan
+Target: browser/PWA client in TypeScript + existing Go backend
+Core architecture decision
+[BodyText] Physics stays off the server. One elected client acts as the room simulation host. The Go service coordinates the room, grants a single host lease, relays realtime traffic in the first implementation, enforces ownership, and stores periodic canonical snapshots. Other clients predict only their own avatar and interpolate shared state.
+Prepared from project requirements and architecture interviewAugust 21, 2026
+
+[Heading1] Executive summary
+[BodyText] This system is a persistent, shared 2D world for up to 20 active avatars and about 50 items. Avatars are circular, player-controlled entities. Items may be decorative, sensor-only, static collision geometry, simple movable bodies, or developer-authored interactive objects with multi-step behaviors. A canvas defines world geometry, edge rules, environmental forces, rendering orientation, and item tuning.
+[BodyText] The recommended architecture uses one client as the canonical simulation host for each active canvas. That host runs the full physics and behavior model in a Web Worker. Other clients send control intent, predict their own avatar, and render shared entities from host snapshots. The Go backend never steps physics. It grants a host lease, prevents split-brain authority, validates durable mutations and ownership, relays packets for the first implementation, and stores checkpoints for persistence and host migration.
+[BodyText] Start with secure WebSockets because they are simple, observable, and backend-agnostic. Keep the transport behind an interface. If relay bandwidth later matters, add a WebRTC star topology from the simulation host to other clients. Do not start with a full peer mesh.
+[Heading2] Key requirements and chosen defaults
+Area
+Requirement / default
+Players
+Up to 20 active avatars per canvas.
+Items
+Up to 50 total items; budget up to 5 complex physics/behavior objects.
+Authority
+One elected browser client owns canonical simulation for the room.
+Server role
+Coordination, relay, host lease, ownership, validation, persistence. No physics loop.
+Client rendering
+60 FPS target; remote state interpolated.
+Physics
+Fixed-step host simulation; recommended 60 Hz.
+State updates
+Recommended 15 Hz deltas to peers; 1 Hz durable checkpoint to backend.
+Idle behavior
+When the last player leaves, freeze transforms, zero motion, and resume later from an idle state.
+Behavior authoring
+Developer-authored behavior types plus data-driven configuration.
+Network transport
+WebSocket first; optional WebRTC host-star later.
+Persistence
+Transforms, ownership, item config, persistent behavior state, scene revision, and definition versions.
+
+[Heading2] Architecture at a glance
+                       +-----------------------------+                       |         Go backend          |                       |-----------------------------|                       | auth / room membership      |                       | single host lease           |                       | ownership + mutations       |                       | websocket relay             |                       | snapshot checkpoint store   |                       +-------------+---------------+                                     |                           reliable coordination                                     |                  +------------------+------------------+                  |                                     |        +---------v----------+                 +--------v---------+        | Simulation host    |   realtime      | Normal client    |        | browser client     |<--------------->| browser client   |        |--------------------|                 |------------------|        | full Rapier world  |                 | own avatar pred. |        | all avatars/items  |                 | interpolation    |        | behavior runtime   |                 | Pixi rendering   |        | canonical tick     |                 | local effects    |        +---------+----------+                 +------------------+                  |                  | host snapshots / effect events                  +-------> all room clientsV1: traffic may relay through Go WebSocket.Later: same protocol may travel host-to-peer over WebRTC DataChannels.
+
+[Heading1] 1. Product goals and non-goals
+[Heading2] 1.1 Goals
+[ListBullet] Make a shared 2D canvas feel immediate and playful on phones and desktop browsers.
+[ListBullet] Support objects that react to one or more avatars, other items, collisions, bounces, timers, regions, and workflow state.
+[ListBullet] Allow one item to have multiple collision shapes with different roles: solid contact, interaction sensors, triggers, and hit areas.
+[ListBullet] Support top-down and side-facing worlds from the same runtime.
+[ListBullet] Support spatially varying forces and drag, including smooth gradients.
+[ListBullet] Keep realtime physics CPU off the Go backend.
+[ListBullet] Persist the scene so item position, rotation, ownership, configuration, and durable state survive an empty room.
+[ListBullet] Allow item owners to spawn, move, rotate, configure, and delete only their own items.
+[ListBullet] Keep behavior authoring extensible without allowing arbitrary user scripting.
+[ListBullet] Allow transport to evolve from WebSocket relay to WebRTC without rewriting gameplay code.
+[Heading2] 1.2 Non-goals for the first implementation
+[ListBullet] Competitive anti-cheat or tamper-proof physics. A malicious simulation host can influence outcomes. The system will stop unauthorized durable edits, but it will not prove every physical interaction.
+[ListBullet] Rollback netcode or frame-identical deterministic simulation on every client.
+[ListBullet] A user-facing visual behavior editor.
+[ListBullet] Large MMO-scale rooms, hundreds of simultaneous dynamic bodies, or server-side always-on worlds.
+[ListBullet] General 3D physics. Top-down “height” uses a lightweight 2.5D elevation channel rather than a 3D rigid-body engine.
+[ListBullet] Offline continuation. An empty canvas sleeps.
+[Heading1] 2. Domain model
+[Heading2] 2.1 Core concepts
+Concept
+Definition
+Canvas
+A persistent world definition: size, orientation, background, fixed collision geometry, regions, environment fields, edges, spawn points, and item limits.
+Avatar
+A circular, player-controlled kinematic entity. It may collide with world geometry and kickable items while passing through other avatars or sensor-only items.
+Item definition
+Developer-authored type definition that declares visuals, colliders, physics traits, behavior type, config schema, tuning rules, animations, and persistence rules.
+Item instance
+A placed item with an ID, owner, transform, resolved config, runtime state, and reference to a versioned item definition.
+Collider
+A geometric shape attached to an avatar, item, or static world entity. A single entity may have several colliders with different masks and roles.
+Region
+A spatial area that can trigger behavior events or modify environmental fields.
+Environment field
+A function of position that returns gravity, drag, speed limits, friction modifiers, or top-down elevation forces.
+Behavior
+Developer-authored stateful logic that consumes normalized events and emits commands. Behavior code does not directly own rendering or network transport.
+Effect event
+A short-lived visual/audio event such as a trail, dust burst, countdown pulse, or impact animation. Effects are not persisted unless explicitly modeled as state.
+Simulation host
+The one connected client holding the active host lease and producing canonical room state.
+
+[Heading2] 2.2 Coordinate system and units
+[BodyText] Use logical world units, not pixels, for all simulation data. A canvas might be 100 x 60 world units regardless of whether it renders into a 390 px phone viewport or a 1600 px desktop viewport. The camera maps world units to screen pixels. This keeps item behavior stable across screen sizes and lets a canvas tune items based on world dimensions rather than device resolution.
+[ListBullet] Origin: top-left is acceptable for rendering, but physics APIs should expose a consistent world-space convention. Recommended: X increases right, Y increases down to match browser canvas coordinates.
+[ListBullet] Rotation: radians internally; degrees only in authoring UI.
+[ListBullet] Time: fixed simulation ticks, not frame time, for behavior timers.
+[ListBullet] Scale: item definitions use world-unit dimensions. Sprite assets can have any source pixel size.
+[ListBullet] Persistent transforms: X, Y, rotation, optional elevation Z. Velocities are not resumed after room sleep by default.
+[Heading1] 3. Canvas specification
+[Heading2] 3.1 Canvas definition
+interface CanvasDefinition {  id: string;  version: number;  size: { width: number; height: number };  orientation: "topDown" | "side";  backgroundAssetId: string;  edges: {    top: EdgePolicy;    right: EdgePolicy;    bottom: EdgePolicy;    left: EdgePolicy;  };  staticGeometry: StaticColliderDefinition[];  regions: RegionDefinition[];  environment: EnvironmentDefinition;  spawnPoints: SpawnPoint[];  limits: {    maxAvatars: 20;    maxItems: 50;    maxComplexPhysicsItems: 5;  };}
+
+[Heading2] 3.2 Edge policies
+Policy
+Behavior
+solid
+A fixed world collider prevents bodies from leaving.
+wrap
+Crossing one edge teleports the body to the opposite edge while preserving velocity and rotation.
+respawn
+Crossing the edge removes the body from active simulation and restores it at a configured spawn point, normally with zero velocity.
+open
+The body may leave the nominal canvas. A behavior or region rule is responsible for later recovery.
+
+[BodyText] Configure each edge independently. A soccer-field-style canvas could be solid on all sides. A looping space canvas could wrap horizontally and vertically. A platform canvas could be solid on the sides, open at the bottom, and respawn fallen objects at center.
+[Heading2] 3.3 Static geometry
+[BodyText] Static collision geometry belongs to the canvas rather than being stored as ordinary user-owned items. It includes floors, walls, hills, ramps, launch pads, barriers, and collision-only shapes that do not need per-instance ownership. Static geometry may still expose semantic tags such as hill, launchPad, goal, or wall so behavior logic can react to contacts.
+[ListBullet] Prefer primitive shapes and convex polygons.
+[ListBullet] Use several convex colliders instead of one complicated concave polygon when practical.
+[ListBullet] Allow sensor-only static geometry for zones that should trigger events without blocking motion.
+[ListBullet] Keep the rendered background separate from collision geometry so art can change without altering physics.
+[Heading1] 4. Environmental physics and 2.5D elevation
+[Heading2] 4.1 Environment fields
+[BodyText] Do not model canvas physics as a single global gravity vector. Instead, sample an environment field for each affected body during each simulation step. The field starts with canvas defaults and blends in region modifiers. This gives the rocket example a natural implementation: full downward gravity near the ground, a smooth reduction in gravity through the upper canvas, increased drag or a soft speed cap in “space,” then stronger downward acceleration as the rocket returns.
+interface EnvironmentSample {  gravityXY: Vec2;  linearDrag: number;  angularDrag: number;  softSpeedLimit?: number;  surfaceFrictionMultiplier: number;  // Optional top-down 2.5D channel.  zGravity: number;  zDrag: number;}interface RegionFieldModifier {  shape: RegionShape;  blend: "step" | "linear" | "smoothstep" | "radial";  priority: number;  gravityXY?: FieldValue<Vec2>;  linearDrag?: FieldValue<number>;  softSpeedLimit?: FieldValue<number>;  zGravity?: FieldValue<number>;}
+
+[BodyText] Forces should usually be applied rather than teleporting or hard-clamping a body. A soft speed limit can add drag only to the velocity above a threshold. This produces smoother motion and fewer abrupt corrections across the network.
+[Heading2] 4.2 Side-facing canvases
+[ListBullet] Y gravity is the main gravity vector.
+[ListBullet] Static geometry provides ground, ramps, hills, platforms, and walls.
+[ListBullet] Air resistance uses linear and angular drag.
+[ListBullet] Avatar movement uses horizontal/vertical intent but the canvas may constrain allowed movement if desired.
+[ListBullet] Dynamic items may use restitution, friction, mass, gravity scale, and explicit designer forces.
+[Heading2] 4.3 Top-down canvases
+[ListBullet] The X/Y plane has little or no gravity. Drag gives rolling/sliding objects a natural slowdown.
+[ListBullet] Optional elevation Z is simulated separately as scalar position/velocity.
+[ListBullet] Z controls visual offset, scale, shadow separation, and whether an item participates in ground-level collisions.
+[ListBullet] An item can be “kicked into the air” without requiring a 3D rigid-body world.
+[ListBullet] When Z returns to the ground plane, emit a landing event and optionally an impact impulse or bounce.
+Recommended 2.5D rule
+[BodyText] Keep X/Y physics in Rapier and model Z as a small custom component. Do not introduce a 3D engine just to make top-down objects hop, arc, or fall.
+[Heading1] 5. Physics and collision model
+[Heading2] 5.1 Recommended physics engine
+[BodyText] Use Rapier 2D in the browser, loaded as WebAssembly. It has rigid-body types, multiple colliders per body, sensor colliders, collision events, forces, impulses, sleeping, filtering, and fixed/static/kinematic/dynamic bodies. Those features map well to the required interaction model. The simulation host should run the physics world in a Web Worker so rendering and touch input remain responsive.
+[Heading2] 5.2 Body types
+Entity
+Recommended body type
+Reason
+Avatar
+Kinematic velocity-based
+The player controls motion directly. The avatar can push dynamic items without being knocked around by them.
+Static world
+Fixed
+Walls, hills, floors, barriers, and pads should never move from physics.
+Movable physics item
+Dynamic
+Receives forces, impulses, gravity, friction, restitution, and contacts.
+Scripted moving item
+Kinematic
+Useful for elevators, moving hazards, path-followers, or a behavior-controlled platform.
+Trigger / zone
+Sensor collider
+Detects overlap without causing contact forces.
+
+[Heading2] 5.3 Collision roles and layers
+[BodyText] An item is not limited to one collision box. It may have several colliders attached to the same rigid body, each with its own role and filter. For example, a rocket can have a narrow solid hull, a larger “touch to arm” sensor, and a small launch-pad alignment sensor.
+Layer / role
+Typical behavior
+AVATAR_BODY
+Solid circle against world and kickable items. Usually does not collide with other avatars.
+AVATAR_SENSOR
+Slightly larger interaction circle used for contact workflows and multi-avatar triggers.
+WORLD_STATIC
+Solid static geometry.
+ITEM_SOLID
+Physical item collider.
+ITEM_SENSOR
+Touch / proximity / semantic interaction collider.
+REGION_SENSOR
+Region entry and exit detection.
+PORTAL_SENSOR
+Triggers portal workflow; normally non-solid.
+DECORATIVE
+No collider; render only.
+
+[Heading2] 5.4 Passing through versus kicking
+[BodyText] Separate “can overlap” from “can interact.” If an avatar should pass through an item, exclude AVATAR_BODY from that item’s solid collision mask but keep its interaction sensor active. The behavior still receives touch events. If an item should be kickable, either allow the avatar body to contact it physically or use a sensor-based Kickable behavior that applies a capped impulse based on avatar velocity and contact direction.
+kickImpulse = clamp(  kickStrength * max(0, dot(avatarVelocity - itemVelocity, contactNormal)),  minImpulse,  maxImpulse);applyImpulse(item, contactNormal * kickImpulse);
+
+[BodyText] The sensor-based kick option is useful when the designer wants the avatar to glide through the item while still making it move. A short per-avatar/item contact cooldown prevents one overlap from applying an impulse on every physics tick.
+[Heading1] 6. Avatar controls and local prediction
+[Heading2] 6.1 Input model
+[BodyText] Treat touch and click-drag as movement intent, not as authoritative position. The input layer turns a drag vector into desired direction and magnitude. The avatar controller then accelerates toward a desired velocity with a configured maximum speed and acceleration. This keeps collisions meaningful and prevents a pointer jump from teleporting through walls.
+[ListBullet] Pointer/touch down establishes a drag origin or virtual joystick center.
+[ListBullet] Drag vector maps to normalized direction and 0..1 intensity with a dead zone.
+[ListBullet] Release decelerates to zero using avatar drag or explicit braking.
+[ListBullet] Send input sequence number, desired direction, intensity, and client-local input time.
+[ListBullet] Do not send raw avatar position as normal control data.
+[Heading2] 6.2 Prediction and reconciliation
+[BodyText] Every client predicts only its own avatar against local static canvas geometry. The simulation host also simulates that avatar as part of the canonical world. Host snapshots include the last processed input sequence for each avatar. The local client compares the canonical position with its prediction and reconciles the difference.
+[ListBullet] Small error: blend the correction over several render frames.
+[ListBullet] Large error or invalid geometry penetration: snap to the canonical position.
+[ListBullet] Remote avatars: interpolate from buffered host snapshots; do not predict their controls.
+[ListBullet] Shared physics items: interpolate/extrapolate visually; do not run competing canonical item physics on non-host clients.
+[Heading1] 7. Item definition and runtime model
+[Heading2] 7.1 Item definition
+interface ItemDefinition<Config = unknown> {  definitionId: string;  version: number;  displayName: string;  visual: VisualDefinition;  body?: RigidBodyDefinition;  colliders: ColliderDefinition[];  elevation?: ElevationDefinition;  behaviorType?: string;  configSchemaId?: string;  defaultConfig?: Config;  tuningRules?: TuningRule[];  persistence: {    transform: boolean;    behaviorState: boolean;    onRoomSleep: "resetToIdle" | "pause";  };  complexity: "simple" | "complex";}
+
+[Heading2] 7.2 Item instance
+interface ItemInstance {  entityId: string;  canvasId: string;  definitionId: string;  definitionVersion: number;  ownerUserId: string;  transform: { x: number; y: number; rotation: number; z?: number };  resolvedConfig: unknown;  behaviorState?: unknown;  createdAt: string;  sceneRevision: number;}
+
+[Heading2] 7.3 Canvas-aware tuning
+[BodyText] Item definitions should not hard-code one set of physics values for every canvas. Each definition may include data-only tuning rules that resolve configuration when the item is spawned or when a canvas version changes. The resolved result is stored on the instance so every client receives the same values.
+tuningRules: [  {    when: { maxCanvasWidth: 70 },    overrides: { scale: 0.85, thrust: 18, maxSpeed: 14 }  },  {    when: { minCanvasWidth: 70 },    overrides: { scale: 1.0, thrust: 24, maxSpeed: 19 }  }]
+
+[BodyText] This keeps the behavior developer-authored while letting the same rocket, ball, portal, or toy feel right on differently shaped canvases. Keep the tuning language small and declarative so the backend can validate it without running game code.
+[Heading1] 8. Extensible behavior and workflow system
+[Heading2] 8.1 Design principle
+[BodyText] Behavior code should consume events and emit commands. It should not reach directly into PixiJS, WebSocket objects, persistence, or arbitrary global state. This boundary is the most important extensibility decision in the design because it makes complex items testable, serializable, and transport-independent.
+[Heading2] 8.2 Behavior API
+type BehaviorEvent =  | ContactEnterEvent  | ContactStayEvent  | ContactExitEvent  | BounceEvent  | ImpulseEvent  | RegionEnterEvent  | RegionExitEvent  | TimerEvent  | OwnerActionEvent  | RoomWakeEvent  | TickEvent;type BehaviorCommand =  | ApplyForce  | ApplyImpulse  | SetVelocity  | SetBodyMode  | SetColliderEnabled  | SetSpriteVariant  | StartAnimation  | EmitEffect  | Teleport  | ScheduleTimer  | CancelTimer  | SetState;interface ItemBehavior<Config, State> {  initialState(config: Config): State;  onEvent(    ctx: BehaviorContext,    config: Config,    state: Readonly<State>,    event: BehaviorEvent  ): { state: State; commands: BehaviorCommand[] };}
+
+[Heading2] 8.3 Normalized behavior events
+Event
+Examples
+contact.enter / stay / exit
+Avatar touches rocket, two avatars overlap a pressure pad, ball contacts wall.
+contact.count
+Number or set of qualifying avatars/items currently touching a sensor.
+bounce
+Collision normal plus relative speed; behavior may increment a bounce counter.
+region.enter / exit
+Rocket enters upper-space region or ball enters goal area.
+timer
+Countdown expires, cooldown completes, delayed action fires.
+owner.action
+Owner activates, rotates, edits, or requests a supported manual action.
+room.wake
+Room becomes active after sleeping; behavior can reset transient workflow state.
+tick
+Reserved for behaviors that need continuous logic. Avoid using it when an event or timer is enough.
+
+[Heading2] 8.4 Behavior state rules
+[ListBullet] State must be serializable data. No closures, DOM nodes, renderer objects, or physics handles in persisted state.
+[ListBullet] Use simulation ticks for countdowns and durations while a room is active.
+[ListBullet] Persistent behavior state must declare a schema version and migration function when it changes.
+[ListBullet] Transient particle systems, trails, shakes, and sound are effect events, not persisted state.
+[ListBullet] Process events in a stable order within a tick to make host behavior reproducible and easy to test.
+[ListBullet] Apply commands after event handling rather than allowing behavior callbacks to mutate the physics world in arbitrary order.
+[Heading2] 8.5 Rocket example
+states:  idle    contactCount(avatar) >= 1 -> arming  arming    on enter: start countdown(3s), show countdown overlay    contact forces may still rotate/push rocket    timer.complete -> launch    no qualifying contact for configured grace -> idle  launch    apply thrust along rocket forward vector    start trail effect    -> flying  flying    region.enter("space") -> spaceDrift    contact("ground") at low speed -> landed  spaceDrift    use environment field: reduced gravity + drag + soft speed cap    region.exit("space", heading downward) -> falling  falling    environment field increases downward gravity as Y increases    contact("ground") -> landed  landed    zero excessive residual motion    short cooldown -> idle
+
+[BodyText] The countdown overlay is derived from the authoritative activation tick and duration. Clients do not need a countdown packet every frame. The trail is a local effect triggered by a single launch event and stopped by behavior state change.
+[Heading1] 9. Rendering and animation
+[Heading2] 9.1 Recommended renderer
+[BodyText] Use PixiJS 8 for the scene renderer. It maps naturally to sprite-heavy 2D worlds and separates rendering from the physics engine. Prefer the stable WebGL path for production. Keep rendering on the main thread and physics/behavior on a worker.
+[ListBullet] Use texture atlases for item and avatar assets.
+[ListBullet] Anchor sprites around the entity origin so rotation and collider alignment are predictable.
+[ListBullet] Use animation definitions keyed by behavior state: idle, arming, launch, landed, etc.
+[ListBullet] Pool particles and trail segments. Do not create network entities for cosmetic particles.
+[ListBullet] Represent interaction overlays, ownership handles, countdowns, and selection rings in a separate UI layer.
+[ListBullet] Interpolate display transforms independently from the canonical physics state so network jitter does not directly shake the sprite.
+[Heading2] 9.2 Render state versus simulation state
+Simulation state
+Render-only state
+Entity transform, velocity, collider mode, behavior state, persistent sprite variant.
+Interpolated transform, particles, trails, screen shake, hover highlight, drag ghost, local selection.
+Canonical and networked when relevant.
+Recreated locally from effect events and UI state.
+May be persisted.
+Never persisted unless it becomes explicit gameplay state.
+
+[Heading1] 10. Multiplayer architecture
+[Heading2] 10.1 Why a single client simulation host
+[BodyText] Do not give every client authority over its own physics objects, and do not let every peer simulate the same shared world and vote on results. Both approaches become difficult when two avatars touch the same item, an item hits another item, or a workflow depends on collision order. A single client simulation host gives the room one canonical answer without making the server run physics.
+[ListBullet] One canonical collision order and behavior event stream.
+[ListBullet] Simple handling of two players kicking the same object.
+[ListBullet] No requirement for cross-browser floating-point determinism.
+[ListBullet] Cheap host migration because scene state is small.
+[ListBullet] Server CPU remains focused on I/O and validation rather than frame simulation.
+[Heading2] 10.2 Simulation ownership
+Responsibility
+Simulation host
+Normal client
+Go backend
+Step full physics
+Yes
+No
+No
+Run item behavior workflows
+Yes
+No
+No
+Predict own avatar
+Yes
+Yes
+No
+Render scene
+Yes
+Yes
+No
+Validate item owner edits
+No
+No
+Yes
+Grant host authority
+No
+No
+Yes
+Persist canonical checkpoints
+Sends
+No
+Stores
+Relay V1 realtime packets
+Sends
+Receives
+Yes
+
+[Heading2] 10.3 Recommended update rates
+Loop / message
+Default
+Notes
+Physics / behavior tick
+60 Hz fixed
+Run in worker. If low-end devices struggle, make 30 Hz an explicit fallback profile rather than using variable dt.
+Local render
+Up to 60 FPS
+requestAnimationFrame; interpolate between state samples.
+Player input to host
+30 Hz or on change
+Include heartbeat while held so lost packets do not leave stale input.
+Host state delta
+15 Hz
+Positions, rotations, velocities, behavior-state deltas, processed input sequence.
+Host full keyframe to peers
+2 Hz
+Lets late or lossy clients repair state without a special recovery path.
+Canonical checkpoint to backend
+1 Hz
+Also send after durable scene mutations and on graceful room sleep.
+Host heartbeat
+2 Hz
+Backend revokes lease after a short missed-heartbeat window.
+
+[Heading2] 10.4 Snapshot interpolation
+[BodyText] Clients keep a short buffer of host states and render remote entities slightly behind the newest packet. Start with about 100 ms of interpolation delay and tune from production metrics. Extrapolate briefly using linear/angular velocity if the next state is late, then stop extrapolating rather than letting an item drift indefinitely.
+[Heading1] 11. Host election, leases, and migration
+[Heading2] 11.1 Single host lease
+[BodyText] The Go backend must be the authority for who is allowed to publish canonical state. Each room has a monotonically increasing hostEpoch and one active hostClientId. Every canonical state packet carries the current epoch. Peers ignore state from an old epoch. This prevents split-brain when an old host reconnects or a network hiccup causes two clients to believe they are host.
+RoomAuthority {  roomId: string  hostEpoch: uint64  hostClientId: string  leaseExpiresAt: timestamp}
+
+[Heading2] 11.2 Host selection
+[BodyText] Keep election simple. Any compatible, foreground client can host. Prefer a client that is visible, has a stable connection, and has recently demonstrated a healthy simulation loop. The first client may become host immediately; later migrations can use health information.
+[ListBullet] Host voluntarily yields when the page becomes hidden or its simulation worker falls materially behind.
+[ListBullet] Backend revokes the lease when host heartbeats stop.
+[ListBullet] Backend increments hostEpoch before assigning the replacement.
+[ListBullet] New host starts from the freshest accepted keyframe/checkpoint and broadcasts a full state immediately.
+[ListBullet] All clients clear stale interpolation history when hostEpoch changes.
+[Heading2] 11.3 Host migration sequence
+1. Host heartbeat expires or host sends YIELD_HOST.2. Backend marks old lease invalid and increments hostEpoch.3. Backend chooses a connected eligible client.4. Backend sends HOST_GRANTED(epoch, canonicalCheckpoint).5. New host builds full physics world from checkpoint.6. New host starts fixed-step simulation.7. New host sends FULL_STATE(epoch, tick=0 or resumedTick).8. Other clients resume interpolation and input routing.
+
+[Heading2] 11.4 Browser backgrounding
+[BodyText] A browser tab can throttle timers or suspend work when backgrounded, especially on mobile. Treat visibility changes as a host-health signal. The host should yield before the browser becomes unusable when possible. The backend should still rely on heartbeats because visibility events are not guaranteed during a crash or abrupt process kill.
+[Heading1] 12. Transport and wire protocol
+[Heading2] 12.1 V1 transport: secure WebSocket relay
+[BodyText] Add one realtime WebSocket endpoint to the existing Go binary. Clients connect to the backend, join a room, and the backend relays realtime packets without interpreting physics. This is simple to deploy, works through common firewalls, keeps authentication in one place, and makes logging and host migration straightforward. At the expected room size, relay traffic should be modest.
+Important
+[BodyText] WebSocket relay still uses server bandwidth, but the expensive part - simulation and behavior execution - stays on a client. This is the recommended first implementation because it minimizes architecture risk.
+[Heading2] 12.2 Optional later transport: WebRTC host star
+[BodyText] Keep networking behind a RoomTransport interface. A later WebRTC implementation can create direct DataChannels from the simulation host to each peer. The Go backend continues to authenticate membership, exchange signaling data, grant the host lease, and receive durable checkpoints. Use WebSocket as a fallback because some connections will require TURN or may fail direct ICE negotiation.
+interface RoomTransport {  connect(join: JoinDescriptor): Promise<void>;  sendReliable(message: ReliableMessage): void;  sendRealtime(message: RealtimeMessage): void;  onMessage(handler: (message: RoomMessage) => void): Unsubscribe;  close(): void;}
+
+[BodyText] For WebRTC, use separate logical channels: a reliable ordered channel for control/state transitions and an unordered or limited-retransmit channel for frequent transform snapshots. Old transform packets are usually less useful than newer ones.
+[Heading2] 12.3 Binary protocol
+[BodyText] Use Protocol Buffers for realtime envelopes shared by TypeScript and Go. Keep JSON for editable item/canvas definitions and administration. Binary state packets are smaller and faster to parse, while versioned .proto files make the Go/TypeScript contract explicit.
+message RoomEnvelope {  string room_id = 1;  uint64 host_epoch = 2;  uint32 sequence = 3;  uint64 tick = 4;  oneof payload {    PlayerInput player_input = 10;    StateDelta state_delta = 11;    FullState full_state = 12;    EffectEvent effect_event = 13;    HostControl host_control = 14;    DurableCommand durable_command = 15;    DurableCommandResult durable_result = 16;  }}
+
+[Heading2] 12.4 Message classes
+Class
+Delivery
+Examples
+Coordination
+Reliable ordered
+JOIN, HOST_GRANTED, HOST_REVOKED, peer presence, protocol mismatch.
+Durable mutation
+Reliable ordered + server validation
+SPAWN_ITEM, DELETE_ITEM, OWNER_MOVE, SET_CONFIG.
+Input
+Frequent; newest matters most
+Desired avatar movement vector and input sequence.
+State delta
+Frequent; newest matters most
+Transforms, velocities, behavior state changes.
+Keyframe
+Reliable or periodically repeated
+Full room runtime state for repair and migration.
+Effect event
+Reliable when one-shot matters
+Launch trail start, impact burst, portal flash, animation cue.
+
+[Heading1] 13. Persistence and room sleep
+[Heading2] 13.1 What is persisted
+[ListBullet] Canvas version and scene revision.
+[ListBullet] Item instance IDs, definition IDs and versions.
+[ListBullet] Owner user IDs.
+[ListBullet] Resolved item configuration.
+[ListBullet] X/Y/rotation and optional elevation Z.
+[ListBullet] Persistent behavior state that the item definition declares durable.
+[ListBullet] Any persistent visual variant or mode needed to reconstruct the item.
+[ListBullet] A canonical checkpoint revision and host epoch for recovery bookkeeping.
+[Heading2] 13.2 What is not resumed after the room empties
+[ListBullet] Linear and angular velocity.
+[ListBullet] Active forces or impulses.
+[ListBullet] Cosmetic particles and trails.
+[ListBullet] Short-lived contact sets.
+[ListBullet] Default transient behavior timers and mid-animation progress.
+[ListBullet] Avatar entities; players are presence, not persisted world objects.
+[Heading2] 13.3 Room sleep sequence
+1. Last connected client leaves.2. Backend uses the newest canonical checkpoint.3. Normalize runtime motion: velocity = 0, angularVelocity = 0.4. For each item behavior:     resetToIdle -> call its room-sleep normalization rule.     pause       -> keep declared persistent state, but stop timers.5. Persist the normalized snapshot.6. Mark room SLEEPING.7. No simulation runs while the room is empty.
+
+[BodyText] On a graceful final disconnect, the host sends one final checkpoint before leaving. If the host dies abruptly, the backend falls back to its most recent periodic checkpoint. With a 1 Hz checkpoint, sudden process death may lose up to about one second of movement. Increase checkpoint frequency only if product testing shows that this is visible enough to matter.
+[Heading2] 13.4 Room wake sequence
+1. First player joins a sleeping canvas.2. Backend loads normalized persisted snapshot.3. Backend grants host lease to an eligible client.4. Host rebuilds physics bodies with zero motion.5. Behaviors receive ROOM_WAKE and initialize transient state.6. Host publishes full state.7. Other clients join/interpolate from that state.
+
+[Heading1] 14. Ownership, editing, and integrity
+[Heading2] 14.1 Server-authoritative durable mutations
+[BodyText] The simulation host is authoritative for moment-to-moment physics, but it is not authoritative for ownership or durable edits. Every spawn, delete, move-in-edit-mode, rotate, or config change goes through the Go backend. The backend checks the authenticated user and item owner before accepting the command.
+owner client -> DURABLE_COMMAND(move item 123)Go backend:  authenticate user  load/check item owner  validate config / bounds / scene limits  increment sceneRevision  broadcast accepted commandsimulation host:  apply edit to canonical world  include result in next snapshot
+
+[Heading2] 14.2 Edit mode behavior
+[ListBullet] While the owner drags an item for editing, show a local ghost immediately.
+[ListBullet] Send rate-limited edit updates through the reliable server path.
+[ListBullet] The host applies the accepted transform as a kinematic reposition or temporary simulation lock.
+[ListBullet] On release, the owner sends a final durable transform.
+[ListBullet] Non-owners may interact with the item through its normal physics/behavior but cannot change its configuration or authored placement.
+[Heading2] 14.3 Integrity limitations
+[BodyText] Because physics runs on a player device, the host can potentially send fake physical outcomes. For a social canvas this is an acceptable tradeoff if physics is not tied to money, rankings, or safety. The backend should still reject malformed state, unknown entity IDs, impossible scene revisions, NaN values, grossly out-of-bounds transforms, and packets from a client without the active host lease.
+[Heading1] 15. TypeScript frontend architecture
+[Heading2] 15.1 Recommended modules
+src/canvas/  runtime/    CanvasRuntime.ts    RoomClock.ts    EntityRegistry.ts    components.ts  simulation/    SimulationWorker.ts    FixedStepLoop.ts    RapierWorld.ts    AvatarController.ts    EnvironmentField.ts    ElevationSystem.ts    CollisionEventAdapter.ts  behaviors/    BehaviorRegistry.ts    BehaviorRuntime.ts    BehaviorEvents.ts    BehaviorCommands.ts    builtins/      RocketBehavior.ts      PortalBehavior.ts      KickableBehavior.ts  render/    PixiScene.ts    SpriteFactory.ts    AnimationSystem.ts    EffectSystem.ts    InterpolationBuffer.ts    Camera.ts  input/    PointerDragController.ts    TouchController.ts  net/    RoomTransport.ts    WebSocketRoomTransport.ts    WebRTCRoomTransport.ts        // later    ProtocolCodec.ts    StateReplicator.ts    AvatarReconciler.ts    HostLeaseClient.ts  persistence-model/    CanvasDefinition.ts    ItemDefinition.ts    ItemInstance.ts
+
+[Heading2] 15.2 Worker boundary
+[BodyText] The simulation worker owns Rapier handles, canonical behavior state when hosting, environment sampling, and fixed-step time. The main thread owns PixiJS, DOM/UI overlays, pointer/touch input, and transport objects. Send compact input/state messages across the worker boundary. Do not pass physics engine objects across it.
+[ListBullet] Host client: worker contains the full room world.
+[ListBullet] Normal client: worker may contain only static collision geometry plus the local avatar prediction world.
+[ListBullet] Main thread receives render snapshots as typed arrays or small structured-clone objects.
+[ListBullet] Avoid SharedArrayBuffer in V1; the cross-origin isolation requirements are not justified at this scale.
+[Heading2] 15.3 Runtime entity components
+type Entity = {  id: EntityId;  transform: Transform;  render?: RenderComponent;  rigidBody?: RigidBodyComponent;  colliders?: ColliderComponent[];  avatar?: AvatarComponent;  elevation?: ElevationComponent;  behavior?: BehaviorComponent;  ownership?: OwnershipComponent;  persistence?: PersistenceComponent;  tags?: Set<string>;};
+
+[BodyText] This is an ECS-like composition model, not a requirement to adopt a full ECS framework. A lightweight registry is enough for 70-ish active entities. The important part is avoiding deep class inheritance such as Rocket extends PhysicsItem extends Item extends SpriteEntity.
+[Heading1] 16. Go backend architecture
+[Heading2] 16.1 Recommended responsibilities
+[ListBullet] Authenticate the WebSocket connection using the application session/token.
+[ListBullet] Track room membership and presence.
+[ListBullet] Grant/revoke a single host lease and increment hostEpoch.
+[ListBullet] Relay realtime input/state packets in V1 without stepping physics.
+[ListBullet] Validate and persist item ownership and durable scene mutations.
+[ListBullet] Accept periodic canonical checkpoints only from the active host.
+[ListBullet] Normalize and store a sleeping-room snapshot when the room becomes empty.
+[ListBullet] Serve canvas definitions, item instance metadata, and initial snapshots.
+[ListBullet] Optionally relay WebRTC signaling later.
+[Heading2] 16.2 Suggested package structure
+internal/  realtime/    websocket.go    room_manager.go    room.go    relay.go    host_lease.go    presence.go    protocol.go  canvas/    service.go    definitions.go    instances.go    ownership.go    mutations.go    snapshot.go    sleep.go  storage/    canvas_repository.go    snapshot_repository.go
+
+[Heading2] 16.3 Room state held by Go
+type Room struct {    CanvasID       string    SceneRevision  uint64    HostEpoch      uint64    HostClientID   string    HostLeaseUntil time.Time    Clients        map[string]*Client    LatestSnapshot []byte    SnapshotTick   uint64    Sleeping       bool}
+
+[BodyText] This room object is coordination state, not a physics world. Keep it small. The server can hold many sleeping canvases only in persistent storage and create an in-memory room object when the first client connects.
+[Heading2] 16.4 API shape
+Endpoint / channel
+Purpose
+GET /v1/canvases/{id}
+Canvas definition, scene revision, static item metadata, current snapshot descriptor.
+POST /v1/canvases/{id}/join
+Return room join token/descriptor and protocol compatibility data if needed.
+WSS /v1/realtime/canvases/{id}
+Presence, host lease, inputs, relayed state, durable commands, checkpoints.
+GET /v1/item-definitions/{id}
+Definition metadata / asset manifest when not bundled with the client.
+
+[Heading1] 17. Critical realtime flows
+[Heading2] 17.1 Player joins an active room
+Client -> Go: JOIN(canvasId, protocolVersion)Go -> Client: JOIN_ACCEPTED(sceneRevision, hostEpoch, hostClientId, latestKeyframe)Client: load assets + static geometryClient: build local prediction worldClient -> Host (relayed V1): PLAYER_READYHost -> Client: FULL_STATE(currentTick)Client: begin interpolation and input stream
+
+[Heading2] 17.2 Avatar kicks a rocket
+Player client  predicts avatar movement immediately  sends INPUT(seq=812, direction, intensity)        |        vSimulation host  applies input during fixed tick  avatar contact/sensor intersects rocket  Kickable -> impulse command  Rapier steps rocket  RocketBehavior receives contact/bounce events  host emits STATE_DELTA + effect/state changes        |        vAll clients  reconcile avatar if needed  interpolate rocket transform  render effect events locally
+
+[Heading2] 17.3 Two avatars activate one item
+[BodyText] The host maintains the canonical set of entities touching each interaction sensor. A behavior can query or receive contact-count changes. Because all contacts are evaluated in one world, “two avatars must touch this pad for 500 ms” is straightforward: record the qualifying avatar set, transition when its size reaches two, schedule the timer, and cancel if the count falls below two before completion.
+[Heading2] 17.4 Portal / partial teleportation
+[BodyText] Treat a portal as a sensor plus a behavior command, not as an edge case in the physics engine. The behavior can transform position and velocity through a portal mapping. For a partial portal visual, render the sprite into clipped masks on each side while the canonical body transitions based on a defined threshold. If true split-body physics is not required, keep one rigid body and make the “partial” effect visual.
+[Heading1] 18. Example configuration: rocket canvas
+{  "orientation": "side",  "size": { "width": 100, "height": 70 },  "edges": {    "left": "solid",    "right": "solid",    "top": "wrap",    "bottom": "solid"  },  "environment": {    "base": {      "gravityXY": { "x": 0, "y": 20 },      "linearDrag": 0.10    },    "regions": [      {        "id": "space-gradient",        "shape": { "type": "rect", "x": 0, "y": 0, "w": 100, "h": 40 },        "blend": "linear",        "axis": "y",        "from": 40,        "to": 10,        "overrides": {          "gravityScale": [1.0, 0.10],          "linearDrag": [0.10, 0.45],          "softSpeedLimit": [null, 12]        }      }    ]  }}
+
+[BodyText] The hill and launch pad are fixed static geometry with semantic tags. The rocket is one dynamic body with several colliders. Its behavior uses the canvas environment rather than hard-coding special gravity rules inside RocketBehavior, which keeps the rocket reusable on other canvases.
+[Heading1] 19. Performance budgets
+[Heading2] 19.1 Scene budget
+Resource
+Initial budget
+Active avatars
+20
+Total item instances
+50
+Complex physics/behavior items
+5
+Total active colliders
+Target <= 150
+Physics step
+60 Hz fixed on host
+Render
+60 FPS target; acceptable adaptive degradation on low-end devices
+Host state send
+15 Hz deltas
+Backend checkpoint
+1 Hz full canonical checkpoint
+
+[Heading2] 19.2 Optimization order
+[ListNumber] Profile the host worker and rendering independently.
+[ListNumber] Reduce unnecessary active colliders and collision event subscriptions.
+[ListNumber] Let sleeping dynamic bodies sleep; do not wake them every tick with custom code unless needed.
+[ListNumber] Use event-driven behaviors instead of TickEvent for every object.
+[ListNumber] Pool particles and reuse textures.
+[ListNumber] Send only changed/moving entities in deltas.
+[ListNumber] Quantize transforms only if production bandwidth metrics justify the added complexity.
+[ListNumber] Add WebRTC only if WebSocket relay bandwidth or latency is a real problem.
+[Heading2] 19.3 Suggested network budget
+[BodyText] Design for an average of less than roughly 20 KB/s of realtime state per receiving client in a busy scene. With only avatars and a handful of moving items in each transform packet, the expected payload should be comfortably below that after binary encoding and delta filtering. Do not enable compression by default for tiny high-frequency packets; measure first.
+[Heading1] 20. Failure modes and recovery
+Failure
+Expected behavior
+Host closes tab
+Heartbeat expires, backend increments epoch, grants new host, new host resumes from latest checkpoint/keyframe.
+Host goes to background
+Host yields when possible; heartbeat fallback handles suspension.
+Stale host keeps sending
+Packets carry old hostEpoch and are ignored.
+Client misses deltas
+Interpolation extrapolates briefly; periodic keyframe repairs state.
+Client joins mid-workflow
+Full state includes behavior state/ticks needed to render the current workflow.
+Invalid physics value / NaN
+Host catches and quarantines entity; backend rejects malformed checkpoints; recover item from last valid state or configured spawn.
+Definition mismatch
+Client is blocked from room simulation until it has a compatible item definition/protocol version.
+Backend connection lost in WebSocket V1
+Freeze shared realtime state and reconnect. Do not continue divergent local canonical simulation.
+WebRTC direct path fails later
+Fall back to WebSocket relay for that peer or the entire room.
+Last host dies without final leave
+Backend sleeps room from latest periodic checkpoint and zeros motion.
+
+[Heading1] 21. Testing strategy
+[Heading2] 21.1 Unit tests
+[ListBullet] Behavior state transitions from normalized event sequences.
+[ListBullet] Canvas tuning-rule resolution.
+[ListBullet] Environment field sampling and gradient blending.
+[ListBullet] Edge policies: solid, wrap, respawn, open.
+[ListBullet] Elevation integration and landing events.
+[ListBullet] Ownership checks and mutation validation.
+[ListBullet] Snapshot encode/decode and schema migration.
+[ListBullet] Host epoch rejection and lease state transitions.
+[Heading2] 21.2 Deterministic behavior harness
+[BodyText] Build a headless test harness that feeds a behavior a fixed sequence of events and ticks, then asserts final state and commands. The physics engine itself does not need to be deterministic across every browser because only one host is canonical, but behavior ordering on a host should be stable and replayable in tests.
+[Heading2] 21.3 Multiplayer simulation tests
+[ListBullet] 20 synthetic avatar clients sending input through the relay.
+[ListBullet] Host migration while multiple items are moving.
+[ListBullet] Packet loss, reordering, and artificial 50/100/200 ms latency.
+[ListBullet] Join in the middle of a rocket countdown and during active flight.
+[ListBullet] Two to five avatars pushing the same dynamic item from different directions.
+[ListBullet] Room sleep immediately after movement, then wake and verify zero motion with preserved position.
+[ListBullet] Unauthorized item edit from a non-owner.
+[ListBullet] Background/suspended host on iOS and Android PWA/browser combinations.
+[Heading2] 21.4 Visual test scenes
+[ListBullet] Collision laboratory: every collider type and filter visible with debug outlines.
+[ListBullet] Network laboratory: interpolation, correction vectors, host tick, RTT, packet loss, and host epoch overlay.
+[ListBullet] Environment laboratory: gravity/drag vectors and region gradients visualized as arrows or heat bands.
+[ListBullet] Behavior laboratory: event log and state machine panel for one selected item.
+[Heading1] 22. Observability and diagnostics
+[Heading2] 22.1 Client metrics
+[ListBullet] Render FPS and long frames.
+[ListBullet] Simulation tick duration and worker drift when hosting.
+[ListBullet] Number of awake bodies and active colliders.
+[ListBullet] Inbound/outbound realtime bytes and messages.
+[ListBullet] Interpolation buffer depth and extrapolation count.
+[ListBullet] Local avatar reconciliation error.
+[ListBullet] Host migration count and reason.
+[ListBullet] Physics entity quarantine / NaN count.
+[Heading2] 22.2 Backend metrics
+[ListBullet] Active rooms and connected clients.
+[ListBullet] Room relay bytes/sec.
+[ListBullet] Host lease changes and timeout rate.
+[ListBullet] Checkpoint bytes/sec and checkpoint age.
+[ListBullet] Durable mutation rejects by reason.
+[ListBullet] Protocol-version mismatch count.
+[ListBullet] Room sleep/wake events.
+[Heading1] 23. Technical implementation plan
+[Heading2] Phase 0 - Prove the simulation model
+[ListBullet] Create a PixiJS scene with one canvas definition and debug overlay.
+[ListBullet] Run Rapier 2D in a Web Worker at a fixed step.
+[ListBullet] Implement circular avatar movement from pointer/touch drag intent.
+[ListBullet] Add static walls, one ramp/hill, one sensor, and one dynamic kickable item.
+[ListBullet] Render collider debug shapes and verify transform alignment.
+[ListBullet] Implement environment sampling with one linear gravity/drag gradient.
+[ListBullet] Exit criterion: one browser can reproduce the rocket push/countdown/launch/space/return loop without networking.
+[Heading2] Phase 1 - Lock the data model and behavior boundary
+[ListBullet] Implement versioned CanvasDefinition, ItemDefinition, ItemInstance, and snapshot schemas.
+[ListBullet] Build EntityRegistry and component types.
+[ListBullet] Build BehaviorRegistry and event -> command runtime.
+[ListBullet] Implement timer service based on simulation ticks.
+[ListBullet] Implement persistent versus transient behavior state.
+[ListBullet] Implement data-only item tuning rules.
+[ListBullet] Exit criterion: rocket behavior is a registered behavior type with configuration, not hard-coded inside the canvas runtime.
+[Heading2] Phase 2 - Add Go room coordination and WebSocket transport
+[ListBullet] Define protobuf room envelopes and generate Go/TypeScript bindings.
+[ListBullet] Add authenticated realtime WebSocket endpoint to the existing Go service.
+[ListBullet] Implement RoomManager, presence, relay, host lease, epoch, and heartbeat.
+[ListBullet] Implement TypeScript RoomTransport and WebSocketRoomTransport.
+[ListBullet] Send player input to the host through the relay.
+[ListBullet] Host sends full state and state deltas back through the relay.
+[ListBullet] Exit criterion: two browsers see the same avatar/item state and one browser is clearly the active host.
+[Heading2] Phase 3 - Prediction, interpolation, and host migration
+[ListBullet] Implement local avatar prediction against static geometry.
+[ListBullet] Include processed input sequence in host state.
+[ListBullet] Implement smooth reconciliation.
+[ListBullet] Implement remote snapshot buffer and interpolation/extrapolation.
+[ListBullet] Implement periodic full keyframes.
+[ListBullet] Implement host yield on visibility/health signal.
+[ListBullet] Implement timeout election and full-state restart on new host.
+[ListBullet] Exit criterion: host can be closed mid-motion and another connected client resumes the room without reload.
+[Heading2] Phase 4 - Ownership, durable editing, and persistence
+[ListBullet] Add durable mutation commands: spawn, delete, move, rotate, set config.
+[ListBullet] Enforce ownerUserId in Go before broadcasting accepted mutations.
+[ListBullet] Persist item instances and canvas scene revision.
+[ListBullet] Accept 1 Hz canonical host checkpoints into room memory/storage path.
+[ListBullet] Implement sleeping-room normalization and zero-motion behavior.
+[ListBullet] Implement first-join wake path.
+[ListBullet] Exit criterion: users can rearrange only their own items, leave the room empty, return, and see the same placements in idle state.
+[Heading2] Phase 5 - Complete advanced interaction primitives
+[ListBullet] Multi-avatar contact sets and dwell-time triggers.
+[ListBullet] Bounce counters and impact thresholds.
+[ListBullet] Portal behavior and transform mapping.
+[ListBullet] Region enter/exit events and smooth field gradients.
+[ListBullet] Top-down elevation Z with shadows/scale and landing events.
+[ListBullet] Per-edge wrap, respawn, solid, and open behavior.
+[ListBullet] Effect-event system for trails, particles, overlays, and one-shot animations.
+[ListBullet] Exit criterion: the runtime can build several very different interactive items without adding special cases to the networking or renderer.
+[Heading2] Phase 6 - Hardening and production budgets
+[ListBullet] Synthetic 20-player load test with 50 items.
+[ListBullet] Host-worker performance profiling on representative low/mid/high mobile devices.
+[ListBullet] Network loss/latency tests and state-repair checks.
+[ListBullet] Metrics and debug overlays.
+[ListBullet] NaN/out-of-bounds protection and item quarantine.
+[ListBullet] Definition/protocol compatibility checks.
+[ListBullet] Asset preloading and reconnect behavior.
+[ListBullet] Exit criterion: scene stays responsive and recoverable under the stated room limits.
+[Heading2] Phase 7 - Optional WebRTC transport
+[ListBullet] Add signaling messages over the existing backend connection.
+[ListBullet] Implement host-to-peer DataChannel star, not peer mesh.
+[ListBullet] Use reliable control and low-latency state channels.
+[ListBullet] Keep WebSocket relay fallback for failed direct connectivity.
+[ListBullet] Compare latency, TURN usage, server bandwidth, reconnect behavior, and operational complexity before making it the default.
+[ListBullet] Exit criterion: gameplay runtime and behavior code require no changes when transport switches.
+[Heading1] 24. Acceptance criteria for V1
+[ListBullet] A canvas supports 20 connected avatars and 50 placed items within configured budgets.
+[ListBullet] One and only one client holds the active canonical simulation lease.
+[ListBullet] Two avatars can simultaneously interact with the same dynamic item without divergent results.
+[ListBullet] Avatars can pass through sensor-only items while still triggering workflows.
+[ListBullet] An owner can spawn, move, rotate, configure, and delete their item; a non-owner cannot.
+[ListBullet] A developer can add a new item behavior by registering a behavior type and data schema without editing the core multiplayer protocol.
+[ListBullet] A canvas can use side-view gravity, top-down drag, region-based field changes, and smooth gradients.
+[ListBullet] The rocket reference workflow works: push/rotate, contact activation, countdown, thrust/trail, upper-region space behavior, and return/landing.
+[ListBullet] Host migration succeeds after the current host disconnects.
+[ListBullet] When the final player disconnects, the persisted scene keeps item placement but resumes later with items at rest and transient workflows reset or paused per item policy.
+[ListBullet] Clients joining an active room receive enough state to render a workflow already in progress.
+[ListBullet] Transport implementation is isolated behind RoomTransport.
+[Heading1] 25. Architecture decisions to preserve
+Decision
+Reason
+One client canonical simulation host
+Avoids server physics cost and avoids multi-peer conflict resolution.
+Backend-controlled host lease
+Prevents split-brain state publishers.
+WebSocket first
+Fastest path to a reliable, observable implementation.
+WebRTC as transport adapter later
+Potential bandwidth/latency benefit without tying gameplay to WebRTC complexity.
+Rapier physics separate from Pixi rendering
+Clear responsibilities and good fit for sprite + collider requirements.
+Behavior event/command boundary
+Makes complex developer-authored workflows testable and serializable.
+Environment fields outside item behavior
+Keeps canvas physics reusable and items portable.
+Server-authoritative durable ownership
+Client-host physics does not grant edit rights.
+Room sleeps when empty
+No background compute; reconnect starts from stable idle state.
+
+[Heading1] 26. Deferred choices
+[BodyText] These can be decided during implementation without changing the architecture above:
+[ListBullet] Exact Go WebSocket library.
+[ListBullet] Exact TypeScript protobuf generator/runtime.
+[ListBullet] Database layout for snapshots versus normalized item rows.
+[ListBullet] Whether host delta rate settles at 10, 15, or 20 Hz after testing.
+[ListBullet] Whether a 30 Hz low-power simulation profile is needed.
+[ListBullet] Whether WebRTC is worth operating at all after measuring V1 relay bandwidth.
+[ListBullet] Whether edit-mode movement is continuous reliable messages or a preview ghost plus final commit for some item types.
+[ListBullet] Whether visual item definitions are bundled with the client or loaded from an asset manifest service.
+[Heading1] 27. Technology references
+[BodyText] The design does not depend on any one backend vendor. These current official references support the recommended browser technology choices:
+[ListBullet] Rapier JavaScript rigid bodies
+[ListBullet] Rapier JavaScript colliders, sensors, filters, and collision events
+[ListBullet] PixiJS v8 renderers
+[ListBullet] PixiJS v8 sprites
+[ListBullet] MDN RTCDataChannel
+Recommended V1 stack
+[BodyText] TypeScript + PixiJS 8 + Rapier 2D/WASM + Web Worker on the client; Protocol Buffers over secure WebSocket; existing Go service for room coordination, host lease, relay, ownership, and snapshot persistence. Add WebRTC only after measuring a real need.
