@@ -1,0 +1,209 @@
+syntax = "proto3";
+
+package canvasphysics.v1;
+
+option go_package = "github.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1";
+
+// Spec 12.3. One envelope carries every realtime message. Peers drop an
+// envelope whose host_epoch is older than the epoch they know.
+message RoomEnvelope {
+  string room_id = 1;
+  uint64 host_epoch = 2;
+  uint32 sequence = 3;
+  uint64 tick = 4;
+  // Client that sent the envelope. The server fills it on relay.
+  string sender_client_id = 5;
+
+  oneof payload {
+    Join join = 10;
+    JoinAccepted join_accepted = 11;
+    Presence presence = 12;
+    PlayerInput player_input = 13;
+    StateDelta state_delta = 14;
+    FullState full_state = 15;
+    EffectEvent effect_event = 16;
+    HostControl host_control = 17;
+    DurableCommand durable_command = 18;
+    DurableCommandResult durable_result = 19;
+    Checkpoint checkpoint = 20;
+    Heartbeat heartbeat = 21;
+    ProtocolError error = 22;
+  }
+}
+
+message Vec2 {
+  float x = 1;
+  float y = 2;
+}
+
+// ---------- coordination ----------
+
+message Join {
+  string canvas_id = 1;
+  uint32 protocol_version = 2;
+  string user_id = 3;
+  string display_name = 4;
+  // Item definition ids and versions the client already has.
+  repeated DefinitionVersion definitions = 5;
+}
+
+message DefinitionVersion {
+  string definition_id = 1;
+  uint32 version = 2;
+}
+
+message JoinAccepted {
+  string client_id = 1;
+  uint64 scene_revision = 2;
+  uint64 host_epoch = 3;
+  string host_client_id = 4;
+  // JSON canvas definition. Editable data stays JSON (spec 12.3).
+  bytes canvas_definition_json = 5;
+  // Newest durable snapshot, as JSON.
+  bytes snapshot_json = 6;
+  bool room_was_sleeping = 7;
+  uint32 tick_rate = 8;
+}
+
+message Presence {
+  repeated Peer peers = 1;
+}
+
+message Peer {
+  string client_id = 1;
+  string user_id = 2;
+  string display_name = 3;
+  bool is_host = 4;
+  bool host_eligible = 5;
+}
+
+enum HostControlKind {
+  HOST_CONTROL_UNSPECIFIED = 0;
+  HOST_CONTROL_GRANTED = 1;
+  HOST_CONTROL_REVOKED = 2;
+  HOST_CONTROL_YIELD_REQUEST = 3;
+  HOST_CONTROL_YIELD = 4;
+  HOST_CONTROL_ELIGIBILITY = 5;
+}
+
+message HostControl {
+  HostControlKind kind = 1;
+  string host_client_id = 2;
+  uint64 host_epoch = 3;
+  // Set on HOST_CONTROL_GRANTED so the new host can rebuild the world.
+  bytes snapshot_json = 4;
+  string reason = 5;
+  bool eligible = 6;
+  uint64 lease_expires_at_unix_ms = 7;
+}
+
+message Heartbeat {
+  uint64 sent_at_unix_ms = 1;
+  // Host health signals used for election (spec 11.2).
+  float simulation_hz = 2;
+  float worker_drift_ms = 3;
+  bool page_visible = 4;
+}
+
+// ---------- realtime ----------
+
+message PlayerInput {
+  uint32 input_sequence = 1;
+  Vec2 direction = 2;
+  float intensity = 3;
+  uint64 client_time_unix_ms = 4;
+  // True while the pointer is held, so a lost packet leaves no stale input.
+  bool held = 5;
+}
+
+message EntityState {
+  string entity_id = 1;
+  Vec2 position = 2;
+  float rotation = 3;
+  Vec2 velocity = 4;
+  float angular_velocity = 5;
+  float z = 6;
+  float vz = 7;
+  // Set for avatars so the owner can reconcile its prediction.
+  uint32 last_processed_input_sequence = 8;
+  string sprite_variant = 9;
+  // JSON behavior state, sent only when it changed.
+  bytes behavior_state_json = 10;
+  bool quarantined = 11;
+}
+
+message StateDelta {
+  repeated EntityState entities = 1;
+  repeated string removed_entity_ids = 2;
+  uint64 scene_revision = 3;
+}
+
+message FullState {
+  repeated EntityState entities = 1;
+  repeated AvatarPresence avatars = 2;
+  uint64 scene_revision = 3;
+  uint32 tick_rate = 4;
+}
+
+message AvatarPresence {
+  string entity_id = 1;
+  string client_id = 2;
+  string user_id = 3;
+  string display_name = 4;
+}
+
+message EffectEvent {
+  string entity_id = 1;
+  string effect = 2;
+  // "oneShot", "start", or "stop".
+  string mode = 3;
+  bytes params_json = 4;
+}
+
+// ---------- durable mutations ----------
+
+enum DurableCommandKind {
+  DURABLE_UNSPECIFIED = 0;
+  DURABLE_SPAWN_ITEM = 1;
+  DURABLE_DELETE_ITEM = 2;
+  DURABLE_MOVE_ITEM = 3;
+  DURABLE_ROTATE_ITEM = 4;
+  DURABLE_SET_CONFIG = 5;
+}
+
+message DurableCommand {
+  string command_id = 1;
+  DurableCommandKind kind = 2;
+  string entity_id = 3;
+  string definition_id = 4;
+  uint32 definition_version = 5;
+  Vec2 position = 6;
+  float rotation = 7;
+  float z = 8;
+  bytes config_json = 9;
+  // True while an owner drags an item, so the host uses a kinematic reposition.
+  bool preview = 10;
+}
+
+message DurableCommandResult {
+  string command_id = 1;
+  bool accepted = 2;
+  string reject_reason = 3;
+  uint64 scene_revision = 4;
+  // The accepted item instance as JSON, present on accept.
+  bytes item_instance_json = 5;
+  DurableCommand command = 6;
+}
+
+message Checkpoint {
+  uint64 checkpoint_revision = 1;
+  uint64 tick = 2;
+  bytes snapshot_json = 3;
+  bool final = 4;
+}
+
+message ProtocolError {
+  string code = 1;
+  string message = 2;
+  uint32 server_protocol_version = 3;
+}

@@ -11,6 +11,7 @@
     "dev": "pnpm --filter @canvas-physics/demo dev"
   },
   "devDependencies": {
+    "ts-proto": "^2.12.1",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

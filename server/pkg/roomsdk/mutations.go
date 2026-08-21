@@ -1,0 +1,217 @@
+package roomsdk
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math"
+
+	pb "github.com/dafepro/canvas/server/gen/canvasphysicsv1"
+)
+
+var (
+	errCanvasMismatch     = errors.New("canvas id mismatch")
+	errTooManyItems       = errors.New("item count above the canvas limit")
+	errNonFiniteTransform = errors.New("transform is not finite")
+	errOutOfBounds        = errors.New("transform is grossly out of bounds")
+	errStaleCheckpoint    = errors.New("checkpoint revision is older than the stored one")
+)
+
+// handleDurableCommand enforces ownership before the command reaches the
+// simulation host (spec 14.1). Client-host physics does not grant edit rights.
+func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) {
+	accepted, item, reason := r.validateDurable(client, command)
+	if !accepted {
+		r.cfg.Metrics.DurableRejected(r.canvasID, reason)
+		r.sendTo(client, &pb.RoomEnvelope{
+			RoomId:    r.canvasID,
+			HostEpoch: r.hostEpoch,
+			Payload: &pb.RoomEnvelope_DurableResult{DurableResult: &pb.DurableCommandResult{
+				CommandId:     command.CommandId,
+				Accepted:      false,
+				RejectReason:  reason,
+				SceneRevision: r.sceneRevision,
+				Command:       command,
+			}},
+		})
+		return
+	}
+
+	// A preview move is not durable. Relay it so the host can show the drag,
+	// but do not move the scene revision or persist it.
+	if command.Preview {
+		r.relayToHost(client, &pb.RoomEnvelope{
+			RoomId:         r.canvasID,
+			HostEpoch:      r.hostEpoch,
+			SenderClientId: client.ID,
+			Payload:        &pb.RoomEnvelope_DurableCommand{DurableCommand: command},
+		})
+		return
+	}
+
+	r.applyDurable(command, item, client)
+	r.sceneRevision++
+	r.snapshot.SceneRevision = r.sceneRevision
+	if raw, err := json.Marshal(r.snapshot); err == nil {
+		r.snapshotRaw = raw
+	}
+
+	// After a spawn the created item is the one the server just indexed.
+	if item == nil {
+		item = r.items[command.EntityId]
+	}
+	var itemJSON []byte
+	if item != nil {
+		itemJSON, _ = json.Marshal(item)
+	}
+
+	// Every client learns the accepted mutation, including the host, which
+	// applies it to the canonical world.
+	r.broadcast(&pb.RoomEnvelope{
+		RoomId:         r.canvasID,
+		HostEpoch:      r.hostEpoch,
+		SenderClientId: client.ID,
+		Payload: &pb.RoomEnvelope_DurableResult{DurableResult: &pb.DurableCommandResult{
+			CommandId:        command.CommandId,
+			Accepted:         true,
+			SceneRevision:    r.sceneRevision,
+			ItemInstanceJson: itemJSON,
+			Command:          command,
+		}},
+	})
+	r.persist(false)
+}
+
+// validateDurable returns the item the command targets, or nil for a spawn.
+func (r *Room) validateDurable(
+	client *Client,
+	command *pb.DurableCommand,
+) (bool, *SnapshotItem, string) {
+	switch command.Kind {
+	case pb.DurableCommandKind_DURABLE_SPAWN_ITEM:
+		if len(r.snapshot.Items) >= r.canvasShape.Limits.MaxItems {
+			return false, nil, "item_limit_reached"
+		}
+		if command.DefinitionId == "" {
+			return false, nil, "missing_definition_id"
+		}
+		transform := transformOf(command)
+		if !transform.finite() {
+			return false, nil, "non_finite_transform"
+		}
+		if !r.insideCanvas(transform) {
+			return false, nil, "outside_canvas"
+		}
+		return true, nil, ""
+
+	case pb.DurableCommandKind_DURABLE_DELETE_ITEM,
+		pb.DurableCommandKind_DURABLE_MOVE_ITEM,
+		pb.DurableCommandKind_DURABLE_ROTATE_ITEM,
+		pb.DurableCommandKind_DURABLE_SET_CONFIG:
+
+		item, ok := r.items[command.EntityId]
+		if !ok {
+			return false, nil, "unknown_entity"
+		}
+		if item.OwnerUserID != client.UserID {
+			return false, nil, "not_owner"
+		}
+		if command.Kind == pb.DurableCommandKind_DURABLE_MOVE_ITEM ||
+			command.Kind == pb.DurableCommandKind_DURABLE_ROTATE_ITEM {
+			transform := transformOf(command)
+			if !transform.finite() {
+				return false, nil, "non_finite_transform"
+			}
+			if !r.insideCanvas(transform) {
+				return false, nil, "outside_canvas"
+			}
+		}
+		if command.Kind == pb.DurableCommandKind_DURABLE_SET_CONFIG &&
+			len(command.ConfigJson) > 0 &&
+			!json.Valid(command.ConfigJson) {
+			return false, nil, "invalid_config_json"
+		}
+		return true, item, ""
+
+	default:
+		return false, nil, "unknown_command_kind"
+	}
+}
+
+func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, client *Client) {
+	switch command.Kind {
+	case pb.DurableCommandKind_DURABLE_SPAWN_ITEM:
+		r.nextEntityNo++
+		entityID := command.EntityId
+		if entityID == "" || r.items[entityID] != nil {
+			entityID = fmt.Sprintf("%s-i%d", r.canvasID, r.nextEntityNo)
+		}
+		created := SnapshotItem{
+			EntityID:          entityID,
+			DefinitionID:      command.DefinitionId,
+			DefinitionVersion: command.DefinitionVersion,
+			// The server sets the owner from the authenticated session.
+			OwnerUserID:    client.UserID,
+			Transform:      transformOf(command),
+			ResolvedConfig: json.RawMessage(command.ConfigJson),
+		}
+		r.snapshot.Items = append(r.snapshot.Items, created)
+		r.indexItems()
+		command.EntityId = entityID
+
+	case pb.DurableCommandKind_DURABLE_DELETE_ITEM:
+		kept := make([]SnapshotItem, 0, len(r.snapshot.Items))
+		for _, existing := range r.snapshot.Items {
+			if existing.EntityID != command.EntityId {
+				kept = append(kept, existing)
+			}
+		}
+		r.snapshot.Items = kept
+		r.indexItems()
+
+	case pb.DurableCommandKind_DURABLE_MOVE_ITEM:
+		item.Transform = transformOf(command)
+
+	case pb.DurableCommandKind_DURABLE_ROTATE_ITEM:
+		item.Transform.Rotation = float64(command.Rotation)
+
+	case pb.DurableCommandKind_DURABLE_SET_CONFIG:
+		if len(command.ConfigJson) > 0 {
+			item.ResolvedConfig = json.RawMessage(command.ConfigJson)
+		}
+	}
+}
+
+func transformOf(command *pb.DurableCommand) Transform {
+	transform := Transform{Rotation: float64(command.Rotation)}
+	if command.Position != nil {
+		transform.X = float64(command.Position.X)
+		transform.Y = float64(command.Position.Y)
+	}
+	if command.Z != 0 {
+		z := float64(command.Z)
+		transform.Z = &z
+	}
+	return transform
+}
+
+// insideCanvas refuses an authored placement outside the canvas. A physics body
+// may leave the canvas, but an owner may not place one there.
+func (r *Room) insideCanvas(t Transform) bool {
+	width := r.canvasShape.Size.Width
+	height := r.canvasShape.Size.Height
+	if width == 0 || height == 0 {
+		return t.finite()
+	}
+	return t.X >= 0 && t.X <= width && t.Y >= 0 && t.Y <= height &&
+		!math.IsNaN(t.Rotation)
+}
+
+// ItemOwner reports the owner of an item, for host applications that need it.
+func (r *Room) ItemOwner(entityID string) (string, bool) {
+	item, ok := r.items[entityID]
+	if !ok {
+		return "", false
+	}
+	return item.OwnerUserID, true
+}
