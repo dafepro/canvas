@@ -50,6 +50,8 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 	}
 
 	r.applyDurable(command, item, client)
+	// Spec 20. A new item can use a definition a client does not hold.
+	r.checkAllDefinitions()
 	r.sceneRevision++
 	r.snapshot.SceneRevision = r.sceneRevision
 	if raw, err := json.Marshal(r.snapshot); err == nil {

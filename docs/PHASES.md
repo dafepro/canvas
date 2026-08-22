@@ -86,12 +86,43 @@ same simulation in the test process.
 | Effect events for trails, particles, overlays, and one-shot animations | Done with pooled particles and a countdown overlay. A client that joins during a countdown restores the overlay from the behavior state. |
 | Addendum A1: disable an avatar | Done. See `docs/ADDENDUM.md`. `RapierWorld.setAvatarDisabled` switches off the colliders, ends every open contact and region, and stops the drive. The flag rides on `PlayerInput` and returns on `EntityState`. The demo toggles it with the `P` key or a button. Tested in `host-simulation.test.ts` and end to end in `two-client-relay.test.ts`. |
 
-## Phase 6 — Hardening and production budgets: not started
+## Phase 6 — Hardening and production budgets: in progress
 
-No load test, no device profiling, no packet-loss test suite. The client metrics
-from spec 22.1 are reported through `RuntimeDiagnostics` and shown in the demo
-panel. The server metrics from spec 22.2 exist as a `Metrics` interface with a
-logging implementation.
+| Item | State |
+| --- | --- |
+| Synthetic 20-player load test with 50 items | Done. `packages/client/test/load-budget.test.ts` runs 20 clients and 50 items through a real `canvasd` and checks the scene and network budgets. |
+| Host-worker profiling on real mobile devices | Not done. No device was available. The load test reports the simulation rate and the worst step on the machine that runs it. |
+| Network loss and latency tests, state repair | Done. `packages/client/test/packet-loss.test.ts` drops half of the realtime packets and proves that the 2 Hz keyframe repairs the peer. |
+| Metrics and debug overlays | Done. The client reports every counter of spec 22.1, and the demo panel shows them. The server reports every counter of spec 22.2 through `CountingMetrics`, which `canvasd` exposes at `GET /metrics` in the Prometheus text format. |
+| NaN and out-of-bounds protection, item quarantine | Done. A NaN value and a body more than one canvas width outside the canvas are both quarantined. |
+| Definition and protocol compatibility checks | Done. The client declares its item definitions on join. A client that lacks a definition the scene uses, or holds an older version, receives a `definition_mismatch` refusal and loses the host lease. |
+| Asset preloading and reconnect behavior | Partly done. The transport reconnects with backoff. There is no asset preload step, because the renderer draws placeholder shapes only. |
+| Exit criterion: the scene stays responsive and recoverable at the room limits | Met for the simulation and the repair path. Not met for the network budget in a busy scene; see the measurement below. |
+
+### The measured room, 20 avatars and 50 items
+
+The load test reports these numbers. They come from one developer machine, so
+read them as a baseline for a change, not as a device target.
+
+| Window | Inbound to one peer | Note |
+| --- | --- | --- |
+| Items at rest, avatars still | 12.9 KB/s | Inside the 20 KB/s guidance of spec 19.3. |
+| Items at rest, avatars moving | 47.4 KB/s | Above the guidance. |
+| Every item falling | 46.3 KB/s | Above the guidance. |
+
+The host held 59.8 Hz with a worst step of 1.00 ms and 129 active colliders,
+inside the 150 collider budget of spec 19.1.
+
+Spec 19.3 states the 20 KB/s figure for a scene with "only avatars and a handful
+of moving items". A room where 20 avatars push a pile of 50 items is above it.
+Four changes already cut the cost: a resting body now sleeps, a delta carries
+only an entity that changed, the server names an item `i7` rather than
+`rocket-canvas-i7`, and a delta leaves out the definition id. Together they took
+the falling case from 73 KB/s to 46 KB/s.
+
+The next lever is transform quantization, which spec 19.2 rule 7 holds back
+until a measurement justifies it. This measurement justifies it. It is not
+done.
 
 ## Phase 7 — Optional WebRTC transport: not started
 
@@ -108,11 +139,14 @@ logging implementation.
 3. **The avatar sprite ignores its definition.** The renderer draws a fixed
    circle for every avatar rather than reading a definition.
 4. **MemoryStore only.** A restart of `canvasd` loses every placement.
-5. **No plan to free a stuck body.** A body that a large impulse pushes into
-   terrain can stay there. The wrap defect that caused most of these is fixed,
-   but nothing detects and frees a body that is stuck for other reasons. This
-   belongs to Phase 6 hardening.
-6. **Behavior state in a delta is JSON.** A keyframe always carries it, and a
+5. **A stuck body is now freed.** The host watches for a body that is still and
+   whose centre lies inside fixed geometry. After half a second it moves the
+   body against the local gravity until the body is clear, and it emits an
+   `unstuck` event.
+6. **The network budget in a busy scene.** See the Phase 6 table above. The
+   room is above the 20 KB/s guidance of spec 19.3 when many items move at once.
+
+7. **Behavior state in a delta is JSON.** A keyframe always carries it, and a
    delta carries it only after a change. A large behavior state on many items
    would still cost bytes. Spec 22 budgets are not measured.
 

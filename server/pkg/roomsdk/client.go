@@ -28,6 +28,12 @@ type Client struct {
 	workerDrift   float32
 	pageVisible   bool
 	hostEligible  bool
+
+	// Spec 20. Item definition versions the client declared on join. A nil map
+	// means the client declared nothing, so no check is possible.
+	definitions map[string]uint32
+	// True while the client lacks a definition the scene uses.
+	definitionMismatch bool
 }
 
 func newClient(id string, identity Identity, queueDepth int) *Client {

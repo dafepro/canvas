@@ -3,7 +3,9 @@ package roomsdk
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	pb "github.com/dafepro/canvas/server/gen/canvasphysicsv1"
@@ -212,6 +214,9 @@ func (r *Room) handleMessage(msg inbound) {
 	r.cfg.Metrics.RelayBytes(r.canvasID, msg.size)
 
 	switch payload := envelope.Payload.(type) {
+	case *pb.RoomEnvelope_Join:
+		r.recordDefinitions(client, payload.Join)
+
 	case *pb.RoomEnvelope_Heartbeat:
 		r.handleHeartbeat(client, payload.Heartbeat)
 
@@ -233,6 +238,78 @@ func (r *Room) handleMessage(msg inbound) {
 
 	default:
 		// Unknown payloads are ignored rather than closing the connection.
+	}
+}
+
+// recordDefinitions stores what item definitions the client holds and then
+// checks them against the scene (spec 20).
+func (r *Room) recordDefinitions(client *Client, join *pb.Join) {
+	if join == nil {
+		return
+	}
+	held := make(map[string]uint32, len(join.Definitions))
+	for _, definition := range join.Definitions {
+		held[definition.DefinitionId] = definition.Version
+	}
+	client.definitions = held
+	r.checkDefinitions(client)
+}
+
+// checkDefinitions blocks a client from the host lease while it lacks a
+// definition the scene uses, or holds an older version of one. A client that
+// declared nothing is not checked, because nothing can be compared.
+func (r *Room) checkDefinitions(client *Client) {
+	if client.definitions == nil {
+		return
+	}
+	missing := make([]string, 0)
+	for _, item := range r.snapshot.Items {
+		version, ok := client.definitions[item.DefinitionID]
+		if !ok || version < item.DefinitionVersion {
+			missing = append(missing, item.DefinitionID)
+		}
+	}
+	sort.Strings(missing)
+	missing = slices.Compact(missing)
+
+	mismatch := len(missing) > 0
+	if mismatch == client.definitionMismatch {
+		return
+	}
+	client.definitionMismatch = mismatch
+	client.hostEligible = !mismatch
+	if !mismatch {
+		// Presence carries the flag, so every peer learns that the client is
+		// eligible again.
+		r.broadcastPresence()
+		return
+	}
+
+	r.cfg.Metrics.ProtocolMismatch(r.canvasID)
+	r.cfg.Logger.Warn("client lacks an item definition the scene uses",
+		"canvas", r.canvasID, "client", client.ID, "definitions", missing)
+	r.sendTo(client, &pb.RoomEnvelope{
+		RoomId:    r.canvasID,
+		HostEpoch: r.hostEpoch,
+		Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
+			Code:    "definition_mismatch",
+			Message: "the client lacks these item definitions: " + strings.Join(missing, ", "),
+		}},
+	})
+	if r.hostClientID == client.ID {
+		r.hostClientID = ""
+		r.electHost("host_definition_mismatch")
+	}
+	// The refusal is sent first, so a client reads the reason before it reads
+	// the presence that carries the flag.
+	r.broadcastPresence()
+}
+
+// checkAllDefinitions runs after the scene changes, so a client that lacks a
+// newly spawned definition loses the lease.
+func (r *Room) checkAllDefinitions() {
+	for _, client := range r.clients {
+		r.checkDefinitions(client)
 	}
 }
 

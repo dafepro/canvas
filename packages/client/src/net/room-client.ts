@@ -55,6 +55,12 @@ export interface RoomClientOptions {
   join: JoinDescriptor;
   /** Host heartbeat rate. Spec 10.3 recommends 2 Hz. */
   heartbeatHz?: number;
+  /**
+   * Spec 20. The item definitions this client holds. The room compares them
+   * with the definitions the scene uses and refuses the host lease to a client
+   * that lacks one.
+   */
+  definitions?: { definitionId: string; version: number }[];
 }
 
 /**
@@ -79,6 +85,7 @@ export class RoomClient {
   health = { simulationHz: 0, workerDriftMs: 0, pageVisible: true };
 
   private sequence = 0;
+  private readonly definitions: { definitionId: string; version: number }[];
 
   /** Spec 22.1. The realtime counters of the transport in use. */
   get traffic(): TransportTraffic {
@@ -89,6 +96,7 @@ export class RoomClient {
     this.transport = options.transport;
     this.joinDescriptor = options.join;
     this.heartbeatHz = options.heartbeatHz ?? 2;
+    this.definitions = options.definitions ?? [];
     this.transport.onMessage((message) => this.receive(message));
     this.transport.onStatus((status, detail) => this.emit("status", status, detail));
   }
@@ -121,7 +129,7 @@ export class RoomClient {
           protocolVersion: PROTOCOL_VERSION,
           userId: this.joinDescriptor.userId,
           displayName: this.joinDescriptor.displayName,
-          definitions: [],
+          definitions: this.definitions,
         },
       }),
     );

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 
@@ -40,6 +41,16 @@ func (s *Server) Handler() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	// Spec 22.2. The endpoint appears only when the configured Metrics can
+	// write an exposition, so a deployment with another backend keeps its own.
+	if exporter, ok := s.cfg.Metrics.(interface {
+		WriteTo(io.Writer) (int64, error)
+	}); ok {
+		mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = exporter.WriteTo(w)
+		})
+	}
 	return mux
 }
 

@@ -151,6 +151,10 @@ export class RoomSession {
     this.driver = options.driver ?? SimulationDriver.spawn();
     this.client = new RoomClient({
       transport,
+      definitions: options.definitions.map((definition) => ({
+        definitionId: definition.definitionId,
+        version: definition.version,
+      })),
       join: {
         canvasId: options.canvasId,
         userId: options.userId,
