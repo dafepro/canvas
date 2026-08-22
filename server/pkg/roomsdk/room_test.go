@@ -622,7 +622,10 @@ func TestRoomSleepsAndWakesWithTheSameItems(t *testing.T) {
 	h := newHarness(t, nil)
 	owner := h.dial("alice")
 	owner.join()
-	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+	firstGrant := owner.await(func(e *pb.RoomEnvelope) bool {
+		control := e.GetHostControl()
+		return control != nil && control.Kind == pb.HostControlKind_HOST_CONTROL_GRANTED
+	}).GetHostControl()
 	owner.send(spawnCommand("cmd-spawn", 20, 30))
 	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetDurableResult() != nil })
 
@@ -660,6 +663,13 @@ func TestRoomSleepsAndWakesWithTheSameItems(t *testing.T) {
 	}
 	if snapshot.Items[0].Transform.X != 20 {
 		t.Errorf("x after wake = %v, want 20", snapshot.Items[0].Transform.X)
+	}
+	nextGrant := next.await(func(e *pb.RoomEnvelope) bool {
+		control := e.GetHostControl()
+		return control != nil && control.Kind == pb.HostControlKind_HOST_CONTROL_GRANTED
+	}).GetHostControl()
+	if nextGrant.HostEpoch <= firstGrant.HostEpoch {
+		t.Errorf("host epoch after wake = %d, want greater than %d", nextGrant.HostEpoch, firstGrant.HostEpoch)
 	}
 }
 

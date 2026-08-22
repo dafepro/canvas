@@ -87,6 +87,10 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 		room.snapshotRaw = snapshot.SnapshotRaw
 		room.sceneRevision = snapshot.SceneRevision
 		room.checkpointNo = snapshot.CheckpointRevision
+		room.hostEpoch = snapshot.HostEpoch
+		if room.snapshot.HostEpoch > room.hostEpoch {
+			room.hostEpoch = room.snapshot.HostEpoch
+		}
 	} else {
 		room.snapshot = emptySnapshot(canvasID, shape.Version, server.cfg.Now())
 		raw, err := json.Marshal(room.snapshot)
