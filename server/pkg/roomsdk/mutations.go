@@ -14,7 +14,10 @@ var (
 	errTooManyItems       = errors.New("item count above the canvas limit")
 	errNonFiniteTransform = errors.New("transform is not finite")
 	errOutOfBounds        = errors.New("transform is grossly out of bounds")
-	errStaleCheckpoint    = errors.New("checkpoint revision is older than the stored one")
+	errStaleCheckpoint    = errors.New("checkpoint revision is not newer than the stored one")
+	errStaleScene         = errors.New("checkpoint scene revision does not match the room")
+	errUnknownEntity      = errors.New("checkpoint contains an unknown entity id")
+	errDuplicateEntity    = errors.New("checkpoint contains a duplicate entity id")
 )
 
 // handleDurableCommand enforces ownership before the command reaches the

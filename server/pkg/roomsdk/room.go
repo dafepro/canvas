@@ -234,7 +234,7 @@ func (r *Room) handleMessage(msg inbound) {
 		r.handleDurableCommand(client, payload.DurableCommand)
 
 	case *pb.RoomEnvelope_Checkpoint:
-		r.handleCheckpoint(client, payload.Checkpoint)
+		r.handleCheckpoint(client, envelope.HostEpoch, payload.Checkpoint)
 
 	default:
 		// Unknown payloads are ignored rather than closing the connection.
@@ -350,9 +350,13 @@ func (r *Room) relayFromHost(from *Client, envelope *pb.RoomEnvelope) {
 	r.broadcastExcept(from.ID, envelope)
 }
 
-func (r *Room) handleCheckpoint(from *Client, checkpoint *pb.Checkpoint) {
+func (r *Room) handleCheckpoint(from *Client, hostEpoch uint64, checkpoint *pb.Checkpoint) {
 	if from.ID != r.hostClientID {
 		r.cfg.Metrics.DurableRejected(r.canvasID, "checkpoint_from_non_host")
+		return
+	}
+	if hostEpoch != r.hostEpoch {
+		r.cfg.Metrics.DurableRejected(r.canvasID, "stale_host_epoch")
 		return
 	}
 	if err := r.acceptCheckpoint(checkpoint); err != nil {
@@ -377,28 +381,54 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 	if incoming.CanvasID != r.canvasID {
 		return errCanvasMismatch
 	}
+	if incoming.SceneRevision != r.sceneRevision {
+		return errStaleScene
+	}
 	if len(incoming.Items) > r.canvasShape.Limits.MaxItems {
 		return errTooManyItems
 	}
-	for i := range incoming.Items {
-		if !incoming.Items[i].Transform.finite() {
-			return errNonFiniteTransform
-		}
-		if !r.withinBounds(incoming.Items[i].Transform) {
-			return errOutOfBounds
-		}
-	}
-	if checkpoint.CheckpointRevision < r.checkpointNo {
+	if checkpoint.CheckpointRevision <= r.checkpointNo {
 		return errStaleCheckpoint
 	}
 
-	// The server keeps its own scene revision, which only durable mutations move.
-	incoming.SceneRevision = r.sceneRevision
-	incoming.HostEpoch = r.hostEpoch
-	incoming.CheckpointRevision = checkpoint.CheckpointRevision
-	r.snapshot = incoming
+	seen := make(map[string]struct{}, len(incoming.Items))
+	for i := range incoming.Items {
+		item := &incoming.Items[i]
+		if _, duplicate := seen[item.EntityID]; duplicate {
+			return errDuplicateEntity
+		}
+		seen[item.EntityID] = struct{}{}
+		if r.items[item.EntityID] == nil {
+			return errUnknownEntity
+		}
+		if !item.Transform.finite() {
+			return errNonFiniteTransform
+		}
+		if !r.withinBounds(item.Transform) {
+			return errOutOfBounds
+		}
+	}
+
+	// The host owns canonical physics and behavior outcomes, but durable item
+	// identity and authorship remain server-authoritative. Merge only the
+	// canonical fields into records that the durable mutation path created.
+	for i := range incoming.Items {
+		item := &incoming.Items[i]
+		stored := r.items[item.EntityID]
+		stored.Transform = item.Transform
+		stored.BehaviorState = item.BehaviorState
+		stored.BehaviorStateVer = item.BehaviorStateVer
+		stored.VisualVariant = item.VisualVariant
+	}
+
+	// The server keeps all durable snapshot metadata. Only runtime checkpoint
+	// bookkeeping comes from the accepted host checkpoint.
+	r.snapshot.HostEpoch = r.hostEpoch
+	r.snapshot.CheckpointRevision = checkpoint.CheckpointRevision
+	r.snapshot.Tick = incoming.Tick
+	r.snapshot.CapturedAt = incoming.CapturedAt
+	r.snapshot.Normalized = incoming.Normalized
 	r.checkpointNo = checkpoint.CheckpointRevision
-	r.indexItems()
 	raw, err := json.Marshal(r.snapshot)
 	if err != nil {
 		return err
