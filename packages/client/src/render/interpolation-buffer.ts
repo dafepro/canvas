@@ -63,7 +63,17 @@ export class InterpolationBuffer {
   ): void {
     const newest = this.samples[this.samples.length - 1];
     const merged = new Map(newest ? newest.entities : undefined);
-    for (const entity of entities) merged.set(entity.id, entity);
+    for (const entity of entities) {
+      // Spec 19.3. A delta leaves out the definition id, so the value from the
+      // last keyframe is carried forward.
+      const before = merged.get(entity.id);
+      merged.set(
+        entity.id,
+        entity.definitionId || !before
+          ? entity
+          : { ...entity, definitionId: before.definitionId },
+      );
+    }
     for (const id of removed) merged.delete(id);
     this.samples.push({ tick, receivedAtMs: nowMs, entities: merged });
     while (this.samples.length > this.bufferSize) this.samples.shift();

@@ -144,7 +144,10 @@ func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, clie
 		r.nextEntityNo++
 		entityID := command.EntityId
 		if entityID == "" || r.items[entityID] != nil {
-			entityID = fmt.Sprintf("%s-i%d", r.canvasID, r.nextEntityNo)
+			// Spec 19.3. The id repeats in every delta for every entity, so it
+			// stays short. The room already scopes it, so the canvas id would
+			// only repeat bytes on the wire.
+			entityID = fmt.Sprintf("i%d", r.nextEntityNo)
 		}
 		created := SnapshotItem{
 			EntityID:          entityID,

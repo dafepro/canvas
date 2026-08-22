@@ -31,12 +31,18 @@ const renderDiagnostics = (diagnostics: RuntimeDiagnostics): void => {
     ["worker drift", `${diagnostics.driftMs.toFixed(1)} ms`],
     ["worst step", `${diagnostics.worstStepMs.toFixed(2)} ms`],
     ["awake bodies", String(diagnostics.awakeBodies)],
+    ["colliders", String(diagnostics.activeColliders)],
     ["render FPS", diagnostics.renderFps.toFixed(0)],
     ["interp depth", String(diagnostics.interpolationDepth)],
     ["extrapolations", String(diagnostics.extrapolations)],
     ["reconcile error", diagnostics.reconcileError.toFixed(3)],
     ["scene revision", String(diagnostics.sceneRevision)],
     ["items", String(diagnostics.itemCount)],
+    ["in", `${(diagnostics.inboundBytesPerSecond / 1024).toFixed(1)} KB/s`],
+    ["out", `${(diagnostics.outboundBytesPerSecond / 1024).toFixed(1)} KB/s`],
+    ["dropped out", String(diagnostics.droppedOutbound)],
+    ["host migrations", String(diagnostics.hostMigrations)],
+    ["quarantined", String(diagnostics.quarantined)],
   ];
   if (diagnostics.lastRejection) rows.push(["last reject", diagnostics.lastRejection]);
 

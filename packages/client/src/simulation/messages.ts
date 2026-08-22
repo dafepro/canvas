@@ -68,6 +68,8 @@ export interface SimulationStats {
   worstStepMs: number;
   awakeBodies: number;
   behaviorErrors: number;
+  /** Spec 19.1. The scene budget is 150 active colliders. */
+  activeColliders: number;
 }
 
 /** Messages the simulation worker sends back to the main thread. */

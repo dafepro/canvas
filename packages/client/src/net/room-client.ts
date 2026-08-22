@@ -13,7 +13,12 @@ import {
   type EffectEvent,
 } from "@canvas-physics/protocol";
 import type { CanvasDefinition, CanvasSnapshot } from "@canvas-physics/core";
-import type { JoinDescriptor, RoomTransport, TransportStatus } from "./transport.js";
+import type {
+  JoinDescriptor,
+  RoomTransport,
+  TransportStatus,
+  TransportTraffic,
+} from "./transport.js";
 
 export interface RoomJoinResult {
   clientId: string;
@@ -74,6 +79,11 @@ export class RoomClient {
   health = { simulationHz: 0, workerDriftMs: 0, pageVisible: true };
 
   private sequence = 0;
+
+  /** Spec 22.1. The realtime counters of the transport in use. */
+  get traffic(): TransportTraffic {
+    return this.transport.traffic;
+  }
 
   constructor(options: RoomClientOptions) {
     this.transport = options.transport;

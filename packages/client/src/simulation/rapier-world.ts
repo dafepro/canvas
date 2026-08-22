@@ -122,6 +122,17 @@ export class RapierWorld implements BehaviorHost {
     return this.tick;
   }
 
+  /** Spec 22.1 and 19.1. The collider budget is 150 for a whole scene. */
+  get activeColliderCount(): number {
+    let count = 0;
+    for (const record of this.bodies.values()) {
+      for (const collider of record.colliders.values()) {
+        if (collider.isEnabled()) count++;
+      }
+    }
+    return count;
+  }
+
   free(): void {
     this.world.free();
     this.events.free();
@@ -492,6 +503,10 @@ export class RapierWorld implements BehaviorHost {
     if (entity.kind === "static" || !entity.rigidBody) return;
     if (entity.rigidBody.mode !== "dynamic") return;
     if (entity.quarantined) return;
+    // Spec 19.2, rule 3. A sleeping body receives no impulse. Applying gravity
+    // to a body at rest on the ground would wake it on every tick, so nothing
+    // in the scene would ever sleep and every delta would carry every item.
+    if (record.body.isSleeping()) return;
 
     const position = record.body.translation();
     this.environment.sample(position, this.sample);
@@ -517,7 +532,7 @@ export class RapierWorld implements BehaviorHost {
     if (this.sample.angularDrag > 0) {
       record.body.applyTorqueImpulse(
         -record.body.angvel() * this.sample.angularDrag * mass * dt,
-        true,
+        false,
       );
     }
     const limitForce = softSpeedLimitForce(velocity, this.sample.softSpeedLimit);
@@ -531,7 +546,9 @@ export class RapierWorld implements BehaviorHost {
 
   private impulse(record: BodyRecord, impulse: Vec2): void {
     if (impulse.x === 0 && impulse.y === 0) return;
-    record.body.applyImpulse(impulse, true);
+    // The body is awake already; see applyEnvironment. Waking it here would
+    // defeat the sleep rule of spec 19.2.
+    record.body.applyImpulse(impulse, false);
   }
 
   private driveAvatar(record: BodyRecord, dt: number): void {

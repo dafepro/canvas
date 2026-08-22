@@ -77,12 +77,23 @@ export interface SessionDiagnostics {
   driftMs: number;
   worstStepMs: number;
   awakeBodies: number;
+  activeColliders: number;
   interpolationDepth: number;
   extrapolations: number;
   reconcileError: number;
   sceneRevision: number;
   itemCount: number;
   lastRejection?: string;
+  /** Spec 22.1 and 19.3. Realtime traffic, measured over the last second. */
+  inboundBytesPerSecond: number;
+  outboundBytesPerSecond: number;
+  inboundMessagesPerSecond: number;
+  outboundMessagesPerSecond: number;
+  droppedOutbound: number;
+  /** Spec 22.1. Host lease changes this client observed, and the last reason. */
+  hostMigrations: number;
+  lastMigrationReason?: string;
+  quarantined: number;
 }
 
 /**
@@ -102,13 +113,38 @@ export class RoomSession {
   private hostEntities: RenderEntity[] = [];
   private localPrediction?: RenderEntity;
   private currentTick = 0;
-  private stats = { hz: 0, driftMs: 0, worstStepMs: 0, awakeBodies: 0, behaviorErrors: 0 };
+  private stats = {
+    hz: 0,
+    driftMs: 0,
+    worstStepMs: 0,
+    awakeBodies: 0,
+    behaviorErrors: 0,
+    activeColliders: 0,
+  };
   private lastRejection?: string;
   private itemCount = 0;
   private commandCounter = 0;
   private running = false;
   private readonly lastBehaviorJson = new Map<string, string>();
   private readonly countdowns = new Set<string>();
+  private readonly lastSent = new Map<string, SentSample>();
+  private hostMigrations = 0;
+  private lastMigrationReason?: string;
+  private quarantinedCount = 0;
+  /** Spec 22.1. One sample of the transport counters, taken every second. */
+  private trafficMark = {
+    atMs: 0,
+    inboundBytes: 0,
+    outboundBytes: 0,
+    inboundMessages: 0,
+    outboundMessages: 0,
+  };
+  private trafficRate = {
+    inboundBytesPerSecond: 0,
+    outboundBytesPerSecond: 0,
+    inboundMessagesPerSecond: 0,
+    outboundMessagesPerSecond: 0,
+  };
 
   constructor(private readonly options: RoomSessionOptions) {
     const transport = options.transport ?? new WebSocketRoomTransport();
@@ -167,8 +203,10 @@ export class RoomSession {
       this.itemCount = snapshot?.items.length ?? 0;
     });
 
-    this.client.on("hostChanged", (_epoch, hostClientId) => {
+    this.client.on("hostChanged", (_epoch, hostClientId, reason) => {
       // Spec 11.2. Clear stale interpolation history when the epoch changes.
+      this.hostMigrations++;
+      this.lastMigrationReason = reason || undefined;
       this.buffer.reset();
       this.reconciler.reset();
       if (hostClientId !== this.client.clientId) {
@@ -345,8 +383,9 @@ export class RoomSession {
 
   private sendDelta(keyframe: boolean): void {
     if (!this.client.isHost || this.hostEntities.length === 0) return;
-    const entities = this.hostEntities.map((entity) =>
-      toEntityState(entity, this.behaviorBytes(entity, keyframe)),
+    const source = keyframe ? this.hostEntities : this.changedEntities();
+    const entities = source.map((entity) =>
+      toEntityState(entity, this.behaviorBytes(entity, keyframe), keyframe),
     );
     if (keyframe) {
       this.client.sendFullState(
@@ -365,12 +404,47 @@ export class RoomSession {
         },
         this.currentTick,
       );
+      // A keyframe carries every entity, so the delta filter starts again here.
+      this.lastSent.clear();
+      for (const entity of this.hostEntities) {
+        this.lastSent.set(entity.id, sentSample(entity));
+      }
       return;
     }
+    const removedEntityIds = this.removedEntityIds();
+    if (entities.length === 0 && removedEntityIds.length === 0) return;
     this.client.sendStateDelta(
-      { entities, removedEntityIds: [], sceneRevision: this.client.sceneRevision },
+      { entities, removedEntityIds, sceneRevision: this.client.sceneRevision },
       this.currentTick,
     );
+  }
+
+  /**
+   * Spec 19.2, rule 6. A delta carries only an entity that changed since the
+   * last delta. A body at rest costs no bytes, and the 2 Hz keyframe repairs a
+   * client that missed a change.
+   */
+  private changedEntities(): RenderEntity[] {
+    const changed: RenderEntity[] = [];
+    for (const entity of this.hostEntities) {
+      const before = this.lastSent.get(entity.id);
+      if (!before || movedSince(before, entity)) {
+        changed.push(entity);
+        this.lastSent.set(entity.id, sentSample(entity));
+      }
+    }
+    return changed;
+  }
+
+  private removedEntityIds(): string[] {
+    const present = new Set(this.hostEntities.map((entity) => entity.id));
+    const removed: string[] = [];
+    for (const id of this.lastSent.keys()) {
+      if (present.has(id)) continue;
+      removed.push(id);
+      this.lastSent.delete(id);
+    }
+    return removed;
   }
 
   /**
@@ -477,6 +551,8 @@ export class RoomSession {
         if (this.client.isHost) {
           this.hostEntities = message.entities;
           this.itemCount = message.entities.filter((e) => e.kind === "item").length;
+          // Spec 22.1. The host is the only client that can quarantine a body.
+          this.quarantinedCount = message.entities.filter((e) => e.quarantined).length;
         } else {
           this.localPrediction = message.entities.find(
             (entity) => entity.id === this.localAvatarId,
@@ -627,6 +703,35 @@ export class RoomSession {
     }
   }
 
+  /**
+   * Spec 22.1 and 19.3. The counters of the transport are cumulative, so a rate
+   * needs two samples. One sample per second is enough for a budget check and
+   * it costs nothing between samples.
+   */
+  private trafficRates(): typeof this.trafficRate {
+    const now = Date.now();
+    const traffic = this.client.traffic;
+    if (this.trafficMark.atMs === 0) {
+      this.trafficMark = { atMs: now, ...pickCounters(traffic) };
+      return this.trafficRate;
+    }
+    const elapsedMs = now - this.trafficMark.atMs;
+    if (elapsedMs < 1000) return this.trafficRate;
+    const perSecond = 1000 / elapsedMs;
+    this.trafficRate = {
+      inboundBytesPerSecond:
+        (traffic.inboundBytes - this.trafficMark.inboundBytes) * perSecond,
+      outboundBytesPerSecond:
+        (traffic.outboundBytes - this.trafficMark.outboundBytes) * perSecond,
+      inboundMessagesPerSecond:
+        (traffic.inboundMessages - this.trafficMark.inboundMessages) * perSecond,
+      outboundMessagesPerSecond:
+        (traffic.outboundMessages - this.trafficMark.outboundMessages) * perSecond,
+    };
+    this.trafficMark = { atMs: now, ...pickCounters(traffic) };
+    return this.trafficRate;
+  }
+
   diagnostics(): SessionDiagnostics {
     return {
       status: this.client.isHost ? "host" : "peer",
@@ -640,12 +745,18 @@ export class RoomSession {
       driftMs: this.stats.driftMs,
       worstStepMs: this.stats.worstStepMs,
       awakeBodies: this.stats.awakeBodies,
+      activeColliders: this.stats.activeColliders,
       interpolationDepth: this.buffer.depth,
       extrapolations: this.buffer.extrapolationCount,
       reconcileError: this.reconciler.lastErrorDistance,
       sceneRevision: this.client.sceneRevision,
       itemCount: this.itemCount,
       lastRejection: this.lastRejection,
+      ...this.trafficRates(),
+      droppedOutbound: this.client.traffic.droppedOutbound,
+      hostMigrations: this.hostMigrations,
+      lastMigrationReason: this.lastMigrationReason,
+      quarantined: this.quarantinedCount,
     };
   }
 
@@ -654,12 +765,77 @@ export class RoomSession {
   }
 }
 
+/** One sample of what a delta last carried for an entity. */
+interface SentSample {
+  x: number;
+  y: number;
+  rotation: number;
+  z: number;
+  vx: number;
+  vy: number;
+  angularVelocity: number;
+  variant?: string;
+  disabled?: boolean;
+  quarantined?: boolean;
+}
+
+const sentSample = (entity: RenderEntity): SentSample => ({
+  x: entity.x,
+  y: entity.y,
+  rotation: entity.rotation,
+  z: entity.z ?? 0,
+  vx: entity.vx,
+  vy: entity.vy,
+  angularVelocity: entity.angularVelocity,
+  variant: entity.variant,
+  disabled: entity.disabled,
+  quarantined: entity.quarantined,
+});
+
+/** Movement below these values is not visible at the 100 ms render delay. */
+const POSITION_EPSILON = 0.01;
+const ROTATION_EPSILON = 0.005;
+const VELOCITY_EPSILON = 0.05;
+
+const movedSince = (before: SentSample, now: RenderEntity): boolean =>
+  Math.abs(before.x - now.x) > POSITION_EPSILON ||
+  Math.abs(before.y - now.y) > POSITION_EPSILON ||
+  Math.abs(before.z - (now.z ?? 0)) > POSITION_EPSILON ||
+  Math.abs(before.rotation - now.rotation) > ROTATION_EPSILON ||
+  Math.abs(before.vx - now.vx) > VELOCITY_EPSILON ||
+  Math.abs(before.vy - now.vy) > VELOCITY_EPSILON ||
+  Math.abs(before.angularVelocity - now.angularVelocity) > VELOCITY_EPSILON ||
+  before.variant !== now.variant ||
+  before.disabled !== now.disabled ||
+  before.quarantined !== now.quarantined;
+// The processed input sequence is not a reason to send. It rides on the entity
+// whenever the entity moves, and the 2 Hz keyframe carries it for a still
+// avatar. Sending it alone would put every idle avatar in every delta.
+
+const pickCounters = (traffic: {
+  inboundBytes: number;
+  outboundBytes: number;
+  inboundMessages: number;
+  outboundMessages: number;
+}) => ({
+  inboundBytes: traffic.inboundBytes,
+  outboundBytes: traffic.outboundBytes,
+  inboundMessages: traffic.inboundMessages,
+  outboundMessages: traffic.outboundMessages,
+});
+
 export const avatarEntityId = (clientId: string): string => `avatar:${clientId}`;
 const clientIdOf = (entityId: string): string => entityId.replace(/^avatar:/, "");
 
+/**
+ * Spec 19.3. A delta leaves out the definition id. A client learns the
+ * definition from the keyframe or from the durable spawn result, and the id
+ * would otherwise repeat for every entity 15 times a second.
+ */
 const toEntityState = (
   entity: RenderEntity,
   behaviorStateJson: Uint8Array,
+  keyframe = true,
 ): EntityState => ({
   entityId: entity.id,
   position: { x: entity.x, y: entity.y },
@@ -672,7 +848,7 @@ const toEntityState = (
   spriteVariant: entity.variant ?? "",
   behaviorStateJson,
   quarantined: entity.quarantined ?? false,
-  definitionId: entity.definitionId,
+  definitionId: keyframe ? entity.definitionId : "",
   disabled: entity.disabled ?? false,
 });
 

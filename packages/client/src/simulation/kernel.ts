@@ -236,7 +236,11 @@ export class SimulationKernel {
         tick: this.simulation.tick,
         isHost: this.isHost,
         entities,
-        stats: { ...this.lastStats, awakeBodies: awake },
+        stats: {
+          ...this.lastStats,
+          awakeBodies: awake,
+          activeColliders: this.simulation.world.activeColliderCount,
+        },
       });
     }
     this.driveTimer = setTimeout(

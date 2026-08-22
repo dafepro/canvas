@@ -3,11 +3,13 @@ import {
   encodeEnvelope,
   type RoomEnvelope,
 } from "@canvas-physics/protocol";
-import type {
-  JoinDescriptor,
-  RoomTransport,
-  TransportStatus,
-  Unsubscribe,
+import {
+  emptyTraffic,
+  type JoinDescriptor,
+  type RoomTransport,
+  type TransportStatus,
+  type TransportTraffic,
+  type Unsubscribe,
 } from "./transport.js";
 
 export interface WebSocketTransportOptions {
@@ -34,6 +36,7 @@ export class WebSocketRoomTransport implements RoomTransport {
   private closedByCaller = false;
   private readonly backoffMs: number[];
   private readonly maxReconnects: number;
+  readonly traffic: TransportTraffic = emptyTraffic();
 
   constructor(options: WebSocketTransportOptions = {}) {
     this.backoffMs = options.backoffMs ?? [250, 500, 1000, 2000, 4000];
@@ -77,13 +80,16 @@ export class WebSocketRoomTransport implements RoomTransport {
 
       socket.onmessage = (event) => {
         if (!(event.data instanceof ArrayBuffer)) return;
+        this.traffic.inboundBytes += event.data.byteLength;
+        this.traffic.inboundMessages++;
+        this.observeInbound(new Uint8Array(event.data));
         let envelope: RoomEnvelope;
         try {
           envelope = decodeEnvelope(new Uint8Array(event.data));
         } catch {
           return;
         }
-        for (const handler of this.messageHandlers) handler(envelope);
+        this.deliver(envelope);
       };
 
       socket.onerror = () => {
@@ -126,13 +132,33 @@ export class WebSocketRoomTransport implements RoomTransport {
   sendRealtime(message: RoomEnvelope): void {
     // Spec 12.2: an old transform packet is less useful than a newer one, so a
     // full send buffer drops the packet instead of queueing it.
-    if (this.socket && this.socket.bufferedAmount > 1 << 20) return;
+    if (this.socket && this.socket.bufferedAmount > 1 << 20) {
+      this.traffic.droppedOutbound++;
+      return;
+    }
     this.write(message);
   }
 
+  /**
+   * Hands one decoded envelope to the handlers. A subclass overrides this to
+   * delay or to drop a packet in a test.
+   */
+  protected deliver(envelope: RoomEnvelope): void {
+    for (const handler of this.messageHandlers) handler(envelope);
+  }
+
+  /**
+   * A hook for a subclass that measures traffic. The base class does nothing,
+   * so a production transport pays only one empty call for each frame.
+   */
+  protected observeInbound(_bytes: Uint8Array): void {}
+
   private write(message: RoomEnvelope): void {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    this.socket.send(encodeEnvelope(message));
+    const bytes = encodeEnvelope(message);
+    this.traffic.outboundBytes += bytes.byteLength;
+    this.traffic.outboundMessages++;
+    this.socket.send(bytes);
   }
 
   onMessage(handler: (message: RoomEnvelope) => void): Unsubscribe {
