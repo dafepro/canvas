@@ -2016,7 +2016,7 @@ const file_room_proto_rawDesc = "" +
 	"\x13DURABLE_DELETE_ITEM\x10\x02\x12\x15\n" +
 	"\x11DURABLE_MOVE_ITEM\x10\x03\x12\x17\n" +
 	"\x13DURABLE_ROTATE_ITEM\x10\x04\x12\x16\n" +
-	"\x12DURABLE_SET_CONFIG\x10\x05BOZMgithub.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1b\x06proto3"
+	"\x12DURABLE_SET_CONFIG\x10\x05BFZDgithub.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1b\x06proto3"
 
 var (
 	file_room_proto_rawDescOnce sync.Once
