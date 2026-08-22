@@ -103,6 +103,7 @@ func loadItemDefinitions(store *roomsdk.MemoryStore, dir string) (int, error) {
 			DefinitionID string                 `json:"definitionId"`
 			Version      uint32                 `json:"version"`
 			Complexity   roomsdk.ItemComplexity `json:"complexity"`
+			ConfigSchema json.RawMessage        `json:"configSchema"`
 		}
 		if err := json.Unmarshal(raw, &probe); err != nil {
 			return count, err
@@ -118,6 +119,7 @@ func loadItemDefinitions(store *roomsdk.MemoryStore, dir string) (int, error) {
 			DefinitionID:  probe.DefinitionID,
 			Version:       probe.Version,
 			Complexity:    probe.Complexity,
+			ConfigSchema:  probe.ConfigSchema,
 			DefinitionRaw: raw,
 		})
 		count++

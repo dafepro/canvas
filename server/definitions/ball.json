@@ -53,5 +53,33 @@
     "behaviorState": false,
     "onRoomSleep": "resetToIdle"
   },
-  "complexity": "simple"
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "sensorId": {
+        "type": "string"
+      },
+      "kickStrength": {
+        "type": "number"
+      },
+      "minImpulse": {
+        "type": "number"
+      },
+      "maxImpulse": {
+        "type": "number"
+      },
+      "cooldownSeconds": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "sensorId",
+      "kickStrength",
+      "minImpulse",
+      "maxImpulse",
+      "cooldownSeconds"
+    ],
+    "additionalProperties": false
+  }
 }

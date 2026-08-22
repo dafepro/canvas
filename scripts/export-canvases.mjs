@@ -40,9 +40,33 @@ const definitions = Object.entries(module).filter(
   ([, value]) => value && typeof value === "object" && !Array.isArray(value) && "definitionId" in value,
 );
 
+const schemaFor = (value) => {
+  if (value === null) return { type: "null" };
+  if (Array.isArray(value)) {
+    return { type: "array", items: schemaFor(value[0] ?? null) };
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value);
+    return {
+      type: "object",
+      properties: Object.fromEntries(entries.map(([key, child]) => [key, schemaFor(child)])),
+      required: entries.map(([key]) => key),
+      additionalProperties: false,
+    };
+  }
+  if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") {
+    return { type: typeof value };
+  }
+  throw new Error(`cannot infer config schema for ${typeof value}`);
+};
+
 for (const [name, definition] of definitions) {
   const file = resolve(definitionDir, `${definition.definitionId}.json`);
-  writeFileSync(file, `${JSON.stringify(definition, null, 2)}\n`);
+  const exported = {
+    ...definition,
+    configSchema: definition.configSchema ?? schemaFor(definition.defaultConfig ?? {}),
+  };
+  writeFileSync(file, `${JSON.stringify(exported, null, 2)}\n`);
   console.log(`wrote ${file} from ${name}`);
 }
 

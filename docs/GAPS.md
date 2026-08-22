@@ -15,7 +15,7 @@ downward. Check an item only after the relevant focused tests pass.
   protocol compatibility, and definition compatibility before room admission or
   host election. Resend JOIN after reconnect and freeze shared simulation while
   disconnected.
-- [ ] Make item definitions and configuration schemas authoritative server
+- [x] Make item definitions and configuration schemas authoritative server
   metadata. Validate definition IDs and versions, resolved config, and
   `maxComplexPhysicsItems` before accepting a spawn or config mutation.
 - [ ] Define and implement room-sleep normalization ownership. Preserve a

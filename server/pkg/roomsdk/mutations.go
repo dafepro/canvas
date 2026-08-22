@@ -110,6 +110,9 @@ func (r *Room) validateDurable(
 		if command.DefinitionVersion != definition.Version {
 			return false, nil, "definition_version_mismatch"
 		}
+		if err := validateConfigJSON(definition.ConfigSchema, command.ConfigJson); err != nil {
+			return false, nil, "config_schema_mismatch"
+		}
 		if definition.Complexity == ItemComplexityComplex &&
 			r.canvasShape.Limits.MaxComplexPhysicsItems > 0 &&
 			r.complexItemCount() >= r.canvasShape.Limits.MaxComplexPhysicsItems {
@@ -150,6 +153,15 @@ func (r *Room) validateDurable(
 			len(command.ConfigJson) > 0 &&
 			!json.Valid(command.ConfigJson) {
 			return false, nil, "invalid_config_json"
+		}
+		if command.Kind == pb.DurableCommandKind_DURABLE_SET_CONFIG && len(command.ConfigJson) > 0 {
+			definition, err := r.itemDefinition(item.DefinitionID)
+			if err != nil {
+				return false, nil, "unknown_definition"
+			}
+			if err := validateConfigJSON(definition.ConfigSchema, command.ConfigJson); err != nil {
+				return false, nil, "config_schema_mismatch"
+			}
 		}
 		return true, item, ""
 

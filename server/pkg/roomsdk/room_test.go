@@ -50,11 +50,23 @@ func newHarness(t *testing.T, mutate func(*Config)) *harness {
 		DefinitionID: "rocket",
 		Version:      1,
 		Complexity:   ItemComplexitySimple,
+		ConfigSchema: json.RawMessage(`{
+			"type":"object",
+			"properties":{"thrust":{"type":"number"}},
+			"required":["thrust"],
+			"additionalProperties":false
+		}`),
 	})
 	store.PutItemDefinition(ItemDefinitionRecord{
 		DefinitionID: "complex-rocket",
 		Version:      1,
 		Complexity:   ItemComplexityComplex,
+		ConfigSchema: json.RawMessage(`{
+			"type":"object",
+			"properties":{"thrust":{"type":"number"}},
+			"required":["thrust"],
+			"additionalProperties":false
+		}`),
 	})
 	cfg := Config{
 		Store:             store,
@@ -478,6 +490,50 @@ func TestSpawnEnforcesTheComplexItemLimit(t *testing.T) {
 	}).GetDurableResult()
 	if secondResult.Accepted || secondResult.RejectReason != "complex_item_limit_reached" {
 		t.Errorf("second complex item: accepted=%v reason=%q", secondResult.Accepted, secondResult.RejectReason)
+	}
+}
+
+func TestDurableConfigMustMatchTheDefinitionSchema(t *testing.T) {
+	h := newHarness(t, nil)
+	owner := h.dial("alice")
+	owner.join()
+	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	badSpawn := spawnCommand("cmd-bad-spawn", 10, 10)
+	badSpawn.GetDurableCommand().ConfigJson = []byte(`{"thrust":"fast"}`)
+	owner.send(badSpawn)
+	badSpawnResult := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-bad-spawn"
+	}).GetDurableResult()
+	if badSpawnResult.Accepted || badSpawnResult.RejectReason != "config_schema_mismatch" {
+		t.Errorf("bad spawn config: accepted=%v reason=%q", badSpawnResult.Accepted, badSpawnResult.RejectReason)
+	}
+
+	owner.send(spawnCommand("cmd-spawn", 20, 30))
+	spawned := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-spawn"
+	}).GetDurableResult()
+	if !spawned.Accepted {
+		t.Fatalf("valid spawn rejected: %s", spawned.RejectReason)
+	}
+
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId:  "cmd-bad-config",
+			Kind:       pb.DurableCommandKind_DURABLE_SET_CONFIG,
+			EntityId:   spawned.Command.EntityId,
+			ConfigJson: []byte(`{"thrust":30,"admin":true}`),
+		}},
+	})
+	badConfigResult := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-bad-config"
+	}).GetDurableResult()
+	if badConfigResult.Accepted || badConfigResult.RejectReason != "config_schema_mismatch" {
+		t.Errorf("bad config mutation: accepted=%v reason=%q", badConfigResult.Accepted, badConfigResult.RejectReason)
 	}
 }
 

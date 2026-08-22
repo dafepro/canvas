@@ -93,6 +93,13 @@ store.PutCanvas(roomsdk.CanvasRecord{
     Version:       1,
     DefinitionRaw: canvasJSON,
 })
+store.PutItemDefinition(roomsdk.ItemDefinitionRecord{
+    DefinitionID:  "rocket",
+    Version:       1,
+    Complexity:    roomsdk.ItemComplexityComplex,
+    ConfigSchema:  rocketConfigSchemaJSON,
+    DefinitionRaw: rocketDefinitionJSON,
+})
 
 server, err := roomsdk.New(roomsdk.Config{
     Store: store,
@@ -104,8 +111,10 @@ if err != nil {
 mux.Handle("/", server.Handler())
 ```
 
-`Store` and `Authenticator` are the only interfaces you must supply. Replace
-`MemoryStore` with a database-backed type to persist a canvas between restarts.
+`Store` and `Authenticator` are the only interfaces you must supply. The store
+holds authoritative canvas, item-definition, schema, and snapshot records.
+Replace `MemoryStore` with a database-backed type to persist a canvas between
+restarts.
 
 ## Use the client library
 

@@ -33,6 +33,7 @@ type ItemDefinitionRecord struct {
 	DefinitionID  string          `json:"definitionId"`
 	Version       uint32          `json:"version"`
 	Complexity    ItemComplexity  `json:"complexity"`
+	ConfigSchema  json.RawMessage `json:"configSchema"`
 	DefinitionRaw json.RawMessage `json:"definition,omitempty"`
 }
 

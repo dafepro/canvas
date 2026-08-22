@@ -36,5 +36,11 @@
     "behaviorState": false,
     "onRoomSleep": "resetToIdle"
   },
-  "complexity": "simple"
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": false
+  }
 }

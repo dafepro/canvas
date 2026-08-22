@@ -115,5 +115,61 @@
     "behaviorState": true,
     "onRoomSleep": "resetToIdle"
   },
-  "complexity": "complex"
+  "complexity": "complex",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "armSensorId": {
+        "type": "string"
+      },
+      "requiredContacts": {
+        "type": "number"
+      },
+      "countdownSeconds": {
+        "type": "number"
+      },
+      "graceSeconds": {
+        "type": "number"
+      },
+      "launchImpulse": {
+        "type": "number"
+      },
+      "thrust": {
+        "type": "number"
+      },
+      "thrustSeconds": {
+        "type": "number"
+      },
+      "maxSpeed": {
+        "type": "number"
+      },
+      "spaceRegionTag": {
+        "type": "string"
+      },
+      "groundTag": {
+        "type": "string"
+      },
+      "landingSpeedThreshold": {
+        "type": "number"
+      },
+      "cooldownSeconds": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "armSensorId",
+      "requiredContacts",
+      "countdownSeconds",
+      "graceSeconds",
+      "launchImpulse",
+      "thrust",
+      "thrustSeconds",
+      "maxSpeed",
+      "spaceRegionTag",
+      "groundTag",
+      "landingSpeedThreshold",
+      "cooldownSeconds"
+    ],
+    "additionalProperties": false
+  }
 }
