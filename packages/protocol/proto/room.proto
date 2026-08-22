@@ -114,6 +114,9 @@ message PlayerInput {
   uint64 client_time_unix_ms = 4;
   // True while the pointer is held, so a lost packet leaves no stale input.
   bool held = 5;
+  // Addendum A1. True while the sender asks the host to disable its avatar.
+  // The flag rides on every input, so a lost packet cannot leave a stale value.
+  bool avatar_disabled = 6;
 }
 
 message EntityState {
@@ -132,6 +135,8 @@ message EntityState {
   bool quarantined = 11;
   // Lets a client that never held the item pick the right visual.
   string definition_id = 12;
+  // Addendum A1. True when no physics act on this avatar.
+  bool disabled = 13;
 }
 
 message StateDelta {

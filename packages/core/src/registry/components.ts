@@ -40,6 +40,12 @@ export interface AvatarComponent {
   lastProcessedInputSeq: number;
   desiredDirection: Vec2;
   desiredIntensity: number;
+  /**
+   * Addendum A1. True when no physics act on this avatar. The avatar keeps its
+   * position, its identity, and its ownership, but it does not move, it does
+   * not collide, and it emits no contact event.
+   */
+  disabled?: boolean;
 }
 
 export interface ElevationComponent extends ElevationDefinition {

@@ -28,6 +28,8 @@ export interface InputIntent {
   direction: Vec2;
   intensity: number;
   held: boolean;
+  /** Addendum A1. True while the player asks for a disabled avatar. */
+  disabled?: boolean;
 }
 
 const NO_INTENT: InputIntent = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
@@ -212,6 +214,7 @@ export class RoomSession {
         direction: input.direction ?? { x: 0, y: 0 },
         intensity: input.intensity,
         inputSequence: input.inputSequence,
+        disabled: input.avatarDisabled,
       });
     });
 
@@ -318,6 +321,7 @@ export class RoomSession {
   private sendInput(): void {
     const intent = this.options.intent?.() ?? NO_INTENT;
     this.inputSequence++;
+    const disabled = intent.disabled === true;
     // The host applies its own input directly; a peer sends it through the relay.
     this.driver.send({
       type: "input",
@@ -325,6 +329,7 @@ export class RoomSession {
       direction: intent.direction,
       intensity: intent.intensity,
       inputSequence: this.inputSequence,
+      disabled,
     });
     if (!this.client.isHost) {
       this.client.sendInput({
@@ -333,6 +338,7 @@ export class RoomSession {
         intensity: intent.intensity,
         clientTimeUnixMs: Date.now(),
         held: intent.held,
+        avatarDisabled: disabled,
       });
     }
   }
@@ -667,6 +673,7 @@ const toEntityState = (
   behaviorStateJson,
   quarantined: entity.quarantined ?? false,
   definitionId: entity.definitionId,
+  disabled: entity.disabled ?? false,
 });
 
 const fromEntityState = (state: EntityState): RenderEntity => ({
@@ -684,4 +691,5 @@ const fromEntityState = (state: EntityState): RenderEntity => ({
   lastProcessedInputSequence: state.lastProcessedInputSequence,
   behaviorState: fromJsonBytes(state.behaviorStateJson),
   quarantined: state.quarantined,
+  disabled: state.disabled,
 });

@@ -84,6 +84,7 @@ same simulation in the test process.
 | Top-down elevation Z with shadows, scale, and landing events | The elevation channel and the landing event are done and tested. The renderer offsets the sprite by Z but draws no shadow. |
 | Per-edge wrap, respawn, solid, and open | Done and tested. |
 | Effect events for trails, particles, overlays, and one-shot animations | Done with pooled particles and a countdown overlay. A client that joins during a countdown restores the overlay from the behavior state. |
+| Addendum A1: disable an avatar | Done. See `docs/ADDENDUM.md`. `RapierWorld.setAvatarDisabled` switches off the colliders, ends every open contact and region, and stops the drive. The flag rides on `PlayerInput` and returns on `EntityState`. The demo toggles it with the `P` key or a button. Tested in `host-simulation.test.ts` and end to end in `two-client-relay.test.ts`. |
 
 ## Phase 6 — Hardening and production budgets: not started
 
@@ -121,6 +122,7 @@ The user ran the demo and reported the following. The state of each item:
 
 | Report | State |
 | --- | --- |
+| The avatar still travels below the bottom edge, and the return trip takes as long as the outward trip. | Fixed. The avatar body is `kinematicVelocityBased`, so the Rapier solver never stopped it and it passed through the ground and through every solid edge. A `KinematicCharacterController` now clamps each avatar move against fixed geometry and slides the rest along the surface. The earlier wrap fix was correct but it only helped dynamic items. Tested by four cases in `host-simulation.test.ts`. |
 | The avatar leaves the top of the canvas, appears at the bottom, and keeps falling past the bottom edge. | Fixed. `resolveEdges` wrapped a body to `height + radius`, which is *outside* the solid bottom edge, so the body fell out of the canvas. It now wraps to `height - radius`. `RapierWorld.clearOfGeometry` then moves the body along its direction of travel until it no longer overlaps solid geometry, because the bottom of the rocket canvas is filled with ground. Tested in `environment.test.ts` and `host-simulation.test.ts`. |
 | An item thrown up gets stuck at the bottom and loses all motion. | Fixed by the same change. |
 | WASD works. Consider other control schemes. | The arrow keys already work as well as WASD. No new scheme is added. |

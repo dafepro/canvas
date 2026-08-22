@@ -30,6 +30,8 @@ export interface CanvasRuntimeOptions {
   rates?: RoomSessionRates;
   scene?: SceneOptions;
   onDiagnostics?: (diagnostics: RuntimeDiagnostics) => void;
+  /** Addendum A1. Runs after the local avatar changes its disabled state. */
+  onAvatarDisabledChange?: (disabled: boolean) => void;
 }
 
 export interface RuntimeDiagnostics extends SessionDiagnostics {
@@ -49,6 +51,8 @@ export class CanvasRuntime {
   private renderFps = 0;
   private running = false;
   private visibilityListener?: () => void;
+  private avatarDisabled = false;
+  private disableKeyListener?: (event: KeyboardEvent) => void;
 
   constructor(private readonly options: CanvasRuntimeOptions) {
     this.session = new RoomSession({
@@ -82,6 +86,10 @@ export class CanvasRuntime {
       document.removeEventListener("visibilitychange", this.visibilityListener);
       this.visibilityListener = undefined;
     }
+    if (this.disableKeyListener) {
+      window.removeEventListener("keydown", this.disableKeyListener);
+      this.disableKeyListener = undefined;
+    }
     this.pointer?.destroy();
     this.keyboard?.destroy();
     this.session.stop();
@@ -97,9 +105,32 @@ export class CanvasRuntime {
     this.keyboard = new KeyboardController();
     this.startRenderLoop();
     this.watchVisibility();
+    this.watchDisableKey();
+  }
+
+  /**
+   * Addendum A1. A disabled avatar keeps its place, but no physics act on it.
+   * The flag rides on every input, so the host always holds the newest value.
+   */
+  setAvatarDisabled(disabled: boolean): void {
+    if (this.avatarDisabled === disabled) return;
+    this.avatarDisabled = disabled;
+    this.options.onAvatarDisabledChange?.(disabled);
+  }
+
+  toggleAvatarDisabled(): boolean {
+    this.setAvatarDisabled(!this.avatarDisabled);
+    return this.avatarDisabled;
+  }
+
+  get isAvatarDisabled(): boolean {
+    return this.avatarDisabled;
   }
 
   private mergedIntent(): InputIntent {
+    if (this.avatarDisabled) {
+      return { direction: { x: 0, y: 0 }, intensity: 0, held: false, disabled: true };
+    }
     const pointer = this.pointer?.intent;
     if (pointer && pointer.intensity > 0) return pointer;
     const keyboard = this.keyboard?.intent;
@@ -119,6 +150,15 @@ export class CanvasRuntime {
       scene.setThumbstick(this.pointer?.gesture);
       this.options.onDiagnostics?.(this.diagnostics());
     });
+  }
+
+  /** Addendum A1. The `P` key disables and enables the local avatar. */
+  private watchDisableKey(): void {
+    this.disableKeyListener = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "p") return;
+      this.toggleAvatarDisabled();
+    };
+    window.addEventListener("keydown", this.disableKeyListener);
   }
 
   private watchVisibility(): void {

@@ -175,7 +175,8 @@ export class PixiScene {
       const elevation = entity.z ?? 0;
       record.display.position.set(screenX, screenY - elevation * this.camera.scale);
       record.display.rotation = entity.rotation;
-      record.display.alpha = entity.quarantined ? 0.3 : 1;
+      // Addendum A1. A disabled avatar stays visible but reads as inactive.
+      record.display.alpha = entity.quarantined || entity.disabled ? 0.35 : 1;
       this.screenPositions.set(entity.id, {
         x: record.display.position.x,
         y: record.display.position.y,

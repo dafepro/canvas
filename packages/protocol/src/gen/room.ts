@@ -219,6 +219,11 @@ export interface PlayerInput {
   clientTimeUnixMs: number;
   /** True while the pointer is held, so a lost packet leaves no stale input. */
   held: boolean;
+  /**
+   * Addendum A1. True while the sender asks the host to disable its avatar.
+   * The flag rides on every input, so a lost packet cannot leave a stale value.
+   */
+  avatarDisabled: boolean;
 }
 
 export interface EntityState {
@@ -237,6 +242,8 @@ export interface EntityState {
   quarantined: boolean;
   /** Lets a client that never held the item pick the right visual. */
   definitionId: string;
+  /** Addendum A1. True when no physics act on this avatar. */
+  disabled: boolean;
 }
 
 export interface StateDelta {
@@ -1822,7 +1829,14 @@ export const Heartbeat: MessageFns<Heartbeat> = {
 };
 
 function createBasePlayerInput(): PlayerInput {
-  return { inputSequence: 0, direction: undefined, intensity: 0, clientTimeUnixMs: 0, held: false };
+  return {
+    inputSequence: 0,
+    direction: undefined,
+    intensity: 0,
+    clientTimeUnixMs: 0,
+    held: false,
+    avatarDisabled: false,
+  };
 }
 
 export const PlayerInput: MessageFns<PlayerInput> = {
@@ -1841,6 +1855,9 @@ export const PlayerInput: MessageFns<PlayerInput> = {
     }
     if (message.held !== false) {
       writer.uint32(40).bool(message.held);
+    }
+    if (message.avatarDisabled !== false) {
+      writer.uint32(48).bool(message.avatarDisabled);
     }
     return writer;
   },
@@ -1898,6 +1915,14 @@ export const PlayerInput: MessageFns<PlayerInput> = {
             message.held = reader.bool();
             continue;
           }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.avatarDisabled = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1925,6 +1950,11 @@ export const PlayerInput: MessageFns<PlayerInput> = {
         ? globalThis.Number(object.client_time_unix_ms)
         : 0,
       held: isSet(object.held) ? globalThis.Boolean(object.held) : false,
+      avatarDisabled: isSet(object.avatarDisabled)
+        ? globalThis.Boolean(object.avatarDisabled)
+        : isSet(object.avatar_disabled)
+        ? globalThis.Boolean(object.avatar_disabled)
+        : false,
     };
   },
 
@@ -1945,6 +1975,9 @@ export const PlayerInput: MessageFns<PlayerInput> = {
     if (message.held !== false) {
       obj.held = message.held;
     }
+    if (message.avatarDisabled !== false) {
+      obj.avatarDisabled = message.avatarDisabled;
+    }
     return obj;
   },
 
@@ -1960,6 +1993,7 @@ export const PlayerInput: MessageFns<PlayerInput> = {
     message.intensity = object.intensity ?? 0;
     message.clientTimeUnixMs = object.clientTimeUnixMs ?? 0;
     message.held = object.held ?? false;
+    message.avatarDisabled = object.avatarDisabled ?? false;
     return message;
   },
 };
@@ -1978,6 +2012,7 @@ function createBaseEntityState(): EntityState {
     behaviorStateJson: new Uint8Array(0),
     quarantined: false,
     definitionId: "",
+    disabled: false,
   };
 }
 
@@ -2018,6 +2053,9 @@ export const EntityState: MessageFns<EntityState> = {
     }
     if (message.definitionId !== "") {
       writer.uint32(98).string(message.definitionId);
+    }
+    if (message.disabled !== false) {
+      writer.uint32(104).bool(message.disabled);
     }
     return writer;
   },
@@ -2131,6 +2169,14 @@ export const EntityState: MessageFns<EntityState> = {
             message.definitionId = reader.string();
             continue;
           }
+          case 13: {
+            if (tag !== 104) {
+              break;
+            }
+
+            message.disabled = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2181,6 +2227,7 @@ export const EntityState: MessageFns<EntityState> = {
         : isSet(object.definition_id)
         ? globalThis.String(object.definition_id)
         : "",
+      disabled: isSet(object.disabled) ? globalThis.Boolean(object.disabled) : false,
     };
   },
 
@@ -2222,6 +2269,9 @@ export const EntityState: MessageFns<EntityState> = {
     if (message.definitionId !== "") {
       obj.definitionId = message.definitionId;
     }
+    if (message.disabled !== false) {
+      obj.disabled = message.disabled;
+    }
     return obj;
   },
 
@@ -2246,6 +2296,7 @@ export const EntityState: MessageFns<EntityState> = {
     message.behaviorStateJson = object.behaviorStateJson ?? new Uint8Array(0);
     message.quarantined = object.quarantined ?? false;
     message.definitionId = object.definitionId ?? "";
+    message.disabled = object.disabled ?? false;
     return message;
   },
 };

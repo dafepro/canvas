@@ -105,6 +105,79 @@ describe("HostSimulation with real physics", () => {
     expect(transform.y).toBeGreaterThan(62);
   });
 
+  // Addendum A1. A disabled avatar keeps its place and takes no part in the
+  // simulation.
+  it("stops a disabled avatar and lets an item pass through it", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:a",
+      clientId: "a",
+      userId: "alice",
+      position: { x: 50, y: 40 },
+    });
+    simulation.world.setAvatarDisabled("avatar:a", true);
+    simulation.world.setAvatarInput("avatar:a", { x: 1, y: 0 }, 1, 4);
+    // A crate falls from directly above the avatar.
+    simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));
+    for (let i = 0; i < 300; i++) simulation.step();
+
+    const avatar = simulation.world.registry.require("avatar:a");
+    expect(avatar.transform.x).toBeCloseTo(50, 3);
+    expect(avatar.transform.y).toBeCloseTo(40, 3);
+    expect(avatar.avatar!.disabled).toBe(true);
+    // The crate reached the ground, so the avatar did not block it.
+    expect(simulation.world.registry.require("crate-1").transform.y).toBeGreaterThan(55);
+    simulation.free();
+  });
+
+  it("moves a re-enabled avatar again from the same place", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:a",
+      clientId: "a",
+      userId: "alice",
+      position: { x: 50, y: 40 },
+    });
+    simulation.world.setAvatarDisabled("avatar:a", true);
+    simulation.world.setAvatarInput("avatar:a", { x: 1, y: 0 }, 1, 1);
+    for (let i = 0; i < 60; i++) simulation.step();
+    const held = simulation.world.registry.require("avatar:a").transform.x;
+
+    simulation.world.setAvatarDisabled("avatar:a", false);
+    simulation.world.setAvatarInput("avatar:a", { x: 1, y: 0 }, 1, 2);
+    for (let i = 0; i < 60; i++) simulation.step();
+    const avatar = simulation.world.registry.require("avatar:a");
+    expect(held).toBeCloseTo(50, 3);
+    expect(avatar.transform.x).toBeGreaterThan(55);
+    simulation.free();
+  });
+
+  it("ends a contact when the avatar is disabled", () => {
+    const simulation = build();
+    simulation.addItem(instance("rocket-1", rocketDefinition as ItemDefinition, 70, 61));
+    simulation.addAvatar({
+      entityId: "avatar:a",
+      clientId: "a",
+      userId: "alice",
+      position: { x: 66, y: 62 },
+    });
+    for (let i = 0; i < 30; i++) simulation.step();
+    const slot = () => simulation.behaviors.slot("rocket-1")!.state as { phase: string };
+    expect(slot().phase).toBe("arming");
+
+    simulation.world.setAvatarDisabled("avatar:a", true);
+    const events = simulation.world.step().events;
+    const counts = events.filter(
+      (event) => event.type === "contact.count" && event.self === "rocket-1",
+    );
+    expect(counts.length).toBeGreaterThan(0);
+    expect((counts[0] as { count: number }).count).toBe(0);
+    expect(
+      events.some((event) => event.type === "contact.exit" && event.self === "rocket-1"),
+    ).toBe(true);
+    simulation.free();
+  });
+
   it("wraps an avatar that leaves the top edge and lands on the ground", () => {
     const simulation = build();
     simulation.addAvatar({

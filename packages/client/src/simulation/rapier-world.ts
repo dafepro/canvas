@@ -399,6 +399,48 @@ export class RapierWorld implements BehaviorHost {
 
   // ---------- input ----------
 
+  /**
+   * Addendum A1. A disabled avatar keeps its place but takes no part in the
+   * simulation. Its colliders are switched off, so no body touches it and it
+   * emits no contact, region, or dwell event.
+   */
+  setAvatarDisabled(entityId: EntityId, disabled: boolean): void {
+    const record = this.bodies.get(entityId);
+    const avatar = record?.entity.avatar;
+    if (!record || !avatar) return;
+    if (avatar.disabled === disabled) return;
+    avatar.disabled = disabled;
+    for (const collider of record.colliders.values()) collider.setEnabled(!disabled);
+    if (disabled) {
+      record.body.setLinvel({ x: 0, y: 0 }, true);
+      record.body.setAngvel(0, true);
+      avatar.desiredDirection = { x: 0, y: 0 };
+      avatar.desiredIntensity = 0;
+      // A contact that was open when the avatar was disabled must end, or a
+      // behavior that counts avatars keeps counting this one. A disabled
+      // collider raises no stop event, so the exit is emitted here.
+      this.endContacts(entityId);
+    }
+  }
+
+  private endContacts(entityId: EntityId): void {
+    const touched: [EntityId, string][] = [];
+    for (const [key, contact] of this.contactSets) {
+      if (contact.selfId !== entityId && contact.other.entityId !== entityId) continue;
+      this.contactSets.delete(key);
+      this.pendingEvents.push({
+        type: "contact.exit",
+        tick: this.tick,
+        self: contact.selfId,
+        selfColliderId: contact.selfColliderId,
+        other: contact.other,
+        dwellTicks: this.tick - contact.startTick,
+      });
+      touched.push([contact.selfId, contact.selfColliderId]);
+    }
+    for (const [id, colliderId] of touched) this.emitContactCount(id, colliderId);
+  }
+
   setAvatarInput(
     entityId: EntityId,
     direction: Vec2,
@@ -407,6 +449,11 @@ export class RapierWorld implements BehaviorHost {
   ): void {
     const entity = this.registry.get(entityId);
     if (!entity?.avatar) return;
+    if (entity.avatar.disabled) {
+      entity.avatar.desiredDirection = { x: 0, y: 0 };
+      entity.avatar.desiredIntensity = 0;
+      return;
+    }
     entity.avatar.desiredDirection = direction;
     entity.avatar.desiredIntensity = Math.max(0, Math.min(1, intensity));
     if (inputSequence > entity.avatar.lastProcessedInputSeq) {
@@ -490,6 +537,10 @@ export class RapierWorld implements BehaviorHost {
   private driveAvatar(record: BodyRecord, dt: number): void {
     const avatar = record.entity.avatar;
     if (!avatar) return;
+    if (avatar.disabled) {
+      record.body.setLinvel({ x: 0, y: 0 }, true);
+      return;
+    }
     // Spec 6.1. Intent accelerates the avatar toward a desired velocity.
     const desired = {
       x: avatar.desiredDirection.x * avatar.desiredIntensity * avatar.maxSpeed,
@@ -693,7 +744,9 @@ export class RapierWorld implements BehaviorHost {
       if (record.entity.kind === "static") continue;
       const position = record.entity.transform;
       const inside = new Set<string>();
-      for (const [id, region] of emitting) {
+      // A disabled avatar belongs to no region, so the loop below emits the
+      // exit for every region it was in.
+      for (const [id, region] of record.entity.avatar?.disabled ? [] : emitting) {
         const shape = region.shape;
         const contained =
           shape.type === "rect"
@@ -734,6 +787,7 @@ export class RapierWorld implements BehaviorHost {
     for (const record of this.bodies.values()) {
       const elevation = record.entity.elevation;
       if (!elevation?.enabled) continue;
+      if (record.entity.avatar?.disabled) continue;
       this.environment.sample(record.entity.transform, this.sample);
       const result = stepElevation(elevation, this.sample, dt);
       record.entity.transform.z = elevation.z;
@@ -751,6 +805,7 @@ export class RapierWorld implements BehaviorHost {
   private applyEdgePolicies(): void {
     for (const record of this.bodies.values()) {
       if (record.entity.kind === "static") continue;
+      if (record.entity.avatar?.disabled) continue;
       const transform = record.entity.transform;
       const velocity = record.body.linvel();
       const radius = record.entity.avatar?.radius ?? 0;

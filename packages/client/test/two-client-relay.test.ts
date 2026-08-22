@@ -152,4 +152,43 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       20_000,
     );
   }, 90_000);
+
+  // Addendum A1. The disabled flag rides on the input, so the host holds the
+  // newest value even after a lost packet.
+  it("disables the peer avatar on the host and enables it again", async () => {
+    let bobIntent: InputIntent = STILL;
+    const alice = session("alice");
+    await alice.start();
+    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+
+    const bob = session("bob", () => bobIntent);
+    await bob.start();
+    await waitFor("bob to join", () => bob.client.clientId !== "");
+
+    const bobAvatar = avatarEntityId(bob.client.clientId);
+    await waitFor("the host to add the peer avatar", () => entity(alice, bobAvatar) !== undefined);
+
+    bobIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true, disabled: true };
+    await waitFor(
+      "the host to disable the peer avatar",
+      () => entity(alice, bobAvatar)?.disabled === true,
+      20_000,
+    );
+
+    // A disabled avatar does not move, even though the intent asks it to.
+    const held = entity(alice, bobAvatar)!.x;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(Math.abs(entity(alice, bobAvatar)!.x - held)).toBeLessThan(0.001);
+
+    bobIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true };
+    await waitFor(
+      "the host to move the avatar again",
+      () => {
+        const onHost = entity(alice, bobAvatar);
+        return onHost !== undefined && onHost.disabled !== true && onHost.x - held > 2;
+      },
+      20_000,
+    );
+    bobIntent = STILL;
+  }, 90_000);
 });

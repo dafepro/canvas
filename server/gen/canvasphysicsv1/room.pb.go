@@ -1010,9 +1010,12 @@ type PlayerInput struct {
 	Intensity        float32                `protobuf:"fixed32,3,opt,name=intensity,proto3" json:"intensity,omitempty"`
 	ClientTimeUnixMs uint64                 `protobuf:"varint,4,opt,name=client_time_unix_ms,json=clientTimeUnixMs,proto3" json:"client_time_unix_ms,omitempty"`
 	// True while the pointer is held, so a lost packet leaves no stale input.
-	Held          bool `protobuf:"varint,5,opt,name=held,proto3" json:"held,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Held bool `protobuf:"varint,5,opt,name=held,proto3" json:"held,omitempty"`
+	// Addendum A1. True while the sender asks the host to disable its avatar.
+	// The flag rides on every input, so a lost packet cannot leave a stale value.
+	AvatarDisabled bool `protobuf:"varint,6,opt,name=avatar_disabled,json=avatarDisabled,proto3" json:"avatar_disabled,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PlayerInput) Reset() {
@@ -1080,6 +1083,13 @@ func (x *PlayerInput) GetHeld() bool {
 	return false
 }
 
+func (x *PlayerInput) GetAvatarDisabled() bool {
+	if x != nil {
+		return x.AvatarDisabled
+	}
+	return false
+}
+
 type EntityState struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	EntityId        string                 `protobuf:"bytes,1,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
@@ -1096,7 +1106,9 @@ type EntityState struct {
 	BehaviorStateJson []byte `protobuf:"bytes,10,opt,name=behavior_state_json,json=behaviorStateJson,proto3" json:"behavior_state_json,omitempty"`
 	Quarantined       bool   `protobuf:"varint,11,opt,name=quarantined,proto3" json:"quarantined,omitempty"`
 	// Lets a client that never held the item pick the right visual.
-	DefinitionId  string `protobuf:"bytes,12,opt,name=definition_id,json=definitionId,proto3" json:"definition_id,omitempty"`
+	DefinitionId string `protobuf:"bytes,12,opt,name=definition_id,json=definitionId,proto3" json:"definition_id,omitempty"`
+	// Addendum A1. True when no physics act on this avatar.
+	Disabled      bool `protobuf:"varint,13,opt,name=disabled,proto3" json:"disabled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1213,6 +1225,13 @@ func (x *EntityState) GetDefinitionId() string {
 		return x.DefinitionId
 	}
 	return ""
+}
+
+func (x *EntityState) GetDisabled() bool {
+	if x != nil {
+		return x.Disabled
+	}
+	return false
 }
 
 type StateDelta struct {
@@ -1885,13 +1904,14 @@ const file_room_proto_rawDesc = "" +
 	"\x0fsent_at_unix_ms\x18\x01 \x01(\x04R\fsentAtUnixMs\x12#\n" +
 	"\rsimulation_hz\x18\x02 \x01(\x02R\fsimulationHz\x12&\n" +
 	"\x0fworker_drift_ms\x18\x03 \x01(\x02R\rworkerDriftMs\x12!\n" +
-	"\fpage_visible\x18\x04 \x01(\bR\vpageVisible\"\xcb\x01\n" +
+	"\fpage_visible\x18\x04 \x01(\bR\vpageVisible\"\xf4\x01\n" +
 	"\vPlayerInput\x12%\n" +
 	"\x0einput_sequence\x18\x01 \x01(\rR\rinputSequence\x124\n" +
 	"\tdirection\x18\x02 \x01(\v2\x16.canvasphysics.v1.Vec2R\tdirection\x12\x1c\n" +
 	"\tintensity\x18\x03 \x01(\x02R\tintensity\x12-\n" +
 	"\x13client_time_unix_ms\x18\x04 \x01(\x04R\x10clientTimeUnixMs\x12\x12\n" +
-	"\x04held\x18\x05 \x01(\bR\x04held\"\xd8\x03\n" +
+	"\x04held\x18\x05 \x01(\bR\x04held\x12'\n" +
+	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xf4\x03\n" +
 	"\vEntityState\x12\x1b\n" +
 	"\tentity_id\x18\x01 \x01(\tR\bentityId\x122\n" +
 	"\bposition\x18\x02 \x01(\v2\x16.canvasphysics.v1.Vec2R\bposition\x12\x1a\n" +
@@ -1905,7 +1925,8 @@ const file_room_proto_rawDesc = "" +
 	"\x13behavior_state_json\x18\n" +
 	" \x01(\fR\x11behaviorStateJson\x12 \n" +
 	"\vquarantined\x18\v \x01(\bR\vquarantined\x12#\n" +
-	"\rdefinition_id\x18\f \x01(\tR\fdefinitionId\"\x9c\x01\n" +
+	"\rdefinition_id\x18\f \x01(\tR\fdefinitionId\x12\x1a\n" +
+	"\bdisabled\x18\r \x01(\bR\bdisabled\"\x9c\x01\n" +
 	"\n" +
 	"StateDelta\x129\n" +
 	"\bentities\x18\x01 \x03(\v2\x1d.canvasphysics.v1.EntityStateR\bentities\x12,\n" +

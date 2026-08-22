@@ -32,6 +32,8 @@ export type SimulationRequest =
       direction: Vec2;
       intensity: number;
       inputSequence: number;
+      /** Addendum A1. True while the client asks for a disabled avatar. */
+      disabled?: boolean;
     }
   | { type: "ownerAction"; entityId: string; action: string; userId: string }
   | { type: "moveItem"; entityId: string; transform: Transform; preview: boolean }
@@ -56,6 +58,8 @@ export interface RenderEntity {
   lastProcessedInputSequence?: number;
   behaviorState?: unknown;
   quarantined?: boolean;
+  /** Addendum A1. True when no physics act on this avatar. */
+  disabled?: boolean;
 }
 
 export interface SimulationStats {

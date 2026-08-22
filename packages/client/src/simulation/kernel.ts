@@ -40,6 +40,7 @@ const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity =
   lastProcessedInputSequence: entity.avatar?.lastProcessedInputSeq,
   behaviorState,
   quarantined: entity.quarantined,
+  disabled: entity.avatar?.disabled,
 });
 
 /**
@@ -121,6 +122,7 @@ export class SimulationKernel {
         break;
 
       case "input":
+        this.simulation?.world.setAvatarDisabled(request.entityId, request.disabled === true);
         this.simulation?.world.setAvatarInput(
           request.entityId,
           request.direction,
