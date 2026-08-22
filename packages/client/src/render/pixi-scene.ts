@@ -5,6 +5,7 @@ import type {
   StaticColliderDefinition,
 } from "@canvas-physics/core";
 import type { RenderEntity } from "../simulation/messages.js";
+import type { DragGesture } from "../input/pointer-drag-controller.js";
 import { Camera } from "./camera.js";
 import { EffectSystem } from "./effect-system.js";
 
@@ -33,6 +34,7 @@ export class PixiScene {
   private readonly entityLayer = new Container();
   private readonly debugLayer = new Container();
   private readonly uiLayer = new Container();
+  private readonly thumbstick = new Graphics();
   private readonly sprites = new Map<string, SpriteRecord>();
   private readonly definitions = new Map<string, ItemDefinition>();
   private readonly screenPositions = new Map<string, { x: number; y: number }>();
@@ -62,6 +64,7 @@ export class PixiScene {
     element.appendChild(this.app.canvas);
 
     this.world.addChild(this.backgroundLayer, this.entityLayer, this.debugLayer);
+    this.uiLayer.addChild(this.thumbstick);
     this.app.stage.addChild(this.world, this.effects.layer, this.uiLayer);
     this.resize();
     this.app.renderer.on("resize", () => this.resize());
@@ -316,6 +319,37 @@ export class PixiScene {
     const delta = this.lastFrameMs === 0 ? 16 : nowMs - this.lastFrameMs;
     this.lastFrameMs = nowMs;
     return delta;
+  }
+
+  /**
+   * Spec 6.1. Draws the drag as a thumb stick: a ring at the point the player
+   * pressed and a knob in the direction of the drag. Pass no gesture to hide it.
+   */
+  setThumbstick(gesture?: DragGesture): void {
+    this.thumbstick.clear();
+    if (!gesture) return;
+    const dx = gesture.point.x - gesture.origin.x;
+    const dy = gesture.point.y - gesture.origin.y;
+    const distance = Math.hypot(dx, dy);
+    const limit = gesture.rangePx;
+    const scale = distance > limit ? limit / distance : 1;
+    const knobX = gesture.origin.x + dx * scale;
+    const knobY = gesture.origin.y + dy * scale;
+
+    this.thumbstick
+      .circle(gesture.origin.x, gesture.origin.y, limit)
+      .stroke({ color: 0xf1faee, width: 2, alpha: 0.35 })
+      .circle(gesture.origin.x, gesture.origin.y, 4)
+      .fill({ color: 0xf1faee, alpha: 0.5 });
+    if (distance > 0) {
+      this.thumbstick
+        .moveTo(gesture.origin.x, gesture.origin.y)
+        .lineTo(knobX, knobY)
+        .stroke({ color: 0xffd166, width: 2, alpha: 0.6 })
+        .circle(knobX, knobY, 14)
+        .fill({ color: 0xffd166, alpha: 0.25 + 0.5 * gesture.intensity })
+        .stroke({ color: 0xffd166, width: 2, alpha: 0.8 });
+    }
   }
 
   get uiContainer(): Container {

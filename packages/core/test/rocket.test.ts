@@ -48,6 +48,20 @@ describe("RocketBehavior", () => {
     expect(h.effects("thrustTrail")[0]?.mode).toBe("start");
   });
 
+  it("keeps the countdown after one touch when the grace time is longer", () => {
+    // Data only: a grace time above the countdown makes one touch enough.
+    const h = harness({ graceSeconds: 3.5 });
+    arm(h).advanceSeconds(0.5);
+    h.send({
+      type: "contact.count",
+      colliderId: "arm",
+      count: 0,
+      previousCount: 1,
+      parties: [],
+    }).advanceSeconds(2.5);
+    expect(h.state.phase).toBe("flying");
+  });
+
   it("disarms when the contact stops before the countdown finishes", () => {
     const h = harness();
     arm(h).advanceSeconds(1);

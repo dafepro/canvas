@@ -1,16 +1,32 @@
+import { SimulationKernel } from "./kernel.js";
 import type { SimulationRequest, SimulationResponse } from "./messages.js";
 
 export type SimulationListener = (message: SimulationResponse) => void;
 
-/** The main-thread handle on the simulation worker. */
-export class SimulationDriver {
-  private readonly worker: Worker;
-  private readonly listeners = new Set<SimulationListener>();
+/** The two ends of the simulation boundary look the same to the driver. */
+interface SimulationChannel {
+  send(request: SimulationRequest): void;
+  terminate(): void;
+}
 
-  constructor(worker: Worker) {
-    this.worker = worker;
-    this.worker.onmessage = (event: MessageEvent<SimulationResponse>) => {
-      for (const listener of this.listeners) listener(event.data);
+/** The main-thread handle on the simulation. */
+export class SimulationDriver {
+  private readonly listeners = new Set<SimulationListener>();
+  private readonly channel: SimulationChannel;
+
+  constructor(source: Worker | ((post: SimulationListener) => SimulationChannel)) {
+    const deliver: SimulationListener = (message) => {
+      for (const listener of this.listeners) listener(message);
+    };
+    if (typeof source === "function") {
+      this.channel = source(deliver);
+      return;
+    }
+    const worker = source;
+    worker.onmessage = (event: MessageEvent<SimulationResponse>) => deliver(event.data);
+    this.channel = {
+      send: (request) => worker.postMessage(request),
+      terminate: () => worker.terminate(),
     };
   }
 
@@ -23,8 +39,22 @@ export class SimulationDriver {
     return new SimulationDriver(worker);
   }
 
+  /**
+   * Builds a driver that runs the kernel in this thread. A test uses it to run a
+   * full client with no worker. A browser client uses `spawn`.
+   */
+  static local(): SimulationDriver {
+    return new SimulationDriver((post) => {
+      const kernel = new SimulationKernel(post);
+      return {
+        send: (request) => kernel.handle(request),
+        terminate: () => kernel.stop(),
+      };
+    });
+  }
+
   send(request: SimulationRequest): void {
-    this.worker.postMessage(request);
+    this.channel.send(request);
   }
 
   onMessage(listener: SimulationListener): () => void {
@@ -34,7 +64,7 @@ export class SimulationDriver {
 
   terminate(): void {
     this.send({ type: "stop" });
-    this.worker.terminate();
+    this.channel.terminate();
     this.listeners.clear();
   }
 }

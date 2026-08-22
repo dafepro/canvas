@@ -141,10 +141,20 @@ describe("resolveEdges", () => {
   });
 
   it("wraps to the opposite edge and preserves velocity", () => {
-    const result = resolveEdges(allWrap, { x: -1, y: 35 }, { x: -5, y: 0 });
+    const result = resolveEdges(allWrap, { x: -3, y: 35 }, { x: -5, y: 0 }, 2);
     expect(result.crossings[0]).toEqual({ edge: "left", policy: "wrap" });
-    expect(result.position!.x).toBe(100);
+    // Just inside the right edge, by the radius of the body.
+    expect(result.position!.x).toBe(98);
     expect(result.velocity).toBeUndefined();
+  });
+
+  it("keeps a wrapped body inside a canvas with a solid opposite edge", () => {
+    const wrapTop = canvas({ top: "wrap", right: "solid", bottom: "solid", left: "solid" });
+    const result = resolveEdges(wrapTop, { x: 50, y: -3 }, { x: 0, y: -9 }, 1.5);
+    expect(result.crossings[0]).toEqual({ edge: "top", policy: "wrap" });
+    // A position below the solid bottom edge would fall out of the canvas.
+    expect(result.position!.y).toBe(68.5);
+    expect(result.position!.y).toBeLessThan(wrapTop.size.height);
   });
 
   it("ignores a solid edge because a static collider stops the body", () => {

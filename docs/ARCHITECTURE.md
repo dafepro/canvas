@@ -9,16 +9,18 @@ This file explains how the pieces fit together. The specification in
    browser client                          browser client
 +-------------------------+            +-------------------------+
 | main thread             |            | main thread             |
-|  PixiScene              |            |  PixiScene              |
-|  PointerDragController  |            |  InterpolationBuffer    |
-|  CanvasRuntime          |            |  AvatarReconciler       |
-|  RoomClient + transport |            |  RoomClient + transport |
+|  CanvasRuntime          |            |  CanvasRuntime          |
+|   PixiScene             |            |   PixiScene             |
+|   PointerDragController |            |  RoomSession            |
+|  RoomSession            |            |   InterpolationBuffer   |
+|   RoomClient + transport|            |   AvatarReconciler      |
 +-----------+-------------+            +-----------+-------------+
             |                                     |
    worker boundary                        worker boundary
             |                                     |
 +-----------v-------------+            +-----------v-------------+
 | simulation worker       |            | simulation worker       |
+|  SimulationKernel       |            |  SimulationKernel       |
 |  RapierWorld (all)      |            |  RapierWorld (static +  |
 |  BehaviorRuntime        |            |  local avatar only)     |
 |  HostSimulation         |            |                         |
@@ -123,10 +125,10 @@ A host that lies about physics cannot grant itself edit rights. The server sets
 | --- | --- | --- |
 | Physics and behavior tick | 60 Hz fixed | `HostSimulation` |
 | Render | Up to 60 FPS | Pixi ticker |
-| Input to the host | 30 Hz | `CanvasRuntime` |
-| Host state delta | 15 Hz | `CanvasRuntime` |
-| Host keyframe | 2 Hz | `CanvasRuntime` |
-| Checkpoint to the server | 1 Hz | `CanvasRuntime` |
+| Input to the host | 30 Hz | `RoomSession` |
+| Host state delta | 15 Hz | `RoomSession` |
+| Host keyframe | 2 Hz | `RoomSession` |
+| Checkpoint to the server | 1 Hz | `RoomSession` |
 | Host heartbeat | 2 Hz | `RoomClient` |
 
 ## Extending the system
@@ -139,3 +141,4 @@ A host that lies about physics cannot grant itself edit rights. The server sets
 | A real database | Implement `roomsdk.Store`. |
 | A real session check | Implement `roomsdk.Authenticator`. |
 | A new wire field | Edit `room.proto`, then run `make generate`. |
+| A headless client in a test | Build a `RoomSession` with `SimulationDriver.local()`. It needs no DOM. |

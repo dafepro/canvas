@@ -41,11 +41,13 @@ export const resolveEdges = (
     if (policy === "solid") return;
     crossings.push({ edge, policy });
     if (policy === "wrap") {
-      // Wrapping preserves velocity and rotation.
-      if (edge === "left") next.x = width + radius;
-      if (edge === "right") next.x = -radius;
-      if (edge === "top") next.y = height + radius;
-      if (edge === "bottom") next.y = -radius;
+      // Wrapping preserves velocity and rotation. The body arrives just inside
+      // the opposite edge. A position outside that edge would fall out of a
+      // canvas whose opposite edge is solid.
+      if (edge === "left") next.x = width - radius;
+      if (edge === "right") next.x = radius;
+      if (edge === "top") next.y = height - radius;
+      if (edge === "bottom") next.y = radius;
     } else if (policy === "respawn") {
       respawn = true;
     }

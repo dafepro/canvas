@@ -62,13 +62,15 @@ export const rocketCanvas: CanvasDefinition = {
     regions: [
       {
         id: "space-gradient",
-        shape: { type: "rect", x: 0, y: 0, w: 100, h: 40 },
+        // The band starts closer to the ground and ends near zero gravity, so
+        // the change is easy to see when an item rises.
+        shape: { type: "rect", x: 0, y: 0, w: 100, h: 50 },
         blend: "linear",
         axis: "y",
-        from: 40,
-        to: 10,
+        from: 50,
+        to: 8,
         priority: 0,
-        gravityScale: [1.0, 0.1],
+        gravityScale: [1.0, 0.04],
         linearDrag: [0.1, 0.45],
         softSpeedLimit: [null, 12],
       },
@@ -112,7 +114,9 @@ export const rocketDefinition: ItemDefinition<typeof defaultRocketConfig> = {
     { id: "pad", role: "itemSensor", shape: { type: "circle", radius: 1.2 }, offset: { x: 0, y: 3 } },
   ],
   behaviorType: "rocket",
-  defaultConfig: defaultRocketConfig,
+  // One touch commits the launch. The grace time is longer than the countdown,
+  // so the avatar can step away and watch the rocket go.
+  defaultConfig: { ...defaultRocketConfig, graceSeconds: 3.5 },
   tuningRules: [
     {
       when: { maxCanvasWidth: 70 },

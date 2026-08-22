@@ -68,21 +68,60 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
-  it("keeps an avatar inside a solid edge", () => {
+  // The avatar body is kinematic, so the solver never stops it. These cases
+  // prove that the character controller does.
+  const drivenAvatar = (direction: { x: number; y: number }, steps = 240) => {
     const simulation = build();
     simulation.addAvatar({
       entityId: "avatar:a",
       clientId: "a",
       userId: "alice",
-      position: { x: 50, y: 60 },
+      position: { x: 50, y: 55 },
     });
-    // Push hard into the left wall for two seconds.
-    simulation.world.setAvatarInput("avatar:a", { x: -1, y: 0 }, 1, 1);
-    for (let i = 0; i < 120; i++) simulation.step();
-
+    simulation.world.setAvatarInput("avatar:a", direction, 1, 1);
+    for (let i = 0; i < steps; i++) simulation.step();
     const avatar = simulation.world.registry.require("avatar:a");
-    expect(avatar.transform.x).toBeGreaterThan(-1);
-    expect(Number.isFinite(avatar.transform.x)).toBe(true);
+    const transform = { ...avatar.transform };
+    simulation.free();
+    return transform;
+  };
+
+  it("keeps an avatar inside the left edge", () => {
+    const transform = drivenAvatar({ x: -1, y: 0 });
+    expect(transform.x).toBeGreaterThan(0);
+    expect(transform.x).toBeLessThan(3);
+  });
+
+  it("keeps an avatar inside the right edge", () => {
+    const transform = drivenAvatar({ x: 1, y: 0 });
+    expect(transform.x).toBeLessThan(100);
+    expect(transform.x).toBeGreaterThan(97);
+  });
+
+  it("stops an avatar on the ground instead of below the bottom edge", () => {
+    // The ground rect spans y 66 to 70. The avatar radius is 1.2.
+    const transform = drivenAvatar({ x: 0, y: 1 });
+    expect(transform.y).toBeLessThan(66);
+    expect(transform.y).toBeGreaterThan(62);
+  });
+
+  it("wraps an avatar that leaves the top edge and lands on the ground", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:a",
+      clientId: "a",
+      userId: "alice",
+      position: { x: 50, y: 10 },
+    });
+    simulation.world.setAvatarInput("avatar:a", { x: 0, y: -1 }, 1, 1);
+    let wrapped = false;
+    for (let i = 0; i < 240 && !wrapped; i++) {
+      simulation.step();
+      wrapped = simulation.world.registry.require("avatar:a").transform.y > 40;
+    }
+    expect(wrapped).toBe(true);
+    const avatar = simulation.world.registry.require("avatar:a");
+    expect(avatar.transform.y).toBeLessThan(70);
     simulation.free();
   });
 
@@ -96,6 +135,13 @@ describe("HostSimulation with real physics", () => {
       wrapped = simulation.world.registry.require("crate-1").transform.y > 60;
     }
     expect(wrapped).toBe(true);
+
+    // The body must arrive above the ground, not inside it and not below the
+    // solid bottom edge.
+    const crate = simulation.world.registry.require("crate-1");
+    expect(crate.transform.y).toBeLessThan(66);
+    for (let i = 0; i < 120; i++) simulation.step();
+    expect(simulation.world.registry.require("crate-1").transform.y).toBeLessThan(70);
     simulation.free();
   });
 

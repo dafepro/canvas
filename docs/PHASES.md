@@ -36,8 +36,17 @@ what is verified, and what is not done.
 | RoomManager, presence, relay, host lease, epoch, heartbeat | Done and tested. |
 | TypeScript RoomTransport and WebSocketRoomTransport | Done, including reconnect backoff. |
 | Player input to the host through the relay | Done. |
-| Host state and deltas back through the relay | Done at 15 Hz deltas and 2 Hz keyframes. |
-| Exit criterion: two browsers see the same state with one clear host | Not visually verified. The Go tests prove the server side; I did not open two browsers. |
+| Host state and deltas back through the relay | Done at 15 Hz deltas and 2 Hz keyframes. A keyframe also carries the behavior state. |
+| Exit criterion: two browsers see the same state with one clear host | Met, and now tested. `packages/client/test/two-client-relay.test.ts` starts a real `canvasd` process and joins two clients over a real WebSocket. One client holds the lease, the other names the same host and epoch, a durable spawn from the peer reaches the host, and the two views of the item agree within one unit. A second case proves that peer input moves the peer avatar on the host. The test drives the same `RoomSession` the browser drives; only the renderer and the input controllers are absent. |
+
+### What made the Phase 2 test possible
+
+`CanvasRuntime` used to hold the coordination code, the send loops, and the
+renderer in one class, so no test could run a client without a DOM. The
+coordination code now lives in `RoomSession`, which has no DOM reference.
+`CanvasRuntime` adds the renderer and the input controllers to one session. The
+worker body moved into `SimulationKernel`, so `SimulationDriver.local()` runs the
+same simulation in the test process.
 
 ## Phase 3 — Prediction, interpolation, and host migration: mostly complete
 
@@ -74,7 +83,7 @@ what is verified, and what is not done.
 | Region enter and exit events with smooth gradients | Done. |
 | Top-down elevation Z with shadows, scale, and landing events | The elevation channel and the landing event are done and tested. The renderer offsets the sprite by Z but draws no shadow. |
 | Per-edge wrap, respawn, solid, and open | Done and tested. |
-| Effect events for trails, particles, overlays, and one-shot animations | Done with pooled particles and a countdown overlay. |
+| Effect events for trails, particles, overlays, and one-shot animations | Done with pooled particles and a countdown overlay. A client that joins during a countdown restores the overlay from the behavior state. |
 
 ## Phase 6 — Hardening and production budgets: not started
 
@@ -89,15 +98,34 @@ logging implementation.
 
 ## Known gaps
 
-1. **No visual verification.** No browser tool was available in the session that
-   built this. The renderer compiles, the bundle builds, and the simulation is
-   tested headlessly, but nobody has watched the demo run.
-2. **No drag-to-edit.** `CanvasRuntime.moveItem` exists, but no pointer
+1. **No visual verification by me.** No browser tool was available in the
+   sessions that built this. The renderer compiles, the bundle builds, the
+   simulation is tested headlessly, and two headless clients agree through a real
+   server. The user has watched the demo and reported the results below.
+2. **No drag-to-edit.** `RoomSession.moveItem` exists, but no pointer
    interaction calls it, so Phase 4 editing is API-only.
-3. **Behavior state is not sent in deltas.** `EntityState.behaviorStateJson` is
-   defined and empty. A client that joins during a countdown gets the sprite
-   variant but not the remaining time, so spec section 20 "client joins
-   mid-workflow" is incomplete.
-4. **The avatar sprite ignores its definition.** The renderer draws a fixed
+3. **The avatar sprite ignores its definition.** The renderer draws a fixed
    circle for every avatar rather than reading a definition.
-5. **MemoryStore only.** A restart of `canvasd` loses every placement.
+4. **MemoryStore only.** A restart of `canvasd` loses every placement.
+5. **No plan to free a stuck body.** A body that a large impulse pushes into
+   terrain can stay there. The wrap defect that caused most of these is fixed,
+   but nothing detects and frees a body that is stuck for other reasons. This
+   belongs to Phase 6 hardening.
+6. **Behavior state in a delta is JSON.** A keyframe always carries it, and a
+   delta carries it only after a change. A large behavior state on many items
+   would still cost bytes. Spec 22 budgets are not measured.
+
+## Feedback from the demo, and what I changed
+
+The user ran the demo and reported the following. The state of each item:
+
+| Report | State |
+| --- | --- |
+| The avatar leaves the top of the canvas, appears at the bottom, and keeps falling past the bottom edge. | Fixed. `resolveEdges` wrapped a body to `height + radius`, which is *outside* the solid bottom edge, so the body fell out of the canvas. It now wraps to `height - radius`. `RapierWorld.clearOfGeometry` then moves the body along its direction of travel until it no longer overlaps solid geometry, because the bottom of the rocket canvas is filled with ground. Tested in `environment.test.ts` and `host-simulation.test.ts`. |
+| An item thrown up gets stuck at the bottom and loses all motion. | Fixed by the same change. |
+| WASD works. Consider other control schemes. | The arrow keys already work as well as WASD. No new scheme is added. |
+| The press and drag needs a visual, such as a thumb stick. | Done. `PointerDragController.gesture` reports the press point and the drag point in element pixels. `PixiScene.setThumbstick` draws a ring at the press point and a knob toward the drag. I did not watch it draw. |
+| The gravity gradient works, but the difference is small. | Tuned in data only. The band now spans y 0 to 50 rather than 0 to 40, and the gravity scale at the top is 0.04 rather than 0.1. Run `make export-canvases` after a change; the server reads the JSON file. |
+| The rocket needs touch and hold. One touch should be enough. | Changed in data only. The rocket item now sets `graceSeconds` to 3.5, which is longer than the 3 second countdown, so the countdown survives after the avatar steps away. The behavior code is unchanged. Tested in `rocket.test.ts`. |
+| The teal rectangle appears to have no collider. | Correct as designed. It is `pad-zone`, a `regionSensor`. It reports contact and never blocks a body. The renderer draws a sensor in teal. |
+| Pinching geometry sends items flying. | No change. This is normal contact resolution in Rapier. |

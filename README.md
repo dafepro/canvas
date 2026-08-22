@@ -80,6 +80,10 @@ make test-ts     # TypeScript: behavior harness plus real Rapier physics
 make test-go     # Go: host lease, ownership, sleep and wake, with -race
 ```
 
+`packages/client/test/two-client-relay.test.ts` builds `canvasd`, starts it on a
+free port, and joins two headless clients over a real WebSocket. It needs the Go
+toolchain. The test skips itself when `go` is absent.
+
 ## Use the server SDK
 
 ```go

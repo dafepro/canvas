@@ -50,6 +50,20 @@ interface ContactRecord {
   startTick: number;
 }
 
+/** The direction a wrapped body travels, away from the edge it arrived at. */
+const inwardOf = (edge: "top" | "right" | "bottom" | "left"): Vec2 => {
+  switch (edge) {
+    case "top":
+      return { x: 0, y: -1 };
+    case "bottom":
+      return { x: 0, y: 1 };
+    case "left":
+      return { x: -1, y: 0 };
+    case "right":
+      return { x: 1, y: 0 };
+  }
+};
+
 const collisionGroups = (membership: number, filter: number): number =>
   ((membership & 0xffff) << 16) | (filter & 0xffff);
 
@@ -63,6 +77,7 @@ export class RapierWorld implements BehaviorHost {
   readonly environment: EnvironmentField;
   private readonly world: RAPIER.World;
   private readonly events: RAPIER.EventQueue;
+  private readonly characterController: RAPIER.KinematicCharacterController;
   private readonly bodies = new Map<EntityId, BodyRecord>();
   private readonly colliderOwner = new Map<number, { entityId: EntityId; colliderId: string }>();
   private readonly contactSets = new Map<string, ContactRecord>();
@@ -89,6 +104,16 @@ export class RapierWorld implements BehaviorHost {
     this.world = new RAPIER.World({ x: 0, y: 0 });
     this.world.timestep = 1 / tickRate;
     this.events = new RAPIER.EventQueue(true);
+    // Spec 6.1. The avatar is a kinematic body, so the solver never stops it.
+    // The character controller clamps each move against solid geometry and
+    // slides the rest along the surface.
+    this.characterController = this.world.createCharacterController(0.02);
+    this.characterController.setUp({ x: 0, y: -1 });
+    this.characterController.setSlideEnabled(true);
+    // Every surface is climbable. This canvas has no walk cycle, so a steep
+    // surface must slide rather than stop the avatar.
+    this.characterController.setMaxSlopeClimbAngle(Math.PI);
+    this.characterController.setMinSlopeSlideAngle(0);
     this.sample = this.environment.sample({ x: 0, y: 0 });
     this.buildStaticGeometry();
   }
@@ -476,10 +501,32 @@ export class RapierWorld implements BehaviorHost {
     const deltaY = desired.y - current.y;
     const distance = Math.hypot(deltaX, deltaY);
     const scale = distance > maxChange && distance > 0 ? maxChange / distance : 1;
-    record.body.setLinvel(
-      { x: current.x + deltaX * scale, y: current.y + deltaY * scale },
-      true,
+    const next = { x: current.x + deltaX * scale, y: current.y + deltaY * scale };
+    record.body.setLinvel(this.clampAgainstGeometry(record, next, dt), true);
+  }
+
+  /**
+   * Spec 6.1. Returns the part of the velocity that solid geometry allows. A
+   * kinematic body moves by its velocity alone, so without this step the avatar
+   * travels through the ground and through a solid edge.
+   */
+  private clampAgainstGeometry(record: BodyRecord, velocity: Vec2, dt: number): Vec2 {
+    const collider = record.colliders.get("body");
+    if (!collider) return velocity;
+    if (velocity.x === 0 && velocity.y === 0) return velocity;
+    // Only a fixed collider stops the avatar. An item is dynamic and the solver
+    // pushes it; another avatar is kinematic and never blocks. A filter
+    // predicate is not used here: in rapier2d-compat 0.20 a predicate that sees
+    // a collision leaves a Rust borrow open, and `World.free` then throws.
+    this.characterController.computeColliderMovement(
+      collider,
+      { x: velocity.x * dt, y: velocity.y * dt },
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS |
+        RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC |
+        RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC,
     );
+    const moved = this.characterController.computedMovement();
+    return { x: moved.x / dt, y: moved.y / dt };
   }
 
   private readTransforms(): void {
@@ -710,15 +757,49 @@ export class RapierWorld implements BehaviorHost {
       const resolution = resolveEdges(this.canvas, transform, velocity, radius);
       if (resolution.crossings.length === 0) continue;
       if (resolution.position) {
-        record.body.setTranslation(resolution.position, true);
-        transform.x = resolution.position.x;
-        transform.y = resolution.position.y;
+        const wrapped = resolution.crossings.find((crossing) => crossing.policy === "wrap");
+        const target = wrapped
+          ? this.clearOfGeometry(record, resolution.position, inwardOf(wrapped.edge))
+          : resolution.position;
+        record.body.setTranslation(target, true);
+        transform.x = target.x;
+        transform.y = target.y;
       }
       if (resolution.velocity) {
         record.body.setLinvel(resolution.velocity, true);
         record.body.setAngvel(0, true);
       }
     }
+  }
+
+  /**
+   * Spec 3.2. A wrapped body must arrive in free space. The opposite edge of the
+   * rocket canvas is behind the ground, so a wrap without this step leaves the
+   * body inside the terrain, where it sticks or falls out of the canvas.
+   */
+  private clearOfGeometry(record: BodyRecord, position: Vec2, inward: Vec2): Vec2 {
+    const radius = Math.max(record.entity.avatar?.radius ?? 0, 0.75);
+    const shape = new RAPIER.Ball(radius);
+    const step = radius;
+    const limit = Math.ceil(
+      Math.max(this.canvas.size.width, this.canvas.size.height) / 2 / step,
+    );
+    let probe = { ...position };
+    for (let i = 0; i <= limit; i++) {
+      const hit = this.world.intersectionWithShape(
+        probe,
+        0,
+        shape,
+        undefined,
+        undefined,
+        undefined,
+        record.body,
+        (collider) => !collider.isSensor(),
+      );
+      if (!hit) return probe;
+      probe = { x: probe.x + inward.x * step, y: probe.y + inward.y * step };
+    }
+    return position;
   }
 
   /** Spec 14.3 and 20. A NaN entity is quarantined rather than crashing the room. */
