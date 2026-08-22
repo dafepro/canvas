@@ -160,7 +160,7 @@ describe.skipIf(!goAvailable())("room at the stated limits", () => {
     // again. That is the scene spec 19.3 describes: many avatars and a few
     // moving items.
     moving.value = false;
-    const stillAwake = await settle(host, 90_000);
+    const stillAwake = await settle(host, 30_000);
     const restBytes = await measureInbound(peers, 3000);
     moving.value = true;
     const steadyBytes = await measureInbound(peers, 3000);

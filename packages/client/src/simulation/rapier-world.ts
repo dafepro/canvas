@@ -41,7 +41,14 @@ interface BodyRecord {
   colliders: Map<string, RAPIER.Collider>;
   /** Region ids the body was inside on the previous tick. */
   regions: Set<string>;
+  /** Consecutive ticks the body spent still and inside fixed geometry. */
+  stuckTicks?: number;
 }
+
+/** Spec 20. Half a second at 60 Hz before a still, embedded body is freed. */
+const STUCK_TICKS = 30;
+/** Below this speed a body is treated as not moving. */
+const STUCK_SPEED = 0.2;
 
 interface ContactRecord {
   selfId: EntityId;
@@ -491,6 +498,7 @@ export class RapierWorld implements BehaviorHost {
     this.collectDwellEvents();
     this.stepElevations(dt);
     this.applyEdgePolicies();
+    this.freeStuckBodies();
     this.quarantineInvalid();
 
     const events = [...this.pendingEvents];
@@ -850,7 +858,7 @@ export class RapierWorld implements BehaviorHost {
    * body inside the terrain, where it sticks or falls out of the canvas.
    */
   private clearOfGeometry(record: BodyRecord, position: Vec2, inward: Vec2): Vec2 {
-    const radius = Math.max(record.entity.avatar?.radius ?? 0, 0.75);
+    const radius = this.probeRadius(record);
     const shape = new RAPIER.Ball(radius);
     const step = radius;
     const limit = Math.ceil(
@@ -874,17 +882,113 @@ export class RapierWorld implements BehaviorHost {
     return position;
   }
 
-  /** Spec 14.3 and 20. A NaN entity is quarantined rather than crashing the room. */
-  private quarantineInvalid(): void {
-    for (const record of this.bodies.values()) {
-      const transform = record.entity.transform;
-      if (
-        Number.isFinite(transform.x) &&
-        Number.isFinite(transform.y) &&
-        Number.isFinite(transform.rotation)
-      ) {
+  /**
+   * A radius that covers the body. The probe must be at least as large as the
+   * body, or a place that is free for the probe still overlaps the body.
+   */
+  private probeRadius(record: BodyRecord): number {
+    let radius = record.entity.avatar?.radius ?? 0;
+    for (const collider of record.colliders.values()) {
+      const half = collider.halfExtents();
+      if (half) {
+        radius = Math.max(radius, Math.hypot(half.x, half.y));
         continue;
       }
+      const ball = collider.radius();
+      if (Number.isFinite(ball)) radius = Math.max(radius, ball);
+    }
+    return Math.max(radius, 0.75);
+  }
+
+  /**
+   * Spec 20. A large impulse can push a body into terrain, where the solver
+   * cannot separate it and the body sits still forever. A body whose centre is
+   * inside fixed geometry, and which has not moved for `STUCK_TICKS`, is placed
+   * on the nearest surface of that geometry.
+   */
+  private freeStuckBodies(): void {
+    for (const record of this.bodies.values()) {
+      if (record.entity.kind === "static") continue;
+      if (record.entity.rigidBody?.mode !== "dynamic") continue;
+      if (record.entity.quarantined) continue;
+
+      const speed = Math.hypot(record.body.linvel().x, record.body.linvel().y);
+      if (speed > STUCK_SPEED) {
+        record.stuckTicks = 0;
+        continue;
+      }
+      const inside = this.insideGeometry(record);
+      if (!inside) {
+        record.stuckTicks = 0;
+        continue;
+      }
+      record.stuckTicks = (record.stuckTicks ?? 0) + 1;
+      if (record.stuckTicks < STUCK_TICKS) continue;
+
+      record.stuckTicks = 0;
+      const escape = this.escapeFrom(record, inside);
+      record.body.setTranslation(escape, true);
+      record.body.setLinvel({ x: 0, y: 0 }, true);
+      record.body.setAngvel(0, true);
+      record.entity.transform.x = escape.x;
+      record.entity.transform.y = escape.y;
+      this.pendingEvents.push({
+        type: "unstuck",
+        tick: this.tick,
+        self: record.entity.id,
+        from: { x: inside.x, y: inside.y },
+        to: { ...escape },
+      });
+    }
+  }
+
+  /** The body centre, when it lies inside a fixed collider. */
+  private insideGeometry(record: BodyRecord): Vec2 | undefined {
+    const centre = record.body.translation();
+    const projection = this.world.projectPoint(
+      centre,
+      true,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS |
+        RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC |
+        RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC,
+    );
+    if (!projection || !projection.isInside) return undefined;
+    return { x: centre.x, y: centre.y };
+  }
+
+  /**
+   * The nearest free point outside the geometry. The body travels against the
+   * local gravity, which is the direction a player expects, and it stops at the
+   * first place where its shape no longer overlaps fixed geometry.
+   */
+  private escapeFrom(record: BodyRecord, centre: Vec2): Vec2 {
+    this.environment.sample(centre, this.sample);
+    const gravity = this.sample.gravityXY;
+    const length = Math.hypot(gravity.x, gravity.y);
+    const direction =
+      length > 1e-6 ? { x: -gravity.x / length, y: -gravity.y / length } : { x: 0, y: -1 };
+    return this.clearOfGeometry(record, centre, direction);
+  }
+
+  /** Spec 14.3 and 20. A NaN entity is quarantined rather than crashing the room. */
+  private quarantineInvalid(): void {
+    const { width, height } = this.canvas.size;
+    // Spec 14.3. A body this far outside the canvas can no longer return, so it
+    // is treated as an invalid value rather than as a body in flight.
+    const margin = Math.max(width, height);
+    for (const record of this.bodies.values()) {
+      const transform = record.entity.transform;
+      const finite =
+        Number.isFinite(transform.x) &&
+        Number.isFinite(transform.y) &&
+        Number.isFinite(transform.rotation);
+      const inRange =
+        finite &&
+        transform.x > -margin &&
+        transform.x < width + margin &&
+        transform.y > -margin &&
+        transform.y < height + margin;
+      if (inRange) continue;
       record.entity.quarantined = true;
       const spawn = this.canvas.spawnPoints[0]?.position ?? {
         x: this.canvas.size.width / 2,

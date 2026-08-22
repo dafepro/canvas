@@ -102,6 +102,16 @@ export interface LandingEvent extends BaseEvent {
   impactSpeed: number;
 }
 
+/**
+ * Spec 20. The host moved a body that was embedded in fixed geometry and could
+ * not free itself. A behavior may reset its state when it receives this.
+ */
+export interface UnstuckEvent extends BaseEvent {
+  type: "unstuck";
+  from: Vec2;
+  to: Vec2;
+}
+
 export interface TickEvent extends BaseEvent {
   type: "tick";
   /** Fixed step duration in seconds. */
@@ -121,6 +131,7 @@ export type BehaviorEvent =
   | OwnerActionEvent
   | RoomWakeEvent
   | LandingEvent
+  | UnstuckEvent
   | TickEvent;
 
 export type BehaviorEventType = BehaviorEvent["type"];
@@ -140,9 +151,10 @@ export const eventOrder: Record<BehaviorEventType, number> = {
   bounce: 7,
   impulse: 8,
   landing: 9,
-  timer: 10,
-  "owner.action": 11,
-  tick: 12,
+  unstuck: 10,
+  timer: 11,
+  "owner.action": 12,
+  tick: 13,
 };
 
 /** Sorts events into the canonical processing order for one tick. */

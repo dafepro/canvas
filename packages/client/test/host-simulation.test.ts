@@ -276,6 +276,41 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  // Spec 20. A body pushed into terrain must not stay there.
+  it("frees a body that a teleport left inside the ground", () => {
+    const simulation = build();
+    simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));
+    for (let i = 0; i < 5; i++) simulation.step();
+    // The ground rect spans y 66 to 70. Place the crate in the middle of it.
+    simulation.world.teleport("crate-1", { x: 50, y: 68 }, 0, { x: 0, y: 0 });
+
+    let freed = false;
+    for (let i = 0; i < 120 && !freed; i++) {
+      const events = simulation.world.step().events;
+      freed = events.some((event) => event.type === "unstuck" && event.self === "crate-1");
+    }
+    expect(freed).toBe(true);
+
+    // The crate now rests on the ground rather than inside it.
+    for (let i = 0; i < 120; i++) simulation.step();
+    const crate = simulation.world.registry.require("crate-1");
+    expect(crate.transform.y).toBeLessThan(66);
+    expect(crate.transform.y).toBeGreaterThan(55);
+    simulation.free();
+  });
+
+  it("quarantines a body that left the canvas by a wide margin", () => {
+    const simulation = build();
+    simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));
+    simulation.world.teleport("crate-1", { x: 5000, y: 20 }, 0, { x: 0, y: 0 });
+    simulation.step();
+
+    const crate = simulation.world.registry.require("crate-1");
+    expect(crate.quarantined).toBe(true);
+    expect(crate.transform.x).toBeLessThan(100);
+    simulation.free();
+  });
+
   it("produces a snapshot that reloads to the same placement at rest", () => {
     const first = build();
     first.addItem(instance("rocket-1", rocketDefinition as ItemDefinition, 70, 62));
