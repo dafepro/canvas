@@ -48,6 +48,7 @@ type Room struct {
 	snapshotRaw  json.RawMessage
 	checkpointNo uint64
 	items        map[string]*SnapshotItem
+	definitions  map[string]ItemDefinitionRecord
 	nextEntityNo uint64
 
 	joins      chan *Client
@@ -71,6 +72,7 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 		definitionRaw: record.DefinitionRaw,
 		clients:       make(map[string]*Client),
 		items:         make(map[string]*SnapshotItem),
+		definitions:   make(map[string]ItemDefinitionRecord),
 		joins:         make(chan *Client, 8),
 		departures:    make(chan departure, 8),
 		messages:      make(chan inbound, 512),
@@ -95,6 +97,31 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 	}
 	room.indexItems()
 	return room, nil
+}
+
+func (r *Room) itemDefinition(definitionID string) (ItemDefinitionRecord, error) {
+	if definition, ok := r.definitions[definitionID]; ok {
+		return definition, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	definition, err := r.cfg.Store.LoadItemDefinition(ctx, definitionID)
+	if err != nil {
+		return ItemDefinitionRecord{}, err
+	}
+	r.definitions[definitionID] = definition
+	return definition, nil
+}
+
+func (r *Room) complexItemCount() int {
+	count := 0
+	for _, item := range r.snapshot.Items {
+		definition, err := r.itemDefinition(item.DefinitionID)
+		if err == nil && definition.Complexity == ItemComplexityComplex {
+			count++
+		}
+	}
+	return count
 }
 
 func (r *Room) indexItems() {

@@ -1,0 +1,40 @@
+{
+  "definitionId": "crate",
+  "version": 1,
+  "displayName": "Crate",
+  "visual": {
+    "size": {
+      "width": 3,
+      "height": 3
+    },
+    "placeholder": {
+      "shape": "rect",
+      "color": 11569512
+    },
+    "zIndex": 3
+  },
+  "body": {
+    "mode": "dynamic",
+    "mass": 1.5,
+    "gravityScale": 1
+  },
+  "colliders": [
+    {
+      "id": "solid",
+      "role": "itemSolid",
+      "shape": {
+        "type": "rect",
+        "width": 3,
+        "height": 3
+      },
+      "friction": 0.8,
+      "restitution": 0.05
+    }
+  ],
+  "persistence": {
+    "transform": true,
+    "behaviorState": false,
+    "onRoomSleep": "resetToIdle"
+  },
+  "complexity": "simple"
+}

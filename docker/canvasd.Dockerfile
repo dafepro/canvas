@@ -10,9 +10,11 @@ FROM alpine:3.21
 RUN adduser -D -u 10001 canvasd
 COPY --from=build /out/canvasd /usr/local/bin/canvasd
 COPY server/canvases /etc/canvasd/canvases
+COPY server/definitions /etc/canvasd/definitions
 USER canvasd
 EXPOSE 8080
 ENV CANVASD_ADDR=":8080" \
     CANVASD_CANVAS_DIR="/etc/canvasd/canvases" \
+    CANVASD_DEFINITION_DIR="/etc/canvasd/definitions" \
     CANVASD_ALLOWED_ORIGINS="*"
 ENTRYPOINT ["/usr/local/bin/canvasd"]

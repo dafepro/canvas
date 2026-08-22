@@ -46,6 +46,16 @@ func newHarness(t *testing.T, mutate func(*Config)) *harness {
 		Version:       1,
 		DefinitionRaw: json.RawMessage(canvasJSON),
 	})
+	store.PutItemDefinition(ItemDefinitionRecord{
+		DefinitionID: "rocket",
+		Version:      1,
+		Complexity:   ItemComplexitySimple,
+	})
+	store.PutItemDefinition(ItemDefinitionRecord{
+		DefinitionID: "complex-rocket",
+		Version:      1,
+		Complexity:   ItemComplexityComplex,
+	})
 	cfg := Config{
 		Store:             store,
 		Logger:            slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -410,6 +420,64 @@ func TestDurableLimitsAndBounds(t *testing.T) {
 	}).GetDurableResult()
 	if limit.Accepted || limit.RejectReason != "item_limit_reached" {
 		t.Errorf("got accepted=%v reason=%q, want item_limit_reached", limit.Accepted, limit.RejectReason)
+	}
+}
+
+func TestSpawnRequiresAKnownDefinitionVersion(t *testing.T) {
+	h := newHarness(t, nil)
+	owner := h.dial("alice")
+	owner.join()
+	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	unknown := spawnCommand("cmd-unknown", 10, 10)
+	unknown.GetDurableCommand().DefinitionId = "invented"
+	owner.send(unknown)
+	unknownResult := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-unknown"
+	}).GetDurableResult()
+	if unknownResult.Accepted || unknownResult.RejectReason != "unknown_definition" {
+		t.Errorf("unknown definition: accepted=%v reason=%q", unknownResult.Accepted, unknownResult.RejectReason)
+	}
+
+	wrongVersion := spawnCommand("cmd-version", 10, 10)
+	wrongVersion.GetDurableCommand().DefinitionVersion = 99
+	owner.send(wrongVersion)
+	versionResult := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-version"
+	}).GetDurableResult()
+	if versionResult.Accepted || versionResult.RejectReason != "definition_version_mismatch" {
+		t.Errorf("wrong version: accepted=%v reason=%q", versionResult.Accepted, versionResult.RejectReason)
+	}
+}
+
+func TestSpawnEnforcesTheComplexItemLimit(t *testing.T) {
+	h := newHarness(t, nil)
+	owner := h.dial("alice")
+	owner.join()
+	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	first := spawnCommand("cmd-complex-1", 10, 10)
+	first.GetDurableCommand().DefinitionId = "complex-rocket"
+	owner.send(first)
+	firstResult := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-complex-1"
+	}).GetDurableResult()
+	if !firstResult.Accepted {
+		t.Fatalf("first complex item rejected: %s", firstResult.RejectReason)
+	}
+
+	second := spawnCommand("cmd-complex-2", 20, 20)
+	second.GetDurableCommand().DefinitionId = "complex-rocket"
+	owner.send(second)
+	secondResult := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-complex-2"
+	}).GetDurableResult()
+	if secondResult.Accepted || secondResult.RejectReason != "complex_item_limit_reached" {
+		t.Errorf("second complex item: accepted=%v reason=%q", secondResult.Accepted, secondResult.RejectReason)
 	}
 }
 

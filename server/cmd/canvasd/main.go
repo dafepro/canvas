@@ -23,6 +23,8 @@ func main() {
 	addr := flag.String("addr", envOr("CANVASD_ADDR", ":8080"), "listen address")
 	canvasDir := flag.String("canvases", envOr("CANVASD_CANVAS_DIR", "./canvases"),
 		"directory of canvas definition JSON files")
+	definitionDir := flag.String("definitions", envOr("CANVASD_DEFINITION_DIR", "./definitions"),
+		"directory of item definition JSON files")
 	origins := flag.String("allowed-origins", envOr("CANVASD_ALLOWED_ORIGINS", "*"),
 		"comma separated WebSocket origin patterns")
 	tickRate := flag.Uint("tick-rate", 60, "simulation tick rate advertised to the host")
@@ -33,6 +35,12 @@ func main() {
 	slog.SetDefault(logger)
 
 	store := roomsdk.NewMemoryStore()
+	definitionCount, err := loadItemDefinitions(store, *definitionDir)
+	if err != nil {
+		logger.Error("load item definitions failed", "dir", *definitionDir, "error", err)
+		os.Exit(1)
+	}
+	logger.Info("loaded item definitions", "count", definitionCount, "dir", *definitionDir)
 	loaded, err := loadCanvases(store, *canvasDir)
 	if err != nil {
 		logger.Error("load canvases failed", "dir", *canvasDir, "error", err)
@@ -75,6 +83,46 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+}
+
+func loadItemDefinitions(store *roomsdk.MemoryStore, dir string) (int, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			return count, err
+		}
+		var probe struct {
+			DefinitionID string                 `json:"definitionId"`
+			Version      uint32                 `json:"version"`
+			Complexity   roomsdk.ItemComplexity `json:"complexity"`
+		}
+		if err := json.Unmarshal(raw, &probe); err != nil {
+			return count, err
+		}
+		if probe.DefinitionID == "" {
+			return count, errors.New("item definition file " + entry.Name() + " has no definitionId")
+		}
+		if probe.Complexity != roomsdk.ItemComplexitySimple &&
+			probe.Complexity != roomsdk.ItemComplexityComplex {
+			return count, errors.New("item definition file " + entry.Name() + " has invalid complexity")
+		}
+		store.PutItemDefinition(roomsdk.ItemDefinitionRecord{
+			DefinitionID:  probe.DefinitionID,
+			Version:       probe.Version,
+			Complexity:    probe.Complexity,
+			DefinitionRaw: raw,
+		})
+		count++
+	}
+	return count, nil
 }
 
 func loadCanvases(store *roomsdk.MemoryStore, dir string) (int, error) {

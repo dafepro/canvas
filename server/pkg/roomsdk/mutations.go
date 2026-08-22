@@ -103,6 +103,18 @@ func (r *Room) validateDurable(
 		if command.DefinitionId == "" {
 			return false, nil, "missing_definition_id"
 		}
+		definition, err := r.itemDefinition(command.DefinitionId)
+		if err != nil {
+			return false, nil, "unknown_definition"
+		}
+		if command.DefinitionVersion != definition.Version {
+			return false, nil, "definition_version_mismatch"
+		}
+		if definition.Complexity == ItemComplexityComplex &&
+			r.canvasShape.Limits.MaxComplexPhysicsItems > 0 &&
+			r.complexItemCount() >= r.canvasShape.Limits.MaxComplexPhysicsItems {
+			return false, nil, "complex_item_limit_reached"
+		}
 		transform := transformOf(command)
 		if !transform.finite() {
 			return false, nil, "non_finite_transform"

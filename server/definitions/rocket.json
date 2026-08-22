@@ -1,0 +1,119 @@
+{
+  "definitionId": "rocket",
+  "version": 1,
+  "displayName": "Rocket",
+  "visual": {
+    "size": {
+      "width": 3,
+      "height": 6
+    },
+    "placeholder": {
+      "shape": "triangle",
+      "color": 15858414
+    },
+    "zIndex": 5,
+    "variants": {
+      "idle": {
+        "color": 15858414
+      },
+      "arming": {
+        "color": 16765286
+      },
+      "flying": {
+        "color": 16747586
+      },
+      "spaceDrift": {
+        "color": 11004159
+      },
+      "falling": {
+        "color": 16739179
+      },
+      "landed": {
+        "color": 10221216
+      }
+    }
+  },
+  "body": {
+    "mode": "dynamic",
+    "mass": 2,
+    "gravityScale": 1,
+    "linearDamping": 0,
+    "angularDamping": 0.6
+  },
+  "colliders": [
+    {
+      "id": "hull",
+      "role": "itemSolid",
+      "shape": {
+        "type": "capsule",
+        "halfHeight": 2,
+        "radius": 1
+      },
+      "friction": 0.5,
+      "restitution": 0.1
+    },
+    {
+      "id": "arm",
+      "role": "itemSensor",
+      "shape": {
+        "type": "circle",
+        "radius": 3.4
+      }
+    },
+    {
+      "id": "pad",
+      "role": "itemSensor",
+      "shape": {
+        "type": "circle",
+        "radius": 1.2
+      },
+      "offset": {
+        "x": 0,
+        "y": 3
+      }
+    }
+  ],
+  "behaviorType": "rocket",
+  "defaultConfig": {
+    "armSensorId": "arm",
+    "requiredContacts": 1,
+    "countdownSeconds": 3,
+    "graceSeconds": 3.5,
+    "launchImpulse": 12,
+    "thrust": 24,
+    "thrustSeconds": 1.5,
+    "maxSpeed": 19,
+    "spaceRegionTag": "space",
+    "groundTag": "ground",
+    "landingSpeedThreshold": 4,
+    "cooldownSeconds": 1.5
+  },
+  "tuningRules": [
+    {
+      "when": {
+        "maxCanvasWidth": 70
+      },
+      "overrides": {
+        "thrust": 18,
+        "launchImpulse": 9,
+        "maxSpeed": 14
+      }
+    },
+    {
+      "when": {
+        "minCanvasWidth": 70
+      },
+      "overrides": {
+        "thrust": 24,
+        "launchImpulse": 12,
+        "maxSpeed": 19
+      }
+    }
+  ],
+  "persistence": {
+    "transform": true,
+    "behaviorState": true,
+    "onRoomSleep": "resetToIdle"
+  },
+  "complexity": "complex"
+}

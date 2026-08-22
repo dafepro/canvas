@@ -1,0 +1,57 @@
+{
+  "definitionId": "ball",
+  "version": 1,
+  "displayName": "Ball",
+  "visual": {
+    "size": {
+      "width": 2.4,
+      "height": 2.4
+    },
+    "placeholder": {
+      "shape": "circle",
+      "color": 16765286
+    },
+    "zIndex": 4
+  },
+  "body": {
+    "mode": "dynamic",
+    "mass": 0.6,
+    "gravityScale": 1,
+    "angularDamping": 0.4
+  },
+  "colliders": [
+    {
+      "id": "solid",
+      "role": "itemSolid",
+      "shape": {
+        "type": "circle",
+        "radius": 1.2
+      },
+      "restitution": 0.75,
+      "friction": 0.4,
+      "collisionMask": 12
+    },
+    {
+      "id": "kick",
+      "role": "itemSensor",
+      "shape": {
+        "type": "circle",
+        "radius": 1.9
+      }
+    }
+  ],
+  "behaviorType": "kickable",
+  "defaultConfig": {
+    "sensorId": "kick",
+    "kickStrength": 1.4,
+    "minImpulse": 0,
+    "maxImpulse": 30,
+    "cooldownSeconds": 0.25
+  },
+  "persistence": {
+    "transform": true,
+    "behaviorState": false,
+    "onRoomSleep": "resetToIdle"
+  },
+  "complexity": "simple"
+}

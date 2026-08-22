@@ -19,6 +19,23 @@ type CanvasRecord struct {
 	DefinitionRaw json.RawMessage `json:"definition"`
 }
 
+type ItemComplexity string
+
+const (
+	ItemComplexitySimple  ItemComplexity = "simple"
+	ItemComplexityComplex ItemComplexity = "complex"
+)
+
+// ItemDefinitionRecord is the server-authoritative metadata needed to validate
+// a durable item mutation. DefinitionRaw can be served or inspected by a host
+// application without making the room execute behavior code.
+type ItemDefinitionRecord struct {
+	DefinitionID  string          `json:"definitionId"`
+	Version       uint32          `json:"version"`
+	Complexity    ItemComplexity  `json:"complexity"`
+	DefinitionRaw json.RawMessage `json:"definition,omitempty"`
+}
+
 // SnapshotRecord is one canonical checkpoint (spec 13.1).
 type SnapshotRecord struct {
 	CanvasID           string          `json:"canvasId"`
@@ -35,6 +52,7 @@ type SnapshotRecord struct {
 // implementation without touching the realtime code.
 type Store interface {
 	LoadCanvas(ctx context.Context, canvasID string) (CanvasRecord, error)
+	LoadItemDefinition(ctx context.Context, definitionID string) (ItemDefinitionRecord, error)
 	LoadSnapshot(ctx context.Context, canvasID string) (SnapshotRecord, error)
 	SaveSnapshot(ctx context.Context, snapshot SnapshotRecord) error
 }
@@ -42,16 +60,26 @@ type Store interface {
 // MemoryStore keeps every canvas and snapshot in process memory. It is the
 // default for local runs and tests.
 type MemoryStore struct {
-	mu        sync.RWMutex
-	canvases  map[string]CanvasRecord
-	snapshots map[string]SnapshotRecord
+	mu          sync.RWMutex
+	canvases    map[string]CanvasRecord
+	definitions map[string]ItemDefinitionRecord
+	snapshots   map[string]SnapshotRecord
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		canvases:  make(map[string]CanvasRecord),
-		snapshots: make(map[string]SnapshotRecord),
+		canvases:    make(map[string]CanvasRecord),
+		definitions: make(map[string]ItemDefinitionRecord),
+		snapshots:   make(map[string]SnapshotRecord),
 	}
+}
+
+// PutItemDefinition registers authoritative item metadata. Call it at start-up
+// before a room accepts mutations that reference the definition.
+func (s *MemoryStore) PutItemDefinition(record ItemDefinitionRecord) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.definitions[record.DefinitionID] = record
 }
 
 // PutCanvas registers a canvas definition. Call it at start-up.
@@ -67,6 +95,19 @@ func (s *MemoryStore) LoadCanvas(_ context.Context, canvasID string) (CanvasReco
 	record, ok := s.canvases[canvasID]
 	if !ok {
 		return CanvasRecord{}, ErrNotFound
+	}
+	return record, nil
+}
+
+func (s *MemoryStore) LoadItemDefinition(
+	_ context.Context,
+	definitionID string,
+) (ItemDefinitionRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	record, ok := s.definitions[definitionID]
+	if !ok {
+		return ItemDefinitionRecord{}, ErrNotFound
 	}
 	return record, nil
 }

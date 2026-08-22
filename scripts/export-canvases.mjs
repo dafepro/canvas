@@ -9,6 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const entry = resolve(root, "packages/client/src/definitions/rocket-canvas.ts");
 const outFile = resolve(root, "node_modules/.cache/canvas-definitions.mjs");
 const outDir = resolve(root, "server/canvases");
+const definitionDir = resolve(root, "server/definitions");
 
 mkdirSync(dirname(outFile), { recursive: true });
 await build({
@@ -23,6 +24,7 @@ await build({
 
 const module = await import(`file://${outFile}`);
 mkdirSync(outDir, { recursive: true });
+mkdirSync(definitionDir, { recursive: true });
 
 const canvases = Object.entries(module).filter(
   ([, value]) => value && typeof value === "object" && "staticGeometry" in value,
@@ -34,8 +36,22 @@ for (const [name, canvas] of canvases) {
   console.log(`wrote ${file} from ${name}`);
 }
 
+const definitions = Object.entries(module).filter(
+  ([, value]) => value && typeof value === "object" && !Array.isArray(value) && "definitionId" in value,
+);
+
+for (const [name, definition] of definitions) {
+  const file = resolve(definitionDir, `${definition.definitionId}.json`);
+  writeFileSync(file, `${JSON.stringify(definition, null, 2)}\n`);
+  console.log(`wrote ${file} from ${name}`);
+}
+
 rmSync(outFile, { force: true });
 if (canvases.length === 0) {
   console.error("no canvas definitions found");
+  process.exit(1);
+}
+if (definitions.length === 0) {
+  console.error("no item definitions found");
   process.exit(1);
 }
