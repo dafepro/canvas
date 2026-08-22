@@ -191,4 +191,52 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     );
     bobIntent = STILL;
   }, 90_000);
+
+  it("keeps avatars and checkpointed item placement when the host reconnects", async () => {
+    const alice = session("alice");
+    await alice.start();
+    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+
+    const bob = session("bob");
+    await bob.start();
+    await waitFor("bob to receive host state", () => view(bob).length > 0);
+
+    alice.spawnItem(crateDefinition.definitionId, { x: 40, y: 20 });
+    await waitFor(
+      "the crate to settle before the checkpoint",
+      () =>
+        items(alice).length === 1 &&
+        items(alice)[0]!.y > 55 &&
+        Math.abs(items(alice)[0]!.vy) < 0.2,
+      20_000,
+    );
+    const crateId = items(alice)[0]!.id;
+    const settledY = items(alice)[0]!.y;
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+    const oldAliceAvatar = alice.avatarId;
+    alice.stop();
+    await waitFor("bob to take the host lease", () => bob.client.isHost);
+    await waitFor(
+      "the departed host avatar to disappear",
+      () => entity(bob, oldAliceAvatar) === undefined,
+    );
+
+    const rejoinedAlice = session("alice");
+    await rejoinedAlice.start();
+    await waitFor(
+      "the rejoined client to receive stationary avatars and the crate",
+      () => {
+        const rejoinedView = view(rejoinedAlice);
+        const crate = rejoinedView.find((candidate) => candidate.id === crateId);
+        return (
+          rejoinedView.some((candidate) => candidate.id === bob.avatarId) &&
+          rejoinedView.some((candidate) => candidate.id === rejoinedAlice.avatarId) &&
+          crate?.definitionId === crateDefinition.definitionId &&
+          Math.abs(crate.y - settledY) < 1
+        );
+      },
+      20_000,
+    );
+  }, 90_000);
 });

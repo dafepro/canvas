@@ -25,11 +25,11 @@ downward. Check an item only after the relevant focused tests pass.
 
 ## Priority 1 — large gaps in completed phases
 
-- [ ] Restore checkpoint sequencing during host migration and wake; do not emit
+- [x] Restore checkpoint sequencing during host migration and wake; do not emit
   stale checkpoints until a new host catches up.
 - [ ] Preserve active workflows and avatar positions across host migration
   instead of treating every loaded checkpoint as `room.wake`.
-- [ ] Reconcile avatar presence by adding only new peers and removing departed
+- [x] Reconcile avatar presence by adding only new peers and removing departed
   peers; eliminate duplicate avatars and ghost colliders.
 - [ ] Wire behavior-state migrations into snapshot loading and preserve actual
   behavior/definition versions in checkpoints.
@@ -59,7 +59,8 @@ downward. Check an item only after the relevant focused tests pass.
 - [ ] Render avatars from definition data.
 - [ ] Preserve networked effect parameters and connect `startAnimation` to the
   renderer/network path.
-- [ ] Correct peer item counts and host-migration diagnostics.
+- [x] Correct peer item counts.
+- [ ] Correct host-migration diagnostics.
 - [ ] Add collision, network, environment, and behavior visual laboratories.
 - [x] Make the integration harness use the correct executable name on Windows.
 - [ ] Add Windows/Linux CI and publishable package exports that target built

@@ -56,8 +56,15 @@ export class HostSimulation {
 
   /** Spec 13.4. Rebuilds the world from a durable snapshot with zero motion. */
   loadSnapshot(snapshot: CanvasSnapshot, fromSnapshot = true): void {
+    this.checkpointRevision = Math.max(
+      this.checkpointRevision,
+      snapshot.checkpointRevision,
+    );
     for (const item of snapshot.items) {
       this.addItem(this.instanceFromSnapshot(snapshot.canvasId, item, snapshot.sceneRevision));
+      if (item.visualVariant) {
+        this.world.setSpriteVariant(item.entityId, item.visualVariant);
+      }
     }
     // Behaviors initialize transient state on wake.
     for (const slot of this.behaviors.all()) {
@@ -143,7 +150,10 @@ export class HostSimulation {
   }
 
   /** Spec 13.1. A durable checkpoint with no velocity and no transient state. */
-  snapshot(normalized = false): CanvasSnapshot {
+  snapshot(
+    normalized = false,
+    metadata: { sceneRevision?: number; hostEpoch?: number } = {},
+  ): CanvasSnapshot {
     const items: SnapshotItem[] = [];
     for (const entity of this.world.registry.ofKind("item")) {
       const persistence = entity.persistence;
@@ -168,8 +178,8 @@ export class HostSimulation {
       schemaVersion: 1,
       canvasId: this.canvas.id,
       canvasVersion: this.canvas.version,
-      sceneRevision: 0,
-      hostEpoch: 0,
+      sceneRevision: metadata.sceneRevision ?? 0,
+      hostEpoch: metadata.hostEpoch ?? 0,
       checkpointRevision: ++this.checkpointRevision,
       tick: this.world.currentTick,
       capturedAt: new Date().toISOString(),
@@ -179,14 +189,16 @@ export class HostSimulation {
   }
 
   /** Spec 13.3. Normalize behavior state and stop timers before the room sleeps. */
-  normalizeForSleep(): CanvasSnapshot {
+  normalizeForSleep(
+    metadata: { sceneRevision?: number; hostEpoch?: number } = {},
+  ): CanvasSnapshot {
     this.behaviors.normalizeForSleep();
     for (const entity of this.world.registry.all()) {
       if (entity.rigidBody) {
         this.world.setVelocity(entity.id, { x: 0, y: 0 }, 0);
       }
     }
-    return this.snapshot(true);
+    return this.snapshot(true, metadata);
   }
 
   get nextCheckpointRevision(): number {

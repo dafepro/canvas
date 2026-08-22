@@ -155,9 +155,13 @@ export class SimulationKernel {
 
       case "requestSnapshot": {
         if (!this.simulation) break;
+        const metadata = {
+          sceneRevision: request.sceneRevision,
+          hostEpoch: request.hostEpoch,
+        };
         const snapshot = request.final
-          ? this.simulation.normalizeForSleep()
-          : this.simulation.snapshot(false);
+          ? this.simulation.normalizeForSleep(metadata)
+          : this.simulation.snapshot(false, metadata);
         this.post({ type: "snapshot", snapshot, final: request.final });
         break;
       }

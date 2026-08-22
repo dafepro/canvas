@@ -14,6 +14,7 @@ import {
   toJsonBytes,
   type DurableCommand,
   type EntityState,
+  type Peer,
 } from "@canvas-physics/protocol";
 import { AvatarReconciler } from "../net/avatar-reconciler.js";
 import { RoomClient } from "../net/room-client.js";
@@ -113,6 +114,9 @@ export class RoomSession {
   private hostEntities: RenderEntity[] = [];
   private localPrediction?: RenderEntity;
   private currentTick = 0;
+  private simulationReady = false;
+  private latestPeers?: Peer[];
+  private readonly hostAvatarIds = new Set<string>();
   private stats = {
     hz: 0,
     driftMs: 0,
@@ -203,7 +207,10 @@ export class RoomSession {
       this.reconciler.reset();
       this.driver.send({ type: "setHost", isHost: true, snapshot });
       // Rebuilding the world drops the local avatar, so add it again.
+      this.hostAvatarIds.clear();
       this.spawnLocalAvatar();
+      if (this.localAvatarId) this.hostAvatarIds.add(this.localAvatarId);
+      this.syncHostAvatars();
       this.itemCount = snapshot?.items.length ?? 0;
     });
 
@@ -215,6 +222,7 @@ export class RoomSession {
       this.reconciler.reset();
       if (hostClientId !== this.client.clientId) {
         this.driver.send({ type: "setHost", isHost: false });
+        this.hostAvatarIds.clear();
         this.spawnLocalAvatar();
       }
     });
@@ -224,7 +232,7 @@ export class RoomSession {
       const entities = state.entities.map(fromEntityState);
       this.buffer.push(tick, entities);
       this.syncCountdowns(entities, tick);
-      this.itemCount = state.entities.length;
+      this.itemCount = entities.filter((entity) => entity.kind === "item").length;
     });
 
     this.client.on("stateDelta", (delta, _epoch, tick) => {
@@ -261,19 +269,8 @@ export class RoomSession {
     });
 
     this.client.on("presence", (peers) => {
-      if (!this.client.isHost) return;
-      // The host keeps one avatar for each connected client.
-      for (const peer of peers) {
-        this.driver.send({
-          type: "addAvatar",
-          spawn: {
-            entityId: avatarEntityId(peer.clientId),
-            clientId: peer.clientId,
-            userId: peer.userId,
-            position: this.spawnPosition(),
-          },
-        });
-      }
+      this.latestPeers = peers;
+      this.syncHostAvatars();
     });
 
     this.client.on("durableAccepted", (command, _revision, itemJson) => {
@@ -337,6 +334,9 @@ export class RoomSession {
       },
     });
 
+    this.hostAvatarIds.clear();
+    if (this.client.isHost) this.hostAvatarIds.add(this.localAvatarId);
+
     this.startSendLoops();
   }
 
@@ -351,6 +351,34 @@ export class RoomSession {
         position: this.spawnPosition(),
       },
     });
+  }
+
+  /** Keeps the host simulation's transient avatars identical to presence. */
+  private syncHostAvatars(): void {
+    if (!this.client.isHost || !this.simulationReady || !this.latestPeers) return;
+    const desired = new Map(
+      this.latestPeers.map((peer) => [avatarEntityId(peer.clientId), peer]),
+    );
+
+    for (const entityId of this.hostAvatarIds) {
+      if (desired.has(entityId)) continue;
+      this.driver.send({ type: "removeAvatar", entityId });
+      this.hostAvatarIds.delete(entityId);
+    }
+
+    for (const [entityId, peer] of desired) {
+      if (this.hostAvatarIds.has(entityId)) continue;
+      this.driver.send({
+        type: "addAvatar",
+        spawn: {
+          entityId,
+          clientId: peer.clientId,
+          userId: peer.userId,
+          position: this.spawnPosition(),
+        },
+      });
+      this.hostAvatarIds.add(entityId);
+    }
   }
 
   // ---------- loops ----------
@@ -480,7 +508,12 @@ export class RoomSession {
 
   private requestCheckpoint(): void {
     if (!this.client.isHost) return;
-    this.driver.send({ type: "requestSnapshot", final: false });
+    this.driver.send({
+      type: "requestSnapshot",
+      final: false,
+      sceneRevision: this.client.sceneRevision,
+      hostEpoch: this.client.hostEpoch,
+    });
   }
 
   /**
@@ -557,6 +590,10 @@ export class RoomSession {
 
   private onSimulation(message: SimulationResponse): void {
     switch (message.type) {
+      case "ready":
+        this.simulationReady = true;
+        this.syncHostAvatars();
+        break;
       case "render": {
         this.currentTick = message.tick;
         this.stats = { ...message.stats };

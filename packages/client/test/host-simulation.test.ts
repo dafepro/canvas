@@ -428,6 +428,48 @@ describe("HostSimulation with real physics", () => {
     second.free();
   });
 
+  it("continues checkpoint metadata and restores a saved visual variant", () => {
+    const first = build();
+    const snapshot = {
+      schemaVersion: 1,
+      canvasId: rocketCanvas.id,
+      canvasVersion: rocketCanvas.version,
+      sceneRevision: 7,
+      hostEpoch: 4,
+      checkpointRevision: 41,
+      tick: 120,
+      capturedAt: new Date().toISOString(),
+      normalized: false,
+      items: [
+        {
+          entityId: "rocket-1",
+          definitionId: rocketDefinition.definitionId,
+          definitionVersion: rocketDefinition.version,
+          ownerUserId: "alice",
+          transform: { x: 70, y: 62, rotation: 0 },
+          resolvedConfig: resolveItemConfig(
+            rocketDefinition as ItemDefinition<Record<string, unknown>>,
+            {
+              width: rocketCanvas.size.width,
+              height: rocketCanvas.size.height,
+              orientation: rocketCanvas.orientation,
+            },
+          ),
+          visualVariant: "armed",
+        },
+      ],
+    };
+    first.loadSnapshot(snapshot);
+
+    expect(first.world.registry.require("rocket-1").render?.variant).toBe("armed");
+    expect(first.snapshot(false, { sceneRevision: 7, hostEpoch: 4 })).toMatchObject({
+      sceneRevision: 7,
+      hostEpoch: 4,
+      checkpointRevision: 42,
+    });
+    first.free();
+  });
+
   it("reports only the entities whose transform changed", () => {
     const simulation = build();
     simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));

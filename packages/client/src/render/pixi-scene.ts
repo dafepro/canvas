@@ -198,7 +198,13 @@ export class PixiScene {
 
   private ensureSprite(entity: RenderEntity): SpriteRecord {
     const existing = this.sprites.get(entity.id);
-    if (existing && existing.variant === entity.variant) return existing;
+    if (
+      existing &&
+      existing.definitionId === entity.definitionId &&
+      existing.variant === entity.variant
+    ) {
+      return existing;
+    }
     if (existing) {
       this.entityLayer.removeChild(existing.display);
       existing.display.destroy({ children: true });

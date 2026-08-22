@@ -37,7 +37,12 @@ export type SimulationRequest =
     }
   | { type: "ownerAction"; entityId: string; action: string; userId: string }
   | { type: "moveItem"; entityId: string; transform: Transform; preview: boolean }
-  | { type: "requestSnapshot"; final: boolean }
+  | {
+      type: "requestSnapshot";
+      final: boolean;
+      sceneRevision: number;
+      hostEpoch: number;
+    }
   | { type: "stop" };
 
 export interface RenderEntity {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptySnapshot } from "@canvas-physics/core";
-import { toJsonBytes, type RoomEnvelope } from "@canvas-physics/protocol";
+import { toJsonBytes, type Peer, type RoomEnvelope } from "@canvas-physics/protocol";
 import { RoomClient } from "../src/net/room-client.js";
 import { RoomSession } from "../src/runtime/room-session.js";
 import { rocketCanvas, rocketCanvasDefinitions } from "../src/definitions/rocket-canvas.js";
@@ -158,6 +158,85 @@ describe("RoomClient reconnect handshake", () => {
       type: "addAvatar",
       spawn: expect.objectContaining({ entityId: "avatar:c-second", clientId: "c-second" }),
     });
+    session.stop();
+  });
+
+  it("reconciles host avatars from presence without duplicating the local avatar", async () => {
+    const transport = new ReconnectTransport();
+    const requests: SimulationRequest[] = [];
+    let postFromSimulation:
+      | ((message: Parameters<Parameters<SimulationDriver["onMessage"]>[0]>[0]) => void)
+      | undefined;
+    const driver = new SimulationDriver((post) => {
+      postFromSimulation = post;
+      return {
+        send: (request) => requests.push(request),
+        terminate: () => {},
+      };
+    });
+    const session = new RoomSession({
+      transport,
+      driver,
+      canvasId: rocketCanvas.id,
+      serverUrl: "http://localhost:8080",
+      userId: "alice",
+      displayName: "Alice",
+      definitions: rocketCanvasDefinitions,
+    });
+
+    await session.start();
+    const snapshot = emptySnapshot(rocketCanvas.id, rocketCanvas.version);
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 3,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      joinAccepted: {
+        clientId: "c-host",
+        sceneRevision: 0,
+        hostEpoch: 3,
+        hostClientId: "c-host",
+        canvasDefinitionJson: toJsonBytes(rocketCanvas),
+        snapshotJson: toJsonBytes(snapshot),
+        roomWasSleeping: false,
+        tickRate: 60,
+      },
+    });
+    await Promise.resolve();
+
+    const peer = (clientId: string, userId: string, isHost: boolean): Peer => ({
+      clientId,
+      userId,
+      displayName: userId,
+      isHost,
+      hostEligible: true,
+    });
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 3,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      presence: { peers: [peer("c-host", "alice", true), peer("c-peer", "bob", false)] },
+    });
+    postFromSimulation?.({ type: "ready" });
+
+    expect(
+      requests
+        .filter((request) => request.type === "addAvatar")
+        .map((request) => request.spawn.entityId),
+    ).toEqual(["avatar:c-peer"]);
+
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 3,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      presence: { peers: [peer("c-host", "alice", true)] },
+    });
+    expect(requests).toContainEqual({ type: "removeAvatar", entityId: "avatar:c-peer" });
     session.stop();
   });
 });
