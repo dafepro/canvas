@@ -103,6 +103,31 @@ describe.skipIf(!goAvailable())("a room under packet loss", () => {
     expect(entity(peer, crateId)!.definitionId).toBe(crateDefinition.definitionId);
   }, 120_000);
 
+  // Spec 11.1. A reconnect gives the client a new id. A client that held the
+  // lease before the break must not keep publishing state.
+  it("drops the host role when a reconnect finds another host", async () => {
+    const host = session("host");
+    await host.start();
+    await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
+
+    const peer = session("peer");
+    await peer.start();
+    await waitFor("the peer to join", () => peer.client.clientId !== "");
+    expect(peer.client.isHost).toBe(false);
+
+    // Pretend the peer held the lease before its connection broke.
+    peer.client.isHost = true;
+    expect(peer.client.hostClientId).not.toBe(peer.client.clientId);
+
+    // The room refuses state from a client without the lease, so the guard has
+    // to be on the client. Nothing may leave the peer.
+    const before = peer.client.traffic.outboundBytes;
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const inputOnly = peer.client.traffic.outboundBytes - before;
+    // Input and heartbeats still flow. A delta at 15 Hz would be far larger.
+    expect(inputOnly).toBeLessThan(2000);
+  }, 60_000);
+
   it("keeps moving the peer avatar when input packets are lost", async () => {
     let peerIntent: InputIntent = STILL;
     const host = session("host");

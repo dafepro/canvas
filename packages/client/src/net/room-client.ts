@@ -170,8 +170,17 @@ export class RoomClient {
     );
   }
 
+  /**
+   * Spec 11.1. Only the client the room names may publish canonical state.
+   * `isHost` alone is not enough: it can survive a reconnect that moved the
+   * lease.
+   */
+  private get holdsLease(): boolean {
+    return this.isHost && this.hostClientId === this.clientId;
+  }
+
   sendStateDelta(delta: StateDelta, tick: number): void {
-    if (!this.isHost) return;
+    if (!this.holdsLease) return;
     this.transport.sendRealtime(
       newEnvelope(this.joinDescriptor.canvasId, {
         hostEpoch: this.hostEpoch,
@@ -183,7 +192,7 @@ export class RoomClient {
   }
 
   sendFullState(state: FullState, tick: number): void {
-    if (!this.isHost) return;
+    if (!this.holdsLease) return;
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.canvasId, {
         hostEpoch: this.hostEpoch,
@@ -195,7 +204,7 @@ export class RoomClient {
   }
 
   sendEffect(event: EffectEvent, tick: number): void {
-    if (!this.isHost) return;
+    if (!this.holdsLease) return;
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.canvasId, {
         hostEpoch: this.hostEpoch,
@@ -207,7 +216,7 @@ export class RoomClient {
   }
 
   sendCheckpoint(snapshot: CanvasSnapshot, checkpointRevision: number, final = false): void {
-    if (!this.isHost) return;
+    if (!this.holdsLease) return;
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.canvasId, {
         hostEpoch: this.hostEpoch,
@@ -280,6 +289,10 @@ export class RoomClient {
       this.clientId = accepted.clientId;
       this.hostEpoch = accepted.hostEpoch;
       this.hostClientId = accepted.hostClientId;
+      // Spec 11.1. A reconnect produces a new client id, and the room may have
+      // given the lease to somebody else. Without this line a client that held
+      // the lease before the break keeps sending state the room refuses.
+      this.isHost = accepted.hostClientId === accepted.clientId;
       this.sceneRevision = accepted.sceneRevision;
       this.tickRate = accepted.tickRate || 60;
       const canvas = fromJsonBytes<CanvasDefinition>(accepted.canvasDefinitionJson);

@@ -96,7 +96,7 @@ same simulation in the test process.
 | Metrics and debug overlays | Done. The client reports every counter of spec 22.1, and the demo panel shows them. The server reports every counter of spec 22.2 through `CountingMetrics`, which `canvasd` exposes at `GET /metrics` in the Prometheus text format. |
 | NaN and out-of-bounds protection, item quarantine | Done. A NaN value and a body more than one canvas width outside the canvas are both quarantined. |
 | Definition and protocol compatibility checks | Done. The client declares its item definitions on join. A client that lacks a definition the scene uses, or holds an older version, receives a `definition_mismatch` refusal and loses the host lease. |
-| Asset preloading and reconnect behavior | Partly done. The transport reconnects with backoff. There is no asset preload step, because the renderer draws placeholder shapes only. |
+| Asset preloading and reconnect behavior | Partly done. The transport reconnects with backoff, and a client that reconnects no longer keeps a host role the room gave to somebody else. There is no asset preload step, because the renderer draws placeholder shapes only. |
 | Exit criterion: the scene stays responsive and recoverable at the room limits | Met for the simulation and the repair path. Not met for the network budget in a busy scene; see the measurement below. |
 
 ### The measured room, 20 avatars and 50 items
