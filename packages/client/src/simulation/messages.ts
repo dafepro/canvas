@@ -19,9 +19,15 @@ export type SimulationRequest =
       /** True when this client holds the host lease. */
       isHost: boolean;
       snapshot?: CanvasSnapshot;
+      wakeFromSleep?: boolean;
       localAvatar?: AvatarSpawn;
     }
-  | { type: "setHost"; isHost: boolean; snapshot?: CanvasSnapshot }
+  | {
+      type: "setHost";
+      isHost: boolean;
+      snapshot?: CanvasSnapshot;
+      wakeFromSleep?: boolean;
+    }
   | { type: "addItem"; instance: ItemInstance }
   | { type: "removeItem"; entityId: string }
   | { type: "addAvatar"; spawn: AvatarSpawn }

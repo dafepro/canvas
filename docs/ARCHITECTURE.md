@@ -109,6 +109,11 @@ state and checkpoints from a client without the active lease.
 The heartbeat is the real health signal. A visibility event is a hint, because a
 crashed tab sends no event.
 
+An active host migration resumes the checkpoint tick and checkpointed behavior
+state without emitting `room.wake`. The promoted peer seeds avatars from the
+last canonical keyframe/delta positions it received. A true sleeping-room wake
+is marked separately and does emit `room.wake` so transient workflows reset.
+
 ## Durable versus canonical
 
 Two different kinds of authority, easy to confuse:

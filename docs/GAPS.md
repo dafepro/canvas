@@ -27,8 +27,11 @@ downward. Check an item only after the relevant focused tests pass.
 
 - [x] Restore checkpoint sequencing during host migration and wake; do not emit
   stale checkpoints until a new host catches up.
-- [ ] Preserve active workflows and avatar positions across host migration
-  instead of treating every loaded checkpoint as `room.wake`.
+- [x] Preserve canonical ticks, checkpointed behavior phases and visuals, and
+  avatar positions across active host migration instead of treating every
+  loaded checkpoint as `room.wake`.
+- [ ] Restore behavior timers across active host migration so timer-driven
+  workflows resume from their checkpointed remaining duration.
 - [x] Reconcile avatar presence by adding only new peers and removing departed
   peers; eliminate duplicate avatars and ghost colliders.
 - [ ] Wire behavior-state migrations into snapshot loading and preserve actual

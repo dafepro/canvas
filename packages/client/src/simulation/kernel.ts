@@ -197,7 +197,10 @@ export class SimulationKernel {
       "snapshot" in snapshotSource &&
       snapshotSource.snapshot
     ) {
-      this.simulation.loadSnapshot(snapshotSource.snapshot);
+      this.simulation.loadSnapshot(
+        snapshotSource.snapshot,
+        snapshotSource.wakeFromSleep === true,
+      );
     }
     this.loop = new FixedStepLoop(this.tickRate, () => this.stepOnce());
     this.loop.reset(performance.now());

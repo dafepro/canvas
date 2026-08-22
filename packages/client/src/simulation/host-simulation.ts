@@ -55,25 +55,29 @@ export class HostSimulation {
   }
 
   /** Spec 13.4. Rebuilds the world from a durable snapshot with zero motion. */
-  loadSnapshot(snapshot: CanvasSnapshot, fromSnapshot = true): void {
+  loadSnapshot(snapshot: CanvasSnapshot, wakeFromSleep = true): void {
     this.checkpointRevision = Math.max(
       this.checkpointRevision,
       snapshot.checkpointRevision,
     );
+    this.world.resumeAtTick(snapshot.tick);
     for (const item of snapshot.items) {
       this.addItem(this.instanceFromSnapshot(snapshot.canvasId, item, snapshot.sceneRevision));
       if (item.visualVariant) {
         this.world.setSpriteVariant(item.entityId, item.visualVariant);
       }
     }
-    // Behaviors initialize transient state on wake.
-    for (const slot of this.behaviors.all()) {
-      this.behaviors.emit({
-        type: "room.wake",
-        tick: this.world.currentTick,
-        self: slot.entityId,
-        fromSnapshot,
-      });
+    // A sleeping room resets transient workflows. An active host migration
+    // resumes the checkpointed state without masquerading as a room wake.
+    if (wakeFromSleep) {
+      for (const slot of this.behaviors.all()) {
+        this.behaviors.emit({
+          type: "room.wake",
+          tick: this.world.currentTick,
+          self: slot.entityId,
+          fromSnapshot: true,
+        });
+      }
     }
   }
 

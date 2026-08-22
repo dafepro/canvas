@@ -142,6 +142,11 @@ export class RapierWorld implements BehaviorHost {
     return this.tick;
   }
 
+  /** Continues the canonical tick sequence after a host rebuild. */
+  resumeAtTick(tick: number): void {
+    this.tick = Math.max(0, Math.floor(tick));
+  }
+
   /** Spec 22.1 and 19.1. The collider budget is 150 for a whole scene. */
   get activeColliderCount(): number {
     let count = 0;

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   RapierWorld,
   RoomSession,
@@ -53,14 +53,14 @@ const distance = (a: RenderEntity, b: RenderEntity): number =>
 describe.skipIf(!goAvailable())("two clients through canvasd", () => {
   beforeAll(async () => {
     await RapierWorld.load();
+  }, 120_000);
+
+  beforeEach(async () => {
     server = await startCanvasd();
   }, 120_000);
 
   afterEach(() => {
     for (const room of sessions.splice(0)) room.stop();
-  });
-
-  afterAll(() => {
     server?.stop();
   });
 
@@ -131,7 +131,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       "the host to move the peer avatar",
       () => {
         const onHost = entity(alice, bobAvatar);
-        return onHost !== undefined && onHost.x - startX > 2;
+        return onHost !== undefined && onHost.x - startX > 8;
       },
       20_000,
     );
@@ -148,6 +148,18 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
         const local = entity(bob, bobAvatar);
         const canonical = entity(alice, bobAvatar);
         return local !== undefined && canonical !== undefined && distance(local, canonical) < 3;
+      },
+      20_000,
+    );
+
+    const beforeMigration = entity(alice, bobAvatar)!;
+    alice.stop();
+    await waitFor("bob to become host", () => bob.client.isHost);
+    await waitFor(
+      "bob's avatar to keep its canonical position through migration",
+      () => {
+        const migrated = entity(bob, bobAvatar);
+        return migrated !== undefined && distance(migrated, beforeMigration) < 2;
       },
       20_000,
     );

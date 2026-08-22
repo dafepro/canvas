@@ -470,6 +470,59 @@ describe("HostSimulation with real physics", () => {
     first.free();
   });
 
+  it("resumes an active migration snapshot without applying room wake", () => {
+    const simulation = build();
+    const snapshot = {
+      schemaVersion: 1,
+      canvasId: rocketCanvas.id,
+      canvasVersion: rocketCanvas.version,
+      sceneRevision: 8,
+      hostEpoch: 5,
+      checkpointRevision: 42,
+      tick: 321,
+      capturedAt: new Date().toISOString(),
+      normalized: false,
+      items: [
+        {
+          entityId: "rocket-1",
+          definitionId: rocketDefinition.definitionId,
+          definitionVersion: rocketDefinition.version,
+          ownerUserId: "alice",
+          transform: { x: 70, y: 40, rotation: 0 },
+          resolvedConfig: resolveItemConfig(
+            rocketDefinition as ItemDefinition<Record<string, unknown>>,
+            {
+              width: rocketCanvas.size.width,
+              height: rocketCanvas.size.height,
+              orientation: rocketCanvas.orientation,
+            },
+          ),
+          behaviorState: {
+            phase: "flying" as const,
+            armedAtTick: 100,
+            countdownTicks: 180,
+            qualifyingContacts: 1,
+            thrustTicksRemaining: 30,
+            launchCount: 2,
+          },
+          behaviorStateVersion: 1,
+          visualVariant: "flying",
+        },
+      ],
+    };
+
+    simulation.loadSnapshot(snapshot, false);
+    simulation.step();
+
+    expect(simulation.tick).toBe(322);
+    expect(simulation.behaviors.slot("rocket-1")?.state).toMatchObject({
+      phase: "flying",
+      launchCount: 2,
+    });
+    expect(simulation.world.registry.require("rocket-1").render?.variant).toBe("flying");
+    simulation.free();
+  });
+
   it("reports only the entities whose transform changed", () => {
     const simulation = build();
     simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));

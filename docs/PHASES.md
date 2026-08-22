@@ -58,7 +58,7 @@ same simulation in the test process.
 | Remote snapshot buffer with interpolation and extrapolation | Done. `interpolation-buffer.ts`, 100 ms delay, capped extrapolation. |
 | Periodic full keyframes | Done at 2 Hz. |
 | Host yield on a visibility or health signal | Done. The client yields when the page is hidden. |
-| Timeout election and full-state restart on a new host | Done on the server and tested. |
+| Timeout election and full-state restart on a new host | Done and tested. The replacement resumes the checkpoint tick, behavior phase and visual, and last canonical avatar positions. Generic behavior-timer reconstruction remains open. |
 | Exit criterion: closing the host resumes the room with no reload | Verified in the real-process client test and manually in two browser clients, including stationary avatars and checkpointed item placement. |
 
 ## Phase 4 — Ownership, durable editing, and persistence: mostly complete

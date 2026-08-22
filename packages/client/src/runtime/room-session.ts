@@ -117,6 +117,7 @@ export class RoomSession {
   private simulationReady = false;
   private latestPeers?: Peer[];
   private readonly hostAvatarIds = new Set<string>();
+  private readonly lastCanonicalAvatarPositions = new Map<string, Vec2>();
   private finalCheckpointSent?: () => void;
   private terminated = false;
   private stats = {
@@ -260,7 +261,12 @@ export class RoomSession {
     this.client.on("hostGranted", (_epoch, snapshot) => {
       this.buffer.reset();
       this.reconciler.reset();
-      this.driver.send({ type: "setHost", isHost: true, snapshot });
+      this.driver.send({
+        type: "setHost",
+        isHost: true,
+        snapshot,
+        wakeFromSleep: false,
+      });
       // Rebuilding the world drops the local avatar, so add it again.
       this.hostAvatarIds.clear();
       this.spawnLocalAvatar();
@@ -285,6 +291,7 @@ export class RoomSession {
     this.client.on("fullState", (state, _epoch, tick) => {
       if (this.client.isHost) return;
       const entities = state.entities.map(fromEntityState);
+      this.rememberFullAvatarState(entities);
       this.buffer.push(tick, entities);
       this.syncCountdowns(entities, tick);
       this.itemCount = entities.filter((entity) => entity.kind === "item").length;
@@ -293,6 +300,7 @@ export class RoomSession {
     this.client.on("stateDelta", (delta, _epoch, tick) => {
       if (this.client.isHost) return;
       const entities = delta.entities.map(fromEntityState);
+      this.rememberAvatarDelta(entities, delta.removedEntityIds);
       this.buffer.pushDelta(tick, entities, delta.removedEntityIds);
       this.syncCountdowns(entities, tick);
     });
@@ -381,11 +389,12 @@ export class RoomSession {
       tickRate: this.client.tickRate,
       isHost: this.client.isHost,
       snapshot: this.client.isHost ? snapshot : undefined,
+      wakeFromSleep: wasSleeping,
       localAvatar: {
         entityId: this.localAvatarId,
         clientId: this.client.clientId,
         userId: this.options.userId,
-        position: this.spawnPosition(),
+        position: this.avatarSpawnPosition(this.localAvatarId),
       },
     });
 
@@ -403,9 +412,30 @@ export class RoomSession {
         entityId: this.localAvatarId,
         clientId: this.client.clientId,
         userId: this.options.userId,
-        position: this.spawnPosition(),
+        position: this.avatarSpawnPosition(this.localAvatarId),
       },
     });
+  }
+
+  private avatarSpawnPosition(entityId: string): Vec2 {
+    const canonical = this.lastCanonicalAvatarPositions.get(entityId);
+    return canonical ? { ...canonical } : this.spawnPosition();
+  }
+
+  private rememberFullAvatarState(entities: RenderEntity[]): void {
+    this.lastCanonicalAvatarPositions.clear();
+    for (const entity of entities) {
+      if (entity.kind !== "avatar") continue;
+      this.lastCanonicalAvatarPositions.set(entity.id, { x: entity.x, y: entity.y });
+    }
+  }
+
+  private rememberAvatarDelta(entities: RenderEntity[], removed: string[]): void {
+    for (const entity of entities) {
+      if (entity.kind !== "avatar") continue;
+      this.lastCanonicalAvatarPositions.set(entity.id, { x: entity.x, y: entity.y });
+    }
+    for (const entityId of removed) this.lastCanonicalAvatarPositions.delete(entityId);
   }
 
   /** Keeps the host simulation's transient avatars identical to presence. */
@@ -429,7 +459,7 @@ export class RoomSession {
           entityId,
           clientId: peer.clientId,
           userId: peer.userId,
-          position: this.spawnPosition(),
+          position: this.avatarSpawnPosition(entityId),
         },
       });
       this.hostAvatarIds.add(entityId);
