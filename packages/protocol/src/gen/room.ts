@@ -244,6 +244,13 @@ export interface EntityState {
   definitionId: string;
   /** Addendum A1. True when no physics act on this avatar. */
   disabled: boolean;
+  /**
+   * Addendum A2. Increases on every discontinuous move, such as an edge wrap or
+   * a respawn. A client that sees a new value snaps instead of interpolating.
+   */
+  teleportEpoch: number;
+  /** Addendum A3. True while the body waits out its respawn delay. */
+  respawning: boolean;
 }
 
 export interface StateDelta {
@@ -2013,6 +2020,8 @@ function createBaseEntityState(): EntityState {
     quarantined: false,
     definitionId: "",
     disabled: false,
+    teleportEpoch: 0,
+    respawning: false,
   };
 }
 
@@ -2056,6 +2065,12 @@ export const EntityState: MessageFns<EntityState> = {
     }
     if (message.disabled !== false) {
       writer.uint32(104).bool(message.disabled);
+    }
+    if (message.teleportEpoch !== 0) {
+      writer.uint32(112).uint32(message.teleportEpoch);
+    }
+    if (message.respawning !== false) {
+      writer.uint32(120).bool(message.respawning);
     }
     return writer;
   },
@@ -2177,6 +2192,22 @@ export const EntityState: MessageFns<EntityState> = {
             message.disabled = reader.bool();
             continue;
           }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
+            message.teleportEpoch = reader.uint32();
+            continue;
+          }
+          case 15: {
+            if (tag !== 120) {
+              break;
+            }
+
+            message.respawning = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2228,6 +2259,12 @@ export const EntityState: MessageFns<EntityState> = {
         ? globalThis.String(object.definition_id)
         : "",
       disabled: isSet(object.disabled) ? globalThis.Boolean(object.disabled) : false,
+      teleportEpoch: isSet(object.teleportEpoch)
+        ? globalThis.Number(object.teleportEpoch)
+        : isSet(object.teleport_epoch)
+        ? globalThis.Number(object.teleport_epoch)
+        : 0,
+      respawning: isSet(object.respawning) ? globalThis.Boolean(object.respawning) : false,
     };
   },
 
@@ -2272,6 +2309,12 @@ export const EntityState: MessageFns<EntityState> = {
     if (message.disabled !== false) {
       obj.disabled = message.disabled;
     }
+    if (message.teleportEpoch !== 0) {
+      obj.teleportEpoch = Math.round(message.teleportEpoch);
+    }
+    if (message.respawning !== false) {
+      obj.respawning = message.respawning;
+    }
     return obj;
   },
 
@@ -2297,6 +2340,8 @@ export const EntityState: MessageFns<EntityState> = {
     message.quarantined = object.quarantined ?? false;
     message.definitionId = object.definitionId ?? "";
     message.disabled = object.disabled ?? false;
+    message.teleportEpoch = object.teleportEpoch ?? 0;
+    message.respawning = object.respawning ?? false;
     return message;
   },
 };

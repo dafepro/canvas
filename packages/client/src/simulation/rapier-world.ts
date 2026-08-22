@@ -2,9 +2,12 @@ import RAPIER from "@dimforge/rapier2d-compat";
 import {
   EnvironmentField,
   isSensorRole,
+  defaultRespawnPolicy,
   resolveEdges,
+  resolveTerrainBlocking,
   roleDefaultMask,
   roleMembership,
+  terrainMask,
   softSpeedLimitForce,
   stepElevation,
   type BehaviorEvent,
@@ -19,6 +22,7 @@ import {
   type EnvironmentSample,
   type ItemDefinition,
   type ItemInstance,
+  type RespawnPolicy,
   type ShapeDefinition,
   type Transform,
   type Vec2,
@@ -43,6 +47,15 @@ interface BodyRecord {
   regions: Set<string>;
   /** Consecutive ticks the body spent still and inside fixed geometry. */
   stuckTicks?: number;
+  /**
+   * Addendum A4. The collision groups of the solid collider. A shape query uses
+   * them, so a probe ignores the terrain that lets this body pass through.
+   */
+  queryGroups?: number;
+  /** Addendum A3. Ticks left before the body returns to the canvas. */
+  respawnTicks?: number;
+  /** Addendum A3. Colliders switched off for the wait, to switch back on. */
+  respawnDisabled?: string[];
 }
 
 /** Spec 20. Half a second at 60 Hz before a still, embedded body is freed. */
@@ -174,6 +187,9 @@ export class RapierWorld implements BehaviorHost {
         regions: new Set(),
       };
       this.bodies.set(entity.id, record);
+      // Addendum A4. Terrain states which body kinds it stops. A mask without
+      // the avatar layer lets an avatar walk through the shape.
+      const blocking = resolveTerrainBlocking(definition.blocks, this.canvas.terrainDefaults);
       this.attachCollider(record, {
         id: definition.id,
         role,
@@ -181,6 +197,7 @@ export class RapierWorld implements BehaviorHost {
         restitution: definition.restitution,
         friction: definition.friction,
         tags: definition.tags,
+        collisionMask: role === "worldStatic" ? terrainMask(blocking) : undefined,
       });
     }
 
@@ -266,6 +283,11 @@ export class RapierWorld implements BehaviorHost {
 
     const collider = this.world.createCollider(desc, record.body);
     if (definition.enabled === false) collider.setEnabled(false);
+    // Addendum A4. A shape query for this body uses the groups of its solid
+    // collider, so the query ignores terrain the body passes through.
+    if (definition.role === "avatarBody" || definition.role === "itemSolid") {
+      record.queryGroups = collisionGroups(membership, filter);
+    }
     record.colliders.set(definition.id, collider);
     this.colliderOwner.set(collider.handle, {
       entityId: record.entity.id,
@@ -486,7 +508,10 @@ export class RapierWorld implements BehaviorHost {
     this.tick++;
     const dt = 1 / this.tickRate;
 
+    this.stepRespawns();
+
     for (const record of this.bodies.values()) {
+      if (record.entity.respawning) continue;
       this.applyEnvironment(record);
       this.driveAvatar(record, dt);
     }
@@ -497,9 +522,12 @@ export class RapierWorld implements BehaviorHost {
     this.collectRegionEvents();
     this.collectDwellEvents();
     this.stepElevations(dt);
+    // Spec 14.3. The quarantine runs first. A body far outside the canvas is
+    // an invalid value, and a wrapped edge would otherwise bring it back and
+    // hide the fault.
+    this.quarantineInvalid();
     this.applyEdgePolicies();
     this.freeStuckBodies();
-    this.quarantineInvalid();
 
     const events = [...this.pendingEvents];
     this.pendingEvents.length = 0;
@@ -600,6 +628,10 @@ export class RapierWorld implements BehaviorHost {
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS |
         RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC |
         RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC,
+      // Addendum A4. The controller applies no group filter of its own, so the
+      // groups of the avatar body are given here. Terrain that does not accept
+      // the avatar layer then lets the avatar walk through.
+      record.queryGroups,
     );
     const moved = this.characterController.computedMovement();
     return { x: moved.x / dt, y: moved.y / dt };
@@ -812,7 +844,7 @@ export class RapierWorld implements BehaviorHost {
     for (const record of this.bodies.values()) {
       const elevation = record.entity.elevation;
       if (!elevation?.enabled) continue;
-      if (record.entity.avatar?.disabled) continue;
+      if (record.entity.avatar?.disabled || record.entity.respawning) continue;
       this.environment.sample(record.entity.transform, this.sample);
       const result = stepElevation(elevation, this.sample, dt);
       record.entity.transform.z = elevation.z;
@@ -831,11 +863,18 @@ export class RapierWorld implements BehaviorHost {
     for (const record of this.bodies.values()) {
       if (record.entity.kind === "static") continue;
       if (record.entity.avatar?.disabled) continue;
+      if (record.entity.respawning) continue;
       const transform = record.entity.transform;
       const velocity = record.body.linvel();
       const radius = record.entity.avatar?.radius ?? 0;
       const resolution = resolveEdges(this.canvas, transform, velocity, radius);
       if (resolution.crossings.length === 0) continue;
+      // Addendum A3. A respawn waits before the body comes back, so the loss of
+      // the body reads as a loss rather than as a jump to the middle.
+      if (resolution.respawn) {
+        this.beginRespawn(record, resolution.spawnPointId);
+        continue;
+      }
       if (resolution.position) {
         const wrapped = resolution.crossings.find((crossing) => crossing.policy === "wrap");
         const target = wrapped
@@ -844,6 +883,8 @@ export class RapierWorld implements BehaviorHost {
         record.body.setTranslation(target, true);
         transform.x = target.x;
         transform.y = target.y;
+        // Addendum A2. The move is a jump, not motion. The renderer must snap.
+        this.markTeleport(record);
       }
       if (resolution.velocity) {
         record.body.setLinvel(resolution.velocity, true);
@@ -871,7 +912,7 @@ export class RapierWorld implements BehaviorHost {
         0,
         shape,
         undefined,
-        undefined,
+        record.queryGroups,
         undefined,
         record.body,
         (collider) => !collider.isSensor(),
@@ -910,7 +951,7 @@ export class RapierWorld implements BehaviorHost {
     for (const record of this.bodies.values()) {
       if (record.entity.kind === "static") continue;
       if (record.entity.rigidBody?.mode !== "dynamic") continue;
-      if (record.entity.quarantined) continue;
+      if (record.entity.quarantined || record.entity.respawning) continue;
 
       const speed = Math.hypot(record.body.linvel().x, record.body.linvel().y);
       if (speed > STUCK_SPEED) {
@@ -932,6 +973,7 @@ export class RapierWorld implements BehaviorHost {
       record.body.setAngvel(0, true);
       record.entity.transform.x = escape.x;
       record.entity.transform.y = escape.y;
+      this.markTeleport(record);
       this.pendingEvents.push({
         type: "unstuck",
         tick: this.tick,
@@ -951,6 +993,7 @@ export class RapierWorld implements BehaviorHost {
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS |
         RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC |
         RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC,
+      record.queryGroups,
     );
     if (!projection || !projection.isInside) return undefined;
     return { x: centre.x, y: centre.y };
@@ -990,17 +1033,120 @@ export class RapierWorld implements BehaviorHost {
         transform.y < height + margin;
       if (inRange) continue;
       record.entity.quarantined = true;
-      const spawn = this.canvas.spawnPoints[0]?.position ?? {
-        x: this.canvas.size.width / 2,
-        y: this.canvas.size.height / 2,
-      };
+      // Addendum A3. The body returns after the respawn delay, on the same path
+      // as a body that crossed a respawn edge.
+      if (this.respawnPolicy.applyToQuarantine) {
+        this.beginRespawn(record);
+        continue;
+      }
+      const spawn = this.spawnPosition();
       record.body.setTranslation(spawn, true);
       record.body.setLinvel({ x: 0, y: 0 }, true);
       record.body.setAngvel(0, true);
       transform.x = spawn.x;
       transform.y = spawn.y;
       transform.rotation = 0;
+      this.markTeleport(record);
     }
+  }
+
+  // ---------- respawn (addendum A3) ----------
+
+  /** The canvas policy, or the library default when the canvas states none. */
+  private get respawnPolicy(): RespawnPolicy {
+    return this.canvas.respawn ?? defaultRespawnPolicy;
+  }
+
+  private spawnPosition(spawnPointId?: string): Vec2 {
+    const id = spawnPointId ?? this.respawnPolicy.spawnPointId;
+    const named = id
+      ? this.canvas.spawnPoints.find((point) => point.id === id)
+      : undefined;
+    const point = named ?? this.canvas.spawnPoints[0];
+    return point
+      ? { ...point.position }
+      : { x: this.canvas.size.width / 2, y: this.canvas.size.height / 2 };
+  }
+
+  /**
+   * Addendum A3. Takes the body out of the scene for the respawn delay. The
+   * body is parked on its spawn point, but it is hidden, it holds no active
+   * collider, and no force acts on it. A NaN position cannot stay in the world,
+   * so the park happens now and only the return is delayed.
+   */
+  private beginRespawn(record: BodyRecord, spawnPointId?: string): void {
+    if (record.entity.respawning) return;
+    const spawn = this.spawnPosition(spawnPointId);
+    const policy = this.respawnPolicy;
+
+    record.body.setTranslation(spawn, true);
+    record.body.setLinvel({ x: 0, y: 0 }, true);
+    record.body.setAngvel(0, true);
+    record.body.setRotation(0, true);
+    record.entity.transform.x = spawn.x;
+    record.entity.transform.y = spawn.y;
+    record.entity.transform.rotation = 0;
+    if (record.entity.rigidBody) {
+      record.entity.rigidBody.velocity = { x: 0, y: 0 };
+      record.entity.rigidBody.angularVelocity = 0;
+    }
+    record.stuckTicks = 0;
+    record.regions.clear();
+
+    const disabled: string[] = [];
+    for (const [id, collider] of record.colliders) {
+      if (!collider.isEnabled()) continue;
+      collider.setEnabled(false);
+      disabled.push(id);
+    }
+    record.respawnDisabled = disabled;
+    record.entity.respawning = true;
+    record.respawnTicks = Math.max(
+      0,
+      Math.round(Math.max(0, policy.delaySeconds) * this.tickRate),
+    );
+    this.markTeleport(record);
+    this.pendingEvents.push({
+      type: "respawn.start",
+      tick: this.tick,
+      self: record.entity.id,
+      delaySeconds: Math.max(0, policy.delaySeconds),
+    });
+    if (record.respawnTicks === 0) this.completeRespawn(record);
+  }
+
+  private stepRespawns(): void {
+    for (const record of this.bodies.values()) {
+      if (!record.entity.respawning) continue;
+      record.respawnTicks = (record.respawnTicks ?? 0) - 1;
+      if (record.respawnTicks > 0) continue;
+      this.completeRespawn(record);
+    }
+  }
+
+  private completeRespawn(record: BodyRecord): void {
+    for (const id of record.respawnDisabled ?? []) {
+      record.colliders.get(id)?.setEnabled(true);
+    }
+    record.respawnDisabled = undefined;
+    record.respawnTicks = undefined;
+    record.entity.respawning = false;
+    record.entity.quarantined = false;
+    this.markTeleport(record);
+    this.pendingEvents.push({
+      type: "respawn.end",
+      tick: this.tick,
+      self: record.entity.id,
+      position: { ...record.entity.transform },
+    });
+  }
+
+  /**
+   * Addendum A2. Records a discontinuous move. A renderer that sees a new epoch
+   * snaps the sprite instead of sliding it across the canvas.
+   */
+  private markTeleport(record: BodyRecord): void {
+    record.entity.teleportEpoch = ((record.entity.teleportEpoch ?? 0) + 1) % 0xffff;
   }
 
   // ---------- BehaviorHost ----------
@@ -1120,6 +1266,7 @@ export class RapierWorld implements BehaviorHost {
       record.entity.elevation.z = z;
       record.entity.transform.z = z;
     }
+    this.markTeleport(record);
   }
 
   setSpriteVariant(id: EntityId, variant: string): void {

@@ -1108,7 +1108,12 @@ type EntityState struct {
 	// Lets a client that never held the item pick the right visual.
 	DefinitionId string `protobuf:"bytes,12,opt,name=definition_id,json=definitionId,proto3" json:"definition_id,omitempty"`
 	// Addendum A1. True when no physics act on this avatar.
-	Disabled      bool `protobuf:"varint,13,opt,name=disabled,proto3" json:"disabled,omitempty"`
+	Disabled bool `protobuf:"varint,13,opt,name=disabled,proto3" json:"disabled,omitempty"`
+	// Addendum A2. Increases on every discontinuous move, such as an edge wrap or
+	// a respawn. A client that sees a new value snaps instead of interpolating.
+	TeleportEpoch uint32 `protobuf:"varint,14,opt,name=teleport_epoch,json=teleportEpoch,proto3" json:"teleport_epoch,omitempty"`
+	// Addendum A3. True while the body waits out its respawn delay.
+	Respawning    bool `protobuf:"varint,15,opt,name=respawning,proto3" json:"respawning,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1230,6 +1235,20 @@ func (x *EntityState) GetDefinitionId() string {
 func (x *EntityState) GetDisabled() bool {
 	if x != nil {
 		return x.Disabled
+	}
+	return false
+}
+
+func (x *EntityState) GetTeleportEpoch() uint32 {
+	if x != nil {
+		return x.TeleportEpoch
+	}
+	return 0
+}
+
+func (x *EntityState) GetRespawning() bool {
+	if x != nil {
+		return x.Respawning
 	}
 	return false
 }
@@ -1911,7 +1930,7 @@ const file_room_proto_rawDesc = "" +
 	"\tintensity\x18\x03 \x01(\x02R\tintensity\x12-\n" +
 	"\x13client_time_unix_ms\x18\x04 \x01(\x04R\x10clientTimeUnixMs\x12\x12\n" +
 	"\x04held\x18\x05 \x01(\bR\x04held\x12'\n" +
-	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xf4\x03\n" +
+	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xbb\x04\n" +
 	"\vEntityState\x12\x1b\n" +
 	"\tentity_id\x18\x01 \x01(\tR\bentityId\x122\n" +
 	"\bposition\x18\x02 \x01(\v2\x16.canvasphysics.v1.Vec2R\bposition\x12\x1a\n" +
@@ -1926,7 +1945,11 @@ const file_room_proto_rawDesc = "" +
 	" \x01(\fR\x11behaviorStateJson\x12 \n" +
 	"\vquarantined\x18\v \x01(\bR\vquarantined\x12#\n" +
 	"\rdefinition_id\x18\f \x01(\tR\fdefinitionId\x12\x1a\n" +
-	"\bdisabled\x18\r \x01(\bR\bdisabled\"\x9c\x01\n" +
+	"\bdisabled\x18\r \x01(\bR\bdisabled\x12%\n" +
+	"\x0eteleport_epoch\x18\x0e \x01(\rR\rteleportEpoch\x12\x1e\n" +
+	"\n" +
+	"respawning\x18\x0f \x01(\bR\n" +
+	"respawning\"\x9c\x01\n" +
 	"\n" +
 	"StateDelta\x129\n" +
 	"\bentities\x18\x01 \x03(\v2\x1d.canvasphysics.v1.EntityStateR\bentities\x12,\n" +

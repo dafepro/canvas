@@ -93,4 +93,14 @@ export interface Entity {
   tags?: Set<string>;
   /** Set by the host when a NaN or out-of-bounds value is found (spec 14.3). */
   quarantined?: boolean;
+  /**
+   * Addendum A3. True while the body waits out its respawn delay. It is not
+   * drawn, it holds no active collider, and no force acts on it.
+   */
+  respawning?: boolean;
+  /**
+   * Addendum A2. Rises on every discontinuous move, such as an edge wrap or a
+   * respawn. A renderer that sees a new value snaps instead of interpolating.
+   */
+  teleportEpoch?: number;
 }

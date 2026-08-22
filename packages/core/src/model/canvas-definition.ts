@@ -1,5 +1,5 @@
 import type { Vec2 } from "../math/vec2.js";
-import type { ColliderRole } from "./collision.js";
+import type { ColliderRole, TerrainBlocking } from "./collision.js";
 import type { RegionShape, ShapeDefinition } from "./shapes.js";
 
 /** Spec 3.2. */
@@ -18,6 +18,11 @@ export interface StaticColliderDefinition {
   friction?: number;
   /** Semantic tags such as "hill", "launchPad", "goal", "ground". */
   tags?: string[];
+  /**
+   * Addendum A4. Which body kinds this terrain stops. It overrides
+   * `CanvasDefinition.terrainDefaults` for this collider alone.
+   */
+  blocks?: TerrainBlocking;
 }
 
 export interface RegionDefinition {
@@ -81,6 +86,21 @@ export interface CanvasLimits {
   maxComplexPhysicsItems: number;
 }
 
+/** Addendum A3. What happens between the loss of a body and its return. */
+export interface RespawnPolicy {
+  /** Seconds the body stays out of the scene. Zero returns it at once. */
+  delaySeconds: number;
+  /** The spawn point to use. The first spawn point is the default. */
+  spawnPointId?: string;
+  /** Apply the same delay to a body the host had to quarantine. */
+  applyToQuarantine?: boolean;
+}
+
+export const defaultRespawnPolicy: RespawnPolicy = {
+  delaySeconds: 1.5,
+  applyToQuarantine: true,
+};
+
 export const defaultCanvasLimits: CanvasLimits = {
   maxAvatars: 20,
   maxItems: 50,
@@ -105,4 +125,11 @@ export interface CanvasDefinition {
   environment: EnvironmentDefinition;
   spawnPoints: SpawnPoint[];
   limits: CanvasLimits;
+  /**
+   * Addendum A4. The blocking rule for every static collider that states none.
+   * The library default lets an avatar pass through terrain.
+   */
+  terrainDefaults?: TerrainBlocking;
+  /** Addendum A3. The delayed return of a body that left the canvas. */
+  respawn?: RespawnPolicy;
 }

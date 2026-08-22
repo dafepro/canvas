@@ -112,6 +112,21 @@ export interface UnstuckEvent extends BaseEvent {
   to: Vec2;
 }
 
+/**
+ * Addendum A3. The body left the canvas and waits out its respawn delay. It is
+ * not drawn and no force acts on it until `respawn.end`.
+ */
+export interface RespawnStartEvent extends BaseEvent {
+  type: "respawn.start";
+  delaySeconds: number;
+}
+
+/** Addendum A3. The body is back in the scene at the position given. */
+export interface RespawnEndEvent extends BaseEvent {
+  type: "respawn.end";
+  position: Vec2;
+}
+
 export interface TickEvent extends BaseEvent {
   type: "tick";
   /** Fixed step duration in seconds. */
@@ -132,6 +147,8 @@ export type BehaviorEvent =
   | RoomWakeEvent
   | LandingEvent
   | UnstuckEvent
+  | RespawnStartEvent
+  | RespawnEndEvent
   | TickEvent;
 
 export type BehaviorEventType = BehaviorEvent["type"];
@@ -152,9 +169,11 @@ export const eventOrder: Record<BehaviorEventType, number> = {
   impulse: 8,
   landing: 9,
   unstuck: 10,
-  timer: 11,
-  "owner.action": 12,
-  tick: 13,
+  "respawn.start": 11,
+  "respawn.end": 12,
+  timer: 13,
+  "owner.action": 14,
+  tick: 15,
 };
 
 /** Sorts events into the canonical processing order for one tick. */

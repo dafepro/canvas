@@ -68,3 +68,40 @@ export const isSensorRole = (role: ColliderRole): boolean =>
   role === "itemSensor" ||
   role === "regionSensor" ||
   role === "portalSensor";
+
+/**
+ * Addendum A4. Which body kinds a piece of canvas terrain stops. An avatar
+ * passes through terrain by default, so a canvas reads as a stage rather than
+ * as a maze. Set `avatars` to true for the terrain that must block an avatar.
+ */
+export interface TerrainBlocking {
+  /** Stop an avatar body. */
+  avatars?: boolean;
+  /** Stop a solid item body. */
+  items?: boolean;
+}
+
+/** The value used when neither the collider nor the canvas states one. */
+export const defaultTerrainBlocking: Required<TerrainBlocking> = {
+  avatars: false,
+  items: true,
+};
+
+export const resolveTerrainBlocking = (
+  collider?: TerrainBlocking,
+  canvas?: TerrainBlocking,
+): Required<TerrainBlocking> => ({
+  avatars: collider?.avatars ?? canvas?.avatars ?? defaultTerrainBlocking.avatars,
+  items: collider?.items ?? canvas?.items ?? defaultTerrainBlocking.items,
+});
+
+/**
+ * The filter mask for a static collider. A mask that omits a layer stops every
+ * contact with that layer, because Rapier needs both sides to accept the pair.
+ */
+export const terrainMask = (blocking: Required<TerrainBlocking>): number => {
+  let mask = 0;
+  if (blocking.avatars) mask |= CollisionLayer.AVATAR_BODY;
+  if (blocking.items) mask |= CollisionLayer.ITEM_SOLID;
+  return mask;
+};

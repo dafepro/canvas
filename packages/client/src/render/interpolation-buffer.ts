@@ -124,6 +124,13 @@ export class InterpolationBuffer {
         out.push({ ...target, extrapolated: false });
         continue;
       }
+      // Addendum A2. The body jumped, for example across a wrapped edge. A
+      // blend between the two ends would slide the sprite back across the
+      // whole canvas, so the newer state is drawn as it is.
+      if ((from.teleportEpoch ?? 0) !== (target.teleportEpoch ?? 0)) {
+        out.push({ ...target, extrapolated: false });
+        continue;
+      }
       out.push({
         ...target,
         x: from.x + (target.x - from.x) * t,

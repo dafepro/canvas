@@ -781,6 +781,8 @@ interface SentSample {
   variant?: string;
   disabled?: boolean;
   quarantined?: boolean;
+  teleportEpoch?: number;
+  respawning?: boolean;
 }
 
 const sentSample = (entity: RenderEntity): SentSample => ({
@@ -794,6 +796,8 @@ const sentSample = (entity: RenderEntity): SentSample => ({
   variant: entity.variant,
   disabled: entity.disabled,
   quarantined: entity.quarantined,
+  teleportEpoch: entity.teleportEpoch,
+  respawning: entity.respawning,
 });
 
 /** Movement below these values is not visible at the 100 ms render delay. */
@@ -811,7 +815,11 @@ const movedSince = (before: SentSample, now: RenderEntity): boolean =>
   Math.abs(before.angularVelocity - now.angularVelocity) > VELOCITY_EPSILON ||
   before.variant !== now.variant ||
   before.disabled !== now.disabled ||
-  before.quarantined !== now.quarantined;
+  before.quarantined !== now.quarantined ||
+  // Addendum A2 and A3. A jump and a respawn must reach every peer on the tick
+  // they happen, or a peer slides the sprite across the canvas instead.
+  before.teleportEpoch !== now.teleportEpoch ||
+  before.respawning !== now.respawning;
 // The processed input sequence is not a reason to send. It rides on the entity
 // whenever the entity moves, and the 2 Hz keyframe carries it for a still
 // avatar. Sending it alone would put every idle avatar in every delta.
@@ -854,6 +862,8 @@ const toEntityState = (
   quarantined: entity.quarantined ?? false,
   definitionId: keyframe ? entity.definitionId : "",
   disabled: entity.disabled ?? false,
+  teleportEpoch: entity.teleportEpoch ?? 0,
+  respawning: entity.respawning ?? false,
 });
 
 const fromEntityState = (state: EntityState): RenderEntity => ({
@@ -872,4 +882,6 @@ const fromEntityState = (state: EntityState): RenderEntity => ({
   behaviorState: fromJsonBytes(state.behaviorStateJson),
   quarantined: state.quarantined,
   disabled: state.disabled,
+  teleportEpoch: state.teleportEpoch,
+  respawning: state.respawning,
 });

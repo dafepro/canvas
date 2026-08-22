@@ -11,7 +11,13 @@ export const rocketCanvas: CanvasDefinition = {
   version: 1,
   size: { width: 100, height: 70 },
   orientation: "side",
-  edges: { top: "wrap", right: "solid", bottom: "solid", left: "solid" },
+  // Addendum A2 and A3. A side boundary moves the body instead of stopping it.
+  // The top wraps at once; a side returns the body after the respawn delay.
+  edges: { top: "wrap", right: "respawn", bottom: "solid", left: "respawn" },
+  // Addendum A4. Terrain stops an item but lets an avatar pass through, unless
+  // the collider states otherwise.
+  terrainDefaults: { avatars: false, items: true },
+  respawn: { delaySeconds: 2, spawnPointId: "centre", applyToQuarantine: true },
   staticGeometry: [
     {
       id: "ground",
@@ -19,6 +25,9 @@ export const rocketCanvas: CanvasDefinition = {
       position: { x: 50, y: 68 },
       tags: ["ground", "floor"],
       friction: 0.9,
+      // Addendum A4. The floor is the one piece of terrain that holds an
+      // avatar. The hill and the launch pad let an avatar walk through.
+      blocks: { avatars: true, items: true },
     },
     {
       id: "hill",

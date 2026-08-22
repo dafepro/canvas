@@ -8,9 +8,18 @@
   "orientation": "side",
   "edges": {
     "top": "wrap",
-    "right": "solid",
+    "right": "respawn",
     "bottom": "solid",
-    "left": "solid"
+    "left": "respawn"
+  },
+  "terrainDefaults": {
+    "avatars": false,
+    "items": true
+  },
+  "respawn": {
+    "delaySeconds": 2,
+    "spawnPointId": "centre",
+    "applyToQuarantine": true
   },
   "staticGeometry": [
     {
@@ -28,7 +37,11 @@
         "ground",
         "floor"
       ],
-      "friction": 0.9
+      "friction": 0.9,
+      "blocks": {
+        "avatars": true,
+        "items": true
+      }
     },
     {
       "id": "hill",

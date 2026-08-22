@@ -10,6 +10,9 @@ import {
   explainTuning,
   resolveItemConfig,
   validateCanvasDefinition,
+  CollisionLayer,
+  resolveTerrainBlocking,
+  terrainMask,
   validateItemDefinition,
   validateSnapshot,
   validateTransform,
@@ -301,5 +304,26 @@ describe("PortalBehavior", () => {
       other: { entityId: "ball", colliderId: "solid", kind: "item", tags: [] },
     }).flush();
     expect(h.state.transitCount).toBe(0);
+  });
+});
+
+/** Addendum A4. Terrain states which body kinds it stops. */
+describe("terrain blocking", () => {
+  it("lets an avatar through and stops an item by default", () => {
+    const blocking = resolveTerrainBlocking();
+    expect(blocking).toEqual({ avatars: false, items: true });
+    const mask = terrainMask(blocking);
+    expect(mask & CollisionLayer.AVATAR_BODY).toBe(0);
+    expect(mask & CollisionLayer.ITEM_SOLID).not.toBe(0);
+  });
+
+  it("prefers the collider rule over the canvas rule", () => {
+    const blocking = resolveTerrainBlocking({ avatars: true }, { avatars: false, items: false });
+    expect(blocking).toEqual({ avatars: true, items: false });
+    expect(terrainMask(blocking)).toBe(CollisionLayer.AVATAR_BODY);
+  });
+
+  it("stops nothing when both kinds pass through", () => {
+    expect(terrainMask(resolveTerrainBlocking({ avatars: false, items: false }))).toBe(0);
   });
 });

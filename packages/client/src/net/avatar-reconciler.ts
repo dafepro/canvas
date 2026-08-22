@@ -14,6 +14,7 @@ export interface ReconcilerOptions {
  */
 export class AvatarReconciler {
   private offset: Vec2 = { x: 0, y: 0 };
+  private lastTeleportEpoch?: number;
   lastErrorDistance = 0;
   snapCount = 0;
 
@@ -25,8 +26,21 @@ export class AvatarReconciler {
     this.blendPerFrame = options.blendPerFrame ?? 0.2;
   }
 
-  /** Records the newest canonical state for the local avatar. */
+  /**
+   * Records the newest canonical state for the local avatar. Addendum A2. The
+   * host may have wrapped or respawned the avatar. That is not a prediction
+   * error, so the offset is dropped and the canonical place is used at once.
+   */
   observe(canonical: RenderEntity, predicted: { x: number; y: number }): void {
+    const epoch = canonical.teleportEpoch ?? 0;
+    if (this.lastTeleportEpoch !== undefined && epoch !== this.lastTeleportEpoch) {
+      this.lastTeleportEpoch = epoch;
+      this.offset = { x: 0, y: 0 };
+      this.lastErrorDistance = 0;
+      this.snapCount++;
+      return;
+    }
+    this.lastTeleportEpoch = epoch;
     const errorX = canonical.x - predicted.x;
     const errorY = canonical.y - predicted.y;
     this.lastErrorDistance = Math.hypot(errorX, errorY);
@@ -55,5 +69,6 @@ export class AvatarReconciler {
   reset(): void {
     this.offset = { x: 0, y: 0 };
     this.lastErrorDistance = 0;
+    this.lastTeleportEpoch = undefined;
   }
 }

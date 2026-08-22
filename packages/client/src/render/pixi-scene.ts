@@ -177,6 +177,8 @@ export class PixiScene {
       record.display.rotation = entity.rotation;
       // Addendum A1. A disabled avatar stays visible but reads as inactive.
       record.display.alpha = entity.quarantined || entity.disabled ? 0.35 : 1;
+      // Addendum A3. A body that waits for its respawn is out of the scene.
+      record.display.visible = entity.respawning !== true;
       this.screenPositions.set(entity.id, {
         x: record.display.position.x,
         y: record.display.position.y,

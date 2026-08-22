@@ -137,6 +137,11 @@ message EntityState {
   string definition_id = 12;
   // Addendum A1. True when no physics act on this avatar.
   bool disabled = 13;
+  // Addendum A2. Increases on every discontinuous move, such as an edge wrap or
+  // a respawn. A client that sees a new value snaps instead of interpolating.
+  uint32 teleport_epoch = 14;
+  // Addendum A3. True while the body waits out its respawn delay.
+  bool respawning = 15;
 }
 
 message StateDelta {

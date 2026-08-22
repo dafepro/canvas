@@ -60,6 +60,13 @@ export interface RenderEntity {
   quarantined?: boolean;
   /** Addendum A1. True when no physics act on this avatar. */
   disabled?: boolean;
+  /**
+   * Addendum A2. Rises on every discontinuous move. A renderer that sees a new
+   * value snaps the sprite instead of interpolating across the canvas.
+   */
+  teleportEpoch?: number;
+  /** Addendum A3. True while the body waits out its respawn delay. */
+  respawning?: boolean;
 }
 
 export interface SimulationStats {

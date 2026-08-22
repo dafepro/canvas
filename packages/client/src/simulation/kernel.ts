@@ -41,6 +41,8 @@ const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity =
   behaviorState,
   quarantined: entity.quarantined,
   disabled: entity.avatar?.disabled,
+  teleportEpoch: entity.teleportEpoch,
+  respawning: entity.respawning,
 });
 
 /**

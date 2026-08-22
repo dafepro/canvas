@@ -86,23 +86,118 @@ describe("HostSimulation with real physics", () => {
     return transform;
   };
 
-  it("keeps an avatar inside the left edge", () => {
+  // Addendum A3. The left and the right edge return the body after a delay.
+  it("returns an avatar to the spawn point after it leaves the left edge", () => {
     const transform = drivenAvatar({ x: -1, y: 0 });
-    expect(transform.x).toBeGreaterThan(0);
-    expect(transform.x).toBeLessThan(3);
+    expect(transform.x).toBeCloseTo(50, 1);
   });
 
-  it("keeps an avatar inside the right edge", () => {
+  it("returns an avatar to the spawn point after it leaves the right edge", () => {
     const transform = drivenAvatar({ x: 1, y: 0 });
-    expect(transform.x).toBeLessThan(100);
-    expect(transform.x).toBeGreaterThan(97);
+    expect(transform.x).toBeCloseTo(50, 1);
   });
 
   it("stops an avatar on the ground instead of below the bottom edge", () => {
-    // The ground rect spans y 66 to 70. The avatar radius is 1.2.
+    // The ground rect spans y 66 to 70. The avatar radius is 1.2. The floor is
+    // the one collider of this canvas that blocks an avatar (addendum A4).
     const transform = drivenAvatar({ x: 0, y: 1 });
     expect(transform.y).toBeLessThan(66);
     expect(transform.y).toBeGreaterThan(62);
+  });
+
+  /**
+   * Addendum A3. The body is out of the scene for the whole delay, and it is
+   * back on the spawn point afterwards. The canvas states two seconds.
+   */
+  it("hides an avatar for the respawn delay and then places it on the spawn", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:a",
+      clientId: "a",
+      userId: "alice",
+      position: { x: 50, y: 55 },
+    });
+    simulation.world.setAvatarInput("avatar:a", { x: -1, y: 0 }, 1, 1);
+
+    const avatar = () => simulation.world.registry.require("avatar:a");
+    let startTick = -1;
+    for (let i = 0; i < 400 && startTick < 0; i++) {
+      const events = simulation.world.step().events;
+      if (events.some((event) => event.type === "respawn.start")) startTick = i;
+    }
+    expect(startTick).toBeGreaterThan(0);
+    expect(avatar().respawning).toBe(true);
+
+    // One second into the wait the avatar is still out of the scene.
+    for (let i = 0; i < 60; i++) simulation.step();
+    expect(avatar().respawning).toBe(true);
+
+    // The delay is two seconds, so 90 more ticks pass the end of it.
+    let ended = false;
+    for (let i = 0; i < 90 && !ended; i++) {
+      ended = simulation.world
+        .step()
+        .events.some((event) => event.type === "respawn.end");
+    }
+    expect(ended).toBe(true);
+    expect(avatar().respawning).toBe(false);
+    expect(avatar().transform.x).toBeCloseTo(50, 1);
+    expect(avatar().transform.y).toBeCloseTo(62, 1);
+    simulation.free();
+  });
+
+  /**
+   * Addendum A4. Terrain blocks an item by default and lets an avatar through.
+   * The hill of this canvas states no rule, so it takes the canvas default.
+   */
+  it("lets an avatar walk through the hill that still stops a crate", () => {
+    const simulation = build();
+    // The hill peak is at x 22, y 52. Start to the right of it, level with it.
+    simulation.addAvatar({
+      entityId: "avatar:a",
+      clientId: "a",
+      userId: "alice",
+      position: { x: 34, y: 62 },
+    });
+    simulation.world.setAvatarInput("avatar:a", { x: -1, y: 0 }, 1, 1);
+    for (let i = 0; i < 60; i++) simulation.step();
+    const avatar = simulation.world.registry.require("avatar:a");
+    // Without the pass-through rule the hill face stops the avatar near x 30.
+    expect(avatar.transform.x).toBeLessThan(20);
+
+    // The same hill still holds a crate above the ground.
+    const second = build();
+    second.addItem(instance("crate-1", crateDefinition as ItemDefinition, 22, 30));
+    for (let i = 0; i < 300; i++) second.step();
+    const crate = second.world.registry.require("crate-1");
+    expect(crate.transform.y).toBeLessThan(56);
+    simulation.free();
+    second.free();
+  });
+
+  /**
+   * Addendum A2. A wrap is a jump. The epoch tells a renderer to snap the
+   * sprite rather than slide it back across the whole canvas.
+   */
+  it("raises the teleport epoch when a body wraps across the top edge", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:a",
+      clientId: "a",
+      userId: "alice",
+      position: { x: 50, y: 10 },
+    });
+    const before = simulation.world.registry.require("avatar:a").teleportEpoch ?? 0;
+    simulation.world.setAvatarInput("avatar:a", { x: 0, y: -1 }, 1, 1);
+    let wrapped = false;
+    for (let i = 0; i < 240 && !wrapped; i++) {
+      simulation.step();
+      wrapped = simulation.world.registry.require("avatar:a").transform.y > 40;
+    }
+    expect(wrapped).toBe(true);
+    const after = simulation.world.registry.require("avatar:a").teleportEpoch ?? 0;
+    expect(after).toBeGreaterThan(before);
+    simulation.free();
   });
 
   // Addendum A1. A disabled avatar keeps its place and takes no part in the
