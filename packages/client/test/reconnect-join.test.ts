@@ -1,0 +1,163 @@
+import { describe, expect, it } from "vitest";
+import { emptySnapshot } from "@canvas-physics/core";
+import { toJsonBytes, type RoomEnvelope } from "@canvas-physics/protocol";
+import { RoomClient } from "../src/net/room-client.js";
+import { RoomSession } from "../src/runtime/room-session.js";
+import { rocketCanvas, rocketCanvasDefinitions } from "../src/definitions/rocket-canvas.js";
+import { SimulationDriver } from "../src/simulation/driver.js";
+import type { SimulationRequest } from "../src/simulation/messages.js";
+import {
+  emptyTraffic,
+  type JoinDescriptor,
+  type RoomTransport,
+  type TransportStatus,
+} from "../src/net/transport.js";
+
+class ReconnectTransport implements RoomTransport {
+  status: TransportStatus = "idle";
+  readonly traffic = emptyTraffic();
+  readonly sent: RoomEnvelope[] = [];
+  private readonly messages = new Set<(message: RoomEnvelope) => void>();
+  private readonly statuses = new Set<(
+    status: TransportStatus,
+    detail?: string,
+  ) => void>();
+
+  async connect(_join: JoinDescriptor): Promise<void> {
+    this.setStatus("open");
+  }
+
+  sendReliable(message: RoomEnvelope): void {
+    this.sent.push(message);
+  }
+
+  sendRealtime(message: RoomEnvelope): void {
+    this.sent.push(message);
+  }
+
+  onMessage(handler: (message: RoomEnvelope) => void): () => void {
+    this.messages.add(handler);
+    return () => this.messages.delete(handler);
+  }
+
+  onStatus(handler: (status: TransportStatus, detail?: string) => void): () => void {
+    this.statuses.add(handler);
+    return () => this.statuses.delete(handler);
+  }
+
+  close(): void {
+    this.setStatus("closed");
+  }
+
+  setStatus(status: TransportStatus, detail?: string): void {
+    this.status = status;
+    for (const handler of this.statuses) handler(status, detail);
+  }
+
+  deliver(message: RoomEnvelope): void {
+    for (const handler of this.messages) handler(message);
+  }
+}
+
+describe("RoomClient reconnect handshake", () => {
+  it("resends JOIN and drops a stale host role before reconnecting", async () => {
+    const transport = new ReconnectTransport();
+    const client = new RoomClient({
+      transport,
+      heartbeatHz: 1000,
+      definitions: [{ definitionId: "rocket", version: 1 }],
+      join: {
+        canvasId: "rocket-canvas",
+        serverUrl: "http://localhost:8080",
+        userId: "alice",
+        displayName: "Alice",
+      },
+    });
+
+    await client.connect();
+    expect(transport.sent.filter((message) => message.join).length).toBe(1);
+
+    client.clientId = "c-old";
+    client.hostClientId = "c-old";
+    client.hostEpoch = 7;
+    client.isHost = true;
+    const hostChanges: string[] = [];
+    client.on("hostChanged", (_epoch, _hostClientId, reason) => hostChanges.push(reason));
+
+    transport.setStatus("reconnecting", "connection dropped");
+    expect(client.isHost).toBe(false);
+    expect(hostChanges).toEqual(["transport_lost"]);
+
+    transport.setStatus("open");
+    expect(transport.sent.filter((message) => message.join).length).toBe(2);
+    client.close();
+  });
+
+  it("replaces the local avatar identity assigned to a reconnected socket", async () => {
+    const transport = new ReconnectTransport();
+    const requests: SimulationRequest[] = [];
+    const driver = new SimulationDriver(() => ({
+      send: (request) => requests.push(request),
+      terminate: () => {},
+    }));
+    const session = new RoomSession({
+      transport,
+      driver,
+      canvasId: rocketCanvas.id,
+      serverUrl: "http://localhost:8080",
+      userId: "alice",
+      displayName: "Alice",
+      definitions: rocketCanvasDefinitions,
+    });
+
+    await session.start();
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 1,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      joinAccepted: {
+        clientId: "c-first",
+        sceneRevision: 0,
+        hostEpoch: 1,
+        hostClientId: "c-host",
+        canvasDefinitionJson: toJsonBytes(rocketCanvas),
+        snapshotJson: toJsonBytes(emptySnapshot(rocketCanvas.id, rocketCanvas.version)),
+        roomWasSleeping: false,
+        tickRate: 60,
+      },
+    });
+    await Promise.resolve();
+    expect(session.avatarId).toBe("avatar:c-first");
+
+    transport.setStatus("reconnecting");
+    transport.setStatus("open");
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 2,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      joinAccepted: {
+        clientId: "c-second",
+        sceneRevision: 0,
+        hostEpoch: 2,
+        hostClientId: "c-host",
+        canvasDefinitionJson: toJsonBytes(rocketCanvas),
+        snapshotJson: toJsonBytes(emptySnapshot(rocketCanvas.id, rocketCanvas.version)),
+        roomWasSleeping: false,
+        tickRate: 60,
+      },
+    });
+    await Promise.resolve();
+
+    expect(session.avatarId).toBe("avatar:c-second");
+    expect(requests).toContainEqual({ type: "removeAvatar", entityId: "avatar:c-first" });
+    expect(requests).toContainEqual({
+      type: "addAvatar",
+      spawn: expect.objectContaining({ entityId: "avatar:c-second", clientId: "c-second" }),
+    });
+    session.stop();
+  });
+});

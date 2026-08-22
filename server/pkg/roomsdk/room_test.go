@@ -132,13 +132,48 @@ func (c *testClient) await(match func(*pb.RoomEnvelope) bool) *pb.RoomEnvelope {
 	return nil
 }
 
-func (c *testClient) join() *pb.JoinAccepted {
+func (c *testClient) sendJoin(definitions ...*pb.DefinitionVersion) {
 	c.t.Helper()
+	if len(definitions) == 0 {
+		definitions = []*pb.DefinitionVersion{{DefinitionId: "rocket", Version: 1}}
+	}
+	c.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
+			CanvasId:        "test-canvas",
+			ProtocolVersion: 1,
+			Definitions:     definitions,
+		}},
+	})
+}
+
+func (c *testClient) join(definitions ...*pb.DefinitionVersion) *pb.JoinAccepted {
+	c.t.Helper()
+	c.sendJoin(definitions...)
 	envelope := c.await(func(e *pb.RoomEnvelope) bool { return e.GetJoinAccepted() != nil })
 	accepted := envelope.GetJoinAccepted()
 	c.clientID = accepted.ClientId
 	c.hostEpoch = accepted.HostEpoch
 	return accepted
+}
+
+func TestConnectionMustJoinBeforeRoomAdmission(t *testing.T) {
+	h := newHarness(t, nil)
+	client := h.dial("alice")
+	client.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_Heartbeat{Heartbeat: &pb.Heartbeat{
+			SentAtUnixMs: uint64(time.Now().UnixMilli()),
+		}},
+	})
+
+	first := client.read()
+	if first.GetError() == nil || first.GetError().Code != "join_required" {
+		t.Fatalf("first response = %T, want join_required error", first.Payload)
+	}
+	if len(h.server.Rooms()) != 0 {
+		t.Fatal("a connection entered the room before a valid JOIN")
+	}
 }
 
 func (c *testClient) heartbeat() {
@@ -942,7 +977,6 @@ func TestCanonicalStateValidation(t *testing.T) {
 func TestProtocolMismatchIsRefused(t *testing.T) {
 	h := newHarness(t, nil)
 	client := h.dial("alice")
-	client.join()
 	client.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
@@ -967,6 +1001,7 @@ func TestRoomFullIsRefused(t *testing.T) {
 		client.join()
 	}
 	extra := h.dial("d")
+	extra.sendJoin()
 	got := extra.await(func(e *pb.RoomEnvelope) bool { return e.GetError() != nil }).GetError()
 	if got.Code != "room_full" {
 		t.Errorf("error code = %q, want room_full", got.Code)

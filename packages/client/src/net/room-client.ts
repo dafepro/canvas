@@ -98,7 +98,7 @@ export class RoomClient {
     this.heartbeatHz = options.heartbeatHz ?? 2;
     this.definitions = options.definitions ?? [];
     this.transport.onMessage((message) => this.receive(message));
-    this.transport.onStatus((status, detail) => this.emit("status", status, detail));
+    this.transport.onStatus((status, detail) => this.handleTransportStatus(status, detail));
   }
 
   on<K extends keyof RoomClientEvents>(event: K, listener: Listener<K>): () => void {
@@ -122,6 +122,10 @@ export class RoomClient {
 
   async connect(): Promise<void> {
     await this.transport.connect(this.joinDescriptor);
+    this.startHeartbeat();
+  }
+
+  private sendJoin(): void {
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.canvasId, {
         join: {
@@ -133,7 +137,24 @@ export class RoomClient {
         },
       }),
     );
-    this.startHeartbeat();
+  }
+
+  private handleTransportStatus(status: TransportStatus, detail?: string): void {
+    if (status === "reconnecting" || status === "failed") {
+      const heldHostRole = this.isHost;
+      this.isHost = false;
+      this.hostClientId = "";
+      if (heldHostRole) {
+        this.emit("hostChanged", this.hostEpoch, "", "transport_lost");
+      }
+    }
+    if (status === "open") {
+      // Every WebSocket is a new room connection with a new client id. JOIN is
+      // therefore the first application envelope on both initial connect and
+      // reconnect.
+      this.sendJoin();
+    }
+    this.emit("status", status, detail);
   }
 
   close(): void {

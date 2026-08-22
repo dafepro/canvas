@@ -305,9 +305,19 @@ export class RoomSession {
     snapshot: CanvasSnapshot,
     wasSleeping: boolean,
   ): Promise<void> {
-    if (this.canvasDefinition) return;
+    const nextAvatarId = avatarEntityId(this.client.clientId);
+    if (this.canvasDefinition) {
+      if (this.localAvatarId !== nextAvatarId) {
+        if (this.localAvatarId) {
+          this.driver.send({ type: "removeAvatar", entityId: this.localAvatarId });
+        }
+        this.localAvatarId = nextAvatarId;
+        this.spawnLocalAvatar();
+      }
+      return;
+    }
     this.canvasDefinition = canvas;
-    this.localAvatarId = avatarEntityId(this.client.clientId);
+    this.localAvatarId = nextAvatarId;
     this.itemCount = snapshot.items.length;
 
     await this.options.onJoined?.(canvas, snapshot, wasSleeping);

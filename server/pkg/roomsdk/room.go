@@ -169,9 +169,15 @@ func (r *Room) handleJoin(client *Client) {
 		}},
 	})
 
-	// Spec 13.4. The first client of a sleeping room becomes the host.
+	// Compatibility is known before election because JOIN was validated before
+	// this client entered the room.
+	r.checkDefinitions(client)
+
+	// Spec 13.4. The first eligible client of a sleeping room becomes the host.
 	if r.hostClientID == "" {
-		r.grantHost(client.ID, "first_join")
+		if candidate := r.bestCandidate(); candidate != "" {
+			r.grantHost(candidate, "first_join")
+		}
 	}
 	r.broadcastPresence()
 }
@@ -215,9 +221,6 @@ func (r *Room) handleMessage(msg inbound) {
 	r.cfg.Metrics.RelayBytes(r.canvasID, msg.size)
 
 	switch payload := envelope.Payload.(type) {
-	case *pb.RoomEnvelope_Join:
-		r.recordDefinitions(client, payload.Join)
-
 	case *pb.RoomEnvelope_Heartbeat:
 		r.handleHeartbeat(client, payload.Heartbeat)
 
@@ -240,20 +243,6 @@ func (r *Room) handleMessage(msg inbound) {
 	default:
 		// Unknown payloads are ignored rather than closing the connection.
 	}
-}
-
-// recordDefinitions stores what item definitions the client holds and then
-// checks them against the scene (spec 20).
-func (r *Room) recordDefinitions(client *Client, join *pb.Join) {
-	if join == nil {
-		return
-	}
-	held := make(map[string]uint32, len(join.Definitions))
-	for _, definition := range join.Definitions {
-		held[definition.DefinitionId] = definition.Version
-	}
-	client.definitions = held
-	r.checkDefinitions(client)
 }
 
 // checkDefinitions blocks a client from the host lease while it lacks a

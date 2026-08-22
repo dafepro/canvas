@@ -58,7 +58,8 @@ const waitForHealth = async (url: string, deadlineMs: number): Promise<void> => 
  * so it must call `stop`.
  */
 export const startCanvasd = async (): Promise<Canvasd> => {
-  const binary = path.join(mkdtempSync(path.join(tmpdir(), "canvasd-")), "canvasd");
+  const binaryName = process.platform === "win32" ? "canvasd.exe" : "canvasd";
+  const binary = path.join(mkdtempSync(path.join(tmpdir(), "canvasd-")), binaryName);
   execFileSync("go", ["build", "-o", binary, "./cmd/canvasd"], {
     cwd: serverDir,
     stdio: "pipe",

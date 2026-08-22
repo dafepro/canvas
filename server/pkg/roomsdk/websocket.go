@@ -17,6 +17,7 @@ const (
 	// from allocating without bound.
 	maxMessageBytes = 1 << 20
 	writeTimeout    = 5 * time.Second
+	joinTimeout     = 5 * time.Second
 )
 
 func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
@@ -25,17 +26,6 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 	identity, err := s.cfg.Auth.Authenticate(r.Context(), r)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	room, err := s.roomFor(r.Context(), canvasID)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			http.Error(w, "canvas not found", http.StatusNotFound)
-			return
-		}
-		s.cfg.Logger.Error("open room failed", "canvas", canvasID, "error", err)
-		http.Error(w, "room unavailable", http.StatusInternalServerError)
 		return
 	}
 
@@ -51,15 +41,56 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.SetReadLimit(maxMessageBytes)
 
-	client := newClient(newClientID(), identity, sendQueueDepth)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	defer func() { _ = conn.CloseNow() }()
+
+	join, ok := s.readJoin(ctx, conn, canvasID)
+	if !ok {
+		return
+	}
+	if join.ProtocolVersion != s.cfg.ProtocolVersion {
+		s.cfg.Metrics.ProtocolMismatch(canvasID)
+		s.writeNow(ctx, conn, &pb.RoomEnvelope{
+			RoomId: canvasID,
+			Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
+				Code:                  "protocol_mismatch",
+				Message:               "the client protocol version is not supported",
+				ServerProtocolVersion: s.cfg.ProtocolVersion,
+			}},
+		})
+		return
+	}
+
+	room, err := s.roomFor(ctx, canvasID)
+	if err != nil {
+		code := "room_unavailable"
+		message := "the room is unavailable"
+		if errors.Is(err, ErrNotFound) {
+			code = "canvas_not_found"
+			message = "the canvas was not found"
+		} else {
+			s.cfg.Logger.Error("open room failed", "canvas", canvasID, "error", err)
+		}
+		s.writeNow(ctx, conn, &pb.RoomEnvelope{
+			RoomId: canvasID,
+			Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
+				Code: code, Message: message,
+			}},
+		})
+		return
+	}
+
+	client := newClient(newClientID(), identity, sendQueueDepth)
+	client.definitions = make(map[string]uint32, len(join.Definitions))
+	for _, definition := range join.Definitions {
+		client.definitions[definition.DefinitionId] = definition.Version
+	}
 
 	room.joins <- client
 	reason := "closed"
 	defer func() {
 		room.departures <- departure{client: client, reason: reason}
-		_ = conn.CloseNow()
 	}()
 
 	go s.writePump(ctx, conn, client)
@@ -79,20 +110,15 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 				"canvas", canvasID, "client", client.ID)
 			continue
 		}
-		if join := envelope.GetJoin(); join != nil && join.ProtocolVersion != s.cfg.ProtocolVersion {
-			s.cfg.Metrics.ProtocolMismatch(canvasID)
-			// Write the refusal on this goroutine so the client receives it
-			// before the deferred close runs.
+		if envelope.GetJoin() != nil {
 			s.writeNow(ctx, conn, &pb.RoomEnvelope{
 				RoomId: canvasID,
 				Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
-					Code:                  "protocol_mismatch",
-					Message:               "the client protocol version is not supported",
-					ServerProtocolVersion: s.cfg.ProtocolVersion,
+					Code:    "already_joined",
+					Message: "the connection already joined the room",
 				}},
 			})
-			reason = "protocol_mismatch"
-			return
+			continue
 		}
 		envelope.SenderClientId = client.ID
 
@@ -106,6 +132,53 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 			s.cfg.Logger.Warn("room inbox full, dropped envelope", "canvas", canvasID)
 		}
 	}
+}
+
+func (s *Server) readJoin(
+	ctx context.Context,
+	conn *websocket.Conn,
+	canvasID string,
+) (*pb.Join, bool) {
+	joinCtx, cancel := context.WithTimeout(ctx, joinTimeout)
+	defer cancel()
+	messageType, data, err := conn.Read(joinCtx)
+	if err != nil {
+		return nil, false
+	}
+	if messageType != websocket.MessageBinary {
+		s.writeJoinError(ctx, conn, canvasID, "join_required", "the first message must be JOIN")
+		return nil, false
+	}
+	envelope := &pb.RoomEnvelope{}
+	if err := proto.Unmarshal(data, envelope); err != nil {
+		s.writeJoinError(ctx, conn, canvasID, "malformed_join", "the JOIN envelope is malformed")
+		return nil, false
+	}
+	join := envelope.GetJoin()
+	if join == nil {
+		s.writeJoinError(ctx, conn, canvasID, "join_required", "the first message must be JOIN")
+		return nil, false
+	}
+	if join.CanvasId != canvasID || (envelope.RoomId != "" && envelope.RoomId != canvasID) {
+		s.writeJoinError(ctx, conn, canvasID, "canvas_mismatch", "JOIN names a different canvas")
+		return nil, false
+	}
+	return join, true
+}
+
+func (s *Server) writeJoinError(
+	ctx context.Context,
+	conn *websocket.Conn,
+	canvasID string,
+	code string,
+	message string,
+) {
+	s.writeNow(ctx, conn, &pb.RoomEnvelope{
+		RoomId: canvasID,
+		Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
+			Code: code, Message: message,
+		}},
+	})
 }
 
 // writeNow sends one envelope immediately, bypassing the client queue.

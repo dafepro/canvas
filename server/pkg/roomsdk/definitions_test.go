@@ -2,21 +2,10 @@ package roomsdk
 
 import (
 	"testing"
+	"time"
 
 	pb "github.com/dafepro/canvas/server/gen/canvasphysicsv1"
 )
-
-// joinWith sends a Join that declares the item definitions the client holds.
-func joinWith(c *testClient, definitions ...*pb.DefinitionVersion) {
-	c.send(&pb.RoomEnvelope{
-		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
-			CanvasId:        "test-canvas",
-			ProtocolVersion: 1,
-			Definitions:     definitions,
-		}},
-	})
-}
 
 // Spec 20. A client that lacks an item definition the scene uses must not hold
 // the simulation lease.
@@ -24,14 +13,12 @@ func TestClientWithoutADefinitionLosesTheHostLease(t *testing.T) {
 	h := newHarness(t, nil)
 
 	host := h.dial("alice")
-	host.join()
+	host.join(&pb.DefinitionVersion{DefinitionId: "rocket", Version: 1})
 	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
-	joinWith(host, &pb.DefinitionVersion{DefinitionId: "rocket", Version: 1})
 
 	// The peer holds an older version of the definition the scene will use.
 	peer := h.dial("bob")
-	peer.join()
-	joinWith(peer, &pb.DefinitionVersion{DefinitionId: "rocket", Version: 0})
+	peer.join(&pb.DefinitionVersion{DefinitionId: "rocket", Version: 0})
 
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	result := host.await(func(e *pb.RoomEnvelope) bool {
@@ -71,9 +58,8 @@ func TestClientWithEveryDefinitionStaysEligible(t *testing.T) {
 	h := newHarness(t, nil)
 
 	host := h.dial("alice")
-	host.join()
+	host.join(&pb.DefinitionVersion{DefinitionId: "rocket", Version: 1})
 	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
-	joinWith(host, &pb.DefinitionVersion{DefinitionId: "rocket", Version: 1})
 
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	// Read until the result of the spawn. No refusal may appear on the way,
@@ -90,6 +76,40 @@ func TestClientWithEveryDefinitionStaysEligible(t *testing.T) {
 		if result := envelope.GetDurableResult(); result != nil {
 			if !result.Accepted {
 				t.Fatalf("spawn rejected: %s", result.RejectReason)
+			}
+			return
+		}
+	}
+}
+
+func TestIncompatibleFirstClientNeverReceivesTheHostLease(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	host.join(&pb.DefinitionVersion{DefinitionId: "rocket", Version: 1})
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+	host.send(spawnCommand("cmd-spawn", 20, 30))
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetDurableResult() != nil })
+	_ = host.conn.CloseNow()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) && len(h.server.Rooms()) > 0 {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(h.server.Rooms()) != 0 {
+		t.Fatal("the room did not sleep")
+	}
+
+	incompatible := h.dial("bob")
+	incompatible.join(&pb.DefinitionVersion{DefinitionId: "rocket", Version: 0})
+	for {
+		envelope := incompatible.read()
+		if control := envelope.GetHostControl(); control != nil &&
+			control.Kind == pb.HostControlKind_HOST_CONTROL_GRANTED {
+			t.Fatal("an incompatible client briefly received the host lease")
+		}
+		if failure := envelope.GetError(); failure != nil {
+			if failure.Code != "definition_mismatch" {
+				t.Fatalf("error code = %q, want definition_mismatch", failure.Code)
 			}
 			return
 		}

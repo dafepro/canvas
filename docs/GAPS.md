@@ -11,7 +11,7 @@ downward. Check an item only after the relevant focused tests pass.
   delete items or change ownership, definitions, resolved config, or scene
   revision. Reject unknown IDs, invalid transforms, stale revisions, and stale
   checkpoint numbers.
-- [ ] Introduce an explicit JOIN/reconnect state machine. Validate JOIN,
+- [x] Introduce an explicit JOIN/reconnect state machine. Validate JOIN,
   protocol compatibility, and definition compatibility before room admission or
   host election. Resend JOIN after reconnect and freeze shared simulation while
   disconnected.
@@ -61,6 +61,6 @@ downward. Check an item only after the relevant focused tests pass.
   renderer/network path.
 - [ ] Correct peer item counts and host-migration diagnostics.
 - [ ] Add collision, network, environment, and behavior visual laboratories.
-- [ ] Make the integration harness use the correct executable name on Windows.
+- [x] Make the integration harness use the correct executable name on Windows.
 - [ ] Add Windows/Linux CI and publishable package exports that target built
   JavaScript and declarations rather than TypeScript source.
