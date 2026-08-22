@@ -92,10 +92,13 @@ const join = async (): Promise<void> => {
 };
 
 const leave = (): void => {
-  runtime?.stop();
+  const leaving = runtime;
   runtime = undefined;
-  stage.innerHTML = "";
-  joinButton.disabled = false;
+  joinButton.disabled = true;
+  void (leaving?.stopGracefully() ?? Promise.resolve()).finally(() => {
+    stage.innerHTML = "";
+    joinButton.disabled = false;
+  });
   leaveButton.disabled = true;
   disableButton.disabled = true;
   disableButton.textContent = "Disable my avatar";

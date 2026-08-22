@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { emptySnapshot } from "@canvas-physics/core";
-import { toJsonBytes, type Peer, type RoomEnvelope } from "@canvas-physics/protocol";
+import { emptySnapshot, type CanvasSnapshot } from "@canvas-physics/core";
+import {
+  fromJsonBytes,
+  toJsonBytes,
+  type Peer,
+  type RoomEnvelope,
+} from "@canvas-physics/protocol";
 import { RoomClient } from "../src/net/room-client.js";
 import { RoomSession } from "../src/runtime/room-session.js";
 import { rocketCanvas, rocketCanvasDefinitions } from "../src/definitions/rocket-canvas.js";
@@ -238,5 +243,92 @@ describe("RoomClient reconnect handshake", () => {
     });
     expect(requests).toContainEqual({ type: "removeAvatar", entityId: "avatar:c-peer" });
     session.stop();
+  });
+
+  it("sends a normalized final checkpoint before the last host closes", async () => {
+    const transport = new ReconnectTransport();
+    const snapshot = emptySnapshot(rocketCanvas.id, rocketCanvas.version);
+    let postFromSimulation:
+      | ((message: Parameters<Parameters<SimulationDriver["onMessage"]>[0]>[0]) => void)
+      | undefined;
+    const driver = new SimulationDriver((post) => {
+      postFromSimulation = post;
+      return {
+        send: (request) => {
+          if (request.type !== "requestSnapshot" || !request.final) return;
+          post({
+            type: "snapshot",
+            final: true,
+            snapshot: {
+              ...snapshot,
+              sceneRevision: request.sceneRevision,
+              hostEpoch: request.hostEpoch,
+              checkpointRevision: 1,
+              normalized: true,
+            },
+          });
+        },
+        terminate: () => {},
+      };
+    });
+    const session = new RoomSession({
+      transport,
+      driver,
+      canvasId: rocketCanvas.id,
+      serverUrl: "http://localhost:8080",
+      userId: "alice",
+      displayName: "Alice",
+      definitions: rocketCanvasDefinitions,
+    });
+
+    await session.start();
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 3,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      joinAccepted: {
+        clientId: "c-host",
+        sceneRevision: 0,
+        hostEpoch: 3,
+        hostClientId: "c-host",
+        canvasDefinitionJson: toJsonBytes(rocketCanvas),
+        snapshotJson: toJsonBytes(snapshot),
+        roomWasSleeping: false,
+        tickRate: 60,
+      },
+    });
+    await Promise.resolve();
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 3,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      presence: {
+        peers: [
+          {
+            clientId: "c-host",
+            userId: "alice",
+            displayName: "Alice",
+            isHost: true,
+            hostEligible: true,
+          },
+        ],
+      },
+    });
+    // The real worker reports readiness after it has rebuilt the host world.
+    postFromSimulation?.({ type: "ready" });
+
+    await session.stopGracefully(1_000);
+
+    const final = transport.sent.find((message) => message.checkpoint?.final);
+    expect(final).toBeDefined();
+    expect(final?.checkpoint?.checkpointRevision).toBe(1);
+    expect(
+      fromJsonBytes<CanvasSnapshot>(final!.checkpoint!.snapshotJson)?.normalized,
+    ).toBe(true);
+    expect(transport.status).toBe("closed");
   });
 });

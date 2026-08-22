@@ -51,6 +51,7 @@ export class CanvasRuntime {
   private renderFps = 0;
   private running = false;
   private visibilityListener?: () => void;
+  private pageHideListener?: () => void;
   private avatarDisabled = false;
   private disableKeyListener?: (event: KeyboardEvent) => void;
 
@@ -81,10 +82,26 @@ export class CanvasRuntime {
   }
 
   stop(): void {
+    this.prepareStop();
+    this.session.stop();
+    this.scene?.destroy();
+  }
+
+  async stopGracefully(timeoutMs = 250): Promise<void> {
+    this.prepareStop();
+    await this.session.stopGracefully(timeoutMs);
+    this.scene?.destroy();
+  }
+
+  private prepareStop(): void {
     this.running = false;
     if (this.visibilityListener) {
       document.removeEventListener("visibilitychange", this.visibilityListener);
       this.visibilityListener = undefined;
+    }
+    if (this.pageHideListener) {
+      window.removeEventListener("pagehide", this.pageHideListener);
+      this.pageHideListener = undefined;
     }
     if (this.disableKeyListener) {
       window.removeEventListener("keydown", this.disableKeyListener);
@@ -92,8 +109,6 @@ export class CanvasRuntime {
     }
     this.pointer?.destroy();
     this.keyboard?.destroy();
-    this.session.stop();
-    this.scene?.destroy();
   }
 
   private async mountScene(canvas: CanvasDefinition): Promise<void> {
@@ -166,6 +181,10 @@ export class CanvasRuntime {
       this.session.setPageVisible(document.visibilityState === "visible");
     };
     document.addEventListener("visibilitychange", this.visibilityListener);
+    this.pageHideListener = () => {
+      void this.stopGracefully(150);
+    };
+    window.addEventListener("pagehide", this.pageHideListener);
   }
 
   // ---------- durable mutations ----------

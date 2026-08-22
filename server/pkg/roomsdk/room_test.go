@@ -618,7 +618,7 @@ func TestSoleHostKeepsTheLeaseOnYield(t *testing.T) {
 	}
 }
 
-func TestRoomSleepsAndWakesWithTheSameItems(t *testing.T) {
+func TestAbruptlyClosedRoomSleepsWithoutClaimingNormalization(t *testing.T) {
 	h := newHarness(t, nil)
 	owner := h.dial("alice")
 	owner.join()
@@ -644,8 +644,15 @@ func TestRoomSleepsAndWakesWithTheSameItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load snapshot: %v", err)
 	}
-	if !stored.Normalized {
-		t.Error("the sleeping snapshot is not marked normalized")
+	if stored.Normalized {
+		t.Error("an abrupt disconnect must not pretend the host normalized behavior state")
+	}
+	var sleptSnapshot CanvasSnapshot
+	if err := json.Unmarshal(stored.SnapshotRaw, &sleptSnapshot); err != nil {
+		t.Fatalf("unmarshal sleeping snapshot: %v", err)
+	}
+	if sleptSnapshot.Normalized {
+		t.Error("the abrupt fallback snapshot is incorrectly marked normalized")
 	}
 
 	// Wake it again and check the item survived.
@@ -670,6 +677,131 @@ func TestRoomSleepsAndWakesWithTheSameItems(t *testing.T) {
 	}).GetHostControl()
 	if nextGrant.HostEpoch <= firstGrant.HostEpoch {
 		t.Errorf("host epoch after wake = %d, want greater than %d", nextGrant.HostEpoch, firstGrant.HostEpoch)
+	}
+}
+
+func TestRoomPreservesAHostNormalizedFinalCheckpointOnSleep(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	host.send(spawnCommand("cmd-spawn", 20, 30))
+	result := host.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetDurableResult() != nil
+	}).GetDurableResult()
+	entityID := result.Command.EntityId
+
+	finalSnapshot := CanvasSnapshot{
+		SchemaVersion:      1,
+		CanvasID:           "test-canvas",
+		CanvasVersion:      1,
+		SceneRevision:      result.SceneRevision,
+		HostEpoch:          host.hostEpoch,
+		CheckpointRevision: 1,
+		Tick:               120,
+		CapturedAt:         time.Now().UTC().Format(time.RFC3339Nano),
+		Normalized:         true,
+		Items: []SnapshotItem{{
+			EntityID:      entityID,
+			Transform:     Transform{X: 24, Y: 33},
+			BehaviorState: json.RawMessage(`{"phase":"idle"}`),
+		}},
+	}
+	raw, err := json.Marshal(finalSnapshot)
+	if err != nil {
+		t.Fatalf("marshal final snapshot: %v", err)
+	}
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Payload: &pb.RoomEnvelope_Checkpoint{Checkpoint: &pb.Checkpoint{
+			CheckpointRevision: 1,
+			Tick:               120,
+			SnapshotJson:       raw,
+			Final:              true,
+		}},
+	})
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		stored, loadErr := h.store.LoadSnapshot(context.Background(), "test-canvas")
+		if loadErr == nil && stored.CheckpointRevision == 1 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	_ = host.conn.CloseNow()
+
+	deadline = time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) && len(h.server.Rooms()) > 0 {
+		time.Sleep(20 * time.Millisecond)
+	}
+	stored, err := h.store.LoadSnapshot(context.Background(), "test-canvas")
+	if err != nil {
+		t.Fatalf("load snapshot: %v", err)
+	}
+	if !stored.Normalized {
+		t.Error("the server discarded the host's final normalization marker")
+	}
+	var snapshot CanvasSnapshot
+	if err := json.Unmarshal(stored.SnapshotRaw, &snapshot); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if !snapshot.Normalized || snapshot.Items[0].Transform.X != 24 {
+		t.Fatalf("stored final snapshot = %+v", snapshot)
+	}
+}
+
+func TestFinalCheckpointRequiresANormalizedSnapshot(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+	host.send(spawnCommand("cmd-spawn", 20, 30))
+	result := host.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetDurableResult() != nil
+	}).GetDurableResult()
+
+	bad, err := json.Marshal(CanvasSnapshot{
+		SchemaVersion:      1,
+		CanvasID:           "test-canvas",
+		CanvasVersion:      1,
+		SceneRevision:      result.SceneRevision,
+		HostEpoch:          host.hostEpoch,
+		CheckpointRevision: 1,
+		CapturedAt:         time.Now().UTC().Format(time.RFC3339Nano),
+		Normalized:         false,
+		Items: []SnapshotItem{{
+			EntityID:  result.Command.EntityId,
+			Transform: Transform{X: 20, Y: 30},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("marshal checkpoint: %v", err)
+	}
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Payload: &pb.RoomEnvelope_Checkpoint{Checkpoint: &pb.Checkpoint{
+			CheckpointRevision: 1,
+			SnapshotJson:       bad,
+			Final:              true,
+		}},
+	})
+	// A later durable result proves the room processed the checkpoint first.
+	host.send(spawnCommand("cmd-after-checkpoint", 40, 30))
+	host.await(func(e *pb.RoomEnvelope) bool {
+		result := e.GetDurableResult()
+		return result != nil && result.CommandId == "cmd-after-checkpoint"
+	})
+
+	stored, err := h.store.LoadSnapshot(context.Background(), "test-canvas")
+	if err != nil {
+		t.Fatalf("load snapshot: %v", err)
+	}
+	if stored.CheckpointRevision != 0 {
+		t.Errorf("rejected checkpoint revision was stored: %d", stored.CheckpointRevision)
 	}
 }
 

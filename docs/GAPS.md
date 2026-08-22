@@ -18,7 +18,7 @@ downward. Check an item only after the relevant focused tests pass.
 - [x] Make item definitions and configuration schemas authoritative server
   metadata. Validate definition IDs and versions, resolved config, and
   `maxComplexPhysicsItems` before accepting a spawn or config mutation.
-- [ ] Define and implement room-sleep normalization ownership. Preserve a
+- [x] Define and implement room-sleep normalization ownership. Preserve a
   monotonically increasing `hostEpoch` across room sleep/wake, produce a real
   normalized final snapshot, and handle abrupt host loss without pretending an
   unnormalized snapshot is normalized.

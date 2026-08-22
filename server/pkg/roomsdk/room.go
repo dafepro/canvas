@@ -465,11 +465,7 @@ func (r *Room) handleCheckpoint(from *Client, hostEpoch uint64, checkpoint *pb.C
 		return
 	}
 	r.cfg.Metrics.CheckpointStored(r.canvasID, len(checkpoint.SnapshotJson))
-	if checkpoint.Final {
-		r.persist(true)
-	} else {
-		r.persist(false)
-	}
+	r.persist()
 }
 
 func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
@@ -488,6 +484,9 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 	}
 	if checkpoint.CheckpointRevision <= r.checkpointNo {
 		return errStaleCheckpoint
+	}
+	if checkpoint.Final != incoming.Normalized {
+		return errNormalizationFlag
 	}
 
 	seen := make(map[string]struct{}, len(incoming.Items))
@@ -546,14 +545,14 @@ func (r *Room) withinBounds(t Transform) bool {
 	return t.X > -maxX && t.X < maxX && t.Y > -maxY && t.Y < maxY
 }
 
-func (r *Room) persist(final bool) {
+func (r *Room) persist() {
 	record := SnapshotRecord{
 		CanvasID:           r.canvasID,
 		SceneRevision:      r.sceneRevision,
 		CheckpointRevision: r.checkpointNo,
 		HostEpoch:          r.hostEpoch,
 		Tick:               r.snapshot.Tick,
-		Normalized:         final,
+		Normalized:         r.snapshot.Normalized,
 		CapturedAt:         r.cfg.Now().UTC(),
 		SnapshotRaw:        r.snapshotRaw,
 	}
@@ -567,24 +566,16 @@ func (r *Room) persist(final bool) {
 // ---------- room sleep (spec 13.3) ----------
 
 func (r *Room) sleep() {
-	r.normalizeForSleep()
-	r.persist(true)
+	// The server cannot execute developer-authored behavior normalization. A
+	// graceful host may already have supplied a normalized final checkpoint;
+	// after abrupt loss the newest periodic checkpoint remains explicitly
+	// unnormalized instead of making a false claim.
+	r.persist()
 	r.sleeping = true
 	r.cfg.Metrics.RoomSlept(r.canvasID)
 	r.cfg.Logger.Info("room sleeping", "canvas", r.canvasID,
 		"sceneRevision", r.sceneRevision, "items", len(r.snapshot.Items))
 	r.server.removeRoom(r.canvasID)
-}
-
-// normalizeForSleep zeroes motion. The snapshot carries no velocity, so this
-// only marks the snapshot and drops transient behavior state the host left.
-func (r *Room) normalizeForSleep() {
-	r.snapshot.Normalized = true
-	r.snapshot.HostEpoch = r.hostEpoch
-	r.snapshot.SceneRevision = r.sceneRevision
-	if raw, err := json.Marshal(r.snapshot); err == nil {
-		r.snapshotRaw = raw
-	}
 }
 
 // ---------- fan-out ----------

@@ -21,6 +21,7 @@ var (
 	errMissingStateVector = errors.New("canonical state is missing a position or velocity")
 	errDefinitionMismatch = errors.New("canonical state definition does not match the durable item")
 	errInvalidBehavior    = errors.New("canonical behavior state is not valid json")
+	errNormalizationFlag  = errors.New("checkpoint final flag does not match snapshot normalization")
 )
 
 // handleDurableCommand enforces ownership before the command reaches the
@@ -60,6 +61,10 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 	r.checkAllDefinitions()
 	r.sceneRevision++
 	r.snapshot.SceneRevision = r.sceneRevision
+	// Only the simulation host can normalize behavior state. Any accepted edit
+	// makes a previously sleeping snapshot active again until a host sends a
+	// normalized final checkpoint.
+	r.snapshot.Normalized = false
 	if raw, err := json.Marshal(r.snapshot); err == nil {
 		r.snapshotRaw = raw
 	}
@@ -87,7 +92,7 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 			Command:          command,
 		}},
 	})
-	r.persist(false)
+	r.persist()
 }
 
 // validateDurable returns the item the command targets, or nil for a spawn.

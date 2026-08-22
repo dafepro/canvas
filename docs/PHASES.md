@@ -59,7 +59,7 @@ same simulation in the test process.
 | Periodic full keyframes | Done at 2 Hz. |
 | Host yield on a visibility or health signal | Done. The client yields when the page is hidden. |
 | Timeout election and full-state restart on a new host | Done on the server and tested. |
-| Exit criterion: closing the host resumes the room with no reload | Server side is tested. The browser path is not verified. |
+| Exit criterion: closing the host resumes the room with no reload | Verified in the real-process client test and manually in two browser clients, including stationary avatars and checkpointed item placement. |
 
 ## Phase 4 — Ownership, durable editing, and persistence: mostly complete
 
@@ -69,9 +69,9 @@ same simulation in the test process.
 | The server enforces the owner before broadcasting | Done and tested, including the reject reasons. |
 | Persist item instances and the scene revision | Done through the snapshot record. |
 | Accept 1 Hz host checkpoints | Done, with validation of bounds, item count, and revision order. |
-| Sleeping-room normalization and zero motion | Done. The server marks the snapshot; the host normalizes behavior state and stops timers. |
+| Sleeping-room normalization and zero motion | Done. A graceful last host normalizes behavior state and stops timers before its final checkpoint. After abrupt loss, the server preserves the newest periodic checkpoint as explicitly unnormalized. |
 | First-join wake path | Done and tested. |
-| Exit criterion: rearrange only your own items, leave, return, see the same placement | The Go test `TestRoomSleepsAndWakesWithTheSameItems` proves it. The drag-to-edit interaction is not built, so a user cannot yet move an item by dragging. |
+| Exit criterion: rearrange only your own items, leave, return, see the same placement | The Go sleep/wake tests and `graceful-sleep.test.ts` prove persistence through a real service. The drag-to-edit interaction is not built, so a user cannot yet move an item by dragging. |
 
 ## Phase 5 — Advanced interaction primitives: partly complete
 

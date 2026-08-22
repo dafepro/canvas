@@ -117,6 +117,8 @@ export class RoomSession {
   private simulationReady = false;
   private latestPeers?: Peer[];
   private readonly hostAvatarIds = new Set<string>();
+  private finalCheckpointSent?: () => void;
+  private terminated = false;
   private stats = {
     hz: 0,
     driftMs: 0,
@@ -189,8 +191,61 @@ export class RoomSession {
 
   stop(): void {
     this.running = false;
+    this.clearTimers();
+    this.finishStop();
+  }
+
+  /**
+   * Produces a behavior-normalized final checkpoint when this is known to be
+   * the room's last client. A timeout falls back to an abrupt close, whose
+   * periodic checkpoint remains explicitly unnormalized on the server.
+   */
+  async stopGracefully(timeoutMs = 250): Promise<void> {
+    const isLastHost =
+      this.running &&
+      this.simulationReady &&
+      this.client.isHost &&
+      this.client.peers.length === 1 &&
+      this.client.peers[0]?.clientId === this.client.clientId;
+    if (!isLastHost) {
+      this.stop();
+      return;
+    }
+
+    this.running = false;
+    this.clearTimers();
+    const sent = new Promise<void>((resolve) => {
+      this.finalCheckpointSent = resolve;
+    });
+    this.driver.send({
+      type: "requestSnapshot",
+      final: true,
+      sceneRevision: this.client.sceneRevision,
+      hostEpoch: this.client.hostEpoch,
+    });
+
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      sent,
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+    if (timeout) clearTimeout(timeout);
+    this.finalCheckpointSent = undefined;
+    this.finishStop();
+  }
+
+  private clearTimers(): void {
     for (const timer of this.timers) clearInterval(timer);
     this.timers = [];
+  }
+
+  private finishStop(): void {
+    if (this.terminated) return;
+    this.terminated = true;
+    this.finalCheckpointSent?.();
+    this.finalCheckpointSent = undefined;
     this.driver.terminate();
     this.client.close();
   }
@@ -633,6 +688,10 @@ export class RoomSession {
           message.snapshot.checkpointRevision,
           message.final,
         );
+        if (message.final) {
+          this.finalCheckpointSent?.();
+          this.finalCheckpointSent = undefined;
+        }
         break;
       case "error":
         this.lastRejection = `simulation: ${message.message}`;

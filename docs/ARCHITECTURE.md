@@ -48,6 +48,7 @@ This file explains how the pieces fit together. The specification in
 | --- | --- |
 | Stepping physics | The simulation host client, in its worker |
 | Running item behaviors | The simulation host client |
+| Normalizing behavior state for room sleep | The last simulation host client |
 | Predicting the local avatar | Every client |
 | Rendering | Every client, main thread |
 | Granting the host lease | The Go server |
@@ -118,6 +119,19 @@ Two different kinds of authority, easy to confuse:
 
 A host that lies about physics cannot grant itself edit rights. The server sets
 `ownerUserId` from the authenticated session, never from the client payload.
+
+## Room-sleep normalization
+
+Only the simulation host has the behavior implementations and timer state, so
+only it can normalize a snapshot for sleep. A graceful last host asks its worker
+to normalize behavior state, zero motion, and send a final checkpoint before it
+closes. The server validates that the checkpoint's `final` flag agrees with the
+snapshot's `normalized` marker and preserves that marker when the room sleeps.
+
+After an abrupt host loss, the server sleeps the room from the newest periodic
+checkpoint. It does not claim that developer-authored behavior normalization
+ran. Snapshots contain no velocity, so wake still rebuilds bodies with zero
+motion; the false marker records that abrupt fallback accurately.
 
 ## Rates
 

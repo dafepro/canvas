@@ -101,12 +101,12 @@ export const startCanvasd = async (): Promise<Canvasd> => {
 /** Polls `condition` until it is true, or fails after `timeoutMs`. */
 export const waitFor = async (
   label: string,
-  condition: () => boolean,
+  condition: () => boolean | Promise<boolean>,
   timeoutMs = 10_000,
 ): Promise<void> => {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
-    if (condition()) return;
+    if (await condition()) return;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error(`timed out waiting for ${label}`);
