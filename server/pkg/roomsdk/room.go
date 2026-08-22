@@ -3,6 +3,7 @@ package roomsdk
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -345,9 +346,87 @@ func (r *Room) relayFromHost(from *Client, envelope *pb.RoomEnvelope) {
 		r.cfg.Metrics.DurableRejected(r.canvasID, "stale_host_epoch")
 		return
 	}
+	if err := r.validateCanonicalState(envelope); err != nil {
+		r.cfg.Logger.Warn("rejected canonical state",
+			"canvas", r.canvasID, "reason", err.Error())
+		r.cfg.Metrics.DurableRejected(r.canvasID, "malformed_state")
+		return
+	}
 	envelope.SenderClientId = from.ID
 	envelope.RoomId = r.canvasID
 	r.broadcastExcept(from.ID, envelope)
+}
+
+func (r *Room) validateCanonicalState(envelope *pb.RoomEnvelope) error {
+	if delta := envelope.GetStateDelta(); delta != nil {
+		if delta.SceneRevision != r.sceneRevision {
+			return errStaleScene
+		}
+		return r.validateEntityStates(delta.Entities)
+	}
+	if full := envelope.GetFullState(); full != nil {
+		if full.SceneRevision != r.sceneRevision {
+			return errStaleScene
+		}
+		return r.validateEntityStates(full.Entities)
+	}
+	return nil
+}
+
+func (r *Room) validateEntityStates(states []*pb.EntityState) error {
+	seen := make(map[string]struct{}, len(states))
+	for _, state := range states {
+		if state == nil || state.Position == nil || state.Velocity == nil {
+			return errMissingStateVector
+		}
+		if _, duplicate := seen[state.EntityId]; duplicate {
+			return errDuplicateEntity
+		}
+		seen[state.EntityId] = struct{}{}
+
+		item := r.items[state.EntityId]
+		if item == nil && !r.connectedAvatar(state.EntityId) {
+			return errUnknownEntity
+		}
+		if item != nil && state.DefinitionId != "" && state.DefinitionId != item.DefinitionID {
+			return errDefinitionMismatch
+		}
+		if len(state.BehaviorStateJson) > 0 && !json.Valid(state.BehaviorStateJson) {
+			return errInvalidBehavior
+		}
+
+		values := []float64{
+			float64(state.Position.X),
+			float64(state.Position.Y),
+			float64(state.Rotation),
+			float64(state.Velocity.X),
+			float64(state.Velocity.Y),
+			float64(state.AngularVelocity),
+			float64(state.Z),
+			float64(state.Vz),
+		}
+		for _, value := range values {
+			if math.IsNaN(value) || math.IsInf(value, 0) {
+				return errNonFiniteTransform
+			}
+		}
+		if !r.withinBounds(Transform{
+			X:        float64(state.Position.X),
+			Y:        float64(state.Position.Y),
+			Rotation: float64(state.Rotation),
+		}) {
+			return errOutOfBounds
+		}
+	}
+	return nil
+}
+
+func (r *Room) connectedAvatar(entityID string) bool {
+	if !strings.HasPrefix(entityID, "avatar:") {
+		return false
+	}
+	_, ok := r.clients[strings.TrimPrefix(entityID, "avatar:")]
+	return ok
 }
 
 func (r *Room) handleCheckpoint(from *Client, hostEpoch uint64, checkpoint *pb.Checkpoint) {

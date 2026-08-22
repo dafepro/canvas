@@ -6,7 +6,7 @@ downward. Check an item only after the relevant focused tests pass.
 
 ## Priority 0 — structural fixes
 
-- [ ] Separate host-authored physics from server-authoritative durable item data.
+- [x] Separate host-authored physics from server-authoritative durable item data.
   Checkpoints may update permitted canonical fields only; they must not add or
   delete items or change ownership, definitions, resolved config, or scene
   revision. Reject unknown IDs, invalid transforms, stale revisions, and stale

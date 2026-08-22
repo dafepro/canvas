@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -822,6 +823,119 @@ func TestCheckpointRejectsAStaleHostEpoch(t *testing.T) {
 	}
 	if item.Transform.X != 20 || item.Transform.Y != 30 {
 		t.Errorf("transform = (%v,%v), want pre-checkpoint value (20,30)", item.Transform.X, item.Transform.Y)
+	}
+}
+
+func TestCanonicalStateValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		state       func(entityID string, sceneRevision uint64) *pb.StateDelta
+		wantRelayed bool
+	}{
+		{
+			name: "valid known item",
+			state: func(entityID string, sceneRevision uint64) *pb.StateDelta {
+				return &pb.StateDelta{
+					SceneRevision: sceneRevision,
+					Entities: []*pb.EntityState{{
+						EntityId: entityID,
+						Position: &pb.Vec2{X: 25, Y: 30},
+						Velocity: &pb.Vec2{},
+					}},
+				}
+			},
+			wantRelayed: true,
+		},
+		{
+			name: "unknown item",
+			state: func(_ string, sceneRevision uint64) *pb.StateDelta {
+				return &pb.StateDelta{
+					SceneRevision: sceneRevision,
+					Entities: []*pb.EntityState{{
+						EntityId: "host-invented-item",
+						Position: &pb.Vec2{X: 25, Y: 30},
+						Velocity: &pb.Vec2{},
+					}},
+				}
+			},
+		},
+		{
+			name: "non-finite transform",
+			state: func(entityID string, sceneRevision uint64) *pb.StateDelta {
+				return &pb.StateDelta{
+					SceneRevision: sceneRevision,
+					Entities: []*pb.EntityState{{
+						EntityId: entityID,
+						Position: &pb.Vec2{X: float32(math.NaN()), Y: 30},
+						Velocity: &pb.Vec2{},
+					}},
+				}
+			},
+		},
+		{
+			name: "stale scene revision",
+			state: func(entityID string, _ uint64) *pb.StateDelta {
+				return &pb.StateDelta{
+					SceneRevision: 0,
+					Entities: []*pb.EntityState{{
+						EntityId: entityID,
+						Position: &pb.Vec2{X: 25, Y: 30},
+						Velocity: &pb.Vec2{},
+					}},
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t, nil)
+			host := h.dial("alice")
+			host.join()
+			host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+			peer := h.dial("bob")
+			peer.join()
+
+			host.send(spawnCommand("cmd-spawn", 20, 30))
+			spawned := host.await(func(e *pb.RoomEnvelope) bool {
+				r := e.GetDurableResult()
+				return r != nil && r.CommandId == "cmd-spawn"
+			}).GetDurableResult()
+			// Consume the accepted mutation on the peer before testing relay order.
+			peer.await(func(e *pb.RoomEnvelope) bool {
+				r := e.GetDurableResult()
+				return r != nil && r.CommandId == "cmd-spawn"
+			})
+
+			host.send(&pb.RoomEnvelope{
+				RoomId:    "test-canvas",
+				HostEpoch: host.hostEpoch,
+				Payload: &pb.RoomEnvelope_StateDelta{StateDelta: tt.state(
+					spawned.Command.EntityId,
+					spawned.SceneRevision,
+				)},
+			})
+			host.send(&pb.RoomEnvelope{
+				RoomId: "test-canvas",
+				Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+					CommandId:  "cmd-sync",
+					Kind:       pb.DurableCommandKind_DURABLE_SET_CONFIG,
+					EntityId:   spawned.Command.EntityId,
+					ConfigJson: []byte(`{"thrust":30}`),
+				}},
+			})
+
+			got := peer.await(func(e *pb.RoomEnvelope) bool {
+				return e.GetStateDelta() != nil ||
+					(e.GetDurableResult() != nil && e.GetDurableResult().CommandId == "cmd-sync")
+			})
+			if tt.wantRelayed && got.GetStateDelta() == nil {
+				t.Fatal("valid canonical state was not relayed")
+			}
+			if !tt.wantRelayed && got.GetStateDelta() != nil {
+				t.Fatal("invalid canonical state was relayed")
+			}
+		})
 	}
 }
 

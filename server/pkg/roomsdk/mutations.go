@@ -18,6 +18,9 @@ var (
 	errStaleScene         = errors.New("checkpoint scene revision does not match the room")
 	errUnknownEntity      = errors.New("checkpoint contains an unknown entity id")
 	errDuplicateEntity    = errors.New("checkpoint contains a duplicate entity id")
+	errMissingStateVector = errors.New("canonical state is missing a position or velocity")
+	errDefinitionMismatch = errors.New("canonical state definition does not match the durable item")
+	errInvalidBehavior    = errors.New("canonical behavior state is not valid json")
 )
 
 // handleDurableCommand enforces ownership before the command reaches the
