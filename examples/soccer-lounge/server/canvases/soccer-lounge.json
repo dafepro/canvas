@@ -1,6 +1,6 @@
 {
   "id": "soccer-lounge",
-  "version": 1,
+  "version": 2,
   "size": { "width": 120, "height": 80 },
   "orientation": "topDown",
   "backgroundAssetId": "soccer-field",
@@ -83,6 +83,22 @@
       "position": { "x": 114.5, "y": 43.5 },
       "tags": ["goalFrame", "rightGoal"],
       "restitution": 0.55
+    },
+    {
+      "id": "left-goal-backstop",
+      "shape": { "type": "rect", "width": 1, "height": 16 },
+      "position": { "x": 0.5, "y": 36 },
+      "tags": ["goalFrame", "leftGoal", "backstop"],
+      "restitution": 0.35,
+      "friction": 0.5
+    },
+    {
+      "id": "right-goal-backstop",
+      "shape": { "type": "rect", "width": 1, "height": 16 },
+      "position": { "x": 119.5, "y": 36 },
+      "tags": ["goalFrame", "rightGoal", "backstop"],
+      "restitution": 0.35,
+      "friction": 0.5
     }
   ],
   "regions": [
@@ -102,11 +118,31 @@
   "environment": {
     "base": {
       "gravityXY": { "x": 0, "y": 0 },
-      "linearDrag": 0.42,
-      "angularDrag": 0.55,
+      "linearDrag": 0.18,
+      "angularDrag": 0.3,
       "softSpeedLimit": 28,
       "surfaceFrictionMultiplier": 1
-    }
+    },
+    "regions": [
+      {
+        "id": "left-net-damping",
+        "shape": { "type": "rect", "x": 0.5, "y": 29, "w": 7.5, "h": 14 },
+        "blend": "step",
+        "priority": 10,
+        "linearDrag": 3.5,
+        "angularDrag": 4,
+        "softSpeedLimit": 8
+      },
+      {
+        "id": "right-net-damping",
+        "shape": { "type": "rect", "x": 112, "y": 29, "w": 7.5, "h": 14 },
+        "blend": "step",
+        "priority": 10,
+        "linearDrag": 3.5,
+        "angularDrag": 4,
+        "softSpeedLimit": 8
+      }
+    ]
   },
   "spawnPoints": [
     { "id": "home", "position": { "x": 42, "y": 36 } },
@@ -118,7 +154,7 @@
     {
       "entityId": "match-ball",
       "definitionId": "soccer-ball",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "transform": { "x": 60, "y": 36, "rotation": 0 },
       "resolvedConfig": {
         "sensorId": "kick",

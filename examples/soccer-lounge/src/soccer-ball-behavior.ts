@@ -119,8 +119,6 @@ export const SoccerBallBehavior: ItemBehavior<SoccerBallConfig, SoccerBallState>
           cooldownUntil: [],
         },
         commands: [
-          { type: "setVelocity", velocity: { x: 0, y: 0 }, angularVelocity: 0 },
-          { type: "setBodyMode", mode: "kinematicVelocity" },
           {
             type: "emitEffect",
             effect: "goal",

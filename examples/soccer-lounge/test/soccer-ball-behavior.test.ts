@@ -43,7 +43,7 @@ describe("SoccerBallBehavior", () => {
     expect(h.host.body(h.entityId).velocity.x).toBeGreaterThan(0);
   });
 
-  it("scores for away at the left goal, stops, then resets at centre", () => {
+  it("scores for away while physics continues, then resets at centre", () => {
     const h = harness();
     h.host.body(h.entityId).velocity = { x: -9, y: 1 };
 
@@ -54,8 +54,8 @@ describe("SoccerBallBehavior", () => {
     }).flush();
 
     expect(h.state).toMatchObject({ phase: "goal", homeScore: 0, awayScore: 1 });
-    expect(h.host.body(h.entityId).mode).toBe("kinematicVelocity");
-    expect(h.host.body(h.entityId).velocity).toEqual({ x: 0, y: 0 });
+    expect(h.host.body(h.entityId).mode).toBe("dynamic");
+    expect(h.host.body(h.entityId).velocity).toEqual({ x: -9, y: 1 });
 
     h.advanceSeconds(defaultSoccerBallConfig.resetSeconds);
 

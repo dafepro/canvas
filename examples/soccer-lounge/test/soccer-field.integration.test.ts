@@ -80,7 +80,7 @@ describe("soccer field integration", () => {
     simulation.free();
   });
 
-  it("allows a goal, records it, stops, and restarts from centre", () => {
+  it("scores at the mouth, lets net physics continue, then restarts from centre", () => {
     const simulation = build();
     simulation.addItem(instance(16, 36));
     simulation.world.setVelocity("match-ball", { x: -18, y: 0 }, 0);
@@ -93,20 +93,37 @@ describe("soccer field integration", () => {
     }
 
     expect(goalState).toMatchObject({ homeScore: 0, awayScore: 1, phase: "goal" });
-    expect(simulation.world.registry.require("match-ball").transform.x).toBeLessThan(10);
-    simulation.step();
-    expect(simulation.world.registry.require("match-ball").rigidBody?.velocity).toEqual({
-      x: 0,
-      y: 0,
-    });
+    const atGoal = simulation.world.registry.require("match-ball");
+    expect(atGoal.transform.x).toBeLessThan(10);
+    expect(atGoal.rigidBody?.mode).toBe("dynamic");
+    const goalX = atGoal.transform.x;
+    const goalSpeed = Math.abs(atGoal.rigidBody?.velocity.x ?? 0);
 
-    for (let tick = 0; tick < 100; tick++) simulation.step();
+    for (let tick = 0; tick < 30; tick++) simulation.step();
+    const inNet = simulation.world.registry.require("match-ball");
+    expect(inNet.transform.x).toBeLessThan(goalX);
+    expect(inNet.transform.x).toBeGreaterThan(2);
+    expect(Math.abs(inNet.rigidBody?.velocity.x ?? 0)).toBeLessThan(goalSpeed);
+
+    for (let tick = 0; tick < 70; tick++) simulation.step();
     const restarted = simulation.world.registry.require("match-ball");
     expect(restarted.transform).toMatchObject({ x: 60, y: 36 });
     expect(simulation.behaviors.slot("match-ball")!.state).toMatchObject({
       phase: "playing",
       awayScore: 1,
     });
+    simulation.free();
+  });
+
+  it("uses high-damping net zones and explicit goal backstops", () => {
+    const simulation = build();
+    const fieldDrag = simulation.world.environment.sample({ x: 60, y: 36 }).linearDrag;
+    expect(simulation.world.environment.sample({ x: 3, y: 36 }).linearDrag).toBeGreaterThan(
+      fieldDrag * 5,
+    );
+    expect(canvas.staticGeometry.map(({ id }) => id)).toEqual(
+      expect.arrayContaining(["left-goal-backstop", "right-goal-backstop"]),
+    );
     simulation.free();
   });
 });

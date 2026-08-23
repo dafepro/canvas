@@ -6,11 +6,11 @@ import {
 
 export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
   definitionId: "soccer-ball",
-  version: 1,
+  version: 2,
   displayName: "Match ball",
   visual: {
     spriteId: "soccer.ball.idle",
-    size: { width: 2.6, height: 2.6 },
+    size: { width: 3.3, height: 3.3 },
     placeholder: { shape: "circle", color: 0xf7f4e9 },
     zIndex: 6,
     variants: {
@@ -34,23 +34,23 @@ export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
     mode: "dynamic",
     mass: 0.45,
     gravityScale: 0,
-    linearDamping: 0.35,
-    angularDamping: 0.6,
+    linearDamping: 0.15,
+    angularDamping: 0.35,
     canSleep: true,
   },
   colliders: [
     {
       id: "solid",
       role: "itemSolid",
-      shape: { type: "circle", radius: 1.3 },
-      restitution: 0.72,
-      friction: 0.35,
+      shape: { type: "circle", radius: 1.65 },
+      restitution: 0.9,
+      friction: 0.2,
       collisionMask: 0b0000_1100,
     },
     {
       id: "kick",
       role: "itemSensor",
-      shape: { type: "circle", radius: 2.2 },
+      shape: { type: "circle", radius: 2.55 },
     },
   ],
   behaviorType: "soccerBall",
