@@ -41,8 +41,6 @@ message Vec2 {
 message Join {
   string canvas_id = 1;
   uint32 protocol_version = 2;
-  string user_id = 3;
-  string display_name = 4;
   // Item definition ids and versions the client already has.
   repeated DefinitionVersion definitions = 5;
 }
@@ -63,6 +61,9 @@ message JoinAccepted {
   bytes snapshot_json = 6;
   bool room_was_sleeping = 7;
   uint32 tick_rate = 8;
+  // Authenticated identity. Client-supplied JOIN identity is not trusted.
+  string user_id = 9;
+  string display_name = 10;
 }
 
 message Presence {

@@ -2,6 +2,8 @@ package roomsdk
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -12,8 +14,8 @@ var ErrUnauthorized = errors.New("roomsdk: unauthorized")
 
 // Identity is the authenticated user behind one connection.
 type Identity struct {
-	UserID      string
-	DisplayName string
+	UserID      string `json:"userId"`
+	DisplayName string `json:"displayName"`
 }
 
 // Authenticator turns an HTTP request into an Identity. The host application
@@ -29,22 +31,33 @@ func (f AuthenticatorFunc) Authenticate(ctx context.Context, r *http.Request) (I
 	return f(ctx, r)
 }
 
-// DevAuthenticator trusts the `user` query parameter or the `X-User-Id` header.
-// Use it for local runs only. It refuses an empty user id.
+// DevAuthenticator trusts a canvas-dev WebSocket subprotocol credential or the
+// X-User-Id header. Use it for local runs only. It refuses an empty user id.
 func DevAuthenticator() Authenticator {
 	return AuthenticatorFunc(func(_ context.Context, r *http.Request) (Identity, error) {
-		userID := r.URL.Query().Get("user")
-		if userID == "" {
-			userID = r.Header.Get("X-User-Id")
+		identity := Identity{
+			UserID:      strings.TrimSpace(r.Header.Get("X-User-Id")),
+			DisplayName: strings.TrimSpace(r.Header.Get("X-Display-Name")),
 		}
-		userID = strings.TrimSpace(userID)
-		if userID == "" {
+		for _, protocol := range strings.Split(r.Header.Get("Sec-WebSocket-Protocol"), ",") {
+			encoded, ok := strings.CutPrefix(strings.TrimSpace(protocol), "canvas-dev.")
+			if !ok {
+				continue
+			}
+			raw, err := base64.RawURLEncoding.DecodeString(encoded)
+			if err != nil || json.Unmarshal(raw, &identity) != nil {
+				return Identity{}, ErrUnauthorized
+			}
+			break
+		}
+		identity.UserID = strings.TrimSpace(identity.UserID)
+		identity.DisplayName = strings.TrimSpace(identity.DisplayName)
+		if identity.UserID == "" {
 			return Identity{}, ErrUnauthorized
 		}
-		name := r.URL.Query().Get("name")
-		if name == "" {
-			name = userID
+		if identity.DisplayName == "" {
+			identity.DisplayName = identity.UserID
 		}
-		return Identity{UserID: userID, DisplayName: name}, nil
+		return identity, nil
 	})
 }

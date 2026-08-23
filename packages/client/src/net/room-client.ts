@@ -22,6 +22,8 @@ import type {
 
 export interface RoomJoinResult {
   clientId: string;
+  userId: string;
+  displayName: string;
   canvas: CanvasDefinition;
   snapshot: CanvasSnapshot;
   sceneRevision: number;
@@ -81,6 +83,8 @@ export class RoomClient {
   sceneRevision = 0;
   tickRate = 60;
   isHost = false;
+  userId = "";
+  displayName = "";
   peers: Peer[] = [];
   /** Health values sent with each heartbeat, updated by the runtime. */
   health = { simulationHz: 0, workerDriftMs: 0, pageVisible: true };
@@ -132,8 +136,6 @@ export class RoomClient {
         join: {
           canvasId: this.joinDescriptor.canvasId,
           protocolVersion: PROTOCOL_VERSION,
-          userId: this.joinDescriptor.userId,
-          displayName: this.joinDescriptor.displayName,
           definitions: this.definitions,
         },
       }),
@@ -309,6 +311,8 @@ export class RoomClient {
     if (message.joinAccepted) {
       const accepted = message.joinAccepted;
       this.clientId = accepted.clientId;
+      this.userId = accepted.userId;
+      this.displayName = accepted.displayName;
       this.hostEpoch = accepted.hostEpoch;
       this.hostClientId = accepted.hostClientId;
       // Spec 11.1. A reconnect produces a new client id, and the room may have
@@ -325,6 +329,8 @@ export class RoomClient {
       }
       this.emit("joined", {
         clientId: accepted.clientId,
+        userId: accepted.userId,
+        displayName: accepted.displayName,
         canvas,
         snapshot: snapshot ?? {
           schemaVersion: 1,

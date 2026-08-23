@@ -8,7 +8,6 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -70,6 +69,7 @@ func newHarness(t *testing.T, mutate func(*Config)) *harness {
 	})
 	cfg := Config{
 		Store:             store,
+		Auth:              DevAuthenticator(),
 		Logger:            slog.New(slog.NewTextHandler(io.Discard, nil)),
 		AllowedOrigins:    []string{"*"},
 		HostLeaseTTL:      150 * time.Millisecond,
@@ -100,10 +100,12 @@ type testClient struct {
 func (h *harness) dial(user string) *testClient {
 	h.t.Helper()
 	wsURL := "ws" + strings.TrimPrefix(h.http.URL, "http") +
-		"/v1/realtime/canvases/test-canvas?user=" + url.QueryEscape(user)
+		"/v1/realtime/canvases/test-canvas"
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	h.t.Cleanup(cancel)
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	conn, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{"X-User-Id": []string{user}},
+	})
 	if err != nil {
 		h.t.Fatalf("dial: %v", err)
 	}
@@ -163,7 +165,7 @@ func (c *testClient) sendJoin(definitions ...*pb.DefinitionVersion) {
 		RoomId: "test-canvas",
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
 			CanvasId:        "test-canvas",
-			ProtocolVersion: 1,
+			ProtocolVersion: 2,
 			Definitions:     definitions,
 		}},
 	})
@@ -1426,15 +1428,14 @@ func TestProtocolMismatchIsRefused(t *testing.T) {
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
 			CanvasId:        "test-canvas",
 			ProtocolVersion: 99,
-			UserId:          "alice",
 		}},
 	})
 	got := client.await(func(e *pb.RoomEnvelope) bool { return e.GetError() != nil }).GetError()
 	if got.Code != "protocol_mismatch" {
 		t.Errorf("error code = %q, want protocol_mismatch", got.Code)
 	}
-	if got.ServerProtocolVersion != 1 {
-		t.Errorf("server protocol version = %d, want 1", got.ServerProtocolVersion)
+	if got.ServerProtocolVersion != 2 {
+		t.Errorf("server protocol version = %d, want 2", got.ServerProtocolVersion)
 	}
 }
 
@@ -1452,14 +1453,15 @@ func TestRoomFullIsRefused(t *testing.T) {
 	}
 }
 
-func TestUnauthenticatedConnectionIsRefused(t *testing.T) {
+func TestQueryStringIdentityIsRefused(t *testing.T) {
 	h := newHarness(t, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	wsURL := "ws" + strings.TrimPrefix(h.http.URL, "http") + "/v1/realtime/canvases/test-canvas"
+	wsURL := "ws" + strings.TrimPrefix(h.http.URL, "http") +
+		"/v1/realtime/canvases/test-canvas?user=legacy-client"
 	_, resp, err := websocket.Dial(ctx, wsURL, nil)
 	if err == nil {
-		t.Fatal("dial without a user succeeded")
+		t.Fatal("dial with only query-string identity succeeded")
 	}
 	if resp == nil || resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("status = %v, want 401", resp)
@@ -1485,5 +1487,11 @@ func TestGetCanvasReturnsTheDefinition(t *testing.T) {
 func TestNewRefusesAConfigWithoutAStore(t *testing.T) {
 	if _, err := New(Config{}); err == nil {
 		t.Fatal("New accepted a Config with no Store")
+	}
+}
+
+func TestNewRefusesAConfigWithoutAuthentication(t *testing.T) {
+	if _, err := New(Config{Store: NewMemoryStore()}); err == nil {
+		t.Fatal("New accepted a Config with no Authenticator")
 	}
 }

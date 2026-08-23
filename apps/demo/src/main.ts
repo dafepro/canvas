@@ -1,5 +1,6 @@
 import {
   CanvasRuntime,
+  devRealtimeCredential,
   rocketCanvasDefinitions,
   type RuntimeDiagnostics,
 } from "@canvas-physics/client";
@@ -71,8 +72,8 @@ const join = async (): Promise<void> => {
   runtime = new CanvasRuntime({
     canvasId: "rocket-canvas",
     serverUrl,
-    userId: userInput.value,
-    displayName: userInput.value,
+    credentialProvider: async () =>
+      devRealtimeCredential(userInput.value, userInput.value),
     mount: stage,
     definitions: rocketCanvasDefinitions,
     scene: { debug: new URLSearchParams(location.search).has("debug") },

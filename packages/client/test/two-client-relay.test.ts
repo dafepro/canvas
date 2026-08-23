@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { defaultRocketConfig } from "@canvas-physics/core";
 import {
+  devRealtimeCredential,
   RapierWorld,
   RoomSession,
   SimulationDriver,
@@ -31,8 +32,7 @@ const session = (userId: string, intent: () => InputIntent = () => STILL): RoomS
   const created = new RoomSession({
     canvasId: "rocket-canvas",
     serverUrl: server.url,
-    userId,
-    displayName: userId,
+    credentialProvider: async () => devRealtimeCredential(userId),
     definitions: rocketCanvasDefinitions,
     driver: SimulationDriver.local(),
     intent,

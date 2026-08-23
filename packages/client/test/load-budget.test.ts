@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  devRealtimeCredential,
   RapierWorld,
   RoomSession,
   SimulationDriver,
@@ -47,8 +48,7 @@ const session = (
     transport,
     canvasId: "rocket-canvas",
     serverUrl: server.url,
-    userId,
-    displayName: userId,
+    credentialProvider: async () => devRealtimeCredential(userId),
     definitions: rocketCanvasDefinitions,
     driver: SimulationDriver.local(),
     intent,
@@ -122,7 +122,9 @@ describe.skipIf(!goAvailable())("room at the stated limits", () => {
     await host.start();
     await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
 
-    const meter = new MeasuringTransport();
+    const meter = new MeasuringTransport(
+      async () => devRealtimeCredential("peer-1"),
+    );
     const peers: RoomSession[] = [];
     for (let i = 1; i < AVATARS; i++) {
       const peer = session(`peer-${i}`, circling(i), i === 1 ? meter : undefined);

@@ -23,10 +23,13 @@ type Server struct {
 	rooms map[string]*Room
 }
 
-// New builds a Server. It refuses a Config without a Store.
+// New builds a Server. It refuses a Config without storage or authentication.
 func New(cfg Config) (*Server, error) {
 	if cfg.Store == nil {
 		return nil, errors.New("roomsdk: Config.Store is required")
+	}
+	if cfg.Auth == nil {
+		return nil, errors.New("roomsdk: Config.Auth is required")
 	}
 	cfg.applyDefaults()
 	return &Server{cfg: cfg, rooms: make(map[string]*Room)}, nil

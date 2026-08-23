@@ -1,5 +1,8 @@
 import { decodeEnvelope } from "@canvas-physics/protocol";
-import { WebSocketRoomTransport } from "../../src/index.js";
+import {
+  WebSocketRoomTransport,
+  type RealtimeCredentialProvider,
+} from "../../src/index.js";
 
 /**
  * A transport that also counts inbound bytes for each payload kind. Phase 6
@@ -8,6 +11,10 @@ import { WebSocketRoomTransport } from "../../src/index.js";
 export class MeasuringTransport extends WebSocketRoomTransport {
   readonly inboundBytesByKind = new Map<string, number>();
   readonly inboundCountByKind = new Map<string, number>();
+
+  constructor(credentialProvider: RealtimeCredentialProvider) {
+    super({ credentialProvider });
+  }
 
   private tally(kind: string, bytes: number): void {
     this.inboundBytesByKind.set(kind, (this.inboundBytesByKind.get(kind) ?? 0) + bytes);

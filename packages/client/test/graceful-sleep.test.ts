@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  devRealtimeCredential,
   RapierWorld,
   RoomSession,
   SimulationDriver,
@@ -38,8 +39,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
     const room = new RoomSession({
       canvasId: "rocket-canvas",
       serverUrl: server.url,
-      userId: "alice",
-      displayName: "alice",
+      credentialProvider: async () => devRealtimeCredential("alice"),
       definitions: rocketCanvasDefinitions,
       driver: SimulationDriver.local(),
     });
@@ -80,8 +80,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
     const writer = new RoomSession({
       canvasId: "rocket-canvas",
       serverUrl: first.url,
-      userId: "restart-owner",
-      displayName: "restart-owner",
+      credentialProvider: async () => devRealtimeCredential("restart-owner"),
       definitions: rocketCanvasDefinitions,
       driver: SimulationDriver.local(),
     });
@@ -99,8 +98,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
       reader = new RoomSession({
         canvasId: "rocket-canvas",
         serverUrl: restarted.url,
-        userId: "restart-reader",
-        displayName: "restart-reader",
+        credentialProvider: async () => devRealtimeCredential("restart-reader"),
         definitions: rocketCanvasDefinitions,
         driver: SimulationDriver.local(),
       });

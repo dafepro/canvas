@@ -90,8 +90,6 @@ const joinedSession = async (): Promise<{
   const session = new RoomSession({
     canvasId: rocketCanvas.id,
     serverUrl: "http://127.0.0.1:1",
-    userId: "carol",
-    displayName: "carol",
     definitions: rocketCanvasDefinitions,
     transport,
     driver: idleDriver(),
@@ -102,6 +100,8 @@ const joinedSession = async (): Promise<{
     ...blank(),
     joinAccepted: {
       clientId: "carol-1",
+      userId: "carol",
+      displayName: "Carol",
       sceneRevision: 4,
       hostEpoch: 7,
       hostClientId: "host-1",

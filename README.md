@@ -143,14 +143,22 @@ import { CanvasRuntime, rocketCanvasDefinitions } from "@canvas-physics/client";
 const runtime = new CanvasRuntime({
   canvasId: "rocket-canvas",
   serverUrl: "http://localhost:8081",
-  userId: "alice",
-  displayName: "Alice",
+  credentialProvider: async () => {
+    const response = await fetch("/api/canvas-ticket", { method: "POST" });
+    if (!response.ok) throw new Error("could not obtain a canvas ticket");
+    return response.text();
+  },
   mount: document.querySelector("#stage")!,
   definitions: rocketCanvasDefinitions,
 });
 await runtime.start();
 runtime.spawnItem("rocket", { x: 70, y: 61 });
 ```
+
+The credential provider runs again for every reconnect. The rooms SDK derives
+identity from that ticket and returns the authenticated user in JOIN_ACCEPTED;
+the browser never declares its own identity in JOIN. See
+`docs/HOST_INTEGRATION.md` for the ticket and origin contract.
 
 ## Add a behavior
 

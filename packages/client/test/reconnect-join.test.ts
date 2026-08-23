@@ -77,8 +77,6 @@ describe("RoomClient reconnect handshake", () => {
       driver,
       canvasId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
-      userId: "alice",
-      displayName: "Alice",
       definitions: rocketCanvasDefinitions,
       rates: { previewHz: 10 },
     });
@@ -116,8 +114,6 @@ describe("RoomClient reconnect handshake", () => {
       join: {
         canvasId: "rocket-canvas",
         serverUrl: "http://localhost:8080",
-        userId: "alice",
-        displayName: "Alice",
       },
     });
 
@@ -152,8 +148,6 @@ describe("RoomClient reconnect handshake", () => {
       driver,
       canvasId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
-      userId: "alice",
-      displayName: "Alice",
       definitions: rocketCanvasDefinitions,
     });
 
@@ -166,6 +160,8 @@ describe("RoomClient reconnect handshake", () => {
       senderClientId: "",
       joinAccepted: {
         clientId: "c-first",
+        userId: "alice",
+        displayName: "Alice",
         sceneRevision: 0,
         hostEpoch: 1,
         hostClientId: "c-host",
@@ -188,6 +184,8 @@ describe("RoomClient reconnect handshake", () => {
       senderClientId: "",
       joinAccepted: {
         clientId: "c-second",
+        userId: "alice",
+        displayName: "Alice",
         sceneRevision: 0,
         hostEpoch: 2,
         hostClientId: "c-host",
@@ -226,8 +224,6 @@ describe("RoomClient reconnect handshake", () => {
       driver,
       canvasId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
-      userId: "alice",
-      displayName: "Alice",
       definitions: rocketCanvasDefinitions,
     });
 
@@ -241,6 +237,8 @@ describe("RoomClient reconnect handshake", () => {
       senderClientId: "",
       joinAccepted: {
         clientId: "c-host",
+        userId: "alice",
+        displayName: "Alice",
         sceneRevision: 0,
         hostEpoch: 3,
         hostClientId: "c-host",
@@ -318,8 +316,6 @@ describe("RoomClient reconnect handshake", () => {
       driver,
       canvasId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
-      userId: "alice",
-      displayName: "Alice",
       definitions: rocketCanvasDefinitions,
     });
 
@@ -332,6 +328,8 @@ describe("RoomClient reconnect handshake", () => {
       senderClientId: "",
       joinAccepted: {
         clientId: "c-host",
+        userId: "alice",
+        displayName: "Alice",
         sceneRevision: 0,
         hostEpoch: 3,
         hostClientId: "c-host",

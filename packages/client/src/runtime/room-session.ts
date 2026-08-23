@@ -20,7 +20,10 @@ import { AvatarReconciler } from "../net/avatar-reconciler.js";
 import { dequantizeTransform, quantizeTransform } from "../net/quantization.js";
 import { RoomClient } from "../net/room-client.js";
 import type { RoomTransport } from "../net/transport.js";
-import { WebSocketRoomTransport } from "../net/websocket-transport.js";
+import {
+  WebSocketRoomTransport,
+  type RealtimeCredentialProvider,
+} from "../net/websocket-transport.js";
 import { InterpolationBuffer } from "../render/interpolation-buffer.js";
 import { SimulationDriver } from "../simulation/driver.js";
 import type { RenderEntity, SimulationResponse } from "../simulation/messages.js";
@@ -49,8 +52,8 @@ export interface RoomSessionRates {
 export interface RoomSessionOptions {
   canvasId: string;
   serverUrl: string;
-  userId: string;
-  displayName: string;
+  /** Required when transport is omitted. Called for every WebSocket attempt. */
+  credentialProvider?: RealtimeCredentialProvider;
   /** Item definitions the client knows. Bundled for now (spec 26). */
   definitions: ItemDefinition[];
   transport?: RoomTransport;
@@ -162,7 +165,12 @@ export class RoomSession {
 
   constructor(private readonly options: RoomSessionOptions) {
     this.previewIntervalMs = 1000 / Math.max(1, options.rates?.previewHz ?? 15);
-    const transport = options.transport ?? new WebSocketRoomTransport();
+    if (!options.transport && !options.credentialProvider) {
+      throw new Error("RoomSession requires a credentialProvider for WebSocket transport");
+    }
+    const transport =
+      options.transport ??
+      new WebSocketRoomTransport({ credentialProvider: options.credentialProvider! });
     this.driver = options.driver ?? SimulationDriver.spawn();
     this.client = new RoomClient({
       transport,
@@ -172,8 +180,6 @@ export class RoomSession {
       })),
       join: {
         canvasId: options.canvasId,
-        userId: options.userId,
-        displayName: options.displayName,
         serverUrl: options.serverUrl,
       },
     });
@@ -191,6 +197,14 @@ export class RoomSession {
 
   get avatarId(): string {
     return this.localAvatarId;
+  }
+
+  get userId(): string {
+    return this.client.userId;
+  }
+
+  get displayName(): string {
+    return this.client.displayName;
   }
 
   async start(): Promise<void> {
@@ -409,7 +423,7 @@ export class RoomSession {
       localAvatar: {
         entityId: this.localAvatarId,
         clientId: this.client.clientId,
-        userId: this.options.userId,
+        userId: this.client.userId,
         position: this.avatarSpawnPosition(this.localAvatarId),
       },
     });
@@ -427,7 +441,7 @@ export class RoomSession {
       spawn: {
         entityId: this.localAvatarId,
         clientId: this.client.clientId,
-        userId: this.options.userId,
+        userId: this.client.userId,
         position: this.avatarSpawnPosition(this.localAvatarId),
       },
     });
@@ -883,7 +897,7 @@ export class RoomSession {
             definitionId: command.definitionId,
             definitionVersion: command.definitionVersion,
             // The server owns the record, so its item wins over the command.
-            ownerUserId: item?.ownerUserId ?? this.options.userId,
+            ownerUserId: item?.ownerUserId ?? this.client.userId,
             transform: item?.transform ?? {
               x: command.position?.x ?? 0,
               y: command.position?.y ?? 0,

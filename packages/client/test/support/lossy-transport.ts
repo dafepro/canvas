@@ -1,5 +1,8 @@
 import type { RoomEnvelope } from "@canvas-physics/protocol";
-import { WebSocketRoomTransport } from "../../src/index.js";
+import {
+  WebSocketRoomTransport,
+  type RealtimeCredentialProvider,
+} from "../../src/index.js";
 
 export interface LossOptions {
   /** Share of realtime packets to drop, from 0 to 1. */
@@ -20,8 +23,11 @@ export class LossyTransport extends WebSocketRoomTransport {
   droppedOut = 0;
   droppedIn = 0;
 
-  constructor(private readonly loss: LossOptions = {}) {
-    super();
+  constructor(
+    credentialProvider: RealtimeCredentialProvider,
+    private readonly loss: LossOptions = {},
+  ) {
+    super({ credentialProvider });
   }
 
   override sendRealtime(message: RoomEnvelope): void {

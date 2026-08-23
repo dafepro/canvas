@@ -200,6 +200,8 @@ func (r *Room) handleJoin(client *Client) {
 			SnapshotJson:         r.snapshotRaw,
 			RoomWasSleeping:      wasSleeping,
 			TickRate:             r.cfg.TickRate,
+			UserId:               client.UserID,
+			DisplayName:          client.DisplayName,
 		}},
 	})
 

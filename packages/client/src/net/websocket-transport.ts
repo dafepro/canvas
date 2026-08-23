@@ -13,10 +13,27 @@ import {
 } from "./transport.js";
 
 export interface WebSocketTransportOptions {
+  /** Supplies a short-lived WebSocket subprotocol ticket for every attempt. */
+  credentialProvider: RealtimeCredentialProvider;
   /** Reconnect delays in milliseconds. The last value repeats. */
   backoffMs?: number[];
   maxReconnects?: number;
 }
+
+export type RealtimeCredentialProvider = () => Promise<string>;
+
+export const REALTIME_SUBPROTOCOL = "canvas-realtime";
+
+/** Creates an identity credential understood only by roomsdk.DevAuthenticator. */
+export const devRealtimeCredential = (
+  userId: string,
+  displayName = userId,
+): string => {
+  const bytes = new TextEncoder().encode(JSON.stringify({ userId, displayName }));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `canvas-dev.${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "")}`;
+};
 
 /**
  * Spec 12.1. The V1 transport. One socket carries both channels, so the
@@ -36,9 +53,11 @@ export class WebSocketRoomTransport implements RoomTransport {
   private closedByCaller = false;
   private readonly backoffMs: number[];
   private readonly maxReconnects: number;
+  private readonly credentialProvider: RealtimeCredentialProvider;
   readonly traffic: TransportTraffic = emptyTraffic();
 
-  constructor(options: WebSocketTransportOptions = {}) {
+  constructor(options: WebSocketTransportOptions) {
+    this.credentialProvider = options.credentialProvider;
     this.backoffMs = options.backoffMs ?? [250, 500, 1000, 2000, 4000];
     this.maxReconnects = options.maxReconnects ?? 20;
   }
@@ -57,18 +76,22 @@ export class WebSocketRoomTransport implements RoomTransport {
     const base = new URL(join.serverUrl);
     base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
     base.pathname = `/v1/realtime/canvases/${encodeURIComponent(join.canvasId)}`;
-    base.searchParams.set("user", join.userId);
-    base.searchParams.set("name", join.displayName);
+    base.search = "";
+    base.hash = "";
     return base.toString();
   }
 
-  private open(): Promise<void> {
+  private async open(): Promise<void> {
     const join = this.join;
-    if (!join) return Promise.reject(new Error("connect was not called"));
+    if (!join) throw new Error("connect was not called");
 
     this.setStatus(this.reconnects === 0 ? "connecting" : "reconnecting");
+    const credential = await this.credentialProvider();
+    if (!credential || credential === REALTIME_SUBPROTOCOL || /[\s,]/u.test(credential)) {
+      throw new Error("credential provider returned an invalid WebSocket subprotocol");
+    }
     return new Promise<void>((resolve, reject) => {
-      const socket = new WebSocket(this.url(join));
+      const socket = new WebSocket(this.url(join), [REALTIME_SUBPROTOCOL, credential]);
       socket.binaryType = "arraybuffer";
       this.socket = socket;
 
@@ -119,8 +142,12 @@ export class WebSocketRoomTransport implements RoomTransport {
     this.reconnects++;
     this.setStatus("reconnecting", detail);
     this.reconnectTimer = setTimeout(() => {
-      void this.open().catch(() => {
-        /* the close handler schedules the next attempt */
+      void this.open().catch((error) => {
+        // A socket close schedules itself. Credential failures happen before a
+        // socket exists and therefore need another attempt here.
+        if (!this.socket && !this.closedByCaller) {
+          this.scheduleReconnect(error instanceof Error ? error.message : String(error));
+        }
       });
     }, delay);
   }

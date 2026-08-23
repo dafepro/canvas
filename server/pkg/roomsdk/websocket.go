@@ -31,6 +31,7 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		OriginPatterns: s.cfg.AllowedOrigins,
+		Subprotocols:   []string{"canvas-realtime"},
 		// Realtime packets are small and already compact, so compression only
 		// adds CPU cost (spec 19.3).
 		CompressionMode: websocket.CompressionDisabled,

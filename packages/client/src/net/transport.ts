@@ -2,8 +2,6 @@ import type { RoomEnvelope } from "@canvas-physics/protocol";
 
 export interface JoinDescriptor {
   canvasId: string;
-  userId: string;
-  displayName: string;
   /** Base URL of the coordination service, such as http://localhost:8080. */
   serverUrl: string;
 }

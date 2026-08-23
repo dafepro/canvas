@@ -5,6 +5,7 @@ import type {
   Vec2,
 } from "@canvas-physics/core";
 import type { RoomTransport } from "../net/transport.js";
+import type { RealtimeCredentialProvider } from "../net/websocket-transport.js";
 import { PixiScene, type SceneOptions } from "../render/pixi-scene.js";
 import { FrameProfiler } from "../render/frame-profiler.js";
 import { KeyboardController } from "../input/keyboard-controller.js";
@@ -26,8 +27,8 @@ import {
 export interface CanvasRuntimeOptions {
   canvasId: string;
   serverUrl: string;
-  userId: string;
-  displayName: string;
+  /** Required when transport is omitted. Called for every WebSocket attempt. */
+  credentialProvider?: RealtimeCredentialProvider;
   mount: HTMLElement;
   /** Item definitions the client knows. Bundled for now (spec 26). */
   definitions: ItemDefinition[];
@@ -81,8 +82,7 @@ export class CanvasRuntime {
     this.session = new RoomSession({
       canvasId: options.canvasId,
       serverUrl: options.serverUrl,
-      userId: options.userId,
-      displayName: options.displayName,
+      credentialProvider: options.credentialProvider,
       definitions: options.definitions,
       transport: options.transport,
       driver: options.driver,
@@ -149,7 +149,7 @@ export class CanvasRuntime {
             this.latestEntities,
             this.options.definitions,
             this.scene!.camera.toWorld(point.x, point.y),
-            this.options.userId,
+            this.session.userId,
           ),
         toWorld: (point) => this.scene!.camera.toWorld(point.x, point.y),
         onPreview: (entityId, transform) => this.moveItem(entityId, transform, true),

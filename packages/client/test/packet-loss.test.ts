@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  devRealtimeCredential,
   RapierWorld,
   RoomSession,
   SimulationDriver,
@@ -31,8 +32,7 @@ const session = (
     transport,
     canvasId: "rocket-canvas",
     serverUrl: server.url,
-    userId,
-    displayName: userId,
+    credentialProvider: async () => devRealtimeCredential(userId),
     definitions: rocketCanvasDefinitions,
     driver: SimulationDriver.local(),
     intent,
@@ -68,7 +68,10 @@ describe.skipIf(!goAvailable())("a room under packet loss", () => {
     await host.start();
     await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
 
-    const lossy = new LossyTransport({ inboundLoss: 0.5, inboundDelayMs: 60 });
+    const lossy = new LossyTransport(
+      async () => devRealtimeCredential("peer"),
+      { inboundLoss: 0.5, inboundDelayMs: 60 },
+    );
     const peer = session("peer", () => STILL, lossy);
     await peer.start();
     await waitFor("the peer to join", () => peer.client.clientId !== "");
@@ -134,7 +137,10 @@ describe.skipIf(!goAvailable())("a room under packet loss", () => {
     await host.start();
     await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
 
-    const lossy = new LossyTransport({ outboundLoss: 0.5 });
+    const lossy = new LossyTransport(
+      async () => devRealtimeCredential("peer"),
+      { outboundLoss: 0.5 },
+    );
     const peer = session("peer", () => peerIntent, lossy);
     await peer.start();
     await waitFor("the peer to join", () => peer.client.clientId !== "");

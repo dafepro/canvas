@@ -6,9 +6,6 @@ export const SCHEMA_VERSIONS = {
   snapshot: 1,
 } as const;
 
-/** Wire protocol version. A client with a different major value is refused. */
-export const PROTOCOL_VERSION = 1;
-
 export type Migration<T = unknown> = (input: T) => T;
 
 /**

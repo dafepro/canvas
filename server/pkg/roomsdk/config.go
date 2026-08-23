@@ -5,12 +5,11 @@ import (
 	"time"
 )
 
-// Config wires the SDK into a host application. Only Store is required; every
-// other field has a working default.
+// Config wires the SDK into a host application. Store and Auth are required.
 type Config struct {
 	// Store holds canvas definitions and canonical checkpoints.
 	Store Store
-	// Auth turns an HTTP request into an Identity. Defaults to DevAuthenticator.
+	// Auth turns an HTTP request into an Identity.
 	Auth Authenticator
 	// TickRate the host should simulate at, sent in JoinAccepted (spec 10.3).
 	TickRate uint32
@@ -42,13 +41,10 @@ const (
 	defaultHeartbeatInterval = 500 * time.Millisecond
 	defaultSleepGrace        = 2 * time.Second
 	defaultMaxClients        = 20
-	defaultProtocolVersion   = 1
+	defaultProtocolVersion   = 2
 )
 
 func (c *Config) applyDefaults() {
-	if c.Auth == nil {
-		c.Auth = DevAuthenticator()
-	}
 	if c.TickRate == 0 {
 		c.TickRate = defaultTickRate
 	}

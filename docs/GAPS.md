@@ -14,7 +14,7 @@ work below because they determine the public boundary every consumer will use.
   and installed outside this workspace.
 - [x] Let an application register custom behaviors in its simulation worker
   without editing or forking Canvas core.
-- [ ] Replace identity query parameters with an asynchronous credential provider
+- [x] Replace identity query parameters with an asynchronous credential provider
   that is called for every connection and reconnect. Require production hosts
   to configure authentication explicitly.
 - [ ] Expose immutable public subscriptions for authenticated presence,
