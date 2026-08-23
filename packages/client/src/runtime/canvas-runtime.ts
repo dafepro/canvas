@@ -40,6 +40,14 @@ import {
   lifecycleError,
   type CanvasLifecycleState,
 } from "./lifecycle.js";
+import {
+  OverlayProjectionStore,
+  projectOverlayPoint,
+  type OverlayPointProjection,
+  type OverlayProjectionObserver,
+  type OverlayProjectionOptions,
+  type OverlayViewportProjection,
+} from "../render/overlay-projection.js";
 
 export interface CanvasRuntimeOptions {
   /** Product-owned room instance id. The server resolves its canvas template. */
@@ -107,6 +115,7 @@ export class CanvasRuntime {
   private disableKeyListener?: (event: KeyboardEvent) => void;
   private assetBundle?: LoadedAssetBundle<Texture>;
   private startPromise?: Promise<void>;
+  private readonly overlayProjections = new OverlayProjectionStore();
 
   constructor(private readonly options: CanvasRuntimeOptions) {
     this.session = new RoomSession({
@@ -152,6 +161,24 @@ export class CanvasRuntime {
 
   subscribeLifecycle(...args: Parameters<RoomSession["subscribeLifecycle"]>) {
     return this.session.subscribeLifecycle(...args);
+  }
+
+  /** Bounded plain-data samples for DOM labels, controls, and product overlays. */
+  subscribeOverlayProjection(
+    observer: OverlayProjectionObserver,
+    options?: OverlayProjectionOptions,
+  ): () => void {
+    return this.overlayProjections.subscribe(observer, options);
+  }
+
+  /** Projects a product-owned world anchor, or returns undefined before mount. */
+  projectWorldPoint(
+    point: Readonly<{ x: number; y: number; z?: number }>,
+  ): Readonly<OverlayPointProjection> | undefined {
+    const viewport = this.overlayViewport();
+    const canvas = this.session.canvas;
+    if (!viewport || !canvas) return undefined;
+    return projectOverlayPoint(point, canvas.size, viewport);
   }
 
   whenReady(): Promise<void> {
@@ -229,6 +256,7 @@ export class CanvasRuntime {
     this.editor = undefined;
     this.keyboard?.destroy();
     this.keyboard = undefined;
+    this.overlayProjections.clear();
   }
 
   private destroyScene(): void {
@@ -353,6 +381,15 @@ export class CanvasRuntime {
       const entities = this.session.entitiesToDraw(nowMs);
       this.latestEntities = entities;
       scene.update(entities, deltaMs);
+      if (this.overlayProjections.hasObservers && this.session.canvas) {
+        this.overlayProjections.publish({
+          sampledAtMs: nowMs,
+          tick: this.session.tick,
+          canvasSize: this.session.canvas.size,
+          viewport: this.overlayViewport()!,
+          entities,
+        });
+      }
       scene.setThumbstick(this.editMode ? undefined : this.pointer?.gesture);
       this.options.onDiagnostics?.(this.diagnostics());
     });
@@ -391,6 +428,18 @@ export class CanvasRuntime {
       void this.stopGracefully(150);
     };
     window.addEventListener("pagehide", this.pageHideListener);
+  }
+
+  private overlayViewport(): Readonly<OverlayViewportProjection> | undefined {
+    const scene = this.scene;
+    if (!scene) return undefined;
+    return Object.freeze({
+      width: scene.app.renderer.width,
+      height: scene.app.renderer.height,
+      scale: scene.camera.scale,
+      offsetX: scene.camera.offsetX,
+      offsetY: scene.camera.offsetY,
+    });
   }
 
   // ---------- durable mutations ----------

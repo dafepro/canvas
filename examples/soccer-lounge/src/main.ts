@@ -21,6 +21,7 @@ const awayScore = document.querySelector<HTMLElement>("#away-score")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const participantCount = document.querySelector<HTMLElement>("#participant-count")!;
 const scoreBoard = document.querySelector<HTMLElement>("#scoreboard")!;
+const ballMarker = document.querySelector<HTMLElement>("#ball-marker")!;
 
 userInput.value =
   new URLSearchParams(location.search).get("user") ??
@@ -107,8 +108,20 @@ const join = async (): Promise<void> => {
         scoreBoard.classList.remove("goal-flash");
         requestAnimationFrame(() => scoreBoard.classList.add("goal-flash"));
       }),
+      nextRuntime.subscribeOverlayProjection((snapshot) => {
+        const ball = snapshot.entities[0];
+        ballMarker.hidden = !ball || !ball.visible || !ball.inViewport;
+        if (!ball || ballMarker.hidden) return;
+        ballMarker.style.transform =
+          `translate(${ball.screen.x}px, ${ball.screen.y}px) translate(-50%, -145%)`;
+      }, {
+        maxHz: 10,
+        maxEntities: 1,
+        definitionIds: ["soccer-ball"],
+      }),
     ];
     await nextRuntime.start();
+    await nextRuntime.whenReady();
     leaveButton.disabled = false;
     benchButton.disabled = false;
   } catch (error) {
@@ -136,6 +149,7 @@ const leave = (): void => {
   benchButton.disabled = true;
   status.textContent = "Not connected";
   participantCount.textContent = "0";
+  ballMarker.hidden = true;
 };
 
 joinButton.addEventListener("click", () => void join());

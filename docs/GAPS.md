@@ -72,7 +72,7 @@ work below because they determine the public boundary every consumer will use.
   items with participant-item protection.
 - [x] Define start, stop, reconnect, remount, background, and route-unmount
   lifecycle behavior with a typed consumer error model.
-- [ ] Provide renderer-safe projection and bounded overlay observation helpers.
+- [x] Provide renderer-safe projection and bounded overlay observation helpers.
 
 ## Consumer-library Priority 2 — proof and hardening
 

@@ -54,6 +54,11 @@ Two immutable goal system items reuse one transparent net texture, with the
 opposing goal expressed by a 180-degree item transform. Net drag, score zones,
 and rear boundaries remain canvas configuration rather than renderer logic.
 
+The DOM `Match ball` marker uses the bounded overlay-projection subscription at
+10 Hz. It demonstrates that a product can align accessible HTML with an
+interpolated entity without reaching into Pixi, observing every render frame,
+or retaining mutable renderer state.
+
 The canvas definition's `systemItems` materializes exactly one match ball on a
 new room. System items have no participant owner and reject participant move,
 configuration, rotation, and delete commands.

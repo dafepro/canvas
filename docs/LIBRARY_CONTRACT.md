@@ -40,6 +40,12 @@ canonical snapshot remains complete.
 Observer callbacks run synchronously at the source update cadence. Consumers
 must enqueue expensive work rather than block simulation or network handling.
 
+`subscribeOverlayProjection` is the renderer-safe exception for visual product
+UI: it publishes filtered, capped, rate-limited plain screen projections of the
+interpolated entities actually drawn. `projectWorldPoint` handles fixed product
+anchors. Neither exposes Pixi or mutable camera state. See
+`docs/OVERLAY_PROJECTION.md`.
+
 `subscribeLifecycle`, `start`, `whenReady`, `stop`, and `stopGracefully` define
 route ownership, backgrounding, reconnect, and terminal teardown. Consumer
 failures use `CanvasConsumerError`, not string parsing. See
@@ -75,4 +81,5 @@ host application explicitly reconciles that sleeping room with the policies in
 - `HOST_INTEGRATION.md` defines authentication and rooms SDK composition.
 - `ROOM_TEMPLATES.md` defines product room and reusable template identity.
 - `RUNTIME_LIFECYCLE.md` defines readiness, reconnect, teardown, and typed errors.
+- `OVERLAY_PROJECTION.md` defines bounded DOM/UI projection observation.
 - `ARCHITECTURE.md` defines authority and dependency direction inside Canvas.

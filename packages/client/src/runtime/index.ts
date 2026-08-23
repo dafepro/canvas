@@ -20,6 +20,7 @@ export type {
   CanvasLifecycleSnapshot,
   CanvasLifecycleState,
 } from "./lifecycle.js";
+export * from "../render/overlay-projection.js";
 export { SimulationDriver } from "../simulation/driver.js";
 export {
   devRealtimeCredential,

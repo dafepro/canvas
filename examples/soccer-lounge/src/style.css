@@ -143,6 +143,24 @@ h1 {
   pointer-events: none;
 }
 
+.ball-marker {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  padding: 3px 7px;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 999px;
+  background: rgb(4 20 11 / 78%);
+  color: #f7f2df;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  pointer-events: none;
+  will-change: transform;
+}
+
 aside {
   padding: 22px;
   border-left: 1px solid #2b5238;
