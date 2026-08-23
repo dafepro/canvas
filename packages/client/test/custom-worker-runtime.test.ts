@@ -9,7 +9,11 @@ import {
   installSimulationWorker,
   type SimulationWorkerScope,
 } from "../src/simulation/worker-runtime.js";
-import type { RenderEntity, SimulationRequest, SimulationResponse } from "../src/index.js";
+import {
+  runSimulationWorkerConformance,
+  type SimulationWorkerConformanceFixture,
+} from "../src/testing/index.js";
+import type { SimulationRequest, SimulationResponse } from "../src/index.js";
 import { rocketCanvas } from "../src/definitions/rocket-canvas.js";
 
 interface CounterState {
@@ -66,52 +70,75 @@ const counterInstance: ItemInstance = {
   sceneRevision: 1,
 };
 
-const waitFor = async <T>(read: () => T | undefined, timeoutMs = 10_000): Promise<T> => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const value = read();
-    if (value !== undefined) return value;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  throw new Error("timed out waiting for simulation response");
-};
-
 describe("custom simulation worker runtime", () => {
-  it("runs an application behavior registered by the worker entry", async () => {
-    const responses: SimulationResponse[] = [];
-    const scope: SimulationWorkerScope = {
-      onmessage: null,
-      postMessage: (message) => responses.push(message),
-    };
-    const runtime = installSimulationWorker(scope, [CounterBehavior]);
-    const send = (data: SimulationRequest): void =>
-      scope.onmessage?.({ data } as MessageEvent<SimulationRequest>);
-
-    try {
-      send({
+  it("passes the public conformance kit with an application behavior", async () => {
+    const fixture: SimulationWorkerConformanceFixture = {
+      timeoutMs: 10_000,
+      create: () => {
+        const listeners = new Set<(message: SimulationResponse) => void>();
+        const scope: SimulationWorkerScope = {
+          onmessage: null,
+          postMessage: (message) => {
+            for (const listener of listeners) listener(message);
+          },
+        };
+        const runtime = installSimulationWorker(scope, [CounterBehavior]);
+        return {
+          postMessage: (data) =>
+            scope.onmessage?.({ data } as MessageEvent<SimulationRequest>),
+          onMessage: (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          terminate: () => runtime.stop(),
+        };
+      },
+      init: {
         type: "init",
         canvas: rocketCanvas,
         definitions: [counterDefinition],
         tickRate: 60,
         isHost: true,
-      });
-      await waitFor(() => responses.find((response) => response.type === "ready"));
-      send({ type: "addItem", instance: counterInstance });
+      },
+      scenarios: [{
+        name: "custom counter behavior advances",
+        exercise: async (worker) => {
+          worker.send({ type: "addItem", instance: counterInstance });
+          await worker.waitFor((response) => {
+            if (response.type !== "render") return false;
+            const found = response.entities.find((candidate) => candidate.id === "counter-1");
+            const state = found?.behaviorState as CounterState | undefined;
+            return Boolean(found && state && state.ticks > 0);
+          }, "custom behavior state did not advance");
+        },
+      }],
+    };
 
-      const entity = await waitFor<RenderEntity>(() => {
-        for (const response of responses) {
-          if (response.type !== "render") continue;
-          const found = response.entities.find((candidate) => candidate.id === "counter-1");
-          const state = found?.behaviorState as CounterState | undefined;
-          if (found && state && state.ticks > 0) return found;
-        }
-        return undefined;
-      });
+    const report = await runSimulationWorkerConformance(fixture);
 
-      expect(entity.behaviorState).toMatchObject({ ticks: expect.any(Number) });
-    } finally {
-      runtime.stop();
-    }
-    expect(scope.onmessage).toBeNull();
+    expect(report).toEqual({ ok: true, checksRun: 4, scenariosRun: 1, issues: [] });
+  });
+
+  it("requires at least one application-owned scenario", async () => {
+    const report = await runSimulationWorkerConformance({
+      create: () => ({
+        postMessage: () => {},
+        onMessage: () => () => {},
+        terminate: () => {},
+      }),
+      init: {
+        type: "init",
+        canvas: rocketCanvas,
+        definitions: [],
+        tickRate: 60,
+        isHost: true,
+      },
+      scenarios: [],
+      timeoutMs: 10,
+    });
+
+    expect(report.issues).toContainEqual(expect.objectContaining({
+      code: "scenario_required",
+    }));
   });
 });

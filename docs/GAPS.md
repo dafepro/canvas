@@ -80,7 +80,7 @@ work below because they determine the public boundary every consumer will use.
 
 ## Consumer-library Priority 2 — proof and hardening
 
-- [ ] Add external-consumer conformance kits for behaviors, authentication,
+- [x] Add external-consumer conformance kits for behaviors, authentication,
   stores, transports, and custom worker bundles.
   - [x] Behavior metadata, deterministic replay, sleep normalization, and
     durable migration cases through `@canvas-physics/core/testing`.
@@ -91,7 +91,9 @@ work below because they determine the public boundary every consumer will use.
     `@canvas-physics/client/testing` fixture, including lifecycle, ordered and
     realtime delivery, listener cleanup, reconnect recovery, counters, and
     caller close.
-  - [ ] Application-owned worker bundles.
+  - [x] Application-owned worker bundles through
+    `runSimulationWorkerConformance`, including readiness, snapshots,
+    representative application behavior, listener cleanup, and quiet stop.
 - [ ] Exercise packed release artifacts from a separate fixture application.
 - [ ] Complete latency, loss, reordering, reconnect, migration, late-join, and
   mobile backgrounding coverage.

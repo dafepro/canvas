@@ -12,10 +12,9 @@ authenticator, store, transport, or worker bundle honors the public contract.
 - [x] Host `Authenticator` implementations.
 - [x] Host `Store` implementations.
 - [x] Custom `RoomTransport` implementations.
-- [ ] Application-owned simulation worker bundles.
+- [x] Application-owned simulation worker bundles.
 
-The parent P2 backlog item remains open until every kit above is runnable from
-a clean external package install.
+Every kit above is now runnable from a clean external package install.
 
 ## Behavior kit
 
@@ -125,3 +124,33 @@ directions, cumulative encoded-byte/message counters, and terminal caller
 close. The immutable report is independent of Vitest or Jest. The test peer is
 responsible for running against the real adapter boundary rather than calling
 private transport methods directly.
+
+## Simulation worker bundle kit
+
+`runSimulationWorkerConformance` also comes from
+`@canvas-physics/client/testing`. Its fixture wraps the application-owned worker
+entry with only `postMessage`, `onMessage`, and `terminate`; consumers should
+construct that wrapper around the actual bundled Worker in a browser-capable
+test. The fixture supplies its ordinary initialization request and at least one
+representative application-behavior scenario.
+
+```ts
+const report = await runSimulationWorkerConformance({
+  create: () => wrapWorker(new Worker(workerUrl, { type: "module" })),
+  init: productSimulationInit,
+  scenarios: [{
+    name: "product behavior advances",
+    exercise: async (worker) => {
+      worker.send(addProductItem);
+      await worker.waitFor(hasAdvancedProductState, "behavior did not advance");
+    },
+  }],
+});
+expect(report.issues).toEqual([]);
+```
+
+The suite verifies worker readiness, data-only request/response exchange,
+snapshot metadata, representative custom behavior, listener cleanup, and
+quiet termination. Worker `error` responses become report issues. The soccer
+example's production build remains the packed-artifact proof that Vite can
+discover and emit the application-owned worker entry.
