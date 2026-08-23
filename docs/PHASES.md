@@ -91,7 +91,7 @@ same simulation in the test process.
 | Item | State |
 | --- | --- |
 | Synthetic 20-player load test with 50 items | Done. `packages/client/test/load-budget.test.ts` runs 20 clients and 50 items through a real `canvasd` and checks the scene and network budgets. |
-| Host-worker profiling on real mobile devices | Not done. No device was available. The load test reports the simulation rate and the worst step on the machine that runs it. |
+| Host-worker profiling on real mobile devices | In progress. The demo reports rolling render p95/worst/long frames separately from simulation rate, worker drift, and worst physics step; it also records background resumes and duration. `docs/MOBILE_PROFILING.md` defines the low/mid/high physical-device matrix. Device results are still pending. |
 | Network loss and latency tests, state repair | Done. `packages/client/test/packet-loss.test.ts` drops half of the realtime packets and proves that the 2 Hz keyframe repairs the peer. |
 | Metrics and debug overlays | Done. The client reports every counter of spec 22.1, and the demo panel shows them. The server reports every counter of spec 22.2 through `CountingMetrics`, which `canvasd` exposes at `GET /metrics` in the Prometheus text format. |
 | NaN and out-of-bounds protection, item quarantine | Done. A NaN value and a body more than one canvas width outside the canvas are both quarantined. |

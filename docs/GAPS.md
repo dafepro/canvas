@@ -54,7 +54,9 @@ downward. Check an item only after the relevant focused tests pass.
   remain above the guidance and should be addressed only after device profiles
   identify whether bandwidth or rendering is the next limiting resource.
 - [ ] Profile host simulation and rendering on representative low-, mid-, and
-  high-tier mobile devices, including suspended/background behavior.
+  high-tier mobile devices, including suspended/background behavior. Rolling
+  p95/worst/long-frame metrics, background duration counters, and the repeatable
+  capture protocol are in place; physical-device results remain outstanding.
 - [ ] Add asset manifests, preloading, texture-atlas rendering, animation
   playback, and bundle splitting.
 - [ ] Finish elevation rendering and behavior: scale, shadows, and

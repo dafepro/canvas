@@ -6,6 +6,7 @@ import type {
 } from "@canvas-physics/core";
 import type { RoomTransport } from "../net/transport.js";
 import { PixiScene, type SceneOptions } from "../render/pixi-scene.js";
+import { FrameProfiler } from "../render/frame-profiler.js";
 import { KeyboardController } from "../input/keyboard-controller.js";
 import { PointerDragController } from "../input/pointer-drag-controller.js";
 import {
@@ -44,6 +45,11 @@ export interface CanvasRuntimeOptions {
 
 export interface RuntimeDiagnostics extends SessionDiagnostics {
   renderFps: number;
+  renderP95Ms: number;
+  renderWorstMs: number;
+  renderLongFrames: number;
+  backgroundResumes: number;
+  lastBackgroundMs: number;
 }
 
 /**
@@ -58,6 +64,11 @@ export class CanvasRuntime {
   private editor?: ItemEditController;
   private keyboard?: KeyboardController;
   private renderFps = 0;
+  private readonly frameProfiler = new FrameProfiler();
+  private hiddenAtMs?: number;
+  private backgroundResumes = 0;
+  private lastBackgroundMs = 0;
+  private skipNextFrameProfile = false;
   private running = false;
   private visibilityListener?: () => void;
   private pageHideListener?: () => void;
@@ -213,6 +224,11 @@ export class CanvasRuntime {
       const nowMs = performance.now();
       const deltaMs = scene.frameDelta(nowMs);
       this.renderFps = deltaMs > 0 ? 1000 / deltaMs : 0;
+      if (this.skipNextFrameProfile) {
+        this.skipNextFrameProfile = false;
+      } else {
+        this.frameProfiler.sample(deltaMs);
+      }
       const entities = this.session.entitiesToDraw(nowMs);
       this.latestEntities = entities;
       scene.update(entities, deltaMs);
@@ -231,10 +247,25 @@ export class CanvasRuntime {
   }
 
   private watchVisibility(): void {
-    this.visibilityListener = () => {
-      this.session.setPageVisible(document.visibilityState === "visible");
+    const applyVisibility = () => {
+      const nowMs = performance.now();
+      const visible = document.visibilityState === "visible";
+      if (!visible && this.hiddenAtMs === undefined) {
+        this.hiddenAtMs = nowMs;
+      } else if (visible && this.hiddenAtMs !== undefined) {
+        this.lastBackgroundMs = nowMs - this.hiddenAtMs;
+        this.backgroundResumes += 1;
+        this.hiddenAtMs = undefined;
+        // A suspended tab produces one huge ticker delta on resume. Record the
+        // suspension separately instead of corrupting the render percentile.
+        this.frameProfiler.reset();
+        this.skipNextFrameProfile = true;
+      }
+      this.session.setPageVisible(visible);
     };
+    this.visibilityListener = applyVisibility;
     document.addEventListener("visibilitychange", this.visibilityListener);
+    applyVisibility();
     this.pageHideListener = () => {
       void this.stopGracefully(150);
     };
@@ -264,6 +295,15 @@ export class CanvasRuntime {
   }
 
   diagnostics(): RuntimeDiagnostics {
-    return { ...this.session.diagnostics(), renderFps: this.renderFps };
+    const frames = this.frameProfiler.diagnostics();
+    return {
+      ...this.session.diagnostics(),
+      renderFps: this.renderFps,
+      renderP95Ms: frames.p95Ms,
+      renderWorstMs: frames.worstMs,
+      renderLongFrames: frames.longFrames,
+      backgroundResumes: this.backgroundResumes,
+      lastBackgroundMs: this.lastBackgroundMs,
+    };
   }
 }

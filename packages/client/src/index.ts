@@ -12,6 +12,7 @@ export * from "./render/camera.js";
 export * from "./render/pixi-scene.js";
 export * from "./render/effect-system.js";
 export * from "./render/interpolation-buffer.js";
+export * from "./render/frame-profiler.js";
 export * from "./input/pointer-drag-controller.js";
 export * from "./input/item-edit-controller.js";
 export * from "./input/keyboard-controller.js";
