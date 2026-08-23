@@ -86,6 +86,26 @@ export interface CanvasLimits {
   maxComplexPhysicsItems: number;
 }
 
+/** Canvas-owned defaults for every participant avatar in the room. */
+export interface AvatarControllerDefinition {
+  radius?: number;
+  maxSpeed?: number;
+  acceleration?: number;
+}
+
+export const defaultAvatarController: Required<AvatarControllerDefinition> = {
+  radius: 1.2,
+  maxSpeed: 18,
+  acceleration: 90,
+};
+
+export const resolveAvatarController = (
+  configured?: AvatarControllerDefinition,
+): Required<AvatarControllerDefinition> => ({
+  ...defaultAvatarController,
+  ...configured,
+});
+
 /** An immutable room-owned item materialized when no snapshot exists yet. */
 export interface SystemItemDefinition {
   entityId: string;
@@ -136,6 +156,8 @@ export interface CanvasDefinition {
   /** Baseline items owned by the room, never by the first participant. */
   systemItems: SystemItemDefinition[];
   limits: CanvasLimits;
+  /** Movement tuning shared by host simulation and local prediction. */
+  avatarController?: AvatarControllerDefinition;
   /**
    * Addendum A4. The blocking rule for every static collider that states none.
    * The library default lets an avatar pass through terrain.

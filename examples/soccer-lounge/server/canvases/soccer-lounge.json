@@ -1,6 +1,6 @@
 {
   "id": "soccer-lounge",
-  "version": 6,
+  "version": 7,
   "size": { "width": 120, "height": 80 },
   "orientation": "topDown",
   "backgroundAssetId": "soccer-field",
@@ -11,6 +11,7 @@
     "left": "solid"
   },
   "terrainDefaults": { "avatars": true, "items": true },
+  "avatarController": { "maxSpeed": 26, "acceleration": 150 },
   "staticGeometry": [
     {
       "id": "top-touchline",

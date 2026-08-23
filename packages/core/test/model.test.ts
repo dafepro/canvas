@@ -119,6 +119,23 @@ describe("validation", () => {
     expect(validateItemDefinition(rocketDefinition, new Set(["rocket"]))).toEqual({ ok: true });
   });
 
+  it("validates optional canvas-owned avatar movement tuning", () => {
+    expect(validateCanvasDefinition({
+      ...canvas,
+      avatarController: { maxSpeed: 26, acceleration: 150 },
+    })).toEqual({ ok: true });
+    expect(validateCanvasDefinition({
+      ...canvas,
+      avatarController: { maxSpeed: 0, acceleration: Number.NaN },
+    })).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([
+        expect.objectContaining({ path: "avatarController.maxSpeed" }),
+        expect.objectContaining({ path: "avatarController.acceleration" }),
+      ]),
+    });
+  });
+
   it("refuses an unknown behavior type", () => {
     const result = validateItemDefinition(rocketDefinition, new Set(["ball"]));
     expect(result.ok).toBe(false);

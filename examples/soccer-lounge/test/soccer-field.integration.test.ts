@@ -59,6 +59,7 @@ const build = () =>
 describe("soccer field integration", () => {
   it("keeps client content and authoritative server data aligned", () => {
     expect(validateCanvasDefinition(canvas)).toEqual({ ok: true });
+    expect(canvas.avatarController).toEqual({ maxSpeed: 26, acceleration: 150 });
     expect(soccerBallJson.defaultConfig).toEqual(soccerBallDefinition.defaultConfig);
     expect(soccerBallJson.behaviorType).toBe(SoccerBallBehavior.behaviorType);
     expect(soccerBallJson.visual).toEqual(soccerBallDefinition.visual);
@@ -99,6 +100,22 @@ describe("soccer field integration", () => {
     expect(ball?.visual.animations).toBeUndefined();
     expect(soccerBallDefinition.visual.animations?.hardKick).toBeDefined();
     expect(ball?.body.lockRotation).not.toBe(true);
+  });
+
+  it("applies the faster canvas-owned movement tuning to avatars", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:sprinter",
+      clientId: "client-sprinter",
+      userId: "sprinter",
+      position: { x: 42, y: 36 },
+    });
+
+    expect(simulation.world.registry.require("avatar:sprinter").avatar).toMatchObject({
+      maxSpeed: 26,
+      acceleration: 150,
+    });
+    simulation.free();
   });
 
   it("preserves ball spin after an off-centre hit", () => {

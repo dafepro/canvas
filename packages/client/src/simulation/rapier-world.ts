@@ -3,6 +3,7 @@ import {
   EnvironmentField,
   isSensorRole,
   defaultRespawnPolicy,
+  resolveAvatarController,
   resolveEdges,
   resolveTerrainBlocking,
   roleDefaultMask,
@@ -385,7 +386,8 @@ export class RapierWorld implements BehaviorHost {
   }
 
   addAvatar(spawn: AvatarSpawn): Entity {
-    const radius = spawn.radius ?? 1.2;
+    const controller = resolveAvatarController(this.canvas.avatarController);
+    const radius = spawn.radius ?? controller.radius;
     const entity: Entity = {
       id: spawn.entityId,
       kind: "avatar",
@@ -394,8 +396,8 @@ export class RapierWorld implements BehaviorHost {
         userId: spawn.userId,
         clientId: spawn.clientId,
         radius,
-        maxSpeed: spawn.maxSpeed ?? 18,
-        acceleration: spawn.acceleration ?? 90,
+        maxSpeed: spawn.maxSpeed ?? controller.maxSpeed,
+        acceleration: spawn.acceleration ?? controller.acceleration,
         lastProcessedInputSeq: 0,
         desiredDirection: { x: 0, y: 0 },
         desiredIntensity: 0,

@@ -22,10 +22,11 @@ append `&kickAnimation=0` to other flags) to hide the deformation atlas while
 testing the ball's physical rotation. The service listens on port 8082 and
 stores local state under `examples/soccer-lounge/.data`.
 
-The example selects Canvas's `avatarDrag` pointer mode: touch or click the local
-avatar and drag it toward a target. Canvas converts that target into ordinary
-movement intent, so acceleration and collisions remain authoritative rather
-than teleporting the avatar. Keyboard movement remains available.
+The example selects Canvas's relative `thumbstick` pointer mode and a faster
+canvas-owned avatar controller. Touch or click anywhere on the field, then drag
+in the direction of travel. Keyboard movement remains available. The alternate
+`avatarDrag` mode remains part of the Canvas runtime for integrations whose
+scale suits direct manipulation.
 
 Both development processes listen on all network interfaces. To join from a
 device on the same network, replace `localhost` with the development computer's

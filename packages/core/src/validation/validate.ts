@@ -27,6 +27,15 @@ export const validateCanvasDefinition = (
   if (canvas.limits.maxItems < 0) {
     problems.push({ path: "limits.maxItems", message: "must be >= 0" });
   }
+  for (const key of ["radius", "maxSpeed", "acceleration"] as const) {
+    const value = canvas.avatarController?.[key];
+    if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
+      problems.push({
+        path: `avatarController.${key}`,
+        message: "must be a positive finite number",
+      });
+    }
+  }
   const spawnIds = new Set<string>();
   canvas.spawnPoints.forEach((spawn, i) => {
     if (spawnIds.has(spawn.id)) {
