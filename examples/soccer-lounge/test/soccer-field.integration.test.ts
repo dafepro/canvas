@@ -16,7 +16,11 @@ import soccerCanvasJson from "../server/canvases/soccer-lounge.json";
 import soccerBallJson from "../server/definitions/soccer-ball.json";
 import soccerGoalJson from "../server/definitions/soccer-goal.json";
 import { SoccerBallBehavior, type SoccerBallState } from "../src/soccer-ball-behavior.js";
-import { soccerBallDefinition, soccerGoalDefinition } from "../src/soccer-content.js";
+import {
+  soccerBallDefinition,
+  soccerDefinitionsForDisplay,
+  soccerGoalDefinition,
+} from "../src/soccer-content.js";
 import { soccerAssets } from "../src/assets.js";
 
 const canvas = soccerCanvasJson as unknown as CanvasDefinition;
@@ -88,6 +92,15 @@ describe("soccer field integration", () => {
     ]);
   });
 
+  it("can disable kick deformation without disabling physical rotation", () => {
+    const definitions = soccerDefinitionsForDisplay({ kickAnimation: false });
+    const ball = definitions.find(({ definitionId }) => definitionId === "soccer-ball");
+
+    expect(ball?.visual.animations).toBeUndefined();
+    expect(soccerBallDefinition.visual.animations?.hardKick).toBeDefined();
+    expect(ball?.body.lockRotation).not.toBe(true);
+  });
+
   it("preserves ball spin after an off-centre hit", () => {
     const simulation = build();
     simulation.addItem(instance(60, 36));
@@ -96,8 +109,8 @@ describe("soccer field integration", () => {
     for (let tick = 0; tick < 12; tick++) simulation.step();
 
     const ball = simulation.world.registry.require("match-ball");
-    expect(Math.abs(ball.transform.rotation)).toBeGreaterThan(0.1);
-    expect(Math.abs(ball.rigidBody?.angularVelocity ?? 0)).toBeGreaterThan(0.1);
+    expect(ball.transform.rotation).toBeGreaterThan(0.1);
+    expect(ball.rigidBody?.angularVelocity ?? 0).toBeGreaterThan(0.1);
     simulation.free();
   });
 

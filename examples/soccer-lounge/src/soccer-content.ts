@@ -6,7 +6,7 @@ import {
 
 export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
   definitionId: "soccer-ball",
-  version: 3,
+  version: 4,
   displayName: "Match ball",
   visual: {
     spriteId: "soccer.ball.idle",
@@ -116,3 +116,22 @@ export const soccerDefinitions: ItemDefinition[] = [
   soccerGoalDefinition as ItemDefinition,
   soccerAvatarDefinition as ItemDefinition,
 ];
+
+export interface SoccerDisplayOptions {
+  /** Disable only the deformation atlas; physical ball rotation remains live. */
+  kickAnimation?: boolean;
+}
+
+export const soccerDefinitionsForDisplay = (
+  options: SoccerDisplayOptions = {},
+): ItemDefinition[] => {
+  if (options.kickAnimation !== false) return soccerDefinitions;
+  return soccerDefinitions.map((definition) =>
+    definition.definitionId === soccerBallDefinition.definitionId
+      ? {
+          ...definition,
+          visual: { ...definition.visual, animations: undefined },
+        }
+      : definition,
+  );
+};

@@ -87,9 +87,47 @@ describe("SoccerBallBehavior", () => {
     expect(h.host.body(h.entityId).velocity.x).toBeGreaterThan(0);
   });
 
+  it("turns a glancing kick into lateral motion and matching clockwise spin", () => {
+    const h = harness();
+    h.host.body(h.entityId).transform = { x: 50, y: 40, rotation: 0 };
+    h.host.body("avatar-1", { x: 50, y: 37 }).velocity = { x: 6, y: 8 };
+
+    h.send({
+      type: "contact.enter",
+      selfColliderId: "kick",
+      other: avatarParty("avatar-1"),
+    }).flush();
+
+    const [impulse] = h.commands("applyImpulse");
+    expect(impulse?.impulse.x).toBeGreaterThan(0);
+    expect(impulse?.impulse.y).toBeGreaterThan(0);
+    expect(h.commands("setVelocity")).toEqual([
+      expect.objectContaining({ angularVelocity: expect.any(Number) }),
+    ]);
+    expect(h.host.body(h.entityId).angularVelocity).toBeGreaterThan(0);
+  });
+
+  it("reverses spin for the mirrored glancing kick and caps angular speed", () => {
+    const h = harness();
+    h.host.body(h.entityId).transform = { x: 50, y: 40, rotation: 0 };
+    h.host.body(h.entityId).angularVelocity = -defaultSoccerBallConfig.maxAngularSpeed + 0.1;
+    h.host.body("avatar-1", { x: 50, y: 43 }).velocity = { x: 20, y: -8 };
+
+    h.send({
+      type: "contact.enter",
+      selfColliderId: "kick",
+      other: avatarParty("avatar-1"),
+    }).flush();
+
+    expect(h.host.body(h.entityId).angularVelocity).toBe(
+      -defaultSoccerBallConfig.maxAngularSpeed,
+    );
+  });
+
   it("scores for away while physics continues, then resets at centre", () => {
     const h = harness();
     h.host.body(h.entityId).velocity = { x: -9, y: 1 };
+    h.host.body(h.entityId).angularVelocity = 7;
 
     h.send({
       type: "region.enter",
@@ -107,6 +145,7 @@ describe("SoccerBallBehavior", () => {
     expect(h.host.body(h.entityId).mode).toBe("dynamic");
     expect(h.host.body(h.entityId).transform).toMatchObject({ x: 60, y: 36 });
     expect(h.host.body(h.entityId).velocity).toEqual({ x: 0, y: 0 });
+    expect(h.host.body(h.entityId).angularVelocity).toBe(0);
   });
 
   it("does not count another region event during the same goal", () => {

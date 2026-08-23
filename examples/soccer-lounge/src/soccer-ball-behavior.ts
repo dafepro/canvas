@@ -14,6 +14,11 @@ export interface SoccerBallConfig {
   sensorId: string;
   kickStrength: number;
   maxImpulse: number;
+  tangentialStrength: number;
+  maxTangentialImpulse: number;
+  spinTransfer: number;
+  spinRadius: number;
+  maxAngularSpeed: number;
   cooldownSeconds: number;
   resetSeconds: number;
   centre: Vec2;
@@ -34,6 +39,11 @@ export const defaultSoccerBallConfig: SoccerBallConfig = {
   sensorId: "kick",
   kickStrength: 1.7,
   maxImpulse: 24,
+  tangentialStrength: 0.35,
+  maxTangentialImpulse: 5,
+  spinTransfer: 0.8,
+  spinRadius: 3,
+  maxAngularSpeed: 12,
   cooldownSeconds: 0.2,
   resetSeconds: 1.5,
   centre: { x: 60, y: 36 },
@@ -63,6 +73,7 @@ const resetBall = (
   state: { ...state, phase: "playing", cooldownUntil: [] },
   commands: [
     { type: "teleport", position: centre, velocity: { x: 0, y: 0 }, rotation: 0 },
+    { type: "setVelocity", angularVelocity: 0 },
     { type: "setBodyMode", mode: "dynamic" },
   ],
 });
@@ -146,9 +157,31 @@ export const SoccerBallBehavior: ItemBehavior<SoccerBallConfig, SoccerBallState>
     const normal = normalize(sub(ball, avatar));
     const avatarVelocity = ctx.velocity(event.other.entityId) ?? { x: 0, y: 0 };
     const ballVelocity = ctx.velocity() ?? { x: 0, y: 0 };
-    const closingSpeed = Math.max(0, dot(sub(avatarVelocity, ballVelocity), normal));
+    const relativeVelocity = sub(avatarVelocity, ballVelocity);
+    const closingSpeed = Math.max(0, dot(relativeVelocity, normal));
     const magnitude = clamp(config.kickStrength * closingSpeed, 0, config.maxImpulse);
     if (magnitude === 0) return { state: state as SoccerBallState, commands: [] };
+
+    // In screen/world coordinates +Y points down. This tangent is clockwise
+    // from the contact normal, so negating its relative speed produces the
+    // visually matching Pixi/Rapier rotation sign.
+    const tangent = { x: -normal.y, y: normal.x };
+    const tangentialSpeed = dot(relativeVelocity, tangent);
+    const tangentialMagnitude = clamp(
+      config.tangentialStrength * tangentialSpeed,
+      -config.maxTangentialImpulse,
+      config.maxTangentialImpulse,
+    );
+    const impulse = {
+      x: normal.x * magnitude + tangent.x * tangentialMagnitude,
+      y: normal.y * magnitude + tangent.y * tangentialMagnitude,
+    };
+    const angularVelocity = clamp(
+      (ctx.angularVelocity() ?? 0) -
+        (tangentialSpeed / config.spinRadius) * config.spinTransfer,
+      -config.maxAngularSpeed,
+      config.maxAngularSpeed,
+    );
 
     return {
       state: {
@@ -163,8 +196,11 @@ export const SoccerBallBehavior: ItemBehavior<SoccerBallConfig, SoccerBallState>
       commands: [
         {
           type: "applyImpulse",
-          impulse: { x: normal.x * magnitude, y: normal.y * magnitude },
+          impulse,
         },
+        ...(Math.abs(tangentialSpeed) > 0.001
+          ? [{ type: "setVelocity" as const, angularVelocity }]
+          : []),
         { type: "startAnimation", animation: "hardKick", loop: false },
         { type: "emitEffect", effect: "kickPuff", params: { magnitude } },
       ],

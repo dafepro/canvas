@@ -4,15 +4,19 @@ import type {
   OverlayProjectionSnapshot,
   ParticipantPresence,
 } from "@canvas-physics/client/runtime";
-import { soccerDefinitions } from "./soccer-content.js";
+import { soccerDefinitionsForDisplay } from "./soccer-content.js";
 import type { SoccerBallState } from "./soccer-ball-behavior.js";
 import { soccerAssets } from "./assets.js";
 import { projectSoccerParticipantAvatar } from "./participant-projection.js";
 import { playerStarCount } from "./player-overlay.js";
 import "./style.css";
 
+const searchParams = new URLSearchParams(location.search);
 const serverUrl =
   import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:8082`;
+const soccerDefinitions = soccerDefinitionsForDisplay({
+  kickAnimation: searchParams.get("kickAnimation") !== "0",
+});
 
 const stage = document.querySelector<HTMLElement>("#stage")!;
 const userInput = document.querySelector<HTMLInputElement>("#user")!;
@@ -26,10 +30,12 @@ const participantCount = document.querySelector<HTMLElement>("#participant-count
 const scoreBoard = document.querySelector<HTMLElement>("#scoreboard")!;
 const ballMarker = document.querySelector<HTMLElement>("#ball-marker")!;
 const playerOverlayLayer = document.querySelector<HTMLElement>("#player-overlays")!;
-const showProjectionOverlay = new URLSearchParams(location.search).has("overlay");
+const spinTestMode = document.querySelector<HTMLElement>("#spin-test-mode")!;
+const showProjectionOverlay = searchParams.has("overlay");
+spinTestMode.hidden = searchParams.get("kickAnimation") !== "0";
 
 userInput.value =
-  new URLSearchParams(location.search).get("user") ??
+  searchParams.get("user") ??
   `player-${Math.random().toString(36).slice(2, 6)}`;
 
 let runtime: CanvasRuntime | undefined;
@@ -122,7 +128,7 @@ const join = async (): Promise<void> => {
       projectParticipantAvatar: projectSoccerParticipantAvatar,
       scene: {
         background: 0x165c31,
-        debug: new URLSearchParams(location.search).has("debug"),
+        debug: searchParams.has("debug"),
       },
       onAssetProgress: ({ loaded, total }) => {
         status.textContent = `Loading lounge art… ${loaded}/${total}`;
@@ -219,4 +225,4 @@ joinButton.addEventListener("click", () => void join());
 leaveButton.addEventListener("click", leave);
 benchButton.addEventListener("click", () => runtime?.toggleAvatarDisabled());
 
-if (new URLSearchParams(location.search).has("autojoin")) void join();
+if (searchParams.has("autojoin")) void join();

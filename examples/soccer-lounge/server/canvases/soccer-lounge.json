@@ -1,6 +1,6 @@
 {
   "id": "soccer-lounge",
-  "version": 4,
+  "version": 5,
   "size": { "width": 120, "height": 80 },
   "orientation": "topDown",
   "backgroundAssetId": "soccer-field",
@@ -154,12 +154,17 @@
     {
       "entityId": "match-ball",
       "definitionId": "soccer-ball",
-      "definitionVersion": 3,
+      "definitionVersion": 4,
       "transform": { "x": 60, "y": 36, "rotation": 0 },
       "resolvedConfig": {
         "sensorId": "kick",
         "kickStrength": 1.7,
         "maxImpulse": 24,
+        "tangentialStrength": 0.35,
+        "maxTangentialImpulse": 5,
+        "spinTransfer": 0.8,
+        "spinRadius": 3,
+        "maxAngularSpeed": 12,
         "cooldownSeconds": 0.2,
         "resetSeconds": 1.5,
         "centre": { "x": 60, "y": 36 },

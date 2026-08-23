@@ -62,6 +62,13 @@ Two immutable goal system items reuse one transparent net texture, with the
 opposing goal expressed by a 180-degree item transform. Net drag, score zones,
 and rear boundaries remain canvas configuration rather than renderer logic.
 
+Glancing avatar contacts split relative velocity into normal and tangential
+components. The soccer behavior—not Canvas core—configures lateral impulse
+transfer, spin transfer, effective ball radius, and an angular-speed cap. This
+keeps sports feel product-tunable while reusing generic behavior commands. The
+`?kickAnimation=0` test mode removes only the deformation atlas so physical
+rotation direction can be reviewed without visual noise.
+
 With `?overlay=1`, the opt-in DOM `Match ball` marker uses the bounded
 overlay-projection subscription at 10 Hz. It demonstrates that a product can
 align HTML with an interpolated entity without reaching into Pixi, observing
