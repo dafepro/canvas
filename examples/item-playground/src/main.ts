@@ -24,6 +24,9 @@ const ownedList = document.querySelector<HTMLElement>("#owned-list")!;
 const ownershipLayer = document.querySelector<HTMLElement>("#ownership-layer")!;
 const editToolbar = document.querySelector<HTMLElement>("#edit-toolbar")!;
 const colorTools = document.querySelector<HTMLElement>("#color-tools")!;
+const moreToggle = document.querySelector<HTMLButtonElement>("#more-toggle")!;
+const moreMenu = document.querySelector<HTMLElement>("#more-menu")!;
+const finishEdit = document.querySelector<HTMLButtonElement>("#finish-edit")!;
 const connectionStatus = document.querySelector<HTMLElement>("#connection-status")!;
 const actionStatus = document.querySelector<HTMLElement>("#action-status")!;
 const rotateLeft = document.querySelector<HTMLButtonElement>("#rotate-left")!;
@@ -74,6 +77,11 @@ const closePopovers = (except?: HTMLElement): void => {
   }
 };
 
+const closeMoreMenu = (): void => {
+  moreMenu.hidden = true;
+  moreToggle.setAttribute("aria-expanded", "false");
+};
+
 const togglePopover = (button: HTMLButtonElement, panel: HTMLElement): void => {
   const open = panel.hidden;
   closePopovers(panel);
@@ -109,6 +117,7 @@ const renderOwnedList = (): void => {
       button.innerHTML = `<span>${definition?.displayName ?? entity.definitionId}</span><small>${entity.isolated ? "paused" : "live"}</small>`;
       button.addEventListener("click", () => {
         selectedEntityId = entity.id;
+        closeMoreMenu();
         closePopovers();
         lastManageSignature = "";
         renderOwnedList();
@@ -135,6 +144,7 @@ const observeState = (snapshot: CanonicalStateSnapshot): void => {
   }
   if (selectedEntityId && !entities.some(({ id }) => id === selectedEntityId)) {
     selectedEntityId = undefined;
+    closeMoreMenu();
   }
   if (pendingAfterRevision !== undefined && snapshot.sceneRevision > pendingAfterRevision) {
     pendingAfterRevision = undefined;
@@ -184,21 +194,22 @@ const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => 
   const projection = snapshot.entities.find(({ entityId }) => entityId === entity?.id);
   if (!entity || !projection || !isOwned(entity) || !projection.visible) {
     editToolbar.hidden = true;
+    closeMoreMenu();
     return;
   }
   editToolbar.hidden = false;
   editToolbar.style.left = `${projection.screen.x}px`;
   const definition = definitionById.get(entity.definitionId);
-  const halfHeight =
-    ((definition?.visual.size.height ?? 3) *
-      (entity.scale ?? 1) *
-      snapshot.viewport.scale) /
-    2;
-  editToolbar.style.top = `${Math.max(52, projection.screen.y - halfHeight - 9)}px`;
-  editToolbar.classList.toggle("below", projection.screen.y - halfHeight < 100);
+  const visualScale = (entity.scale ?? 1) * snapshot.viewport.scale;
+  editToolbar.style.top = `${projection.screen.y}px`;
+  editToolbar.style.width = `${(definition?.visual.size.width ?? 3) * visualScale}px`;
+  editToolbar.style.height = `${(definition?.visual.size.height ?? 3) * visualScale}px`;
   colorTools.hidden = !editableColors.has(entity.definitionId);
   isolateButton.classList.toggle("active", entity.isolated === true);
-  isolateButton.textContent = entity.isolated ? "▶" : "◌";
+  isolateButton.querySelector("b")!.textContent = entity.isolated ? "▶" : "◌";
+  isolateButton.querySelector("span")!.textContent = entity.isolated
+    ? "Resume simulation"
+    : "Pause simulation";
   isolateButton.setAttribute(
     "aria-label",
     entity.isolated ? "Resume physics" : "Pause physics while editing",
@@ -238,6 +249,7 @@ const join = async (): Promise<void> => {
       pointer: { mode: "thumbstick", deadZonePx: 4, fullRangePx: 60 },
       onEditSelectionChange: ({ selectedEntityId: id }) => {
         selectedEntityId = id;
+        closeMoreMenu();
         lastManageSignature = "";
         renderOwnedList();
       },
@@ -303,6 +315,7 @@ const leave = (): void => {
   closePopovers();
   entities = [];
   selectedEntityId = undefined;
+  closeMoreMenu();
   ownershipLayer.replaceChildren();
   editToolbar.hidden = true;
   lastManageSignature = "";
@@ -321,10 +334,23 @@ manageToggle.addEventListener("click", (event) => {
 });
 spawnPopover.addEventListener("click", (event) => event.stopPropagation());
 managePopover.addEventListener("click", (event) => event.stopPropagation());
-document.addEventListener("click", () => closePopovers());
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closePopovers();
+document.addEventListener("click", () => {
+  closePopovers();
+  closeMoreMenu();
 });
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closePopovers();
+    closeMoreMenu();
+  }
+});
+moreToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const open = moreMenu.hidden;
+  moreMenu.hidden = !open;
+  moreToggle.setAttribute("aria-expanded", String(open));
+});
+moreMenu.addEventListener("click", (event) => event.stopPropagation());
 
 paletteButtons.forEach((button) =>
   button.addEventListener("click", () => {
@@ -393,6 +419,27 @@ deleteButton.addEventListener("click", () => {
   const entity = selectedEntity();
   if (!entity) return;
   requestMutation("Deleting…", () => runtime!.deleteItem(entity.id));
+  selectedEntityId = undefined;
+  closeMoreMenu();
+  editToolbar.hidden = true;
+  lastManageSignature = "";
+  renderOwnedList();
+});
+finishEdit.addEventListener("click", () => {
+  const entity = selectedEntity();
+  if (entity?.isolated) {
+    requestMutation("Finished · returning item to live simulation…", () =>
+      runtime!.setItemIsolation(entity.id, false),
+    );
+  } else {
+    actionStatus.textContent = "Finished editing · item remains live";
+    actionStatus.dataset.kind = "accepted";
+  }
+  selectedEntityId = undefined;
+  closeMoreMenu();
+  editToolbar.hidden = true;
+  lastManageSignature = "";
+  renderOwnedList();
 });
 joinButton.addEventListener("click", () => void join());
 leaveButton.addEventListener("click", leave);

@@ -37,6 +37,11 @@ controls are local DOM overlays, so another participant receives the canonical
 item updates but not the editor's private UI state. The server remains the
 authority even though this consumer chooses to list only editable items.
 
+Direct manipulation controls surround the selected item: scale above,
+rotation at each side, and More/delete/finish below. More contains only the
+controls relevant to that item. The example's avatar skin is also supplied
+through the same consumer asset manifest as its item artwork.
+
 Editing never changes the room into a separate mode. A room-owned gold ball
 bounces continuously while item controls are open. Consumers may explicitly
 isolate an owned item while manipulating it; Canvas then preserves its pose and

@@ -177,6 +177,7 @@ export const playgroundAvatarDefinition: ItemDefinition<Record<string, never>> =
   version: 1,
   displayName: "Playground visitor",
   visual: {
+    spriteId: "playground.avatar.maker",
     size: { width: 2.6, height: 2.6 },
     placeholder: { shape: "circle", color: 0xffffff },
     zIndex: 10,

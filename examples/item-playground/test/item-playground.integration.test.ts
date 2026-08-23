@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { validateCanvasDefinition, type CanvasDefinition } from "@canvas-physics/core";
 import { BehaviorTestHarness } from "@canvas-physics/core/testing";
 import { validateAssetReferences } from "@canvas-physics/client";
@@ -12,6 +13,7 @@ import colorTileJson from "../server/definitions/color-tile.json";
 import { playgroundAssets } from "../src/assets.js";
 import {
   playgroundDefinitions,
+  playgroundAvatarDefinition,
   reactiveOrbDefinition,
 } from "../src/content.js";
 import {
@@ -61,6 +63,17 @@ describe("compact item playground", () => {
     }
 
     expect(validateAssetReferences(playgroundAssets, canvas, playgroundDefinitions)).toEqual([]);
+    expect(playgroundAvatarDefinition.visual.spriteId).toBe("playground.avatar.maker");
+  });
+
+  it("keeps direct manipulation controls around the selected item", () => {
+    const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    expect(html).toContain('class="scale-tools"');
+    expect(html).toContain('class="rotate-control rotate-left"');
+    expect(html).toContain('class="rotate-control rotate-right"');
+    expect(html).toContain('id="more-toggle"');
+    expect(html).toContain('id="finish-edit"');
+    expect(html).toContain('aria-label="Delete item"');
   });
 
   it("applies configured color and plays an effect on avatar contact", () => {

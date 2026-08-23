@@ -48,18 +48,27 @@
 
           <div id="ownership-layer" class="ownership-layer" aria-hidden="true"></div>
           <div id="edit-toolbar" class="edit-toolbar" hidden>
-            <div id="color-tools" class="color-tools" hidden>
-              <button data-color="mint" aria-label="Make mint" title="Mint"><i class="mint"></i></button>
-              <button data-color="coral" aria-label="Make coral" title="Coral"><i class="coral"></i></button>
-              <button data-color="violet" aria-label="Make violet" title="Violet"><i class="violet"></i></button>
-            </div>
-            <div class="edit-actions">
-              <button id="rotate-left" aria-label="Rotate left" title="Rotate left">↶</button>
-              <button id="rotate-right" aria-label="Rotate right" title="Rotate right">↷</button>
+            <div class="scale-tools">
               <button id="scale-down" aria-label="Make smaller" title="Make smaller">−</button>
               <button id="scale-up" aria-label="Make larger" title="Make larger">＋</button>
-              <button id="isolate" aria-label="Pause physics while editing" title="Pause physics, collision, and behavior">◌</button>
-              <button id="delete" class="danger" aria-label="Delete item" title="Delete">⌫</button>
+            </div>
+            <button id="rotate-left" class="rotate-control rotate-left" aria-label="Rotate left" title="Rotate left">↶</button>
+            <button id="rotate-right" class="rotate-control rotate-right" aria-label="Rotate right" title="Rotate right">↷</button>
+            <div class="bottom-tools">
+              <div class="more-wrap">
+                <button id="more-toggle" aria-label="More item controls" title="More controls" aria-expanded="false" aria-controls="more-menu">•••</button>
+                <div id="more-menu" class="more-menu" hidden>
+                  <div id="color-tools" class="color-tools" hidden>
+                    <span>Color</span>
+                    <button data-color="mint" aria-label="Make mint" title="Mint"><i class="mint"></i></button>
+                    <button data-color="coral" aria-label="Make coral" title="Coral"><i class="coral"></i></button>
+                    <button data-color="violet" aria-label="Make violet" title="Violet"><i class="violet"></i></button>
+                  </div>
+                  <button id="isolate" class="menu-action" aria-label="Pause physics while editing" title="Pause physics, collision, and behavior"><b>◌</b><span>Pause simulation</span></button>
+                </div>
+              </div>
+              <button id="delete" class="danger" aria-label="Delete item" title="Delete">×</button>
+              <button id="finish-edit" class="finish" aria-label="Finish editing" title="Finish editing">✓</button>
             </div>
           </div>
 

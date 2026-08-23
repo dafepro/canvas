@@ -111,28 +111,96 @@ button:hover:not(:disabled) { border-color: #536c8e; background: #f4f8fd; }
 .edit-toolbar {
   position: absolute;
   z-index: 18;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+.edit-toolbar[hidden], .color-tools[hidden], .more-menu[hidden], .popover[hidden] { display: none; }
+.edit-toolbar button { pointer-events: auto; }
+.scale-tools {
+  position: absolute;
+  top: -38px;
+  left: 50%;
+  display: flex;
+  gap: 5px;
+  translate: -50% 0;
+}
+.scale-tools button {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #182d49;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px #fff, 1px 0 #fff, 0 -1px #fff, -1px 0 #fff;
+}
+.scale-tools button:hover:not(:disabled) { border: 0; border-radius: 50%; background: rgb(255 255 255 / 72%); }
+.rotate-control {
+  position: absolute;
+  top: 50%;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 4px 13px rgb(24 42 64 / 24%);
+  color: #203653;
+  font-size: 21px;
+  translate: 0 -50%;
+}
+.rotate-left { left: -42px; }
+.rotate-right { right: -42px; }
+.bottom-tools {
+  position: absolute;
+  bottom: -43px;
+  left: 50%;
+  display: flex;
+  gap: 6px;
+  translate: -50% 0;
+}
+.bottom-tools > button,
+.bottom-tools > .more-wrap > button {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 4px 13px rgb(24 42 64 / 25%);
+  font-size: 18px;
+  font-weight: 850;
+}
+.more-wrap { position: relative; pointer-events: auto; }
+#more-toggle { background: #fff; color: #263a56; font-size: 13px; letter-spacing: -1px; }
+.bottom-tools .danger { background: #e6535f; color: #fff; }
+.bottom-tools .finish { background: #27ad75; color: #fff; }
+.more-menu {
+  position: absolute;
+  top: 39px;
+  left: 50%;
+  width: 184px;
   display: grid;
-  gap: 4px;
-  translate: -50% -100%;
-  padding: 5px;
-  border: 1px solid rgb(25 43 65 / 35%);
+  gap: 7px;
+  translate: -50% 0;
+  padding: 9px;
+  border: 1px solid #aebccd;
   border-radius: 11px;
-  background: rgb(249 252 255 / 96%);
-  box-shadow: 0 8px 24px rgb(22 38 58 / 27%);
+  background: rgb(252 254 255 / 97%);
+  box-shadow: 0 12px 28px rgb(24 42 64 / 26%);
   pointer-events: auto;
 }
-.edit-toolbar.below { translate: -50% 0; }
-.edit-toolbar[hidden], .color-tools[hidden], .popover[hidden] { display: none; }
-.edit-actions, .color-tools { display: flex; gap: 3px; }
-.edit-toolbar button { width: 30px; min-height: 29px; padding: 2px; border-radius: 7px; font-size: 15px; font-weight: 800; }
-.edit-toolbar button.active { border-color: #5e46ba; background: #ece7ff; color: #4f37a6; }
-.edit-toolbar .danger { border-color: #d6a4aa; color: #a52939; }
-.color-tools { justify-content: center; padding-bottom: 4px; border-bottom: 1px solid #d6deea; }
-.color-tools button { display: grid; place-items: center; }
+.color-tools { display: grid; grid-template-columns: 1fr repeat(3, 29px); align-items: center; gap: 4px; padding-bottom: 7px; border-bottom: 1px solid #d6deea; }
+.color-tools > span { color: #68778c; font-size: 9px; font-weight: 750; }
+.color-tools button { width: 28px; min-height: 28px; display: grid; place-items: center; padding: 0; border-radius: 7px; }
 .color-tools i { width: 17px; height: 17px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #8d9aae; }
 .color-tools .mint { background: #67dfc0; }
 .color-tools .coral { background: #ff7d72; }
 .color-tools .violet { background: #9d7bea; }
+.menu-action { width: 100%; min-height: 34px; display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 8px; font-size: 9px; font-weight: 750; }
+.menu-action b { width: 20px; font-size: 17px; }
+.menu-action.active { border-color: #5e46ba; background: #ece7ff; color: #4f37a6; }
 
 .live-proof { position: absolute; z-index: 7; top: 14px; right: 14px; padding: 6px 9px; border-radius: 999px; background: rgb(25 40 61 / 79%); color: white; font-size: 9px; font-weight: 700; pointer-events: none; }
 .live-proof span { color: #f7d74b; }
