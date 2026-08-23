@@ -38,10 +38,9 @@ The first runnable slice must prove:
    the goal, and resets it to center after a configured delay.
 5. A late joiner derives the same scoreboard from canonical behavior state.
 
-Two requirements depend on generic APIs rather than soccer-specific shortcuts:
+One requirement still depends on a generic API rather than a soccer-specific
+shortcut:
 
-- A system-owned room-template item API must create exactly one match ball.
-  Until it exists, the example exposes an explicit host/user spawn control.
 - A stable participant lifecycle projection must retain offline product members
   after their realtime peer disappears. Zoomigo can then map inactive members
   to a bench without Canvas learning about teams or benches.
@@ -49,3 +48,7 @@ Two requirements depend on generic APIs rather than soccer-specific shortcuts:
 The example's SVG overlay is deliberately product-owned. It will adopt the
 versioned asset manifest and preload gate when that generic Priority 1 contract
 is available.
+
+The canvas definition's `systemItems` materializes exactly one match ball on a
+new room. System items have no participant owner and reject participant move,
+configuration, rotation, and delete commands.

@@ -177,6 +177,7 @@
       }
     }
   ],
+  "systemItems": [],
   "limits": {
     "maxAvatars": 20,
     "maxItems": 50,

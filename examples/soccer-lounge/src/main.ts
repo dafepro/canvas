@@ -15,7 +15,6 @@ const stage = document.querySelector<HTMLElement>("#stage")!;
 const userInput = document.querySelector<HTMLInputElement>("#user")!;
 const joinButton = document.querySelector<HTMLButtonElement>("#join")!;
 const leaveButton = document.querySelector<HTMLButtonElement>("#leave")!;
-const ballButton = document.querySelector<HTMLButtonElement>("#place-ball")!;
 const benchButton = document.querySelector<HTMLButtonElement>("#bench")!;
 const homeScore = document.querySelector<HTMLElement>("#home-score")!;
 const awayScore = document.querySelector<HTMLElement>("#away-score")!;
@@ -43,8 +42,6 @@ const observeEntities = (snapshot: CanonicalStateSnapshot): void => {
       .filter((entity) => entity.kind === "item" && entity.definitionId === "soccer-ball")
       .map((entity) => entity.id),
   );
-  ballButton.disabled = ballIds.size > 0;
-  ballButton.textContent = ballIds.size > 0 ? "Match ball is live" : "Place match ball";
 };
 
 const join = async (): Promise<void> => {
@@ -100,7 +97,6 @@ const join = async (): Promise<void> => {
     await nextRuntime.start();
     leaveButton.disabled = false;
     benchButton.disabled = false;
-    ballButton.disabled = false;
   } catch (error) {
     runtime = undefined;
     nextRuntime.stop();
@@ -121,7 +117,6 @@ const leave = (): void => {
     joinButton.disabled = false;
   });
   leaveButton.disabled = true;
-  ballButton.disabled = true;
   benchButton.disabled = true;
   status.textContent = "Not connected";
   participantCount.textContent = "0";
@@ -129,9 +124,6 @@ const leave = (): void => {
 
 joinButton.addEventListener("click", () => void join());
 leaveButton.addEventListener("click", leave);
-ballButton.addEventListener("click", () => {
-  runtime?.spawnItem("soccer-ball", { x: 60, y: 36 });
-});
 benchButton.addEventListener("click", () => runtime?.toggleAvatarDisabled());
 
 if (new URLSearchParams(location.search).has("autojoin")) void join();

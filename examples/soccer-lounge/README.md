@@ -20,9 +20,9 @@ Open <http://localhost:5174>. Add `?autojoin=1&user=alex` to join immediately,
 or `?debug=1` to inspect the collision geometry. The service listens on port
 8082 and stores local state under `examples/soccer-lounge/.data`.
 
-The first participant must use **Place match ball**. Exactly-once,
-system-owned room bootstrap is intentionally not approximated in application
-code; it is tracked as a generic library gap in `docs/GAPS.md`.
+The room template materializes one system-owned match ball exactly once when no
+snapshot exists. Participants can kick it but cannot move, reconfigure, rotate,
+or delete it through durable authoring commands.
 
 Run its focused checks with:
 

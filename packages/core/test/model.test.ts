@@ -38,6 +38,7 @@ const canvas: CanvasDefinition = {
   regions: [],
   environment: { base: { gravityXY: { x: 0, y: 20 }, linearDrag: 0.1 } },
   spawnPoints: [{ id: "centre", position: { x: 50, y: 35 } }],
+  systemItems: [],
   limits: { maxAvatars: 20, maxItems: 50, maxComplexPhysicsItems: 5 },
 };
 
@@ -159,6 +160,27 @@ describe("validation", () => {
       resolvedConfig: {},
     }));
     expect(validateSnapshot(snapshot, canvas).ok).toBe(false);
+  });
+
+  it("refuses duplicate or out-of-bounds system items", () => {
+    const item = {
+      entityId: "match-ball",
+      definitionId: "ball",
+      definitionVersion: 1,
+      transform: { x: 101, y: 35, rotation: 0 },
+      resolvedConfig: {},
+    };
+    const result = validateCanvasDefinition({
+      ...canvas,
+      systemItems: [item, item],
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([
+        expect.objectContaining({ path: "systemItems[0].transform" }),
+        expect.objectContaining({ path: "systemItems[1].entityId" }),
+      ]),
+    });
   });
 
   it("refuses invalid active timer state in a snapshot", () => {

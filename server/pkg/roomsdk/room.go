@@ -3,6 +3,7 @@ package roomsdk
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -96,6 +97,9 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 		}
 	} else {
 		room.snapshot = emptySnapshot(canvasID, shape.Version, server.cfg.Now())
+		if err := room.bootstrapSystemItems(); err != nil {
+			return nil, err
+		}
 		raw, err := json.Marshal(room.snapshot)
 		if err != nil {
 			return nil, err
@@ -104,6 +108,56 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 	}
 	room.indexItems()
 	return room, nil
+}
+
+func (r *Room) bootstrapSystemItems() error {
+	if len(r.canvasShape.SystemItems) > r.canvasShape.Limits.MaxItems {
+		return fmt.Errorf("system item count exceeds canvas limit")
+	}
+	seen := make(map[string]struct{}, len(r.canvasShape.SystemItems))
+	complexItems := 0
+	for _, template := range r.canvasShape.SystemItems {
+		if template.EntityID == "" {
+			return fmt.Errorf("system item entity id is required")
+		}
+		if _, duplicate := seen[template.EntityID]; duplicate {
+			return fmt.Errorf("duplicate system item entity id %q", template.EntityID)
+		}
+		seen[template.EntityID] = struct{}{}
+		definition, err := r.itemDefinition(template.DefinitionID)
+		if err != nil {
+			return fmt.Errorf("load system item %q definition: %w", template.EntityID, err)
+		}
+		if definition.Version != template.DefinitionVersion {
+			return fmt.Errorf("system item %q definition version mismatch", template.EntityID)
+		}
+		if err := validateConfigJSON(definition.ConfigSchema, template.ResolvedConfig); err != nil {
+			return fmt.Errorf("system item %q config: %w", template.EntityID, err)
+		}
+		if !template.Transform.finite() || !r.insideCanvas(template.Transform) {
+			return fmt.Errorf("system item %q transform is invalid", template.EntityID)
+		}
+		if definition.Complexity == ItemComplexityComplex {
+			complexItems++
+			if r.canvasShape.Limits.MaxComplexPhysicsItems > 0 &&
+				complexItems > r.canvasShape.Limits.MaxComplexPhysicsItems {
+				return fmt.Errorf("system complex item count exceeds canvas limit")
+			}
+		}
+		r.snapshot.Items = append(r.snapshot.Items, SnapshotItem{
+			EntityID:          template.EntityID,
+			DefinitionID:      template.DefinitionID,
+			DefinitionVersion: template.DefinitionVersion,
+			OwnerUserID:       "",
+			Transform:         template.Transform,
+			ResolvedConfig:    append(json.RawMessage(nil), template.ResolvedConfig...),
+		})
+	}
+	if len(r.snapshot.Items) > 0 {
+		r.sceneRevision = 1
+		r.snapshot.SceneRevision = 1
+	}
+	return nil
 }
 
 func (r *Room) itemDefinition(definitionID string) (ItemDefinitionRecord, error) {

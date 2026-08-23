@@ -89,6 +89,7 @@ export const rocketCanvas: CanvasDefinition = {
     { id: "centre", position: { x: 50, y: 62 } },
     { id: "pad", position: { x: 70, y: 62 } },
   ],
+  systemItems: [],
   limits: { maxAvatars: 20, maxItems: 50, maxComplexPhysicsItems: 5 },
 };
 

@@ -60,6 +60,17 @@ type CanvasSnapshot struct {
 	Items              []SnapshotItem `json:"items"`
 }
 
+// SystemItemTemplate is an item owned by the room rather than a participant.
+// An empty OwnerUserID in the materialized snapshot makes it immutable through
+// participant durable commands.
+type SystemItemTemplate struct {
+	EntityID          string          `json:"entityId"`
+	DefinitionID      string          `json:"definitionId"`
+	DefinitionVersion uint32          `json:"definitionVersion"`
+	Transform         Transform       `json:"transform"`
+	ResolvedConfig    json.RawMessage `json:"resolvedConfig"`
+}
+
 func emptySnapshot(canvasID string, canvasVersion uint32, now time.Time) CanvasSnapshot {
 	return CanvasSnapshot{
 		SchemaVersion: 1,
@@ -85,6 +96,7 @@ type canvasShape struct {
 		MaxItems               int `json:"maxItems"`
 		MaxComplexPhysicsItems int `json:"maxComplexPhysicsItems"`
 	} `json:"limits"`
+	SystemItems []SystemItemTemplate `json:"systemItems"`
 }
 
 func parseCanvasShape(raw json.RawMessage) (canvasShape, error) {

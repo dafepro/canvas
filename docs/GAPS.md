@@ -15,7 +15,7 @@ downward. Check an item only after the relevant focused tests pass.
 - [x] Exercise every reference integration from clean installs of packed Canvas
   artifacts so examples detect accidental internal imports and missing release
   files.
-- [ ] Add a server bootstrap API for system-owned template items so a room can
+- [x] Add a server bootstrap API for system-owned template items so a room can
   contain exactly one canonical match ball without a user-owned spawn race.
 - [ ] Add stable participant identity and lifecycle projection so a product can
   retain disconnected roster members, deactivate their physics entities, and
@@ -54,7 +54,8 @@ work below because they determine the public boundary every consumer will use.
   not download Canvas.
 - [ ] Distinguish stable authenticated participant identity from ephemeral
   connection and physics-entity IDs.
-- [ ] Provide dynamic room-template and system-owned item bootstrap APIs.
+- [ ] Provide dynamic room-template selection APIs. Static definitions now
+  bootstrap validated system-owned items exactly once for a new room.
 - [ ] Define start, stop, reconnect, remount, background, and route-unmount
   lifecycle behavior with a typed consumer error model.
 - [ ] Provide renderer-safe projection and bounded overlay observation helpers.

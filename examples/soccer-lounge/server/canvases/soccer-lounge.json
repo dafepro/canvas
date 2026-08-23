@@ -114,6 +114,24 @@
     { "id": "centre", "position": { "x": 60, "y": 36 } },
     { "id": "bench", "position": { "x": 60, "y": 74 } }
   ],
+  "systemItems": [
+    {
+      "entityId": "match-ball",
+      "definitionId": "soccer-ball",
+      "definitionVersion": 1,
+      "transform": { "x": 60, "y": 36, "rotation": 0 },
+      "resolvedConfig": {
+        "sensorId": "kick",
+        "kickStrength": 1.7,
+        "maxImpulse": 24,
+        "cooldownSeconds": 0.2,
+        "resetSeconds": 1.5,
+        "centre": { "x": 60, "y": 36 },
+        "homeGoalTag": "rightGoal",
+        "awayGoalTag": "leftGoal"
+      }
+    }
+  ],
   "limits": {
     "maxAvatars": 20,
     "maxItems": 4,

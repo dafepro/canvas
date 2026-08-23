@@ -38,6 +38,19 @@ canonical snapshot remains complete.
 Observer callbacks run synchronously at the source update cadence. Consumers
 must enqueue expensive work rather than block simulation or network handling.
 
+## Room template items
+
+`CanvasDefinition.systemItems` declares the immutable baseline items for a new
+room. The rooms service materializes them only when no snapshot exists, validates
+their exact definition versions, resolved configuration, transforms, IDs, and
+canvas limits, and gives them no participant owner. Participant durable move,
+rotate, reconfigure, and delete commands therefore reject them as
+`system_owned`. Physics and behavior commands still affect them normally.
+
+Template items are definition data, not a compatibility or migration mechanism.
+Changing a template requires a new canvas version and coordinated consumer
+release; an existing room continues from its canonical snapshot.
+
 ## Related contracts
 
 - `EXTENSION_CONTRACT.md` defines application behavior and worker ownership.

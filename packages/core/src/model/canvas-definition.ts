@@ -86,6 +86,15 @@ export interface CanvasLimits {
   maxComplexPhysicsItems: number;
 }
 
+/** An immutable room-owned item materialized when no snapshot exists yet. */
+export interface SystemItemDefinition {
+  entityId: string;
+  definitionId: string;
+  definitionVersion: number;
+  transform: { x: number; y: number; rotation: number; z?: number };
+  resolvedConfig: unknown;
+}
+
 /** Addendum A3. What happens between the loss of a body and its return. */
 export interface RespawnPolicy {
   /** Seconds the body stays out of the scene. Zero returns it at once. */
@@ -124,6 +133,8 @@ export interface CanvasDefinition {
   regions: RegionDefinition[];
   environment: EnvironmentDefinition;
   spawnPoints: SpawnPoint[];
+  /** Baseline items owned by the room, never by the first participant. */
+  systemItems: SystemItemDefinition[];
   limits: CanvasLimits;
   /**
    * Addendum A4. The blocking rule for every static collider that states none.

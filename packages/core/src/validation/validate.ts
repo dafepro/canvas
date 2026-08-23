@@ -34,6 +34,41 @@ export const validateCanvasDefinition = (
     }
     spawnIds.add(spawn.id);
   });
+  if (canvas.systemItems.length > canvas.limits.maxItems) {
+    problems.push({
+      path: "systemItems",
+      message: `item count ${canvas.systemItems.length} exceeds limit ${canvas.limits.maxItems}`,
+    });
+  }
+  const systemItemIds = new Set<string>();
+  canvas.systemItems.forEach((item, i) => {
+    const path = `systemItems[${i}]`;
+    if (!item.entityId) {
+      problems.push({ path: `${path}.entityId`, message: "required" });
+    } else if (systemItemIds.has(item.entityId)) {
+      problems.push({ path: `${path}.entityId`, message: `duplicate id ${item.entityId}` });
+    }
+    systemItemIds.add(item.entityId);
+    if (!item.definitionId) {
+      problems.push({ path: `${path}.definitionId`, message: "required" });
+    }
+    if (item.definitionVersion < 1) {
+      problems.push({ path: `${path}.definitionVersion`, message: "must be >= 1" });
+    }
+    const { x, y, rotation, z } = item.transform;
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(rotation) ||
+      (z !== undefined && !Number.isFinite(z)) ||
+      x < 0 ||
+      x > canvas.size.width ||
+      y < 0 ||
+      y > canvas.size.height
+    ) {
+      problems.push({ path: `${path}.transform`, message: "must be finite and inside canvas" });
+    }
+  });
   const usesRespawn = Object.values(canvas.edges).includes("respawn");
   if (usesRespawn && canvas.spawnPoints.length === 0) {
     problems.push({

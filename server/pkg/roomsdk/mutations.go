@@ -187,6 +187,9 @@ func (r *Room) validateDurable(
 		if !ok {
 			return false, nil, "unknown_entity"
 		}
+		if item.OwnerUserID == "" {
+			return false, nil, "system_owned"
+		}
 		if item.OwnerUserID != client.UserID {
 			return false, nil, "not_owner"
 		}

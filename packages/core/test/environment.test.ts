@@ -130,6 +130,7 @@ const canvas = (
   regions: [],
   environment: { base: { gravityXY: { x: 0, y: 20 }, linearDrag: 0.1 } },
   spawnPoints,
+  systemItems: [],
   limits: { maxAvatars: 20, maxItems: 50, maxComplexPhysicsItems: 5 },
 });
 
