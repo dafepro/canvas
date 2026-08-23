@@ -20,6 +20,23 @@ item ownership, and stores canonical checkpoints.
 | `apps/demo` | Browser demo of the rocket canvas from spec section 18. |
 | `docker/`, `docker-compose.yml` | The local stack: service, network emulator, demo. |
 
+## Consume the JavaScript packages
+
+The three JavaScript packages expose built ESM and declaration files; consumers
+do not compile Canvas TypeScript source. Each package builds automatically when
+packed:
+
+```bash
+pnpm --filter @canvas-physics/core pack --pack-destination ./artifacts
+pnpm --filter @canvas-physics/protocol pack --pack-destination ./artifacts
+pnpm --filter @canvas-physics/client pack --pack-destination ./artifacts
+```
+
+Install all three archives in an external application until registry releases
+are configured. `@canvas-physics/client/worker` resolves to the packaged default
+simulation worker. Application-defined worker behavior registration is tracked
+as the next consumer-library Priority 0 item in `docs/GAPS.md`.
+
 ## Run the local stack
 
 ```bash

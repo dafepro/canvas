@@ -4,6 +4,57 @@ This backlog records the repository audit performed at commit
 `f4bf0edf35526420abe88a173588c4294fcecf18`. Work proceeds from Priority 0
 downward. Check an item only after the relevant focused tests pass.
 
+## Consumer-library Priority 0 — current structural blockers
+
+These gaps were identified while designing the first external product
+integration. They take precedence over the older Priority 2 and Priority 3
+work below because they determine the public boundary every consumer will use.
+
+- [x] Publish JavaScript, declaration, and worker artifacts that can be packed
+  and installed outside this workspace.
+- [ ] Let an application register custom behaviors in its simulation worker
+  without editing or forking Canvas core.
+- [ ] Replace identity query parameters with an asynchronous credential provider
+  that is called for every connection and reconnect. Require production hosts
+  to configure authentication explicitly.
+- [ ] Expose immutable public subscriptions for authenticated presence,
+  canonical entities, behavior state, and effects.
+- [ ] Specify and enforce the product boundary: Canvas owns generic simulation,
+  rendering, synchronization, and room infrastructure; consumers own domain
+  rules, content, and product state.
+- [ ] Define the prerelease compatibility and release policy: exact protocol
+  matches; coordinated JavaScript, Go SDK, generated protocol, and worker
+  versions; and fail-fast mismatches with no legacy or compatibility branches.
+
+## Consumer-library Priority 1 — major completeness gaps
+
+- [ ] Complete asset manifests, preload gates, backgrounds, sprites, atlases,
+  animations, deterministic asset versions, and failure fallbacks.
+- [ ] Make the runtime and worker lazy-loadable so unrelated consumer routes do
+  not download Canvas.
+- [ ] Distinguish stable authenticated participant identity from ephemeral
+  connection and physics-entity IDs.
+- [ ] Provide dynamic room-template and system-owned item bootstrap APIs.
+- [ ] Define start, stop, reconnect, remount, background, and route-unmount
+  lifecycle behavior with a typed consumer error model.
+- [ ] Provide renderer-safe projection and bounded overlay observation helpers.
+
+## Consumer-library Priority 2 — proof and hardening
+
+- [ ] Add external-consumer conformance kits for behaviors, authentication,
+  stores, transports, and custom worker bundles.
+- [ ] Exercise packed release artifacts from a separate fixture application.
+- [ ] Complete latency, loss, reordering, reconnect, migration, late-join, and
+  mobile backgrounding coverage.
+- [ ] Record physical-device resource profiles and enforce measured budgets.
+- [ ] Add reproducible Windows/Linux release CI with generated-code verification.
+
+## Consumer-library Priority 3 — optional follow-ups
+
+- [ ] Add visual extension labs and additional overlay/diagnostic conveniences.
+- [ ] Complete elevation and richer animation support.
+- [ ] Evaluate WebRTC only if measured WebSocket performance warrants it.
+
 ## Priority 0 — structural fixes
 
 - [x] Separate host-authored physics from server-authoritative durable item data.
@@ -76,5 +127,5 @@ downward. Check an item only after the relevant focused tests pass.
 - [ ] Correct host-migration diagnostics.
 - [ ] Add collision, network, environment, and behavior visual laboratories.
 - [x] Make the integration harness use the correct executable name on Windows.
-- [ ] Add Windows/Linux CI and publishable package exports that target built
-  JavaScript and declarations rather than TypeScript source.
+- [ ] Add Windows/Linux CI. Publishable package exports are now tracked as the
+  first consumer-library Priority 0 item above.
