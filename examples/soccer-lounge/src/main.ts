@@ -1,9 +1,7 @@
-import {
+import type {
   CanvasRuntime,
-  SimulationDriver,
-  devRealtimeCredential,
-  type CanonicalStateSnapshot,
-} from "@canvas-physics/client";
+  CanonicalStateSnapshot,
+} from "@canvas-physics/client/runtime";
 import { soccerDefinitions } from "./soccer-content.js";
 import type { SoccerBallState } from "./soccer-ball-behavior.js";
 import { soccerAssets } from "./assets.js";
@@ -28,6 +26,7 @@ userInput.value =
   `player-${Math.random().toString(36).slice(2, 6)}`;
 
 let runtime: CanvasRuntime | undefined;
+let joining = false;
 let ballIds = new Set<string>();
 let unsubscribers: (() => void)[] = [];
 
@@ -46,72 +45,77 @@ const observeEntities = (snapshot: CanonicalStateSnapshot): void => {
 };
 
 const join = async (): Promise<void> => {
-  if (runtime) return;
+  if (runtime || joining) return;
+  joining = true;
   joinButton.disabled = true;
   status.textContent = "Joining…";
 
-  const worker = new Worker(new URL("./canvas.worker.ts", import.meta.url), {
-    type: "module",
-    name: "soccer-lounge-simulation",
-  });
-  const nextRuntime = new CanvasRuntime({
-    canvasId: "soccer-lounge",
-    serverUrl,
-    credentialProvider: async () =>
-      devRealtimeCredential(userInput.value, userInput.value),
-    mount: stage,
-    definitions: soccerDefinitions,
-    assets: soccerAssets,
-    driver: new SimulationDriver(worker),
-    scene: {
-      background: 0x165c31,
-      debug: new URLSearchParams(location.search).has("debug"),
-    },
-    onAssetProgress: ({ loaded, total }) => {
-      status.textContent = `Loading lounge art… ${loaded}/${total}`;
-    },
-    onAssetWarning: (warning) => {
-      console.warn(`[soccer assets] ${warning.message}`, warning.cause);
-    },
-    onAvatarDisabledChange: (disabled) => {
-      benchButton.textContent = disabled ? "Return to play" : "Take a break";
-      benchButton.classList.toggle("active", disabled);
-    },
-    onDiagnostics: (diagnostics) => {
-      status.textContent = diagnostics.isHost
-        ? `Simulation host · tick ${diagnostics.tick}`
-        : `Peer · tick ${diagnostics.tick}`;
-    },
-  });
-  runtime = nextRuntime;
-
-  unsubscribers = [
-    nextRuntime.subscribeCanonicalState(observeEntities),
-    nextRuntime.subscribeBehaviorState((snapshot) => {
-      const score = snapshot.states.find((entry) => ballIds.has(entry.entityId));
-      if (score) renderScore(score.state as SoccerBallState);
-    }),
-    nextRuntime.subscribePresence((snapshot) => {
-      participantCount.textContent = String(snapshot.participants.length);
-    }),
-    nextRuntime.subscribeEffects((effect) => {
-      if (effect.effect !== "goal") return;
-      scoreBoard.classList.remove("goal-flash");
-      requestAnimationFrame(() => scoreBoard.classList.add("goal-flash"));
-    }),
-  ];
-
+  let nextRuntime: CanvasRuntime | undefined;
   try {
+    const { CanvasRuntime, SimulationDriver, devRealtimeCredential } = await import(
+      "@canvas-physics/client/runtime"
+    );
+    const worker = new Worker(new URL("./canvas.worker.ts", import.meta.url), {
+      type: "module",
+      name: "soccer-lounge-simulation",
+    });
+    nextRuntime = new CanvasRuntime({
+      canvasId: "soccer-lounge",
+      serverUrl,
+      credentialProvider: async () =>
+        devRealtimeCredential(userInput.value, userInput.value),
+      mount: stage,
+      definitions: soccerDefinitions,
+      assets: soccerAssets,
+      driver: new SimulationDriver(worker),
+      scene: {
+        background: 0x165c31,
+        debug: new URLSearchParams(location.search).has("debug"),
+      },
+      onAssetProgress: ({ loaded, total }) => {
+        status.textContent = `Loading lounge art… ${loaded}/${total}`;
+      },
+      onAssetWarning: (warning) => {
+        console.warn(`[soccer assets] ${warning.message}`, warning.cause);
+      },
+      onAvatarDisabledChange: (disabled) => {
+        benchButton.textContent = disabled ? "Return to play" : "Take a break";
+        benchButton.classList.toggle("active", disabled);
+      },
+      onDiagnostics: (diagnostics) => {
+        status.textContent = diagnostics.isHost
+          ? `Simulation host · tick ${diagnostics.tick}`
+          : `Peer · tick ${diagnostics.tick}`;
+      },
+    });
+    runtime = nextRuntime;
+    unsubscribers = [
+      nextRuntime.subscribeCanonicalState(observeEntities),
+      nextRuntime.subscribeBehaviorState((snapshot) => {
+        const score = snapshot.states.find((entry) => ballIds.has(entry.entityId));
+        if (score) renderScore(score.state as SoccerBallState);
+      }),
+      nextRuntime.subscribePresence((snapshot) => {
+        participantCount.textContent = String(snapshot.participants.length);
+      }),
+      nextRuntime.subscribeEffects((effect) => {
+        if (effect.effect !== "goal") return;
+        scoreBoard.classList.remove("goal-flash");
+        requestAnimationFrame(() => scoreBoard.classList.add("goal-flash"));
+      }),
+    ];
     await nextRuntime.start();
     leaveButton.disabled = false;
     benchButton.disabled = false;
   } catch (error) {
     runtime = undefined;
-    nextRuntime.stop();
+    nextRuntime?.stop();
     unsubscribers.forEach((unsubscribe) => unsubscribe());
     unsubscribers = [];
     joinButton.disabled = false;
     status.textContent = `Join failed: ${String(error)}`;
+  } finally {
+    joining = false;
   }
 };
 

@@ -30,16 +30,19 @@ installSimulationWorker(self, [SoccerBallBehavior]);
 ```
 
 The browser entry must construct the worker directly so tools such as Vite can
-discover and bundle it statically:
+discover and bundle it statically. Load the runtime subpath and construct the
+worker inside the route or Join action; the worker URL remains statically
+discoverable without downloading either bundle on unrelated routes:
 
 ```ts
-import { SimulationDriver } from "@canvas-physics/client";
-
-const worker = new Worker(new URL("./canvas.worker.ts", import.meta.url), {
-  type: "module",
-  name: "product-canvas-simulation",
-});
-const driver = new SimulationDriver(worker);
+const joinCanvas = async () => {
+  const { SimulationDriver } = await import("@canvas-physics/client/runtime");
+  const worker = new Worker(new URL("./canvas.worker.ts", import.meta.url), {
+    type: "module",
+    name: "product-canvas-simulation",
+  });
+  return new SimulationDriver(worker);
+};
 ```
 
 Pass `driver` to `RoomSession`. Tests that do not need a real worker can call

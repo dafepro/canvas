@@ -7,6 +7,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -86,6 +87,10 @@ describe("published package artifacts", () => {
         default: "./dist/index.js",
       });
       if (directory === "client") {
+        expect(manifest.exports?.["./runtime"]).toEqual({
+          types: "./dist/runtime/index.d.ts",
+          default: "./dist/runtime/index.js",
+        });
         expect(manifest.exports?.["./worker"]).toEqual({
           types: "./dist/simulation/simulation.worker.d.ts",
           default: "./dist/simulation/simulation.worker.js",
@@ -129,7 +134,7 @@ describe("published package artifacts", () => {
       [
         'import { BehaviorRegistry } from "@canvas-physics/core";',
         'import { PROTOCOL_VERSION } from "@canvas-physics/protocol";',
-        'import { SimulationDriver } from "@canvas-physics/client";',
+        'import { SimulationDriver } from "@canvas-physics/client/runtime";',
         'import { installSimulationWorker } from "@canvas-physics/client/worker-runtime";',
         "if (!BehaviorRegistry || !PROTOCOL_VERSION || !SimulationDriver || !installSimulationWorker) process.exit(1);",
       ].join("\n"),
@@ -186,12 +191,26 @@ describe("published package artifacts", () => {
     );
 
     runPnpm(["install", "--prefer-offline", "--ignore-scripts"], soccerConsumer);
-    runPnpm(["exec", "vite", "build"], soccerConsumer);
+    runPnpm(["exec", "vite", "build", "--manifest"], soccerConsumer);
     expect(existsSync(join(soccerConsumer, "dist", "index.html"))).toBe(true);
     expect(
       readdirSync(join(soccerConsumer, "dist", "assets")).some((name) =>
         name.startsWith("canvas.worker-"),
       ),
     ).toBe(true);
+
+    const viteManifest = JSON.parse(
+      readFileSync(join(soccerConsumer, "dist", ".vite", "manifest.json"), "utf8"),
+    ) as Record<
+      string,
+      { file: string; isEntry?: boolean; imports?: string[]; dynamicImports?: string[] }
+    >;
+    const browserEntry = Object.values(viteManifest).find(({ isEntry }) => isEntry);
+    expect(browserEntry, "soccer browser entry").toBeDefined();
+    expect(browserEntry?.dynamicImports?.length).toBeGreaterThan(0);
+    expect(
+      statSync(join(soccerConsumer, "dist", browserEntry!.file)).size,
+      "unrelated routes must not eagerly download the Canvas runtime",
+    ).toBeLessThan(100_000);
   }, 90_000);
 });

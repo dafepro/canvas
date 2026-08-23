@@ -55,8 +55,10 @@ work below because they determine the public boundary every consumer will use.
 
 - [x] Complete asset manifests, preload gates, backgrounds, sprites, atlases,
   animations, deterministic asset versions, and failure fallbacks.
-- [ ] Make the runtime and worker lazy-loadable so unrelated consumer routes do
-  not download Canvas.
+- [x] Make the runtime and worker lazy-loadable so unrelated consumer routes do
+  not download Canvas. The public `@canvas-physics/client/runtime` subpath is a
+  dynamic-import boundary, the application worker is constructed only on Join,
+  and the packed soccer consumer enforces a sub-100 KB eager browser entry.
 - [ ] Distinguish stable authenticated participant identity from ephemeral
   connection and physics-entity IDs.
 - [ ] Provide dynamic room-template selection and version-reconciliation APIs.
@@ -139,8 +141,8 @@ work below because they determine the public boundary every consumer will use.
   capture protocol are in place; physical-device results remain outstanding.
 - [x] Add asset manifests, preloading, texture-atlas rendering, and synchronized
   animation playback.
-- [ ] Split the renderer and simulation worker into lazy consumer bundles. This
-  remains tracked by the consumer-library Priority 1 lazy-loading item above.
+- [x] Split the renderer and simulation worker into lazy consumer bundles. This
+  is enforced by the consumer-library Priority 1 packed-build contract above.
 - [ ] Finish elevation rendering and behavior: scale, shadows, and
   elevation-dependent ground collision participation.
 - [ ] Complete multiplayer coverage for packet reordering, 50/100/200 ms

@@ -153,22 +153,31 @@ replace it with a database-backed implementation.
 ## Use the client library
 
 ```ts
-import { CanvasRuntime, rocketCanvasDefinitions } from "@canvas-physics/client";
+import { productCanvasDefinitions } from "./canvas-content.js";
 
-const runtime = new CanvasRuntime({
-  canvasId: "rocket-canvas",
-  serverUrl: "http://localhost:8081",
-  credentialProvider: async () => {
-    const response = await fetch("/api/canvas-ticket", { method: "POST" });
-    if (!response.ok) throw new Error("could not obtain a canvas ticket");
-    return response.text();
-  },
-  mount: document.querySelector("#stage")!,
-  definitions: rocketCanvasDefinitions,
-});
-await runtime.start();
-runtime.spawnItem("rocket", { x: 70, y: 61 });
+export const enterCanvasRoute = async () => {
+  const { CanvasRuntime } = await import("@canvas-physics/client/runtime");
+  const runtime = new CanvasRuntime({
+    canvasId: "product-canvas",
+    serverUrl: "http://localhost:8081",
+    credentialProvider: async () => {
+      const response = await fetch("/api/canvas-ticket", { method: "POST" });
+      if (!response.ok) throw new Error("could not obtain a canvas ticket");
+      return response.text();
+    },
+    mount: document.querySelector("#stage")!,
+    definitions: productCanvasDefinitions,
+  });
+  await runtime.start();
+  return runtime;
+};
 ```
+
+The `@canvas-physics/client/runtime` subpath is deliberately loaded with
+`import()`. Product routes that never enter a canvas do not download Pixi,
+Rapier, the runtime, or its simulation worker. Create an application-owned
+worker only inside the same route/join boundary when registering custom
+behaviors.
 
 The credential provider runs again for every reconnect. The rooms SDK derives
 identity from that ticket and returns the authenticated user in JOIN_ACCEPTED;
