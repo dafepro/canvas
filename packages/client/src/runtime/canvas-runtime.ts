@@ -23,6 +23,17 @@ import {
   type RoomSessionRates,
   type SessionDiagnostics,
 } from "./room-session.js";
+import {
+  pixiAssetLoader,
+  preloadAssetManifest,
+  validateAssetReferences,
+  type AssetManifest,
+  type AssetLoaderAdapter,
+  type AssetProgress,
+  type AssetWarning,
+  type LoadedAssetBundle,
+} from "../assets/index.js";
+import type { Texture } from "pixi.js";
 
 export interface CanvasRuntimeOptions {
   canvasId: string;
@@ -37,6 +48,12 @@ export interface CanvasRuntimeOptions {
   /** Rates from spec 10.3. */
   rates?: RoomSessionRates;
   scene?: SceneOptions;
+  /** Consumer-owned art. Required sources preload before the room connection opens. */
+  assets?: AssetManifest;
+  /** Advanced override for tests or a consumer-specific texture loader. */
+  assetLoader?: AssetLoaderAdapter<Texture>;
+  onAssetProgress?: (progress: Readonly<AssetProgress>) => void;
+  onAssetWarning?: (warning: Readonly<AssetWarning>) => void;
   onDiagnostics?: (diagnostics: RuntimeDiagnostics) => void;
   /** Addendum A1. Runs after the local avatar changes its disabled state. */
   onAvatarDisabledChange?: (disabled: boolean) => void;
@@ -77,6 +94,7 @@ export class CanvasRuntime {
   private editMode = false;
   private latestEntities: RenderEntity[] = [];
   private disableKeyListener?: (event: KeyboardEvent) => void;
+  private assetBundle?: LoadedAssetBundle<Texture>;
 
   constructor(private readonly options: CanvasRuntimeOptions) {
     this.session = new RoomSession({
@@ -116,7 +134,19 @@ export class CanvasRuntime {
 
   async start(): Promise<void> {
     this.running = true;
-    await this.session.start();
+    try {
+      if (this.options.assets) {
+        this.assetBundle = await preloadAssetManifest(this.options.assets, {
+          adapter: this.options.assetLoader ?? pixiAssetLoader,
+          onProgress: this.options.onAssetProgress,
+          onWarning: this.options.onAssetWarning,
+        });
+      }
+      await this.session.start();
+    } catch (error) {
+      this.running = false;
+      throw error;
+    }
   }
 
   stop(): void {
@@ -151,7 +181,25 @@ export class CanvasRuntime {
   }
 
   private async mountScene(canvas: CanvasDefinition): Promise<void> {
-    this.scene = new PixiScene(canvas, this.options.definitions, this.options.scene);
+    if (this.options.assets) {
+      for (const message of validateAssetReferences(
+        this.options.assets,
+        canvas,
+        this.options.definitions,
+      )) {
+        this.options.onAssetWarning?.(Object.freeze({
+          sourceId: "references",
+          message,
+          cause: undefined,
+        }));
+      }
+    }
+    this.scene = new PixiScene(
+      canvas,
+      this.options.definitions,
+      this.options.scene,
+      this.assetBundle,
+    );
     await this.scene.mount(this.options.mount);
     this.pointer = new PointerDragController(
       this.scene.app.canvas as unknown as HTMLElement,

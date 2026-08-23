@@ -9,6 +9,9 @@ import {
   type AssetLoaderAdapter,
   type AssetManifest,
 } from "../src/assets/index.js";
+import { CanvasRuntime } from "../src/runtime/canvas-runtime.js";
+import { SimulationDriver } from "../src/simulation/driver.js";
+import { emptyTraffic, type RoomTransport } from "../src/net/transport.js";
 
 const manifest: AssetManifest = {
   schemaVersion: 1,
@@ -123,6 +126,49 @@ describe("asset manifest", () => {
       "definition 'ball' variant 'scored' references unknown texture 'missing.variant'",
       "definition 'ball' animation 'kick' references unknown texture 'missing.frame'",
     ]);
+  });
+
+  it("finishes required preloading before opening the room connection", async () => {
+    let finishLoad!: (texture: string) => void;
+    const adapter: AssetLoaderAdapter<string> = {
+      load: vi.fn(() => new Promise<string>((resolve) => { finishLoad = resolve; })),
+      frame: (source) => source,
+    };
+    const connect = vi.fn(async () => undefined);
+    const transport: RoomTransport = {
+      connect,
+      sendReliable: vi.fn(),
+      sendRealtime: vi.fn(),
+      onMessage: () => () => undefined,
+      onStatus: () => () => undefined,
+      status: "idle",
+      traffic: emptyTraffic(),
+      close: vi.fn(),
+    };
+    const runtime = new CanvasRuntime({
+      canvasId: "asset-gate",
+      serverUrl: "http://unused.test",
+      mount: {} as HTMLElement,
+      definitions: [],
+      transport,
+      driver: SimulationDriver.local(),
+      assets: {
+        schemaVersion: 1,
+        id: "gate",
+        revision: "1",
+        sources: [{ id: "required", src: "/required.png", required: true }],
+        textures: [{ id: "required", sourceId: "required" }],
+      },
+      assetLoader: adapter as AssetLoaderAdapter<import("pixi.js").Texture>,
+    });
+
+    const started = runtime.start();
+    await Promise.resolve();
+    expect(connect).not.toHaveBeenCalled();
+    finishLoad("texture");
+    await started;
+    expect(connect).toHaveBeenCalledOnce();
+    runtime.stop();
   });
 });
 

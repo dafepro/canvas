@@ -1,4 +1,4 @@
-import { Application, Container, Graphics } from "pixi.js";
+import { Application, Container, Graphics, Sprite, type Texture } from "pixi.js";
 import type {
   CanvasDefinition,
   ItemDefinition,
@@ -10,6 +10,8 @@ import type { DragGesture } from "../input/pointer-drag-controller.js";
 import type { ItemEditState } from "../input/item-edit-controller.js";
 import { Camera } from "./camera.js";
 import { EffectSystem } from "./effect-system.js";
+import { buildEntityDisplay } from "./entity-display.js";
+import type { LoadedAssetBundle } from "../assets/index.js";
 
 export interface SceneOptions {
   background?: number;
@@ -21,6 +23,7 @@ interface SpriteRecord {
   display: Container;
   definitionId: string;
   variant?: string;
+  animation?: string;
 }
 
 /**
@@ -49,6 +52,7 @@ export class PixiScene {
     private readonly canvas: CanvasDefinition,
     definitions: ItemDefinition[],
     private readonly options: SceneOptions = {},
+    private readonly assets?: LoadedAssetBundle<Texture>,
   ) {
     for (const definition of definitions) {
       this.definitions.set(definition.definitionId, definition);
@@ -56,6 +60,7 @@ export class PixiScene {
     this.camera = new Camera(canvas);
     this.effects = new EffectSystem(this.camera);
     this.debug = options.debug ?? false;
+    this.entityLayer.sortableChildren = true;
   }
 
   async mount(element: HTMLElement): Promise<void> {
@@ -77,11 +82,18 @@ export class PixiScene {
 
   private resize(): void {
     this.camera.fit(this.app.renderer.width, this.app.renderer.height);
+    for (const record of this.sprites.values()) {
+      this.entityLayer.removeChild(record.display);
+      record.display.destroy({ children: true });
+    }
+    this.sprites.clear();
     this.drawBackground();
   }
 
   private drawBackground(): void {
-    this.backgroundLayer.removeChildren();
+    for (const child of this.backgroundLayer.removeChildren()) {
+      child.destroy({ children: true });
+    }
     const { width, height } = this.canvas.size;
     const frame = new Graphics()
       .rect(
@@ -93,6 +105,17 @@ export class PixiScene {
       .fill({ color: this.options.background ?? 0x131a33 })
       .stroke({ color: 0x2a3566, width: 2 });
     this.backgroundLayer.addChild(frame);
+
+    const backgroundTexture = this.canvas.backgroundAssetId
+      ? this.assets?.texture(this.canvas.backgroundAssetId)
+      : undefined;
+    if (backgroundTexture) {
+      const art = new Sprite({ texture: backgroundTexture });
+      art.position.set(this.camera.toScreenX(0), this.camera.toScreenY(0));
+      art.width = width * this.camera.scale;
+      art.height = height * this.camera.scale;
+      this.backgroundLayer.addChild(art);
+    }
 
     // Region bands make the environment gradient visible (spec 21.4).
     for (const region of this.canvas.environment.regions ?? []) {
@@ -253,7 +276,8 @@ export class PixiScene {
     if (
       existing &&
       existing.definitionId === entity.definitionId &&
-      existing.variant === entity.variant
+      existing.variant === entity.variant &&
+      existing.animation === entity.animation
     ) {
       return existing;
     }
@@ -267,112 +291,16 @@ export class PixiScene {
       display,
       definitionId: entity.definitionId,
       variant: entity.variant,
+      animation: entity.animation,
     };
     this.entityLayer.addChild(display);
     this.sprites.set(entity.id, record);
     return record;
   }
 
-  /**
-   * Draws a placeholder shape from the item definition. Replace this with a
-   * texture atlas sprite factory when art exists (spec 9.1).
-   */
   private buildDisplay(entity: RenderEntity): Container {
-    const container = new Container();
-    const scale = this.camera.scale;
-
-    if (entity.kind === "avatar") {
-      const radius = 1.2 * scale;
-      container.addChild(
-        new Graphics()
-          .circle(0, 0, radius)
-          .fill({ color: 0x8ecae6 })
-          .stroke({ color: 0xffffff, width: 2 }),
-      );
-      // A short nose shows the facing direction.
-      container.addChild(
-        new Graphics().moveTo(0, 0).lineTo(radius, 0).stroke({ color: 0xffffff, width: 2 }),
-      );
-      return container;
-    }
-
     const definition = this.definitions.get(entity.definitionId);
-    const size = definition?.visual.size ?? { width: 2, height: 2 };
-    const placeholder = definition?.visual.placeholder;
-    const variantColor = entity.variant
-      ? definition?.visual.variants?.[entity.variant]?.color
-      : undefined;
-    const color = variantColor ?? placeholder?.color ?? 0xf1faee;
-    const graphics = new Graphics();
-
-    switch (placeholder?.shape ?? "rect") {
-      case "circle":
-        graphics.circle(0, 0, (size.width / 2) * scale).fill({ color });
-        break;
-      case "triangle":
-        graphics
-          .poly([
-            0,
-            -(size.height / 2) * scale,
-            (size.width / 2) * scale,
-            (size.height / 2) * scale,
-            -(size.width / 2) * scale,
-            (size.height / 2) * scale,
-          ])
-          .fill({ color });
-        break;
-      default:
-        graphics
-          .rect(
-            -(size.width / 2) * scale,
-            -(size.height / 2) * scale,
-            size.width * scale,
-            size.height * scale,
-          )
-          .fill({ color });
-    }
-    container.addChild(graphics);
-
-    if (this.debug) {
-      for (const collider of definition?.colliders ?? []) {
-        const outline = new Graphics();
-        const offset = collider.offset ?? { x: 0, y: 0 };
-        const isSensor = collider.sensor ?? collider.role.endsWith("Sensor");
-        switch (collider.shape.type) {
-          case "circle":
-            outline.circle(offset.x * scale, offset.y * scale, collider.shape.radius * scale);
-            break;
-          case "rect":
-            outline.rect(
-              (offset.x - collider.shape.width / 2) * scale,
-              (offset.y - collider.shape.height / 2) * scale,
-              collider.shape.width * scale,
-              collider.shape.height * scale,
-            );
-            break;
-          case "capsule":
-            outline.roundRect(
-              (offset.x - collider.shape.radius) * scale,
-              (offset.y - collider.shape.halfHeight - collider.shape.radius) * scale,
-              collider.shape.radius * 2 * scale,
-              (collider.shape.halfHeight + collider.shape.radius) * 2 * scale,
-              collider.shape.radius * scale,
-            );
-            break;
-          case "polygon":
-            outline.poly(
-              collider.shape.vertices.flatMap((vertex) => [
-                (vertex.x + offset.x) * scale,
-                (vertex.y + offset.y) * scale,
-              ]),
-            );
-            break;
-        }
-        outline.stroke({ color: isSensor ? 0x4cc9f0 : 0xff006e, width: 1, alpha: 0.9 });
-        container.addChild(outline);
-      }
-    }
-    return container;
+    return buildEntityDisplay(entity, definition, this.camera.scale, this.assets, this.debug);
   }
 
   /** Frames per second measured from the render ticker. */
