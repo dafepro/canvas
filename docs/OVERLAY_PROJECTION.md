@@ -17,7 +17,8 @@ renderer objects.
 
 Subscriptions are deliberately bounded:
 
-- `maxHz` defaults to 10 and cannot exceed 30;
+- `maxHz` defaults to 10 and cannot exceed 60. A 60 Hz subscription can track
+  the exact interpolated sample used by each ordinary render frame;
 - `maxEntities` defaults to 128 and cannot exceed 256;
 - entity-ID and definition-ID filters accept at most 256 values;
 - ID, kind, and definition filters run before the entity cap;
@@ -28,6 +29,12 @@ Samples begin on the next eligible render frame. The observer returns an
 unsubscribe function and all overlay observers are released when the runtime
 stops. A throwing observer is isolated from rendering and other observers.
 
+Render-attached decoration such as an avatar name should request 60 Hz and keep
+its filter/entity cap narrow. Canvas publishes after drawing from the same
+interpolated entity array, so the DOM transform and Pixi display share one
+motion sample. Lower cadences remain appropriate for diagnostics, menus, and
+labels whose motion does not need to read as part of the entity.
+
 ## Fixed world anchors
 
 `runtime.projectWorldPoint({ x, y, z? })` projects a product-owned anchor such
@@ -36,7 +43,8 @@ It returns immutable world/screen coordinates plus canvas/viewport containment,
 or `undefined` before the scene is mounted. The pure `projectOverlayPoint`
 helper supports consumer-owned renderer adapters using the same value contract.
 
-The soccer lounge's opt-in `?overlay=1` DOM `Match ball` marker is the reference
-integration. It filters to the ball definition, requests one entity at 10 Hz,
-and positions the HTML element without importing or inspecting Pixi. The marker
-is deliberately absent from the normal lounge experience.
+The soccer lounge's avatar crowns and names are the render-attached reference:
+they filter to at most 64 avatars and request 60 Hz. Its opt-in `?overlay=1` DOM
+`Match ball` marker demonstrates the lower-cost diagnostic case by filtering to
+one ball at 10 Hz. Neither imports or inspects Pixi, and the ball marker remains
+absent from the normal lounge experience.

@@ -102,10 +102,27 @@ describe("bounded overlay projection", () => {
 
   it("rejects subscriptions that could bypass the public observation budgets", () => {
     const store = new OverlayProjectionStore();
-    expect(() => store.subscribe(() => undefined, { maxHz: 31 })).toThrow(RangeError);
+    expect(() => store.subscribe(() => undefined, { maxHz: 61 })).toThrow(RangeError);
     expect(() => store.subscribe(() => undefined, { maxEntities: 257 })).toThrow(RangeError);
     expect(() => store.subscribe(() => undefined, { entityIds: Array(257).fill("x") }))
       .toThrow(RangeError);
+  });
+
+  it("can publish the same interpolated sample on every 60 Hz render frame", () => {
+    const store = new OverlayProjectionStore();
+    const observer = vi.fn();
+    store.subscribe(observer, { maxHz: 60, kinds: ["avatar"] });
+
+    store.publish(source(0));
+    store.publish(source(16.6));
+    store.publish(source(33.2));
+
+    expect(observer).toHaveBeenCalledTimes(3);
+    expect(observer.mock.calls.map(([snapshot]) => snapshot.sampledAtMs)).toEqual([
+      0,
+      16.6,
+      33.2,
+    ]);
   });
 
   it("unsubscribes and clears observers without retaining renderer state", () => {

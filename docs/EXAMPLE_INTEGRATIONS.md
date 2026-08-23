@@ -47,10 +47,12 @@ about teams or benches.
 
 The example registers consumer-owned artwork for Canvas's reserved `avatar`
 visual definition. A bounded avatar projection then drives product-owned DOM
-decoration: each participant gets a compact name label and a deterministic
-one-to-five-star crown. The same label follows the stable avatar into the bench
-projection, demonstrating that roster presentation can evolve independently of
-Canvas physics and rendering internals.
+decoration at render cadence: each participant gets a white outlined name below
+the sprite and a deterministic one-to-five-star crown following its upper arc.
+The projection consumes the exact interpolated sample Pixi rendered, avoiding
+a second motion model. The same decoration follows the stable avatar into the
+bench projection, demonstrating that roster presentation can evolve
+independently of Canvas physics and rendering internals.
 
 The product-owned SVG field, generated ball atlas, goal texture, and player
 sprite are loaded through the

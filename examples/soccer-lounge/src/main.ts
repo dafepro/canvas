@@ -8,7 +8,7 @@ import { soccerDefinitionsForDisplay } from "./soccer-content.js";
 import type { SoccerBallState } from "./soccer-ball-behavior.js";
 import { soccerAssets } from "./assets.js";
 import { projectSoccerParticipantAvatar } from "./participant-projection.js";
-import { playerStarCount } from "./player-overlay.js";
+import { playerOverlayGeometry, playerStarCount } from "./player-overlay.js";
 import "./style.css";
 
 const searchParams = new URLSearchParams(location.search);
@@ -71,7 +71,14 @@ const renderPlayerOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): vo
       label.className = "player-label";
       const stars = document.createElement("span");
       stars.className = "player-stars";
-      stars.textContent = "★".repeat(playerStarCount(participant.participantId));
+      const starCount = playerStarCount(participant.participantId);
+      label.dataset.starCount = String(starCount);
+      for (let index = 0; index < starCount; index++) {
+        const star = document.createElement("span");
+        star.className = "player-star";
+        star.textContent = "★";
+        stars.appendChild(star);
+      }
       const name = document.createElement("span");
       name.className = "player-name";
       label.append(stars, name);
@@ -83,9 +90,23 @@ const renderPlayerOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): vo
     label.dataset.status = participant.status;
     label.hidden = !avatar.visible || !avatar.inViewport;
     if (!label.hidden) {
-      const labelY = avatar.screen.y - 4.2 * snapshot.viewport.scale;
+      const geometryScale = snapshot.viewport.scale.toFixed(4);
+      if (label.dataset.geometryScale !== geometryScale) {
+        label.dataset.geometryScale = geometryScale;
+        const geometry = playerOverlayGeometry(
+          Number(label.dataset.starCount),
+          snapshot.viewport.scale,
+        );
+        const stars = label.querySelectorAll<HTMLElement>(".player-star");
+        geometry.stars.forEach((position, index) => {
+          stars[index]!.style.transform =
+            `translate3d(${position.x}px, ${position.y}px, 0) ` +
+            `translate(-50%, -50%) rotate(${position.rotationDegrees}deg)`;
+        });
+        label.style.setProperty("--player-name-y", `${geometry.nameOffsetY}px`);
+      }
       label.style.transform =
-        `translate(${avatar.screen.x}px, ${labelY}px) translate(-50%, -100%)`;
+        `translate3d(${avatar.screen.x}px, ${avatar.screen.y}px, 0)`;
     }
   }
   for (const [entityId, label] of playerLabels) {
@@ -170,7 +191,7 @@ const join = async (): Promise<void> => {
         requestAnimationFrame(() => scoreBoard.classList.add("goal-flash"));
       }),
       nextRuntime.subscribeOverlayProjection(renderPlayerOverlays, {
-        maxHz: 15,
+        maxHz: 60,
         maxEntities: 64,
         kinds: ["avatar"],
       }),

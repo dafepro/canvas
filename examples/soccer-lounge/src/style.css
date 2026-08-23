@@ -170,37 +170,62 @@ h1 {
 }
 
 .player-label {
+  --player-name-y: 18px;
+
   position: absolute;
   top: 0;
   left: 0;
-  display: grid;
-  justify-items: center;
-  gap: 1px;
-  min-width: 48px;
-  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 70%));
+  width: 0;
+  height: 0;
+  contain: layout style;
   will-change: transform;
 }
 
 .player-stars {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  height: 0;
+}
+
+.player-star {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
   color: #ffd95a;
-  font-size: 9px;
+  font-size: 8px;
+  font-weight: 900;
   line-height: 1;
-  letter-spacing: -1px;
-  white-space: nowrap;
+  text-shadow:
+    -1px -1px 0 #120d02,
+    1px -1px 0 #120d02,
+    -1px 1px 0 #120d02,
+    1px 1px 0 #120d02;
+  transform-origin: center;
+  will-change: transform;
 }
 
 .player-name {
+  position: absolute;
+  top: 0;
+  left: 0;
   max-width: 96px;
   overflow: hidden;
-  padding: 2px 5px;
-  border-radius: 999px;
-  background: rgb(3 18 10 / 76%);
-  color: #f5fff7;
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1.2;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  paint-order: stroke fill;
   text-overflow: ellipsis;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+  transform: translate(-50%, var(--player-name-y));
   white-space: nowrap;
+  -webkit-text-stroke: 2px #000;
 }
 
 .player-label[data-status="inactive"],

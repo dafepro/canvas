@@ -1,10 +1,11 @@
 import type { Vec2 } from "@canvas-physics/core";
 import type { RenderEntity } from "../simulation/messages.js";
 
-export const MAX_OVERLAY_OBSERVATION_HZ = 30;
+export const MAX_OVERLAY_OBSERVATION_HZ = 60;
 export const MAX_OVERLAY_ENTITIES = 256;
 export const DEFAULT_OVERLAY_OBSERVATION_HZ = 10;
 export const DEFAULT_OVERLAY_ENTITIES = 128;
+const FRAME_CADENCE_TOLERANCE_MS = 0.75;
 
 export interface OverlayViewportProjection {
   readonly width: number;
@@ -55,7 +56,7 @@ export interface OverlayProjectionSnapshot {
 }
 
 export interface OverlayProjectionOptions {
-  /** Defaults to 10 and may not exceed 30. */
+  /** Defaults to 10 and may not exceed 60. */
   readonly maxHz?: number;
   /** Defaults to 128 and may not exceed 256. */
   readonly maxEntities?: number;
@@ -118,7 +119,8 @@ export class OverlayProjectionStore {
 
   publish(source: OverlayProjectionSource): void {
     for (const subscription of this.subscriptions) {
-      if (source.sampledAtMs - subscription.lastPublishedAtMs + Number.EPSILON <
+      if (source.sampledAtMs - subscription.lastPublishedAtMs +
+          FRAME_CADENCE_TOLERANCE_MS <
           subscription.intervalMs) continue;
       subscription.lastPublishedAtMs = source.sampledAtMs;
       const snapshot = projectSnapshot(source, subscription);
