@@ -19,10 +19,10 @@ work below because they determine the public boundary every consumer will use.
   to configure authentication explicitly.
 - [x] Expose immutable public subscriptions for authenticated presence,
   canonical entities, behavior state, and effects.
-- [ ] Specify and enforce the product boundary: Canvas owns generic simulation,
+- [x] Specify and enforce the product boundary: Canvas owns generic simulation,
   rendering, synchronization, and room infrastructure; consumers own domain
   rules, content, and product state.
-- [ ] Define the prerelease compatibility and release policy: exact protocol
+- [x] Define the prerelease compatibility and release policy: exact protocol
   matches; coordinated JavaScript, Go SDK, generated protocol, and worker
   versions; and fail-fast mismatches with no legacy or compatibility branches.
 
