@@ -93,8 +93,8 @@ const joinedSession = async (): Promise<{
     definitions: rocketCanvasDefinitions,
     transport,
     driver: idleDriver(),
-    onEffect: (emission) => effects.push(emission),
   });
+  session.subscribeEffects((emission) => effects.push(emission));
   await session.start();
   transport.deliver({
     ...blank(),

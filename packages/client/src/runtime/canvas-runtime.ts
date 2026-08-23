@@ -89,13 +89,29 @@ export class CanvasRuntime {
       rates: options.rates,
       intent: () => this.mergedIntent(),
       onJoined: (canvas) => this.mountScene(canvas),
-      onEffect: (emission) => this.scene?.effects.apply(emission),
     });
+    this.session.subscribeEffects((emission) => this.scene?.effects.apply(emission));
   }
 
   /** The coordination client, for an application that needs the raw events. */
   get client() {
     return this.session.client;
+  }
+
+  subscribePresence(...args: Parameters<RoomSession["subscribePresence"]>) {
+    return this.session.subscribePresence(...args);
+  }
+
+  subscribeCanonicalState(...args: Parameters<RoomSession["subscribeCanonicalState"]>) {
+    return this.session.subscribeCanonicalState(...args);
+  }
+
+  subscribeBehaviorState(...args: Parameters<RoomSession["subscribeBehaviorState"]>) {
+    return this.session.subscribeBehaviorState(...args);
+  }
+
+  subscribeEffects(...args: Parameters<RoomSession["subscribeEffects"]>) {
+    return this.session.subscribeEffects(...args);
   }
 
   async start(): Promise<void> {

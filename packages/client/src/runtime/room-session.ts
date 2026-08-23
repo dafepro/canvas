@@ -39,6 +39,19 @@ export interface InputIntent {
 
 const NO_INTENT: InputIntent = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
 
+const immutableValue = <T>(value: T): T => {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((item) => immutableValue(item))) as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const copy = Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, immutableValue(item)]),
+    );
+    return Object.freeze(copy) as T;
+  }
+  return value;
+};
+
 /** Send rates from spec 10.3. */
 export interface RoomSessionRates {
   inputHz?: number;
@@ -68,9 +81,28 @@ export interface RoomSessionOptions {
     snapshot: CanvasSnapshot,
     wasSleeping: boolean,
   ) => void | Promise<void>;
-  onEffect?: (emission: EffectEmission) => void;
   onError?: (message: string) => void;
 }
+
+export interface PresenceSnapshot {
+  readonly participants: readonly Readonly<Peer>[];
+}
+
+export interface CanonicalStateSnapshot {
+  readonly tick: number;
+  readonly sceneRevision: number;
+  readonly entities: readonly Readonly<RenderEntity>[];
+}
+
+export interface BehaviorStateSnapshot {
+  readonly tick: number;
+  readonly states: readonly {
+    readonly entityId: string;
+    readonly state: unknown;
+  }[];
+}
+
+type Observer<T> = (value: T) => void;
 
 export interface SessionDiagnostics {
   status: string;
@@ -126,6 +158,14 @@ export class RoomSession {
   private currentTick = 0;
   private simulationReady = false;
   private latestPeers?: Peer[];
+  private latestPresenceSnapshot?: PresenceSnapshot;
+  private latestCanonicalSource?: { tick: number; entities: RenderEntity[] };
+  private latestCanonicalSnapshot?: CanonicalStateSnapshot;
+  private latestBehaviorSnapshot?: BehaviorStateSnapshot;
+  private readonly presenceObservers = new Set<Observer<PresenceSnapshot>>();
+  private readonly canonicalObservers = new Set<Observer<CanonicalStateSnapshot>>();
+  private readonly behaviorObservers = new Set<Observer<BehaviorStateSnapshot>>();
+  private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
   private readonly hostAvatarIds = new Set<string>();
   private readonly lastCanonicalAvatarPositions = new Map<string, Vec2>();
   private finalCheckpointSent?: () => void;
@@ -207,6 +247,31 @@ export class RoomSession {
     return this.client.displayName;
   }
 
+  subscribePresence(observer: Observer<PresenceSnapshot>): () => void {
+    this.presenceObservers.add(observer);
+    if (this.latestPresenceSnapshot) observer(this.latestPresenceSnapshot);
+    return () => this.presenceObservers.delete(observer);
+  }
+
+  subscribeCanonicalState(observer: Observer<CanonicalStateSnapshot>): () => void {
+    this.canonicalObservers.add(observer);
+    if (this.latestCanonicalSource) this.refreshCanonicalSnapshots();
+    if (this.latestCanonicalSnapshot) observer(this.latestCanonicalSnapshot);
+    return () => this.canonicalObservers.delete(observer);
+  }
+
+  subscribeBehaviorState(observer: Observer<BehaviorStateSnapshot>): () => void {
+    this.behaviorObservers.add(observer);
+    if (this.latestCanonicalSource) this.refreshCanonicalSnapshots();
+    if (this.latestBehaviorSnapshot) observer(this.latestBehaviorSnapshot);
+    return () => this.behaviorObservers.delete(observer);
+  }
+
+  subscribeEffects(observer: Observer<Readonly<EffectEmission>>): () => void {
+    this.effectObservers.add(observer);
+    return () => this.effectObservers.delete(observer);
+  }
+
   async start(): Promise<void> {
     this.running = true;
     await this.client.connect();
@@ -274,6 +339,10 @@ export class RoomSession {
     this.finalCheckpointSent = undefined;
     this.driver.terminate();
     this.client.close();
+    this.presenceObservers.clear();
+    this.canonicalObservers.clear();
+    this.behaviorObservers.clear();
+    this.effectObservers.clear();
   }
 
   // ---------- coordination ----------
@@ -318,6 +387,7 @@ export class RoomSession {
       const entities = state.entities.map(fromEntityState);
       this.rememberFullAvatarState(entities);
       this.buffer.push(tick, entities);
+      this.publishCanonicalState(tick, entities);
       this.syncCountdowns(entities, tick);
       this.itemCount = entities.filter((entity) => entity.kind === "item").length;
     });
@@ -327,6 +397,7 @@ export class RoomSession {
       const entities = delta.entities.map(fromEntityState);
       this.rememberAvatarDelta(entities, delta.removedEntityIds);
       this.buffer.pushDelta(tick, entities, delta.removedEntityIds);
+      this.publishCanonicalState(tick, this.buffer.latest());
       this.syncCountdowns(entities, tick);
     });
 
@@ -335,12 +406,12 @@ export class RoomSession {
         if (event.mode === "start") this.countdowns.add(event.entityId);
         if (event.mode === "stop") this.countdowns.delete(event.entityId);
       }
-      this.options.onEffect?.({
+      this.publishEffect({
         tick: this.currentTick,
         entityId: event.entityId,
         effect: event.effect,
         mode: (event.mode as "oneShot" | "start" | "stop") || "oneShot",
-        params: undefined,
+        params: fromJsonBytes<Record<string, number | string | boolean>>(event.paramsJson),
       });
     });
 
@@ -358,6 +429,7 @@ export class RoomSession {
 
     this.client.on("presence", (peers) => {
       this.latestPeers = peers;
+      this.publishPresence(peers);
       this.syncHostAvatars();
     });
 
@@ -379,6 +451,62 @@ export class RoomSession {
       this.lastRejection = `${code}: ${message}`;
       this.options.onError?.(this.lastRejection);
     });
+  }
+
+  private publishPresence(peers: Peer[]): void {
+    const participants = Object.freeze(
+      peers.map((peer) => Object.freeze({ ...peer })),
+    );
+    const snapshot = Object.freeze({ participants });
+    this.latestPresenceSnapshot = snapshot;
+    for (const observer of this.presenceObservers) observer(snapshot);
+  }
+
+  private publishCanonicalState(tick: number, source: RenderEntity[]): void {
+    this.latestCanonicalSource = { tick, entities: source };
+    if (this.canonicalObservers.size === 0 && this.behaviorObservers.size === 0) return;
+    this.refreshCanonicalSnapshots();
+    const snapshot = this.latestCanonicalSnapshot!;
+    const behaviorSnapshot = this.latestBehaviorSnapshot!;
+    for (const observer of this.canonicalObservers) observer(snapshot);
+    for (const observer of this.behaviorObservers) observer(behaviorSnapshot);
+  }
+
+  private refreshCanonicalSnapshots(): void {
+    const source = this.latestCanonicalSource;
+    if (!source) return;
+    const entities = Object.freeze(
+      source.entities.map((entity) =>
+        Object.freeze({
+          ...entity,
+          behaviorState: immutableValue(entity.behaviorState),
+        }),
+      ),
+    );
+    const snapshot = Object.freeze({
+      tick: source.tick,
+      sceneRevision: this.client.sceneRevision,
+      entities,
+    });
+    this.latestCanonicalSnapshot = snapshot;
+
+    const states = Object.freeze(
+      entities
+        .filter((entity) => entity.behaviorState !== undefined)
+        .map((entity) =>
+          Object.freeze({ entityId: entity.id, state: entity.behaviorState }),
+        ),
+    );
+    const behaviorSnapshot = Object.freeze({ tick: source.tick, states });
+    this.latestBehaviorSnapshot = behaviorSnapshot;
+  }
+
+  private publishEffect(emission: EffectEmission): void {
+    const effect = Object.freeze({
+      ...emission,
+      params: immutableValue(emission.params),
+    }) as Readonly<EffectEmission>;
+    for (const observer of this.effectObservers) observer(effect);
   }
 
   private spawnPosition(): Vec2 {
@@ -675,7 +803,7 @@ export class RoomSession {
           (state.armedAtTick ?? 0) + (state.countdownTicks ?? 0) - tick;
         if (remainingTicks <= 0) continue;
         this.countdowns.add(entity.id);
-        this.options.onEffect?.({
+        this.publishEffect({
           tick,
           entityId: entity.id,
           effect: "countdown",
@@ -684,7 +812,7 @@ export class RoomSession {
         });
       } else if (!arming && shown) {
         this.countdowns.delete(entity.id);
-        this.options.onEffect?.({
+        this.publishEffect({
           tick,
           entityId: entity.id,
           effect: "countdown",
@@ -716,6 +844,7 @@ export class RoomSession {
         this.client.health.workerDriftMs = message.stats.driftMs;
         if (this.client.isHost) {
           this.hostEntities = message.entities;
+          this.publishCanonicalState(message.tick, message.entities);
           this.itemCount = message.entities.filter((e) => e.kind === "item").length;
           // Spec 22.1. The host is the only client that can quarantine a body.
           this.quarantinedCount = message.entities.filter((e) => e.quarantined).length;
@@ -728,7 +857,7 @@ export class RoomSession {
       }
       case "effects":
         for (const effect of message.effects) {
-          this.options.onEffect?.(effect);
+          this.publishEffect(effect);
           if (this.client.isHost) {
             this.client.sendEffect(
               {

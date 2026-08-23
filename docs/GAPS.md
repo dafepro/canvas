@@ -17,7 +17,7 @@ work below because they determine the public boundary every consumer will use.
 - [x] Replace identity query parameters with an asynchronous credential provider
   that is called for every connection and reconnect. Require production hosts
   to configure authentication explicitly.
-- [ ] Expose immutable public subscriptions for authenticated presence,
+- [x] Expose immutable public subscriptions for authenticated presence,
   canonical entities, behavior state, and effects.
 - [ ] Specify and enforce the product boundary: Canvas owns generic simulation,
   rendering, synchronization, and room infrastructure; consumers own domain
@@ -121,8 +121,8 @@ work below because they determine the public boundary every consumer will use.
 ## Priority 3 — smaller follow-ups
 
 - [ ] Render avatars from definition data.
-- [ ] Preserve networked effect parameters and connect `startAnimation` to the
-  renderer/network path.
+- [ ] Connect `startAnimation` to the renderer/network path. Networked effect
+  parameters are now preserved by the public effect subscription.
 - [x] Correct peer item counts.
 - [ ] Correct host-migration diagnostics.
 - [ ] Add collision, network, environment, and behavior visual laboratories.

@@ -160,6 +160,11 @@ identity from that ticket and returns the authenticated user in JOIN_ACCEPTED;
 the browser never declares its own identity in JOIN. See
 `docs/HOST_INTEGRATION.md` for the ticket and origin contract.
 
+Applications can subscribe to authenticated presence, complete canonical
+entity and behavior state, and effects through `CanvasRuntime`. Snapshot streams
+replay their newest frozen value to late subscribers; see
+`docs/LIBRARY_CONTRACT.md` for the ownership and observation contract.
+
 ## Add a behavior
 
 A behavior consumes normalized events and returns commands. It never touches

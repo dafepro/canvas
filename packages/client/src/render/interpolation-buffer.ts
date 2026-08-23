@@ -40,6 +40,12 @@ export class InterpolationBuffer {
     return this.samples.length;
   }
 
+  /** Complete newest canonical sample, without interpolation or prediction. */
+  latest(): RenderEntity[] {
+    const newest = this.samples[this.samples.length - 1];
+    return newest ? [...newest.entities.values()] : [];
+  }
+
   /** Clears history. Call it when the host epoch changes (spec 11.2). */
   reset(): void {
     this.samples = [];
@@ -67,12 +73,14 @@ export class InterpolationBuffer {
       // Spec 19.3. A delta leaves out the definition id, so the value from the
       // last keyframe is carried forward.
       const before = merged.get(entity.id);
-      merged.set(
-        entity.id,
-        entity.definitionId || !before
-          ? entity
-          : { ...entity, definitionId: before.definitionId },
-      );
+      merged.set(entity.id, {
+        ...before,
+        ...entity,
+        definitionId: entity.definitionId || before?.definitionId || "",
+        behaviorState: entity.behaviorState ?? before?.behaviorState,
+        userId: entity.userId ?? before?.userId,
+        ownerUserId: entity.ownerUserId ?? before?.ownerUserId,
+      });
     }
     for (const id of removed) merged.delete(id);
     this.samples.push({ tick, receivedAtMs: nowMs, entities: merged });
