@@ -22,6 +22,27 @@ append `&kickAnimation=0` to other flags) to hide the deformation atlas while
 testing the ball's physical rotation. The service listens on port 8082 and
 stores local state under `examples/soccer-lounge/.data`.
 
+The example selects Canvas's `avatarDrag` pointer mode: touch or click the local
+avatar and drag it toward a target. Canvas converts that target into ordinary
+movement intent, so acceleration and collisions remain authoritative rather
+than teleporting the avatar. Keyboard movement remains available.
+
+Both development processes listen on all network interfaces. To join from a
+device on the same network, replace `localhost` with the development computer's
+LAN address, for example `http://LAN-IP:5174/?autojoin=1&user=phone`.
+The client automatically connects to port 8082 on the same host. A host firewall
+must allow inbound TCP ports 5174 and 8082, and the network must allow devices to
+communicate with one another.
+
+On Windows, run the included setup script from an administrator PowerShell once:
+
+```powershell
+./examples/soccer-lounge/scripts/allow-windows-lan.ps1
+```
+
+It permits only TCP 5174 and 8082, only from the local subnet, on Private or
+Public network profiles.
+
 The room template materializes one system-owned match ball exactly once when no
 snapshot exists. Participants can kick it but cannot move, reconfigure, rotate,
 or delete it through durable authoring commands.

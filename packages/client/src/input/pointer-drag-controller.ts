@@ -18,10 +18,16 @@ export interface DragGesture {
 }
 
 export interface PointerDragOptions {
+  /** Relative thumbstick by default, or a target that follows the local avatar. */
+  mode?: "thumbstick" | "avatarDrag";
   /** Drag distance in pixels that maps to full intensity. */
   fullRangePx?: number;
   /** Dead zone in pixels. */
   deadZonePx?: number;
+  /** Touch radius around the avatar in avatarDrag mode. */
+  grabRadiusPx?: number;
+  /** Current local-avatar position in element pixels. Required by avatarDrag. */
+  avatarPosition?: () => Vec2 | undefined;
 }
 
 /**
@@ -29,31 +35,58 @@ export interface PointerDragOptions {
  * authoritative position, so a pointer jump cannot teleport through a wall.
  */
 export class PointerDragController {
+  private activePointerId?: number;
   private origin?: { x: number; y: number };
   private originLocal?: Vec2;
   private pointLocal?: Vec2;
+  private grabOffset?: Vec2;
   private current: DragIntent = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
+  private readonly mode: "thumbstick" | "avatarDrag";
   private readonly fullRangePx: number;
   private readonly deadZonePx: number;
+  private readonly grabRadiusPx: number;
+  private readonly avatarPosition?: () => Vec2 | undefined;
   private readonly detach: () => void;
 
   constructor(
     private readonly element: HTMLElement,
     options: PointerDragOptions = {},
   ) {
+    this.mode = options.mode ?? "thumbstick";
     this.fullRangePx = options.fullRangePx ?? 90;
     this.deadZonePx = options.deadZonePx ?? 6;
+    this.grabRadiusPx = options.grabRadiusPx ?? 32;
+    this.avatarPosition = options.avatarPosition;
 
     const onDown = (event: PointerEvent) => {
+      if (this.activePointerId !== undefined) return;
+      const point = this.toLocal(event);
+      if (this.mode === "avatarDrag") {
+        const avatar = this.avatarPosition?.();
+        if (
+          !avatar ||
+          Math.hypot(point.x - avatar.x, point.y - avatar.y) > this.grabRadiusPx
+        ) {
+          return;
+        }
+        this.grabOffset = { x: avatar.x - point.x, y: avatar.y - point.y };
+      }
+      event.preventDefault();
       this.element.setPointerCapture(event.pointerId);
+      this.activePointerId = event.pointerId;
       this.origin = { x: event.clientX, y: event.clientY };
-      this.originLocal = this.toLocal(event);
+      this.originLocal = point;
       this.pointLocal = { ...this.originLocal };
       this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: true };
     };
     const onMove = (event: PointerEvent) => {
-      if (!this.origin) return;
+      if (event.pointerId !== this.activePointerId || !this.origin) return;
+      event.preventDefault();
       this.pointLocal = this.toLocal(event);
+      if (this.mode === "avatarDrag") {
+        this.updateAvatarDragIntent();
+        return;
+      }
       const dx = event.clientX - this.origin.x;
       const dy = event.clientY - this.origin.y;
       const distance = Math.hypot(dx, dy);
@@ -69,12 +102,15 @@ export class PointerDragController {
       };
     };
     const onUp = (event: PointerEvent) => {
+      if (event.pointerId !== this.activePointerId) return;
       if (this.element.hasPointerCapture(event.pointerId)) {
         this.element.releasePointerCapture(event.pointerId);
       }
+      this.activePointerId = undefined;
       this.origin = undefined;
       this.originLocal = undefined;
       this.pointLocal = undefined;
+      this.grabOffset = undefined;
       // Release decelerates to zero through avatar drag.
       this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
     };
@@ -92,6 +128,9 @@ export class PointerDragController {
   }
 
   get intent(): DragIntent {
+    if (this.mode === "avatarDrag" && this.current.held) {
+      this.updateAvatarDragIntent();
+    }
     return this.current;
   }
 
@@ -100,7 +139,9 @@ export class PointerDragController {
    * player can see what the gesture means.
    */
   get gesture(): DragGesture | undefined {
-    if (!this.originLocal || !this.pointLocal) return undefined;
+    if (this.mode !== "thumbstick" || !this.originLocal || !this.pointLocal) {
+      return undefined;
+    }
     return {
       origin: { ...this.originLocal },
       point: { ...this.pointLocal },
@@ -112,6 +153,30 @@ export class PointerDragController {
   private toLocal(event: PointerEvent): Vec2 {
     const rect = this.element.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  private updateAvatarDragIntent(): void {
+    const avatar = this.avatarPosition?.();
+    if (!avatar || !this.pointLocal || !this.grabOffset) {
+      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: true };
+      return;
+    }
+    const target = {
+      x: this.pointLocal.x + this.grabOffset.x,
+      y: this.pointLocal.y + this.grabOffset.y,
+    };
+    const dx = target.x - avatar.x;
+    const dy = target.y - avatar.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance <= this.deadZonePx) {
+      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: true };
+      return;
+    }
+    this.current = {
+      direction: { x: dx / distance, y: dy / distance },
+      intensity: Math.min(1, (distance - this.deadZonePx) / this.fullRangePx),
+      held: true,
+    };
   }
 
   destroy(): void {

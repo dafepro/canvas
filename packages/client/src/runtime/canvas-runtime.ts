@@ -9,7 +9,10 @@ import type { RealtimeCredentialProvider } from "../net/websocket-transport.js";
 import { PixiScene, type SceneOptions } from "../render/pixi-scene.js";
 import { FrameProfiler } from "../render/frame-profiler.js";
 import { KeyboardController } from "../input/keyboard-controller.js";
-import { PointerDragController } from "../input/pointer-drag-controller.js";
+import {
+  PointerDragController,
+  type PointerDragOptions,
+} from "../input/pointer-drag-controller.js";
 import {
   ItemEditController,
   findOwnedItemAt,
@@ -63,6 +66,8 @@ export interface CanvasRuntimeOptions {
   /** Rates from spec 10.3. */
   rates?: RoomSessionRates;
   scene?: SceneOptions;
+  /** Pointer/touch movement style. Defaults to a relative thumbstick. */
+  pointer?: Omit<PointerDragOptions, "avatarPosition">;
   /** Consumer-owned art. Required sources preload before the room connection opens. */
   assets?: AssetManifest;
   /** Advanced override for tests or a consumer-specific texture loader. */
@@ -288,6 +293,21 @@ export class CanvasRuntime {
     await this.scene.mount(this.options.mount);
     this.pointer = new PointerDragController(
       this.scene.app.canvas as unknown as HTMLElement,
+      {
+        ...this.options.pointer,
+        avatarPosition: () => {
+          const scene = this.scene;
+          if (!scene) return undefined;
+          const avatar = this.latestEntities.find(
+            (entity) => entity.kind === "avatar" && entity.userId === this.session.userId,
+          );
+          if (!avatar) return undefined;
+          return {
+            x: scene.camera.toScreenX(avatar.x),
+            y: scene.camera.toScreenY(avatar.y),
+          };
+        },
+      },
     );
     this.editor = new ItemEditController(
       this.scene.app.canvas as unknown as HTMLElement,

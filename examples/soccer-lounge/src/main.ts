@@ -151,6 +151,12 @@ const join = async (): Promise<void> => {
         background: 0x165c31,
         debug: searchParams.has("debug"),
       },
+      pointer: {
+        mode: "avatarDrag",
+        grabRadiusPx: 32,
+        deadZonePx: 3,
+        fullRangePx: 28,
+      },
       onAssetProgress: ({ loaded, total }) => {
         status.textContent = `Loading lounge art… ${loaded}/${total}`;
       },
