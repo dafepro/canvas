@@ -81,7 +81,8 @@ work below because they determine the public boundary every consumer will use.
   - [x] Behavior metadata, deterministic replay, sleep normalization, and
     durable migration cases through `@canvas-physics/core/testing`.
   - [x] Host authentication adapters through the Go `roomsdktest` package.
-  - [ ] Host stores.
+  - [x] Host stores, including stale/concurrent ordering and optional durable
+    adapter reopen, through the Go `roomsdktest` package.
   - [ ] Custom room transports.
   - [ ] Application-owned worker bundles.
 - [ ] Exercise packed release artifacts from a separate fixture application.

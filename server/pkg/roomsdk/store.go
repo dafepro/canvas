@@ -52,7 +52,9 @@ type SnapshotRecord struct {
 }
 
 // Store is the persistence port. Replace MemoryStore with a database-backed
-// implementation without touching the realtime code.
+// implementation without touching the realtime code. Missing records return
+// ErrNotFound and no partial record. Snapshot saves are isolated by RoomID and
+// an older CheckpointRevision must never replace a newer one.
 type Store interface {
 	LoadCanvas(ctx context.Context, canvasID string) (CanvasRecord, error)
 	LoadItemDefinition(ctx context.Context, definitionID string) (ItemDefinitionRecord, error)

@@ -39,3 +39,8 @@ Non-browser tests may supply `X-User-Id` and `X-Display-Name` to
 An external host should run `roomsdktest.RunAuthenticatorConformance` against
 its production adapter with representative valid, missing, expired, and
 malformed tickets. See `CONFORMANCE_KITS.md`.
+
+Database-backed hosts should also run `roomsdktest.RunStoreConformance` with a
+fresh seeded namespace and a reopen callback. This verifies the catalog,
+not-found, room-isolation, checkpoint-ordering, concurrency, and durability
+semantics used by the rooms service.

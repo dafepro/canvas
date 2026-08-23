@@ -10,7 +10,7 @@ authenticator, store, transport, or worker bundle honors the public contract.
 - [x] Behavior metadata, JSON data, deterministic initialization/replay,
   sleep normalization, and durable migration coverage.
 - [x] Host `Authenticator` implementations.
-- [ ] Host `Store` implementations.
+- [x] Host `Store` implementations.
 - [ ] Custom `RoomTransport` implementations.
 - [ ] Application-owned simulation worker bundles.
 
@@ -74,3 +74,30 @@ func TestProductAuthenticator(t *testing.T) {
 
 The host owns ticket issuance, expiration, origin policy, and replay semantics;
 the kit owns only the identity/error boundary visible to Canvas.
+
+## Store kit
+
+`RunStoreConformance` accepts a `StoreConformanceFixture` whose `NewStore`
+function returns a fresh adapter preloaded with one canvas and item definition.
+The suite verifies semantic JSON equality for catalog records, zero records plus
+`roomsdk.ErrNotFound` for misses, snapshot round trips, room isolation, rejection
+of stale checkpoint revisions, and highest-revision wins under concurrent saves.
+
+Production adapters should also supply `ReopenStore`, which constructs a fresh
+adapter over the same backing data. The suite then proves that the latest
+checkpoint survives loss of process-local state. The volatile `MemoryStore`
+intentionally omits this callback; the reference `FileStore` exercises it.
+
+```go
+func TestProductStore(t *testing.T) {
+    roomsdktest.RunStoreConformance(t, roomsdktest.StoreConformanceFixture{
+        NewStore: loadSeededTestDatabase,
+        ReopenStore: reopenTestDatabase,
+        Canvas: canvasFixture,
+        ItemDefinition: definitionFixture,
+        MissingCanvasID: "missing-canvas",
+        MissingItemDefinitionID: "missing-definition",
+        MissingRoomID: "missing-room",
+    })
+}
+```
