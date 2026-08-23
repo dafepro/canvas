@@ -10,6 +10,7 @@ import {
   type AssetManifest,
 } from "../src/assets/index.js";
 import { CanvasRuntime } from "../src/runtime/canvas-runtime.js";
+import { CanvasConsumerError } from "../src/runtime/lifecycle.js";
 import { SimulationDriver } from "../src/simulation/driver.js";
 import { emptyTraffic, type RoomTransport } from "../src/net/transport.js";
 
@@ -169,6 +170,47 @@ describe("asset manifest", () => {
     await started;
     expect(connect).toHaveBeenCalledOnce();
     runtime.stop();
+  });
+
+  it("reports required preload failures through the typed consumer error model", async () => {
+    const connect = vi.fn(async () => undefined);
+    const onError = vi.fn();
+    const runtime = new CanvasRuntime({
+      roomId: "asset-failure",
+      serverUrl: "http://unused.test",
+      mount: {} as HTMLElement,
+      definitions: [],
+      transport: {
+        connect,
+        sendReliable: vi.fn(),
+        sendRealtime: vi.fn(),
+        onMessage: () => () => undefined,
+        onStatus: () => () => undefined,
+        status: "idle",
+        traffic: emptyTraffic(),
+        close: vi.fn(),
+      },
+      driver: SimulationDriver.local(),
+      assets: {
+        schemaVersion: 1,
+        id: "required-failure",
+        revision: "1",
+        sources: [{ id: "required", src: "/missing.png", required: true }],
+        textures: [{ id: "required", sourceId: "required" }],
+      },
+      assetLoader: fakeAdapter("missing.png") as AssetLoaderAdapter<import("pixi.js").Texture>,
+      onError,
+    });
+
+    await expect(runtime.start()).rejects.toMatchObject({
+      code: "asset_preload_failed",
+      source: "assets",
+      recoverable: false,
+    });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0]).toBeInstanceOf(CanvasConsumerError);
+    expect(connect).not.toHaveBeenCalled();
+    expect(runtime.lifecycleState).toBe("stopped");
   });
 });
 

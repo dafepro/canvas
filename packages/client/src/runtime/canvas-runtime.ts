@@ -35,6 +35,11 @@ import {
   type LoadedAssetBundle,
 } from "../assets/index.js";
 import type { Texture } from "pixi.js";
+import {
+  CanvasConsumerError,
+  lifecycleError,
+  type CanvasLifecycleState,
+} from "./lifecycle.js";
 
 export interface CanvasRuntimeOptions {
   /** Product-owned room instance id. The server resolves its canvas template. */
@@ -56,6 +61,8 @@ export interface CanvasRuntimeOptions {
   assetLoader?: AssetLoaderAdapter<Texture>;
   onAssetProgress?: (progress: Readonly<AssetProgress>) => void;
   onAssetWarning?: (warning: Readonly<AssetWarning>) => void;
+  /** Typed runtime, transport, protocol, simulation, and asset failures. */
+  onError?: (error: CanvasConsumerError) => void;
   onDiagnostics?: (diagnostics: RuntimeDiagnostics) => void;
   /** Addendum A1. Runs after the local avatar changes its disabled state. */
   onAvatarDisabledChange?: (disabled: boolean) => void;
@@ -99,6 +106,7 @@ export class CanvasRuntime {
   private latestEntities: RenderEntity[] = [];
   private disableKeyListener?: (event: KeyboardEvent) => void;
   private assetBundle?: LoadedAssetBundle<Texture>;
+  private startPromise?: Promise<void>;
 
   constructor(private readonly options: CanvasRuntimeOptions) {
     this.session = new RoomSession({
@@ -112,6 +120,7 @@ export class CanvasRuntime {
       intent: () => this.mergedIntent(),
       projectParticipantAvatar: options.projectParticipantAvatar,
       onJoined: (canvas) => this.mountScene(canvas),
+      onError: options.onError,
     });
     this.session.subscribeEffects((emission) => this.scene?.effects.apply(emission));
   }
@@ -137,33 +146,67 @@ export class CanvasRuntime {
     return this.session.subscribeEffects(...args);
   }
 
-  async start(): Promise<void> {
-    this.running = true;
-    try {
-      if (this.options.assets) {
-        this.assetBundle = await preloadAssetManifest(this.options.assets, {
-          adapter: this.options.assetLoader ?? pixiAssetLoader,
-          onProgress: this.options.onAssetProgress,
-          onWarning: this.options.onAssetWarning,
-        });
-      }
-      await this.session.start();
-    } catch (error) {
-      this.running = false;
-      throw error;
+  get lifecycleState(): CanvasLifecycleState {
+    return this.session.lifecycleState;
+  }
+
+  subscribeLifecycle(...args: Parameters<RoomSession["subscribeLifecycle"]>) {
+    return this.session.subscribeLifecycle(...args);
+  }
+
+  whenReady(): Promise<void> {
+    return this.session.whenReady();
+  }
+
+  start(): Promise<void> {
+    if (this.session.lifecycleState === "failed" ||
+        this.session.lifecycleState === "stopping" ||
+        this.session.lifecycleState === "stopped") {
+      return this.session.start();
     }
+    if (this.startPromise) return this.startPromise;
+    this.running = true;
+    const operation = (async () => {
+      try {
+        if (this.options.assets) {
+          this.assetBundle = await preloadAssetManifest(this.options.assets, {
+            adapter: this.options.assetLoader ?? pixiAssetLoader,
+            onProgress: this.options.onAssetProgress,
+            onWarning: this.options.onAssetWarning,
+          });
+        }
+        await this.session.start();
+      } catch (cause) {
+        this.running = false;
+        if (cause instanceof CanvasConsumerError) throw cause;
+        const error = lifecycleError(
+          "asset_preload_failed",
+          cause instanceof Error ? cause.message : "Required assets failed to preload",
+          { source: "assets", cause },
+        );
+        this.session.stop();
+        try {
+          this.options.onError?.(error);
+        } catch {
+          // Keep the typed start rejection stable even if consumer reporting fails.
+        }
+        throw error;
+      }
+    })();
+    this.startPromise = operation;
+    return operation;
   }
 
   stop(): void {
     this.prepareStop();
     this.session.stop();
-    this.scene?.destroy();
+    this.destroyScene();
   }
 
   async stopGracefully(timeoutMs = 250): Promise<void> {
     this.prepareStop();
     await this.session.stopGracefully(timeoutMs);
-    this.scene?.destroy();
+    this.destroyScene();
   }
 
   private prepareStop(): void {
@@ -181,8 +224,17 @@ export class CanvasRuntime {
       this.disableKeyListener = undefined;
     }
     this.pointer?.destroy();
+    this.pointer = undefined;
     this.editor?.destroy();
+    this.editor = undefined;
     this.keyboard?.destroy();
+    this.keyboard = undefined;
+  }
+
+  private destroyScene(): void {
+    const scene = this.scene;
+    this.scene = undefined;
+    scene?.destroy();
   }
 
   private async mountScene(canvas: CanvasDefinition): Promise<void> {

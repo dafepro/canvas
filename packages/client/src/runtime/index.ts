@@ -1,6 +1,7 @@
 export { CanvasRuntime } from "./canvas-runtime.js";
 export type { CanvasRuntimeOptions, RuntimeDiagnostics } from "./canvas-runtime.js";
 export { RoomSession } from "./room-session.js";
+export { CanvasConsumerError } from "./lifecycle.js";
 export type {
   CanonicalStateSnapshot,
   InputIntent,
@@ -13,6 +14,12 @@ export type {
   RoomSessionRates,
   SessionDiagnostics,
 } from "./room-session.js";
+export type {
+  CanvasErrorCode,
+  CanvasErrorSource,
+  CanvasLifecycleSnapshot,
+  CanvasLifecycleState,
+} from "./lifecycle.js";
 export { SimulationDriver } from "../simulation/driver.js";
 export {
   devRealtimeCredential,

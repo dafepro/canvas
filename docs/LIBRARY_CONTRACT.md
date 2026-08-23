@@ -40,6 +40,11 @@ canonical snapshot remains complete.
 Observer callbacks run synchronously at the source update cadence. Consumers
 must enqueue expensive work rather than block simulation or network handling.
 
+`subscribeLifecycle`, `start`, `whenReady`, `stop`, and `stopGracefully` define
+route ownership, backgrounding, reconnect, and terminal teardown. Consumer
+failures use `CanvasConsumerError`, not string parsing. See
+`docs/RUNTIME_LIFECYCLE.md`.
+
 `docs/PARTICIPANT_LIFECYCLE.md` defines identity lifetimes, reconnect
 supersession, inactive/disconnected projection, and the product-owned avatar
 placement hook.
@@ -69,4 +74,5 @@ host application explicitly reconciles that sleeping room with the policies in
 - `EXTENSION_CONTRACT.md` defines application behavior and worker ownership.
 - `HOST_INTEGRATION.md` defines authentication and rooms SDK composition.
 - `ROOM_TEMPLATES.md` defines product room and reusable template identity.
+- `RUNTIME_LIFECYCLE.md` defines readiness, reconnect, teardown, and typed errors.
 - `ARCHITECTURE.md` defines authority and dependency direction inside Canvas.

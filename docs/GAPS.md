@@ -70,7 +70,7 @@ work below because they determine the public boundary every consumer will use.
   conflicting resolver changes fail closed. Explicit offline reconciliation
   can adopt a new template/version and add, replace, or retire desired system
   items with participant-item protection.
-- [ ] Define start, stop, reconnect, remount, background, and route-unmount
+- [x] Define start, stop, reconnect, remount, background, and route-unmount
   lifecycle behavior with a typed consumer error model.
 - [ ] Provide renderer-safe projection and bounded overlay observation helpers.
 

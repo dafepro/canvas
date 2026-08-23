@@ -27,6 +27,12 @@ import {
 import { InterpolationBuffer } from "../render/interpolation-buffer.js";
 import { SimulationDriver } from "../simulation/driver.js";
 import type { RenderEntity, SimulationResponse } from "../simulation/messages.js";
+import {
+  CanvasConsumerError,
+  lifecycleError,
+  type CanvasLifecycleSnapshot,
+  type CanvasLifecycleState,
+} from "./lifecycle.js";
 
 /** One sample of movement intent, from a pointer, a key, or a test. */
 export interface InputIntent {
@@ -84,7 +90,8 @@ export interface RoomSessionOptions {
     snapshot: CanvasSnapshot,
     wasSleeping: boolean,
   ) => void | Promise<void>;
-  onError?: (message: string) => void;
+  /** Stable application-facing failures; consumers never need to parse strings. */
+  onError?: (error: CanvasConsumerError) => void;
 }
 
 export type ParticipantStatus = "active" | "inactive" | "disconnected";
@@ -218,6 +225,16 @@ export class RoomSession {
   private itemCount = 0;
   private commandCounter = 0;
   private running = false;
+  private lifecycle: CanvasLifecycleState = "idle";
+  private lifecycleSnapshot: CanvasLifecycleSnapshot = Object.freeze({ state: "idle" });
+  private readonly lifecycleObservers = new Set<Observer<CanvasLifecycleSnapshot>>();
+  private readonly readyWaiters = new Set<{
+    resolve: () => void;
+    reject: (error: CanvasConsumerError) => void;
+  }>();
+  private startPromise?: Promise<void>;
+  private terminalError?: CanvasConsumerError;
+  private pageVisible = true;
   private readonly lastBehaviorJson = new Map<string, string>();
   private readonly countdowns = new Set<string>();
   private readonly lastSent = new Map<string, SentSample>();
@@ -308,13 +325,84 @@ export class RoomSession {
     return () => this.effectObservers.delete(observer);
   }
 
-  async start(): Promise<void> {
+  get lifecycleState(): CanvasLifecycleState {
+    return this.lifecycle;
+  }
+
+  subscribeLifecycle(observer: Observer<CanvasLifecycleSnapshot>): () => void {
+    this.lifecycleObservers.add(observer);
+    observer(this.lifecycleSnapshot);
+    return () => this.lifecycleObservers.delete(observer);
+  }
+
+  /** Resolves after JOIN and consumer initialization (including scene mount). */
+  whenReady(): Promise<void> {
+    if (this.lifecycle === "active" || this.lifecycle === "backgrounded") {
+      return Promise.resolve();
+    }
+    if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
+        this.lifecycle === "stopped") {
+      return Promise.reject(
+        this.terminalError ?? lifecycleError(
+          "invalid_lifecycle_state",
+          `Room session cannot become ready after it is ${this.lifecycle}`,
+        ),
+      );
+    }
+    return new Promise<void>((resolve, reject) => {
+      this.readyWaiters.add({ resolve, reject });
+    });
+  }
+
+  /** Opens the transport and sends JOIN. Use whenReady() to await initialization. */
+  start(): Promise<void> {
+    if (this.lifecycle === "failed" || this.lifecycle === "stopped" ||
+        this.lifecycle === "stopping") {
+      return Promise.reject(lifecycleError(
+        "invalid_lifecycle_state",
+        `Room session is single-use and cannot start after it is ${this.lifecycle}`,
+      ));
+    }
+    if (this.startPromise) return this.startPromise;
+
     this.running = true;
-    await this.client.connect();
+    this.transition("starting");
+    const operation = this.client.connect().then(() => {
+      if (this.lifecycle === "stopping" || this.lifecycle === "stopped") {
+        throw lifecycleError(
+          "start_cancelled",
+          "Room session start was cancelled by stop",
+        );
+      }
+      if (this.lifecycle === "starting") this.transition("joining");
+    }).catch((cause: unknown) => {
+      if (cause instanceof CanvasConsumerError && cause.code === "start_cancelled") {
+        throw cause;
+      }
+      if (this.lifecycle === "stopping" || this.lifecycle === "stopped") {
+        throw lifecycleError(
+          "start_cancelled",
+          "Room session start was cancelled by stop",
+          { cause },
+        );
+      }
+      const error = lifecycleError(
+        "transport_connection_failed",
+        cause instanceof Error ? cause.message : "Room transport failed to connect",
+        { source: "transport", cause },
+      );
+      this.fail(error);
+      throw error;
+    });
+    this.startPromise = operation;
+    return operation;
   }
 
   stop(): void {
+    if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
+        this.lifecycle === "stopped") return;
     this.running = false;
+    this.transition("stopping");
     this.clearTimers();
     this.finishStop();
   }
@@ -325,6 +413,8 @@ export class RoomSession {
    * periodic checkpoint remains explicitly unnormalized on the server.
    */
   async stopGracefully(timeoutMs = 250): Promise<void> {
+    if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
+        this.lifecycle === "stopped") return;
     const isLastHost =
       this.running &&
       this.simulationReady &&
@@ -337,6 +427,7 @@ export class RoomSession {
     }
 
     this.running = false;
+    this.transition("stopping");
     this.clearTimers();
     const sent = new Promise<void>((resolve) => {
       this.finalCheckpointSent = resolve;
@@ -369,6 +460,12 @@ export class RoomSession {
   }
 
   private finishStop(): void {
+    this.terminateResources();
+    this.transition("stopped");
+    this.lifecycleObservers.clear();
+  }
+
+  private terminateResources(): void {
     if (this.terminated) return;
     this.terminated = true;
     this.finalCheckpointSent?.();
@@ -381,11 +478,88 @@ export class RoomSession {
     this.effectObservers.clear();
   }
 
+  private transition(state: CanvasLifecycleState, detail?: string): void {
+    if (this.lifecycle === state && this.lifecycleSnapshot.detail === detail) return;
+    const previousState = this.lifecycle;
+    this.lifecycle = state;
+    this.lifecycleSnapshot = Object.freeze({ state, previousState, detail });
+    for (const observer of this.lifecycleObservers) observer(this.lifecycleSnapshot);
+
+    if (state === "active" || state === "backgrounded") {
+      for (const waiter of this.readyWaiters) waiter.resolve();
+      this.readyWaiters.clear();
+    } else if (state === "failed" || state === "stopped") {
+      const error = this.terminalError ?? lifecycleError(
+        "invalid_lifecycle_state",
+        `Room session cannot become ready after it is ${state}`,
+      );
+      for (const waiter of this.readyWaiters) waiter.reject(error);
+      this.readyWaiters.clear();
+    }
+  }
+
+  private reportError(error: CanvasConsumerError): void {
+    this.lastRejection = error.message;
+    try {
+      this.options.onError?.(error);
+    } catch {
+      // A consumer callback must not prevent terminal resource cleanup or
+      // replace the typed error rejected by start()/whenReady().
+    }
+  }
+
+  private fail(error: CanvasConsumerError): void {
+    if (this.lifecycle === "failed" || this.lifecycle === "stopped") return;
+    this.running = false;
+    this.terminalError = error;
+    this.clearTimers();
+    this.transition("failed", error.message);
+    this.terminateResources();
+    this.reportError(error);
+  }
+
+  private isTerminalOrStopping(): boolean {
+    return this.lifecycle === "stopping" || this.lifecycle === "stopped" ||
+      this.lifecycle === "failed";
+  }
+
   // ---------- coordination ----------
 
   private wireClient(): void {
     this.client.on("joined", (result) => {
-      void this.onJoined(result.canvas, result.snapshot, result.roomWasSleeping);
+      void this.acceptJoin(result.canvas, result.snapshot, result.roomWasSleeping);
+    });
+
+    this.client.on("status", (status, detail) => {
+      if (this.lifecycle === "stopping" || this.lifecycle === "stopped" ||
+          this.lifecycle === "failed") return;
+      switch (status) {
+        case "connecting":
+          if (this.lifecycle === "idle") this.transition("starting", detail);
+          break;
+        case "open":
+          this.transition("joining", detail);
+          break;
+        case "reconnecting":
+          this.transition("reconnecting", detail);
+          break;
+        case "failed":
+          this.fail(lifecycleError(
+            "transport_reconnect_exhausted",
+            detail || "Room transport exhausted its reconnect attempts",
+            { source: "transport" },
+          ));
+          break;
+        case "closed":
+          this.fail(lifecycleError(
+            "transport_closed",
+            detail || "Room transport closed unexpectedly",
+            { source: "transport" },
+          ));
+          break;
+        case "idle":
+          break;
+      }
     });
 
     this.client.on("hostGranted", (_epoch, snapshot) => {
@@ -499,13 +673,19 @@ export class RoomSession {
     });
 
     this.client.on("durableRejected", (_command, reason) => {
-      this.lastRejection = reason;
-      this.options.onError?.(reason);
+      this.reportError(lifecycleError(
+        "durable_command_rejected",
+        reason,
+        { source: "durable-command", recoverable: true },
+      ));
     });
 
     this.client.on("error", (code, message) => {
-      this.lastRejection = `${code}: ${message}`;
-      this.options.onError?.(this.lastRejection);
+      this.fail(lifecycleError(
+        "server_rejected",
+        `${code}: ${message}`,
+        { source: "protocol", details: { serverCode: code } },
+      ));
     });
   }
 
@@ -631,6 +811,25 @@ export class RoomSession {
       return { x: spawn.x + (Math.random() - 0.5) * 6, y: spawn.y };
     }
     return { x: 10, y: 10 };
+  }
+
+  private async acceptJoin(
+    canvas: CanvasDefinition,
+    snapshot: CanvasSnapshot,
+    wasSleeping: boolean,
+  ): Promise<void> {
+    if (this.isTerminalOrStopping()) return;
+    try {
+      await this.onJoined(canvas, snapshot, wasSleeping);
+      if (this.isTerminalOrStopping()) return;
+      this.transition(this.pageVisible ? "active" : "backgrounded");
+    } catch (cause) {
+      this.fail(lifecycleError(
+        "join_initialization_failed",
+        cause instanceof Error ? cause.message : "Room initialization failed",
+        { source: "initialization", cause },
+      ));
+    }
   }
 
   private async onJoined(
@@ -963,9 +1162,15 @@ export class RoomSession {
 
   /** Spec 11.4. The runtime reports page visibility; the session yields. */
   setPageVisible(visible: boolean): void {
+    this.pageVisible = visible;
     this.client.health.pageVisible = visible;
     if (!visible && this.client.isHost) this.client.yieldHost("page_hidden");
     this.client.setHostEligible(visible);
+    if (!visible && this.lifecycle === "active") {
+      this.transition("backgrounded");
+    } else if (visible && this.lifecycle === "backgrounded") {
+      this.transition("active");
+    }
   }
 
   // ---------- simulation messages ----------
@@ -1022,8 +1227,11 @@ export class RoomSession {
         }
         break;
       case "error":
-        this.lastRejection = `simulation: ${message.message}`;
-        this.options.onError?.(this.lastRejection);
+        this.reportError(lifecycleError(
+          "simulation_failed",
+          message.message,
+          { source: "simulation", recoverable: true },
+        ));
         break;
     }
   }

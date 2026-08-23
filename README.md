@@ -177,6 +177,7 @@ export const enterCanvasRoute = async () => {
     definitions: productCanvasDefinitions,
   });
   await runtime.start();
+  await runtime.whenReady();
   return runtime;
 };
 ```
