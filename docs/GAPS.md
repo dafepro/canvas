@@ -36,9 +36,10 @@ downward. Check an item only after the relevant focused tests pass.
   peers; eliminate duplicate avatars and ghost colliders.
 - [x] Wire behavior-state migrations into snapshot loading and preserve actual
   behavior/definition versions in checkpoints.
-- [ ] Complete durable editing: public rotate and set-config APIs, live config
-  application, preview handling, selection/ghost UI, rate limiting, and final
-  release commits.
+- [x] Add public rotate and set-config APIs, use server-authoritative accepted
+  transforms, and apply accepted configuration to the live host behavior.
+- [ ] Complete durable editing previews, selection/ghost UI, rate limiting, and
+  final release commits.
 - [ ] Add a durable Store implementation for the reference service so process
   restarts preserve canvases and snapshots.
 

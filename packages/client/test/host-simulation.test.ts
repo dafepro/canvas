@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   BehaviorRegistry,
+  defaultRocketConfig,
   KickableBehavior,
   MigrationChain,
   PortalBehavior,
@@ -485,6 +486,21 @@ describe("HostSimulation with real physics", () => {
     );
 
     expect(simulation.snapshot().items[0]?.definitionVersion).toBe(7);
+    simulation.free();
+  });
+
+  it("applies resolved config changes to the live behavior and its checkpoint", () => {
+    const simulation = build();
+    simulation.addItem(
+      instance("rocket-1", rocketDefinition as ItemDefinition, 70, 62),
+    );
+    const updated = { ...defaultRocketConfig, countdownSeconds: 0.25 };
+
+    simulation.setItemConfig("rocket-1", updated);
+
+    expect(simulation.behaviors.slot("rocket-1")?.config).toEqual(updated);
+    expect(simulation.world.registry.require("rocket-1").behavior?.config).toEqual(updated);
+    expect(simulation.snapshot().items[0]?.resolvedConfig).toEqual(updated);
     simulation.free();
   });
 

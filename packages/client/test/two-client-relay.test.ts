@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { defaultRocketConfig } from "@canvas-physics/core";
 import {
   RapierWorld,
   RoomSession,
@@ -111,6 +112,60 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
 
     // The server owns the record, so the spawning user owns the item.
     expect(hostCrate.ownerUserId).toBe("bob");
+
+    bob.rotateItem(crateId, Math.PI / 4);
+    await waitFor(
+      "the host to apply the owner's durable rotation",
+      () => Math.abs((entity(alice, crateId)?.rotation ?? 0) - Math.PI / 4) < 0.1,
+    );
+  }, 90_000);
+
+  it("applies an owner's durable config change to the live behavior", async () => {
+    const alice = session("alice");
+    await alice.start();
+    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+
+    const bob = session("bob");
+    await bob.start();
+    await waitFor("bob to receive host state", () => view(bob).length > 0);
+
+    bob.spawnItem(rocketDefinition.definitionId, { x: 70, y: 62 });
+    await waitFor("the host to add the rocket", () => items(alice).length === 1);
+    const rocketId = items(alice)[0]!.id;
+    bob.setItemConfig(rocketId, {
+      ...defaultRocketConfig,
+      countdownSeconds: 0.25,
+      graceSeconds: 1,
+    });
+    bob.moveItem(rocketId, { x: 50, y: 62, rotation: 0 });
+
+    await waitFor(
+      "both durable edits to settle",
+      () => bob.client.sceneRevision >= 3 || bob.diagnostics().lastRejection !== undefined,
+    );
+    expect(bob.diagnostics().lastRejection).toBeUndefined();
+
+    await waitFor(
+      "the moved rocket to arm",
+      () =>
+        (entity(alice, rocketId)?.behaviorState as { phase?: string } | undefined)
+          ?.phase === "arming",
+      2_000,
+    );
+    expect(
+      (entity(alice, rocketId)?.behaviorState as { countdownTicks?: number } | undefined)
+        ?.countdownTicks,
+    ).toBe(15);
+    await waitFor(
+      "the updated short countdown to launch the rocket",
+      () => {
+        const state = entity(alice, rocketId)?.behaviorState as
+          | { phase?: string; launchCount?: number }
+          | undefined;
+        return state?.phase === "flying" && state.launchCount === 1;
+      },
+      1_500,
+    );
   }, 90_000);
 
   it("moves the peer avatar on the host from relayed input", async () => {

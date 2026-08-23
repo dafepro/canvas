@@ -197,6 +197,14 @@ export class CanvasRuntime {
     this.session.moveItem(entityId, transform, preview);
   }
 
+  rotateItem(entityId: string, rotation: number): void {
+    this.session.rotateItem(entityId, rotation);
+  }
+
+  setItemConfig(entityId: string, config: unknown): void {
+    this.session.setItemConfig(entityId, config);
+  }
+
   deleteItem(entityId: string): void {
     this.session.deleteItem(entityId);
   }

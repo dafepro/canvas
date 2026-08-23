@@ -775,6 +775,36 @@ export class RoomSession {
     });
   }
 
+  rotateItem(entityId: string, rotation: number): void {
+    this.client.sendDurableCommand({
+      commandId: this.nextCommandId(),
+      kind: DurableCommandKind.DURABLE_ROTATE_ITEM,
+      entityId,
+      definitionId: "",
+      definitionVersion: 0,
+      position: undefined,
+      rotation,
+      z: 0,
+      configJson: new Uint8Array(),
+      preview: false,
+    });
+  }
+
+  setItemConfig(entityId: string, config: unknown): void {
+    this.client.sendDurableCommand({
+      commandId: this.nextCommandId(),
+      kind: DurableCommandKind.DURABLE_SET_CONFIG,
+      entityId,
+      definitionId: "",
+      definitionVersion: 0,
+      position: undefined,
+      rotation: 0,
+      z: 0,
+      configJson: toJsonBytes(config),
+      preview: false,
+    });
+  }
+
   deleteItem(entityId: string): void {
     this.client.sendDurableCommand({
       commandId: this.nextCommandId(),
@@ -827,19 +857,32 @@ export class RoomSession {
         this.driver.send({ type: "removeItem", entityId: command.entityId });
         break;
       case DurableCommandKind.DURABLE_MOVE_ITEM:
-      case DurableCommandKind.DURABLE_ROTATE_ITEM:
+      case DurableCommandKind.DURABLE_ROTATE_ITEM: {
+        const transform =
+          item?.transform ??
+          (command.kind === DurableCommandKind.DURABLE_MOVE_ITEM
+            ? {
+                x: command.position?.x ?? 0,
+                y: command.position?.y ?? 0,
+                rotation: command.rotation,
+                z: command.z || undefined,
+              }
+            : undefined);
+        if (!transform) break;
         this.driver.send({
           type: "moveItem",
           entityId: command.entityId,
-          transform: {
-            x: command.position?.x ?? 0,
-            y: command.position?.y ?? 0,
-            rotation: command.rotation,
-            z: command.z || undefined,
-          },
+          transform,
           preview: command.preview,
         });
         break;
+      }
+      case DurableCommandKind.DURABLE_SET_CONFIG: {
+        const config = item?.resolvedConfig ?? fromJsonBytes(command.configJson);
+        if (config === undefined) break;
+        this.driver.send({ type: "setItemConfig", entityId: command.entityId, config });
+        break;
+      }
     }
   }
 

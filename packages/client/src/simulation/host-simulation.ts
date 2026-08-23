@@ -130,6 +130,13 @@ export class HostSimulation {
     this.lastSentTransforms.delete(entityId);
   }
 
+  setItemConfig(entityId: string, config: unknown): boolean {
+    const entity = this.world.registry.get(entityId);
+    if (!entity?.behavior || !this.behaviors.setConfig(entityId, config)) return false;
+    entity.behavior.config = config;
+    return true;
+  }
+
   addAvatar(spawn: AvatarSpawn): Entity {
     return this.world.addAvatar(spawn);
   }

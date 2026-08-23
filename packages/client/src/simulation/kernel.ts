@@ -153,6 +153,10 @@ export class SimulationKernel {
         );
         break;
 
+      case "setItemConfig":
+        this.simulation?.setItemConfig(request.entityId, request.config);
+        break;
+
       case "requestSnapshot": {
         if (!this.simulation) break;
         const metadata = {

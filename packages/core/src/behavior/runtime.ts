@@ -99,6 +99,13 @@ export class BehaviorRuntime {
     return this.slots.get(entityId);
   }
 
+  setConfig(entityId: EntityId, config: unknown): boolean {
+    const slot = this.slots.get(entityId);
+    if (!slot) return false;
+    slot.config = config;
+    return true;
+  }
+
   all(): BehaviorSlot[] {
     return [...this.slots.values()];
   }
