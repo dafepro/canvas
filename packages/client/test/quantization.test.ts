@@ -16,6 +16,7 @@ describe("realtime transform quantization", () => {
       angularVelocity: -0.8764,
       z: 2.345,
       vz: -1.234,
+      scale: 1.375,
     };
     const decoded = dequantizeTransform(quantizeTransform(source));
 
@@ -24,6 +25,7 @@ describe("realtime transform quantization", () => {
     expect(Math.abs(decoded.rotation - source.rotation)).toBeLessThanOrEqual(0.00051);
     expect(Math.abs(decoded.vx - source.vx)).toBeLessThanOrEqual(0.0051);
     expect(Math.abs(decoded.angularVelocity - source.angularVelocity)).toBeLessThanOrEqual(0.00051);
+    expect(Math.abs(decoded.scale - source.scale)).toBeLessThanOrEqual(0.00051);
   });
 
   it("keeps a representative realtime entity within its byte budget", () => {
@@ -48,9 +50,10 @@ describe("realtime transform quantization", () => {
         angularVelocity: -0.876,
         z: 2.34,
         vz: -1.23,
+        scale: 1,
       }),
     }).finish();
 
-    expect(quantized.byteLength).toBeLessThanOrEqual(48);
+    expect(quantized.byteLength).toBeLessThanOrEqual(50);
   });
 });

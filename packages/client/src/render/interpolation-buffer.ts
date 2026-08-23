@@ -144,6 +144,8 @@ export class InterpolationBuffer {
         x: from.x + (target.x - from.x) * t,
         y: from.y + (target.y - from.y) * t,
         rotation: from.rotation + shortestAngle(from.rotation, target.rotation) * t,
+        scale:
+          (from.scale ?? 1) + ((target.scale ?? 1) - (from.scale ?? 1)) * t,
         z:
           from.z !== undefined && target.z !== undefined
             ? from.z + (target.z - from.z) * t

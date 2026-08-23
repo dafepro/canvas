@@ -25,6 +25,11 @@ var (
 	errInvalidTimer       = errors.New("checkpoint contains invalid behavior timer state")
 )
 
+const (
+	minItemScale = 0.25
+	maxItemScale = 4.0
+)
+
 // handleDurableCommand enforces ownership before the command reaches the
 // simulation host (spec 14.1). Client-host physics does not grant edit rights.
 func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) {
@@ -58,7 +63,8 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 		return
 	}
 	if command.Kind == pb.DurableCommandKind_DURABLE_MOVE_ITEM ||
-		command.Kind == pb.DurableCommandKind_DURABLE_DELETE_ITEM {
+		command.Kind == pb.DurableCommandKind_DURABLE_DELETE_ITEM ||
+		command.Kind == pb.DurableCommandKind_DURABLE_SCALE_ITEM {
 		delete(r.previews, command.EntityId)
 	}
 
@@ -124,6 +130,7 @@ func (r *Room) cancelPreviews(client *Client) {
 				Y: float32(item.Transform.Y),
 			},
 			Rotation: float32(item.Transform.Rotation),
+			Scale:    float32(item.Transform.Scale),
 			Preview:  true,
 		}
 		if item.Transform.Z != nil {
@@ -173,6 +180,9 @@ func (r *Room) validateDurable(
 		if !transform.finite() {
 			return false, nil, "non_finite_transform"
 		}
+		if transform.Scale < minItemScale || transform.Scale > maxItemScale {
+			return false, nil, "scale_out_of_range"
+		}
 		if !r.insideCanvas(transform) {
 			return false, nil, "outside_canvas"
 		}
@@ -181,6 +191,7 @@ func (r *Room) validateDurable(
 	case pb.DurableCommandKind_DURABLE_DELETE_ITEM,
 		pb.DurableCommandKind_DURABLE_MOVE_ITEM,
 		pb.DurableCommandKind_DURABLE_ROTATE_ITEM,
+		pb.DurableCommandKind_DURABLE_SCALE_ITEM,
 		pb.DurableCommandKind_DURABLE_SET_CONFIG:
 
 		item, ok := r.items[command.EntityId]
@@ -202,6 +213,10 @@ func (r *Room) validateDurable(
 			if !r.insideCanvas(transform) {
 				return false, nil, "outside_canvas"
 			}
+		}
+		if command.Kind == pb.DurableCommandKind_DURABLE_SCALE_ITEM &&
+			(float64(command.Scale) < minItemScale || float64(command.Scale) > maxItemScale) {
+			return false, nil, "scale_out_of_range"
 		}
 		if command.Kind == pb.DurableCommandKind_DURABLE_SET_CONFIG &&
 			len(command.ConfigJson) > 0 &&
@@ -264,6 +279,9 @@ func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, clie
 	case pb.DurableCommandKind_DURABLE_ROTATE_ITEM:
 		item.Transform.Rotation = float64(command.Rotation)
 
+	case pb.DurableCommandKind_DURABLE_SCALE_ITEM:
+		item.Transform.Scale = float64(command.Scale)
+
 	case pb.DurableCommandKind_DURABLE_SET_CONFIG:
 		if len(command.ConfigJson) > 0 {
 			item.ResolvedConfig = json.RawMessage(command.ConfigJson)
@@ -272,7 +290,14 @@ func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, clie
 }
 
 func transformOf(command *pb.DurableCommand) Transform {
-	transform := Transform{Rotation: float64(command.Rotation)}
+	scale := float64(command.Scale)
+	if scale == 0 && command.Kind != pb.DurableCommandKind_DURABLE_SCALE_ITEM {
+		scale = 1
+	}
+	transform := Transform{
+		Rotation: float64(command.Rotation),
+		Scale:    scale,
+	}
 	if command.Position != nil {
 		transform.X = float64(command.Position.X)
 		transform.Y = float64(command.Position.Y)

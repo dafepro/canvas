@@ -8,16 +8,18 @@ import (
 
 // Transform mirrors the client Transform type.
 type Transform struct {
-	X        float64  `json:"x"`
-	Y        float64  `json:"y"`
-	Rotation float64  `json:"rotation"`
-	Z        *float64 `json:"z,omitempty"`
+  X        float64  `json:"x"`
+  Y        float64  `json:"y"`
+  Rotation float64  `json:"rotation"`
+  Scale    float64  `json:"scale"`
+  Z        *float64 `json:"z,omitempty"`
 }
 
 func (t Transform) finite() bool {
 	if math.IsNaN(t.X) || math.IsInf(t.X, 0) ||
 		math.IsNaN(t.Y) || math.IsInf(t.Y, 0) ||
-		math.IsNaN(t.Rotation) || math.IsInf(t.Rotation, 0) {
+		math.IsNaN(t.Rotation) || math.IsInf(t.Rotation, 0) ||
+		math.IsNaN(t.Scale) || math.IsInf(t.Scale, 0) {
 		return false
 	}
 	if t.Z != nil && (math.IsNaN(*t.Z) || math.IsInf(*t.Z, 0)) {

@@ -66,6 +66,7 @@ export interface RenderEntity {
   x: number;
   y: number;
   rotation: number;
+  scale?: number;
   z?: number;
   vx: number;
   vy: number;

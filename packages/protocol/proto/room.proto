@@ -158,6 +158,8 @@ message QuantizedTransform {
   sint32 angular_velocity = 6;
   sint32 z = 7;
   sint32 vz = 8;
+  // Uniform item scale uses 1/1000 precision. Avatars send 1.0.
+  sint32 scale = 9;
 }
 
 message StateDelta {
@@ -197,6 +199,7 @@ enum DurableCommandKind {
   DURABLE_MOVE_ITEM = 3;
   DURABLE_ROTATE_ITEM = 4;
   DURABLE_SET_CONFIG = 5;
+  DURABLE_SCALE_ITEM = 6;
 }
 
 message DurableCommand {
@@ -211,6 +214,7 @@ message DurableCommand {
   bytes config_json = 9;
   // True while an owner drags an item, so the host uses a kinematic reposition.
   bool preview = 10;
+  float scale = 11;
 }
 
 message DurableCommandResult {

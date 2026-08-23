@@ -489,6 +489,21 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("scales item visuals and collider geometry as one persisted transform", () => {
+    const simulation = build();
+    simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));
+    simulation.world.setScale("crate-1", 2);
+    for (let i = 0; i < 300; i++) simulation.step();
+
+    const crate = simulation.world.registry.require("crate-1");
+    // The ground starts at y=66. A doubled 3-unit collider rests with its
+    // centre roughly 3 units above it rather than the default 1.5.
+    expect(crate.transform.y).toBeGreaterThan(62);
+    expect(crate.transform.y).toBeLessThan(64);
+    expect(simulation.snapshot().items[0]?.transform.scale).toBe(2);
+    simulation.free();
+  });
+
   it("applies resolved config changes to the live behavior and its checkpoint", () => {
     const simulation = build();
     simulation.addItem(

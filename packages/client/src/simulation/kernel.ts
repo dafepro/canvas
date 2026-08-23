@@ -21,6 +21,7 @@ const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity =
   x: entity.transform.x,
   y: entity.transform.y,
   rotation: entity.transform.rotation,
+  scale: entity.transform.scale ?? 1,
   z: entity.transform.z,
   vx: entity.rigidBody?.velocity.x ?? 0,
   vy: entity.rigidBody?.velocity.y ?? 0,
@@ -158,6 +159,10 @@ export class SimulationKernel {
           request.transform.rotation,
           { x: 0, y: 0 },
           request.transform.z,
+        );
+        this.simulation?.world.setScale(
+          request.entityId,
+          request.transform.scale ?? 1,
         );
         break;
 

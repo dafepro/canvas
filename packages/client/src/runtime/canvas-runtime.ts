@@ -464,8 +464,8 @@ export class CanvasRuntime {
 
   // ---------- durable mutations ----------
 
-  spawnItem(definitionId: string, at: Vec2, rotation = 0): void {
-    this.session.spawnItem(definitionId, at, rotation);
+  spawnItem(definitionId: string, at: Vec2, rotation = 0, scale = 1): void {
+    this.session.spawnItem(definitionId, at, rotation, scale);
   }
 
   moveItem(entityId: string, transform: Transform, preview = false): void {
@@ -474,6 +474,10 @@ export class CanvasRuntime {
 
   rotateItem(entityId: string, rotation: number): void {
     this.session.rotateItem(entityId, rotation);
+  }
+
+  scaleItem(entityId: string, scale: number): void {
+    this.session.scaleItem(entityId, scale);
   }
 
   setItemConfig(entityId: string, config: unknown): void {

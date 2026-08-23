@@ -163,6 +163,8 @@ describe("validation", () => {
     expect(validateTransform({ x: NaN, y: 0, rotation: 0 }, canvas).ok).toBe(false);
     expect(validateTransform({ x: 100000, y: 0, rotation: 0 }, canvas).ok).toBe(false);
     expect(validateTransform({ x: 50, y: 35, rotation: 1 }, canvas).ok).toBe(true);
+    expect(validateTransform({ x: 50, y: 35, rotation: 1, scale: 0 }, canvas).ok)
+      .toBe(false);
   });
 
   it("refuses a snapshot above the item limit", () => {

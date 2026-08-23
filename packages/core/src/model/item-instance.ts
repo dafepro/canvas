@@ -2,6 +2,8 @@ export interface Transform {
   x: number;
   y: number;
   rotation: number;
+  /** Uniform visual and collider scale. Defaults to 1 when omitted. */
+  scale?: number;
   /** Optional top-down elevation channel. */
   z?: number;
 }

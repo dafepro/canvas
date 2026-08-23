@@ -111,7 +111,7 @@ export interface SystemItemDefinition {
   entityId: string;
   definitionId: string;
   definitionVersion: number;
-  transform: { x: number; y: number; rotation: number; z?: number };
+  transform: { x: number; y: number; rotation: number; scale?: number; z?: number };
   resolvedConfig: unknown;
 }
 

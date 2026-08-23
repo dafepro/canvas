@@ -247,19 +247,25 @@ export class RapierWorld implements BehaviorHost {
     }
   }
 
-  private shapeDesc(shape: ShapeDefinition): RAPIER.ColliderDesc {
+  private shapeDesc(shape: ShapeDefinition, scale = 1): RAPIER.ColliderDesc {
     switch (shape.type) {
       case "circle":
-        return RAPIER.ColliderDesc.ball(shape.radius);
+        return RAPIER.ColliderDesc.ball(shape.radius * scale);
       case "rect":
-        return RAPIER.ColliderDesc.cuboid(shape.width / 2, shape.height / 2);
+        return RAPIER.ColliderDesc.cuboid(
+          (shape.width * scale) / 2,
+          (shape.height * scale) / 2,
+        );
       case "capsule":
-        return RAPIER.ColliderDesc.capsule(shape.halfHeight, shape.radius);
+        return RAPIER.ColliderDesc.capsule(
+          shape.halfHeight * scale,
+          shape.radius * scale,
+        );
       case "polygon": {
         const points = new Float32Array(shape.vertices.length * 2);
         shape.vertices.forEach((vertex, i) => {
-          points[i * 2] = vertex.x;
-          points[i * 2 + 1] = vertex.y;
+          points[i * 2] = vertex.x * scale;
+          points[i * 2 + 1] = vertex.y * scale;
         });
         return (
           RAPIER.ColliderDesc.convexHull(points) ??
@@ -270,7 +276,8 @@ export class RapierWorld implements BehaviorHost {
   }
 
   private attachCollider(record: BodyRecord, definition: ColliderDefinition): void {
-    const desc = this.shapeDesc(definition.shape);
+    const scale = record.entity.kind === "item" ? record.entity.transform.scale ?? 1 : 1;
+    const desc = this.shapeDesc(definition.shape, scale);
     const membership = definition.membership ?? roleMembership[definition.role];
     const filter = definition.collisionMask ?? roleDefaultMask[definition.role];
     const sensor = definition.sensor ?? isSensorRole(definition.role);
@@ -280,7 +287,7 @@ export class RapierWorld implements BehaviorHost {
       .setCollisionGroups(collisionGroups(membership, filter))
       .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     if (definition.offset) {
-      desc.setTranslation(definition.offset.x, definition.offset.y);
+      desc.setTranslation(definition.offset.x * scale, definition.offset.y * scale);
     }
     if (definition.rotation !== undefined) desc.setRotation(definition.rotation);
     if (definition.restitution !== undefined) desc.setRestitution(definition.restitution);
@@ -1288,6 +1295,28 @@ export class RapierWorld implements BehaviorHost {
       render.animation = animation;
       render.animationEpoch = (render.animationEpoch ?? 0) + 1;
     }
+  }
+
+  /** Atomically applies uniform visual/physics scale to an authored item. */
+  setScale(id: EntityId, scale: number): void {
+    const record = this.bodies.get(id);
+    if (!record || record.entity.kind !== "item" || !Number.isFinite(scale) || scale <= 0) {
+      return;
+    }
+    if (Math.abs((record.entity.transform.scale ?? 1) - scale) < 0.0001) return;
+    const definition = this.definitions.get(record.entity.render?.definitionId ?? "");
+    if (!definition) return;
+
+    this.endContacts(id);
+    for (const collider of record.colliders.values()) {
+      this.colliderOwner.delete(collider.handle);
+      this.world.removeCollider(collider, true);
+    }
+    record.colliders.clear();
+    record.entity.colliders = [];
+    record.entity.transform.scale = scale;
+    for (const collider of definition.colliders) this.attachCollider(record, collider);
+    record.body.wakeUp();
   }
 
   emitEffect(emission: EffectEmission): void {

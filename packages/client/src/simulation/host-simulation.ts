@@ -243,6 +243,7 @@ export class HostSimulation {
         entity.transform.x.toFixed(3),
         entity.transform.y.toFixed(3),
         entity.transform.rotation.toFixed(3),
+        (entity.transform.scale ?? 1).toFixed(3),
         entity.render?.variant ?? "",
       ].join(",");
       if (this.lastSentTransforms.get(entity.id) === key) continue;

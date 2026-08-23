@@ -173,7 +173,7 @@ func (c *testClient) sendJoin(definitions ...*pb.DefinitionVersion) {
 		RoomId: c.roomID,
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
 			RoomId:          c.roomID,
-			ProtocolVersion: 4,
+			ProtocolVersion: 5,
 			Definitions:     definitions,
 		}},
 	})
@@ -501,6 +501,47 @@ func TestOwnershipIsEnforced(t *testing.T) {
 	}
 	if accepted.SceneRevision <= result.SceneRevision {
 		t.Error("the scene revision did not increase")
+	}
+
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-scale",
+			Kind:      pb.DurableCommandKind_DURABLE_SCALE_ITEM,
+			EntityId:  entityID,
+			Scale:     1.75,
+		}},
+	})
+	scaled := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-scale"
+	}).GetDurableResult()
+	if !scaled.Accepted {
+		t.Fatalf("owner scale rejected: %s", scaled.RejectReason)
+	}
+	var scaledItem SnapshotItem
+	if err := json.Unmarshal(scaled.ItemInstanceJson, &scaledItem); err != nil {
+		t.Fatalf("scaled item json: %v", err)
+	}
+	if scaledItem.Transform.Scale != 1.75 {
+		t.Errorf("scale = %v, want 1.75", scaledItem.Transform.Scale)
+	}
+
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-scale-too-large",
+			Kind:      pb.DurableCommandKind_DURABLE_SCALE_ITEM,
+			EntityId:  entityID,
+			Scale:     8,
+		}},
+	})
+	scaleReject := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-scale-too-large"
+	}).GetDurableResult()
+	if scaleReject.Accepted || scaleReject.RejectReason != "scale_out_of_range" {
+		t.Errorf("large scale accepted=%v reason=%q", scaleReject.Accepted, scaleReject.RejectReason)
 	}
 }
 
@@ -1515,8 +1556,8 @@ func TestProtocolMismatchIsRefused(t *testing.T) {
 	if got.Code != "protocol_mismatch" {
 		t.Errorf("error code = %q, want protocol_mismatch", got.Code)
 	}
-	if got.ServerProtocolVersion != 4 {
-		t.Errorf("server protocol version = %d, want 4", got.ServerProtocolVersion)
+	if got.ServerProtocolVersion != 5 {
+		t.Errorf("server protocol version = %d, want 5", got.ServerProtocolVersion)
 	}
 }
 

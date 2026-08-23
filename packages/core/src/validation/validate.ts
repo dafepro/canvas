@@ -64,11 +64,12 @@ export const validateCanvasDefinition = (
     if (item.definitionVersion < 1) {
       problems.push({ path: `${path}.definitionVersion`, message: "must be >= 1" });
     }
-    const { x, y, rotation, z } = item.transform;
+    const { x, y, rotation, scale, z } = item.transform;
     if (
       !Number.isFinite(x) ||
       !Number.isFinite(y) ||
       !Number.isFinite(rotation) ||
+      (scale !== undefined && (!Number.isFinite(scale) || scale <= 0)) ||
       (z !== undefined && !Number.isFinite(z)) ||
       x < 0 ||
       x > canvas.size.width ||
@@ -138,6 +139,12 @@ export const validateTransform = (
   }
   if (transform.z !== undefined && !Number.isFinite(transform.z)) {
     problems.push({ path: "z", message: "must be a finite number" });
+  }
+  if (
+    transform.scale !== undefined &&
+    (!Number.isFinite(transform.scale) || transform.scale <= 0)
+  ) {
+    problems.push({ path: "scale", message: "must be a positive finite number" });
   }
   const maxX = canvas.size.width * slackFactor;
   const maxY = canvas.size.height * slackFactor;

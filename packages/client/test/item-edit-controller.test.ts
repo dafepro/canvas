@@ -78,6 +78,15 @@ describe("item edit interaction", () => {
       .toBeUndefined();
   });
 
+  it("hit-tests the scaled visual bounds", () => {
+    expect(
+      findOwnedItemAt([{ ...item(), scale: 2 }], [definition], { x: 13.8, y: 5 }, "alice"),
+    ).toMatchObject({ id: "item-1" });
+    expect(
+      findOwnedItemAt([{ ...item(), scale: 0.5 }], [definition], { x: 11.1, y: 5 }, "alice"),
+    ).toBeUndefined();
+  });
+
   it("shows a local ghost during drag and commits its final transform on release", () => {
     const surface = new PointerSurface();
     const previews: number[] = [];

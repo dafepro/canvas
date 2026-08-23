@@ -1239,7 +1239,7 @@ export class RoomSession {
   // ---------- durable mutations ----------
 
   /** Spec 14.1. Every durable edit goes through the backend. */
-  spawnItem(definitionId: string, at: Vec2, rotation = 0): void {
+  spawnItem(definitionId: string, at: Vec2, rotation = 0, scale = 1): void {
     const definition = this.options.definitions.find(
       (candidate) => candidate.definitionId === definitionId,
     );
@@ -1260,6 +1260,7 @@ export class RoomSession {
       definitionVersion: definition.version,
       position: at,
       rotation,
+      scale,
       z: 0,
       configJson: toJsonBytes(config),
       preview: false,
@@ -1306,6 +1307,7 @@ export class RoomSession {
       definitionVersion: 0,
       position: { x: transform.x, y: transform.y },
       rotation: transform.rotation,
+      scale: transform.scale ?? 1,
       z: transform.z ?? 0,
       configJson: new Uint8Array(),
       preview,
@@ -1321,6 +1323,23 @@ export class RoomSession {
       definitionVersion: 0,
       position: undefined,
       rotation,
+      scale: 0,
+      z: 0,
+      configJson: new Uint8Array(),
+      preview: false,
+    });
+  }
+
+  scaleItem(entityId: string, scale: number): void {
+    this.client.sendDurableCommand({
+      commandId: this.nextCommandId(),
+      kind: DurableCommandKind.DURABLE_SCALE_ITEM,
+      entityId,
+      definitionId: "",
+      definitionVersion: 0,
+      position: undefined,
+      rotation: 0,
+      scale,
       z: 0,
       configJson: new Uint8Array(),
       preview: false,
@@ -1336,6 +1355,7 @@ export class RoomSession {
       definitionVersion: 0,
       position: undefined,
       rotation: 0,
+      scale: 0,
       z: 0,
       configJson: toJsonBytes(config),
       preview: false,
@@ -1351,6 +1371,7 @@ export class RoomSession {
       definitionVersion: 0,
       position: { x: 0, y: 0 },
       rotation: 0,
+      scale: 0,
       z: 0,
       configJson: new Uint8Array(),
       preview: false,
@@ -1378,6 +1399,7 @@ export class RoomSession {
               x: command.position?.x ?? 0,
               y: command.position?.y ?? 0,
               rotation: command.rotation,
+              scale: command.scale || 1,
               z: command.z || undefined,
             },
             resolvedConfig:
@@ -1394,7 +1416,8 @@ export class RoomSession {
         this.driver.send({ type: "removeItem", entityId: command.entityId });
         break;
       case DurableCommandKind.DURABLE_MOVE_ITEM:
-      case DurableCommandKind.DURABLE_ROTATE_ITEM: {
+      case DurableCommandKind.DURABLE_ROTATE_ITEM:
+      case DurableCommandKind.DURABLE_SCALE_ITEM: {
         const transform =
           item?.transform ??
           (command.kind === DurableCommandKind.DURABLE_MOVE_ITEM
@@ -1402,6 +1425,7 @@ export class RoomSession {
                 x: command.position?.x ?? 0,
                 y: command.position?.y ?? 0,
                 rotation: command.rotation,
+                scale: command.scale || 1,
                 z: command.z || undefined,
               }
             : undefined);
@@ -1490,6 +1514,7 @@ interface SentSample {
   x: number;
   y: number;
   rotation: number;
+  scale: number;
   z: number;
   vx: number;
   vy: number;
@@ -1507,6 +1532,7 @@ const sentSample = (entity: RenderEntity): SentSample => ({
   x: entity.x,
   y: entity.y,
   rotation: entity.rotation,
+  scale: entity.scale ?? 1,
   z: entity.z ?? 0,
   vx: entity.vx,
   vy: entity.vy,
@@ -1530,6 +1556,7 @@ const movedSince = (before: SentSample, now: RenderEntity): boolean =>
   Math.abs(before.y - now.y) > POSITION_EPSILON ||
   Math.abs(before.z - (now.z ?? 0)) > POSITION_EPSILON ||
   Math.abs(before.rotation - now.rotation) > ROTATION_EPSILON ||
+  Math.abs(before.scale - (now.scale ?? 1)) > ROTATION_EPSILON ||
   Math.abs(before.vx - now.vx) > VELOCITY_EPSILON ||
   Math.abs(before.vy - now.vy) > VELOCITY_EPSILON ||
   Math.abs(before.angularVelocity - now.angularVelocity) > VELOCITY_EPSILON ||
@@ -1586,6 +1613,7 @@ const toEntityState = (
     x: entity.x,
     y: entity.y,
     rotation: entity.rotation,
+    scale: entity.scale ?? 1,
     vx: entity.vx,
     vy: entity.vy,
     angularVelocity: entity.angularVelocity,
@@ -1604,6 +1632,7 @@ const fromEntityState = (state: EntityState): RenderEntity => {
     x: transform.x,
     y: transform.y,
     rotation: transform.rotation,
+    scale: transform.scale || 1,
     z: transform.z || undefined,
     vx: transform.vx,
     vy: transform.vy,

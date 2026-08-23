@@ -44,7 +44,11 @@ export const findOwnedItemAt = (
     const sine = Math.sin(entity.rotation);
     const localX = cosine * dx + sine * dy;
     const localY = -sine * dx + cosine * dy;
-    if (Math.abs(localX) <= size.width / 2 && Math.abs(localY) <= size.height / 2) {
+    const scale = entity.scale ?? 1;
+    if (
+      Math.abs(localX) <= (size.width * scale) / 2 &&
+      Math.abs(localY) <= (size.height * scale) / 2
+    ) {
       return entity;
     }
   }
@@ -88,6 +92,7 @@ export class ItemEditController {
         x: selected.x,
         y: selected.y,
         rotation: selected.rotation,
+        scale: selected.scale ?? 1,
         z: selected.z,
       };
       this.drag = {

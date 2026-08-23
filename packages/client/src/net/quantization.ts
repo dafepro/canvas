@@ -3,6 +3,7 @@ import type { QuantizedTransform } from "@canvas-physics/protocol";
 const POSITION_SCALE = 100;
 const ROTATION_SCALE = 1000;
 const VELOCITY_SCALE = 100;
+const UNIFORM_SCALE = 1000;
 const INT32_MIN = -0x8000_0000;
 const INT32_MAX = 0x7fff_ffff;
 
@@ -18,6 +19,7 @@ export interface RealtimeTransform {
   angularVelocity: number;
   z?: number;
   vz?: number;
+  scale?: number;
 }
 
 export const quantizeTransform = (value: RealtimeTransform): QuantizedTransform => ({
@@ -29,6 +31,7 @@ export const quantizeTransform = (value: RealtimeTransform): QuantizedTransform 
   angularVelocity: fixed(value.angularVelocity, ROTATION_SCALE),
   z: fixed(value.z ?? 0, POSITION_SCALE),
   vz: fixed(value.vz ?? 0, VELOCITY_SCALE),
+  scale: fixed(value.scale ?? 1, UNIFORM_SCALE),
 });
 
 export const dequantizeTransform = (
@@ -42,4 +45,5 @@ export const dequantizeTransform = (
   angularVelocity: value.angularVelocity / ROTATION_SCALE,
   z: value.z / POSITION_SCALE,
   vz: value.vz / VELOCITY_SCALE,
+  scale: value.scale / UNIFORM_SCALE,
 });

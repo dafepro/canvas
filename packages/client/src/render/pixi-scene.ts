@@ -205,6 +205,7 @@ export class PixiScene {
       const elevation = entity.z ?? 0;
       record.display.position.set(screenX, screenY - elevation * this.camera.scale);
       record.display.rotation = entity.rotation;
+      record.display.scale.set(entity.scale ?? 1);
       // Addendum A1. A disabled avatar stays visible but reads as inactive.
       record.display.alpha = entity.quarantined || entity.disabled ? 0.35 : 1;
       // Addendum A3. A body that waits for its respawn is out of the scene.
@@ -247,10 +248,12 @@ export class PixiScene {
       x: selected?.x ?? 0,
       y: selected?.y ?? 0,
       rotation: selected?.rotation ?? 0,
+      scale: selected?.scale ?? 1,
       z: selected?.z,
     };
-    const width = size.width * this.camera.scale;
-    const height = size.height * this.camera.scale;
+    const itemScale = transform.scale ?? 1;
+    const width = size.width * this.camera.scale * itemScale;
+    const height = size.height * this.camera.scale * itemScale;
     this.editOverlay.position.set(
       this.camera.toScreenX(transform.x),
       this.camera.toScreenY(transform.y) - (transform.z ?? 0) * this.camera.scale,
