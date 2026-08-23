@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -152,5 +153,45 @@ describe("published package artifacts", () => {
       cwd: consumerRoot,
       stdio: "pipe",
     });
-  }, 60_000);
+
+    const soccerSource = join(workspaceRoot, "examples", "soccer-lounge");
+    const soccerConsumer = join(fixtureRoot, "soccer-lounge");
+    mkdirSync(soccerConsumer, { recursive: true });
+    for (const path of ["src", "public"]) {
+      cpSync(join(soccerSource, path), join(soccerConsumer, path), { recursive: true });
+    }
+    for (const path of ["index.html", "tsconfig.json", "vite.config.ts"]) {
+      cpSync(join(soccerSource, path), join(soccerConsumer, path));
+    }
+    writeFileSync(
+      join(soccerConsumer, "package.json"),
+      JSON.stringify({
+        name: "canvas-packed-soccer-consumer",
+        private: true,
+        type: "module",
+        scripts: { build: "vite build" },
+        dependencies: fileDependencies,
+        devDependencies: { typescript: "^5.7.2", vite: "^6.0.7" },
+      }),
+    );
+    writeFileSync(
+      join(soccerConsumer, "pnpm-workspace.yaml"),
+      [
+        "overrides:",
+        ...Object.entries(fileDependencies).map(
+          ([name, archive]) => `  '${name}': '${archive}'`,
+        ),
+        "",
+      ].join("\n"),
+    );
+
+    runPnpm(["install", "--prefer-offline", "--ignore-scripts"], soccerConsumer);
+    runPnpm(["exec", "vite", "build"], soccerConsumer);
+    expect(existsSync(join(soccerConsumer, "dist", "index.html"))).toBe(true);
+    expect(
+      readdirSync(join(soccerConsumer, "dist", "assets")).some((name) =>
+        name.startsWith("canvas.worker-"),
+      ),
+    ).toBe(true);
+  }, 90_000);
 });

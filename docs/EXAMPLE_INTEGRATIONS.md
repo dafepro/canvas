@@ -16,7 +16,7 @@ Each example:
 - runs against the reference rooms service without modifying that service;
 - includes deterministic behavior tests and a production bundle check;
 - names every missing generic capability it works around; and
-- is eventually verified against clean installs of packed release artifacts.
+- is verified against clean installs of packed release artifacts.
 
 Examples are not compatibility fixtures. This repository is prerelease, so a
 public contract change updates the examples in the same release and removes the

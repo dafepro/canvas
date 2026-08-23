@@ -12,7 +12,7 @@ downward. Check an item only after the relevant focused tests pass.
 - [x] Ship the soccer lounge as the first independently runnable reference
   integration, including field art and collision geometry, a custom match-ball
   behavior, shared scoring, goal stoppage, and center reset.
-- [ ] Exercise every reference integration from clean installs of packed Canvas
+- [x] Exercise every reference integration from clean installs of packed Canvas
   artifacts so examples detect accidental internal imports and missing release
   files.
 - [ ] Add a server bootstrap API for system-owned template items so a room can
