@@ -340,6 +340,7 @@ export class RapierWorld implements BehaviorHost {
         size: definition.visual.size,
       },
       ownership: { ownerUserId: instance.ownerUserId },
+      isolated: instance.isolated === true,
       persistence: definition.persistence,
       tags: new Set([definition.definitionId]),
     };
@@ -389,6 +390,7 @@ export class RapierWorld implements BehaviorHost {
     const record: BodyRecord = { entity, body, colliders: new Map(), regions: new Set() };
     this.bodies.set(entity.id, record);
     for (const collider of definition.colliders) this.attachCollider(record, collider);
+    if (instance.isolated) this.setItemIsolation(entity.id, true);
     return entity;
   }
 
@@ -478,6 +480,19 @@ export class RapierWorld implements BehaviorHost {
     }
   }
 
+  /** Removes an owned item from every simulation subsystem while retaining its pose. */
+  setItemIsolation(entityId: EntityId, isolated: boolean): boolean {
+    const record = this.bodies.get(entityId);
+    if (!record || record.entity.kind !== "item") return false;
+    if (record.entity.isolated === isolated && record.body.isEnabled() === !isolated) {
+      return true;
+    }
+    record.entity.isolated = isolated;
+    record.body.setEnabled(!isolated);
+    if (isolated) this.endContacts(entityId);
+    return true;
+  }
+
   private endContacts(entityId: EntityId): void {
     const touched: [EntityId, string][] = [];
     for (const [key, contact] of this.contactSets) {
@@ -526,7 +541,7 @@ export class RapierWorld implements BehaviorHost {
     this.stepRespawns();
 
     for (const record of this.bodies.values()) {
-      if (record.entity.respawning) continue;
+      if (record.entity.respawning || record.entity.isolated) continue;
       this.applyEnvironment(record);
       this.driveAvatar(record, dt);
     }
@@ -818,7 +833,8 @@ export class RapierWorld implements BehaviorHost {
       const inside = new Set<string>();
       // A disabled avatar belongs to no region, so the loop below emits the
       // exit for every region it was in.
-      for (const [id, region] of record.entity.avatar?.disabled ? [] : emitting) {
+      for (const [id, region] of
+        record.entity.avatar?.disabled || record.entity.isolated ? [] : emitting) {
         const shape = region.shape;
         const contained =
           shape.type === "rect"
@@ -859,7 +875,11 @@ export class RapierWorld implements BehaviorHost {
     for (const record of this.bodies.values()) {
       const elevation = record.entity.elevation;
       if (!elevation?.enabled) continue;
-      if (record.entity.avatar?.disabled || record.entity.respawning) continue;
+      if (
+        record.entity.avatar?.disabled ||
+        record.entity.respawning ||
+        record.entity.isolated
+      ) continue;
       this.environment.sample(record.entity.transform, this.sample);
       const result = stepElevation(elevation, this.sample, dt);
       record.entity.transform.z = elevation.z;
@@ -877,7 +897,7 @@ export class RapierWorld implements BehaviorHost {
   private applyEdgePolicies(): void {
     for (const record of this.bodies.values()) {
       if (record.entity.kind === "static") continue;
-      if (record.entity.avatar?.disabled) continue;
+      if (record.entity.avatar?.disabled || record.entity.isolated) continue;
       if (record.entity.respawning) continue;
       const transform = record.entity.transform;
       const velocity = record.body.linvel();
@@ -966,7 +986,9 @@ export class RapierWorld implements BehaviorHost {
     for (const record of this.bodies.values()) {
       if (record.entity.kind === "static") continue;
       if (record.entity.rigidBody?.mode !== "dynamic") continue;
-      if (record.entity.quarantined || record.entity.respawning) continue;
+      if (record.entity.quarantined || record.entity.respawning || record.entity.isolated) {
+        continue;
+      }
 
       const speed = Math.hypot(record.body.linvel().x, record.body.linvel().y);
       if (speed > STUCK_SPEED) {
@@ -1035,6 +1057,7 @@ export class RapierWorld implements BehaviorHost {
     // is treated as an invalid value rather than as a body in flight.
     const margin = Math.max(width, height);
     for (const record of this.bodies.values()) {
+      if (record.entity.isolated) continue;
       const transform = record.entity.transform;
       const finite =
         Number.isFinite(transform.x) &&

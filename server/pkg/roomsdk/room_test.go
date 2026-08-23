@@ -173,7 +173,7 @@ func (c *testClient) sendJoin(definitions ...*pb.DefinitionVersion) {
 		RoomId: c.roomID,
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
 			RoomId:          c.roomID,
-			ProtocolVersion: 5,
+			ProtocolVersion: 6,
 			Definitions:     definitions,
 		}},
 	})
@@ -525,6 +525,46 @@ func TestOwnershipIsEnforced(t *testing.T) {
 	}
 	if scaledItem.Transform.Scale != 1.75 {
 		t.Errorf("scale = %v, want 1.75", scaledItem.Transform.Scale)
+	}
+
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-isolate",
+			Kind:      pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION,
+			EntityId:  entityID,
+			Isolated:  true,
+		}},
+	})
+	isolated := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-isolate"
+	}).GetDurableResult()
+	if !isolated.Accepted {
+		t.Fatalf("owner isolation rejected: %s", isolated.RejectReason)
+	}
+	var isolatedItem SnapshotItem
+	if err := json.Unmarshal(isolated.ItemInstanceJson, &isolatedItem); err != nil {
+		t.Fatalf("isolated item json: %v", err)
+	}
+	if !isolatedItem.Isolated {
+		t.Error("item isolation was not persisted")
+	}
+
+	other.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-steal-isolation",
+			Kind:      pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION,
+			EntityId:  entityID,
+		}},
+	})
+	isolationReject := other.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-steal-isolation"
+	}).GetDurableResult()
+	if isolationReject.Accepted || isolationReject.RejectReason != "not_owner" {
+		t.Errorf("non-owner isolation accepted=%v reason=%q", isolationReject.Accepted, isolationReject.RejectReason)
 	}
 
 	owner.send(&pb.RoomEnvelope{
@@ -1556,8 +1596,8 @@ func TestProtocolMismatchIsRefused(t *testing.T) {
 	if got.Code != "protocol_mismatch" {
 		t.Errorf("error code = %q, want protocol_mismatch", got.Code)
 	}
-	if got.ServerProtocolVersion != 5 {
-		t.Errorf("server protocol version = %d, want 5", got.ServerProtocolVersion)
+	if got.ServerProtocolVersion != 6 {
+		t.Errorf("server protocol version = %d, want 6", got.ServerProtocolVersion)
 	}
 }
 

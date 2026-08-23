@@ -26,6 +26,8 @@ export interface SnapshotItem {
   definitionVersion: number;
   ownerUserId: string;
   transform: Transform;
+  /** Durable owner-controlled simulation isolation. */
+  isolated?: boolean;
   resolvedConfig: unknown;
   /** Present only when the item definition declares behaviorState durable. */
   behaviorState?: unknown;

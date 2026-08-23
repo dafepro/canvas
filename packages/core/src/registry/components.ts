@@ -92,6 +92,8 @@ export interface Entity {
   elevation?: ElevationComponent;
   behavior?: BehaviorComponent;
   ownership?: OwnershipComponent;
+  /** True while this item is excluded from physics, collision, and behavior. */
+  isolated?: boolean;
   persistence?: PersistenceComponent;
   tags?: Set<string>;
   /** Set by the host when a NaN or out-of-bounds value is found (spec 14.3). */

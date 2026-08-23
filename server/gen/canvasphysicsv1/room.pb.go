@@ -82,13 +82,14 @@ func (HostControlKind) EnumDescriptor() ([]byte, []int) {
 type DurableCommandKind int32
 
 const (
-	DurableCommandKind_DURABLE_UNSPECIFIED DurableCommandKind = 0
-	DurableCommandKind_DURABLE_SPAWN_ITEM  DurableCommandKind = 1
-	DurableCommandKind_DURABLE_DELETE_ITEM DurableCommandKind = 2
-	DurableCommandKind_DURABLE_MOVE_ITEM   DurableCommandKind = 3
-	DurableCommandKind_DURABLE_ROTATE_ITEM DurableCommandKind = 4
-	DurableCommandKind_DURABLE_SET_CONFIG  DurableCommandKind = 5
-	DurableCommandKind_DURABLE_SCALE_ITEM  DurableCommandKind = 6
+	DurableCommandKind_DURABLE_UNSPECIFIED        DurableCommandKind = 0
+	DurableCommandKind_DURABLE_SPAWN_ITEM         DurableCommandKind = 1
+	DurableCommandKind_DURABLE_DELETE_ITEM        DurableCommandKind = 2
+	DurableCommandKind_DURABLE_MOVE_ITEM          DurableCommandKind = 3
+	DurableCommandKind_DURABLE_ROTATE_ITEM        DurableCommandKind = 4
+	DurableCommandKind_DURABLE_SET_CONFIG         DurableCommandKind = 5
+	DurableCommandKind_DURABLE_SCALE_ITEM         DurableCommandKind = 6
+	DurableCommandKind_DURABLE_SET_ITEM_ISOLATION DurableCommandKind = 7
 )
 
 // Enum value maps for DurableCommandKind.
@@ -101,15 +102,17 @@ var (
 		4: "DURABLE_ROTATE_ITEM",
 		5: "DURABLE_SET_CONFIG",
 		6: "DURABLE_SCALE_ITEM",
+		7: "DURABLE_SET_ITEM_ISOLATION",
 	}
 	DurableCommandKind_value = map[string]int32{
-		"DURABLE_UNSPECIFIED": 0,
-		"DURABLE_SPAWN_ITEM":  1,
-		"DURABLE_DELETE_ITEM": 2,
-		"DURABLE_MOVE_ITEM":   3,
-		"DURABLE_ROTATE_ITEM": 4,
-		"DURABLE_SET_CONFIG":  5,
-		"DURABLE_SCALE_ITEM":  6,
+		"DURABLE_UNSPECIFIED":        0,
+		"DURABLE_SPAWN_ITEM":         1,
+		"DURABLE_DELETE_ITEM":        2,
+		"DURABLE_MOVE_ITEM":          3,
+		"DURABLE_ROTATE_ITEM":        4,
+		"DURABLE_SET_CONFIG":         5,
+		"DURABLE_SCALE_ITEM":         6,
+		"DURABLE_SET_ITEM_ISOLATION": 7,
 	}
 )
 
@@ -1125,8 +1128,10 @@ type EntityState struct {
 	// Named definition animation and a replay counter for repeated starts.
 	SpriteAnimation string `protobuf:"bytes,16,opt,name=sprite_animation,json=spriteAnimation,proto3" json:"sprite_animation,omitempty"`
 	AnimationEpoch  uint32 `protobuf:"varint,17,opt,name=animation_epoch,json=animationEpoch,proto3" json:"animation_epoch,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// True when the owner has removed this item from physics and behavior.
+	ItemIsolated  bool `protobuf:"varint,18,opt,name=item_isolated,json=itemIsolated,proto3" json:"item_isolated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EntityState) Reset() {
@@ -1241,6 +1246,13 @@ func (x *EntityState) GetAnimationEpoch() uint32 {
 		return x.AnimationEpoch
 	}
 	return 0
+}
+
+func (x *EntityState) GetItemIsolated() bool {
+	if x != nil {
+		return x.ItemIsolated
+	}
+	return false
 }
 
 type QuantizedTransform struct {
@@ -1635,6 +1647,7 @@ type DurableCommand struct {
 	// True while an owner drags an item, so the host uses a kinematic reposition.
 	Preview       bool    `protobuf:"varint,10,opt,name=preview,proto3" json:"preview,omitempty"`
 	Scale         float32 `protobuf:"fixed32,11,opt,name=scale,proto3" json:"scale,omitempty"`
+	Isolated      bool    `protobuf:"varint,12,opt,name=isolated,proto3" json:"isolated,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1744,6 +1757,13 @@ func (x *DurableCommand) GetScale() float32 {
 		return x.Scale
 	}
 	return 0
+}
+
+func (x *DurableCommand) GetIsolated() bool {
+	if x != nil {
+		return x.Isolated
+	}
+	return false
 }
 
 type DurableCommandResult struct {
@@ -2043,7 +2063,7 @@ const file_room_proto_rawDesc = "" +
 	"\tintensity\x18\x03 \x01(\x02R\tintensity\x12-\n" +
 	"\x13client_time_unix_ms\x18\x04 \x01(\x04R\x10clientTimeUnixMs\x12\x12\n" +
 	"\x04held\x18\x05 \x01(\bR\x04held\x12'\n" +
-	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\x99\x04\n" +
+	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xbe\x04\n" +
 	"\vEntityState\x12\x1b\n" +
 	"\tentity_id\x18\x01 \x01(\tR\bentityId\x12U\n" +
 	"\x13quantized_transform\x18\x02 \x01(\v2$.canvasphysics.v1.QuantizedTransformR\x12quantizedTransform\x12A\n" +
@@ -2059,7 +2079,8 @@ const file_room_proto_rawDesc = "" +
 	"respawning\x18\x0f \x01(\bR\n" +
 	"respawning\x12)\n" +
 	"\x10sprite_animation\x18\x10 \x01(\tR\x0fspriteAnimation\x12'\n" +
-	"\x0fanimation_epoch\x18\x11 \x01(\rR\x0eanimationEpoch\"\xcb\x01\n" +
+	"\x0fanimation_epoch\x18\x11 \x01(\rR\x0eanimationEpoch\x12#\n" +
+	"\ritem_isolated\x18\x12 \x01(\bR\fitemIsolated\"\xcb\x01\n" +
 	"\x12QuantizedTransform\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x11R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x11R\x01y\x12\x1a\n" +
@@ -2090,7 +2111,7 @@ const file_room_proto_rawDesc = "" +
 	"\x06effect\x18\x02 \x01(\tR\x06effect\x12\x12\n" +
 	"\x04mode\x18\x03 \x01(\tR\x04mode\x12\x1f\n" +
 	"\vparams_json\x18\x04 \x01(\fR\n" +
-	"paramsJson\"\x89\x03\n" +
+	"paramsJson\"\xa5\x03\n" +
 	"\x0eDurableCommand\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x128\n" +
@@ -2105,7 +2126,8 @@ const file_room_proto_rawDesc = "" +
 	"configJson\x12\x18\n" +
 	"\apreview\x18\n" +
 	" \x01(\bR\apreview\x12\x14\n" +
-	"\x05scale\x18\v \x01(\x02R\x05scale\"\x87\x02\n" +
+	"\x05scale\x18\v \x01(\x02R\x05scale\x12\x1a\n" +
+	"\bisolated\x18\f \x01(\bR\bisolated\"\x87\x02\n" +
 	"\x14DurableCommandResult\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x1a\n" +
@@ -2130,7 +2152,7 @@ const file_room_proto_rawDesc = "" +
 	"\x14HOST_CONTROL_REVOKED\x10\x02\x12\x1e\n" +
 	"\x1aHOST_CONTROL_YIELD_REQUEST\x10\x03\x12\x16\n" +
 	"\x12HOST_CONTROL_YIELD\x10\x04\x12\x1c\n" +
-	"\x18HOST_CONTROL_ELIGIBILITY\x10\x05*\xbe\x01\n" +
+	"\x18HOST_CONTROL_ELIGIBILITY\x10\x05*\xde\x01\n" +
 	"\x12DurableCommandKind\x12\x17\n" +
 	"\x13DURABLE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12DURABLE_SPAWN_ITEM\x10\x01\x12\x17\n" +
@@ -2138,7 +2160,8 @@ const file_room_proto_rawDesc = "" +
 	"\x11DURABLE_MOVE_ITEM\x10\x03\x12\x17\n" +
 	"\x13DURABLE_ROTATE_ITEM\x10\x04\x12\x16\n" +
 	"\x12DURABLE_SET_CONFIG\x10\x05\x12\x16\n" +
-	"\x12DURABLE_SCALE_ITEM\x10\x06BFZDgithub.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1b\x06proto3"
+	"\x12DURABLE_SCALE_ITEM\x10\x06\x12\x1e\n" +
+	"\x1aDURABLE_SET_ITEM_ISOLATION\x10\aBFZDgithub.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1b\x06proto3"
 
 var (
 	file_room_proto_rawDescOnce sync.Once

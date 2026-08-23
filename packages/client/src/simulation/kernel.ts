@@ -35,6 +35,7 @@ const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity =
   behaviorState,
   quarantined: entity.quarantined,
   disabled: entity.avatar?.disabled,
+  isolated: entity.isolated,
   teleportEpoch: entity.teleportEpoch,
   respawning: entity.respawning,
 });
@@ -168,6 +169,10 @@ export class SimulationKernel {
 
       case "setItemConfig":
         this.simulation?.setItemConfig(request.entityId, request.config);
+        break;
+
+      case "setItemIsolation":
+        this.simulation?.setItemIsolation(request.entityId, request.isolated);
         break;
 
       case "requestSnapshot": {

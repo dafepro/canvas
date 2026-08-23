@@ -16,6 +16,7 @@ export interface BehaviorSlot {
   state: unknown;
   stateVersion: number;
   persistent: boolean;
+  disabled?: boolean;
 }
 
 export interface CanvasContextInfo {
@@ -106,6 +107,14 @@ export class BehaviorRuntime {
     return true;
   }
 
+  setDisabled(entityId: EntityId, disabled: boolean, currentTick: number): boolean {
+    const slot = this.slots.get(entityId);
+    if (!slot) return false;
+    slot.disabled = disabled;
+    this.timers.setPaused(entityId, disabled, currentTick);
+    return true;
+  }
+
   all(): BehaviorSlot[] {
     return [...this.slots.values()];
   }
@@ -133,7 +142,7 @@ export class BehaviorRuntime {
 
     for (const event of events) {
       const slot = this.slots.get(event.self);
-      if (!slot) continue;
+      if (!slot || slot.disabled) continue;
       const behavior = this.registry.get<any, any>(slot.behaviorType);
       if (!behavior) continue;
       if (behavior.subscribes && !behavior.subscribes.includes(event.type)) continue;

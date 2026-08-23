@@ -35,6 +35,7 @@ type SnapshotItem struct {
 	DefinitionVersion uint32          `json:"definitionVersion"`
 	OwnerUserID       string          `json:"ownerUserId"`
 	Transform         Transform       `json:"transform"`
+	Isolated          bool            `json:"isolated,omitempty"`
 	ResolvedConfig    json.RawMessage `json:"resolvedConfig,omitempty"`
 	BehaviorState     json.RawMessage `json:"behaviorState,omitempty"`
 	BehaviorStateVer  uint32          `json:"behaviorStateVersion,omitempty"`

@@ -43,7 +43,7 @@ const (
 	defaultHeartbeatInterval = 500 * time.Millisecond
 	defaultSleepGrace        = 2 * time.Second
 	defaultMaxClients        = 20
-	defaultProtocolVersion   = 5
+	defaultProtocolVersion   = 6
 )
 
 func (c *Config) applyDefaults() {

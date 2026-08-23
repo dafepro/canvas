@@ -307,6 +307,15 @@ export class CanvasRuntime {
             y: scene.camera.toScreenY(avatar.y),
           };
         },
+        allowStart: (point) =>
+          this.options.pointer?.allowStart?.(point) !== false &&
+          (!this.editMode ||
+            findOwnedItemAt(
+              this.latestEntities,
+              this.options.definitions,
+              this.scene!.camera.toWorld(point.x, point.y),
+              this.session.userId,
+            ) === undefined),
       },
     );
     this.editor = new ItemEditController(
@@ -375,9 +384,6 @@ export class CanvasRuntime {
     if (this.avatarDisabled) {
       return { direction: { x: 0, y: 0 }, intensity: 0, held: false, disabled: true };
     }
-    if (this.editMode) {
-      return { direction: { x: 0, y: 0 }, intensity: 0, held: false };
-    }
     const pointer = this.pointer?.intent;
     if (pointer && pointer.intensity > 0) return pointer;
     const keyboard = this.keyboard?.intent;
@@ -410,7 +416,7 @@ export class CanvasRuntime {
           entities,
         });
       }
-      scene.setThumbstick(this.editMode ? undefined : this.pointer?.gesture);
+      scene.setThumbstick(this.pointer?.gesture);
       this.options.onDiagnostics?.(this.diagnostics());
     });
   }
@@ -482,6 +488,10 @@ export class CanvasRuntime {
 
   setItemConfig(entityId: string, config: unknown): void {
     this.session.setItemConfig(entityId, config);
+  }
+
+  setItemIsolation(entityId: string, isolated: boolean): void {
+    this.session.setItemIsolation(entityId, isolated);
   }
 
   deleteItem(entityId: string): void {

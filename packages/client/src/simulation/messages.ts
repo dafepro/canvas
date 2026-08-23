@@ -51,6 +51,7 @@ export type SimulationRequest =
   | { type: "ownerAction"; entityId: string; action: string; userId: string }
   | { type: "moveItem"; entityId: string; transform: Transform; preview: boolean }
   | { type: "setItemConfig"; entityId: string; config: unknown }
+  | { type: "setItemIsolation"; entityId: string; isolated: boolean }
   | {
       type: "requestSnapshot";
       final: boolean;
@@ -81,6 +82,8 @@ export interface RenderEntity {
   quarantined?: boolean;
   /** Addendum A1. True when no physics act on this avatar. */
   disabled?: boolean;
+  /** Owner-controlled isolation of an item from physics and behavior. */
+  isolated?: boolean;
   /**
    * Addendum A2. Rises on every discontinuous move. A renderer that sees a new
    * value snaps the sprite instead of interpolating across the canvas.

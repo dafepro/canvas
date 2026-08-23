@@ -74,6 +74,7 @@ export enum DurableCommandKind {
   DURABLE_ROTATE_ITEM = 4,
   DURABLE_SET_CONFIG = 5,
   DURABLE_SCALE_ITEM = 6,
+  DURABLE_SET_ITEM_ISOLATION = 7,
   UNRECOGNIZED = -1,
 }
 
@@ -100,6 +101,9 @@ export function durableCommandKindFromJSON(object: any): DurableCommandKind {
     case 6:
     case "DURABLE_SCALE_ITEM":
       return DurableCommandKind.DURABLE_SCALE_ITEM;
+    case 7:
+    case "DURABLE_SET_ITEM_ISOLATION":
+      return DurableCommandKind.DURABLE_SET_ITEM_ISOLATION;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -123,6 +127,8 @@ export function durableCommandKindToJSON(object: DurableCommandKind): string {
       return "DURABLE_SET_CONFIG";
     case DurableCommandKind.DURABLE_SCALE_ITEM:
       return "DURABLE_SCALE_ITEM";
+    case DurableCommandKind.DURABLE_SET_ITEM_ISOLATION:
+      return "DURABLE_SET_ITEM_ISOLATION";
     case DurableCommandKind.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -223,7 +229,7 @@ export interface Heartbeat {
 
 export interface PlayerInput {
   inputSequence: number;
-  direction?: Vec2 | undefined;
+  direction: Vec2 | undefined;
   intensity: number;
   clientTimeUnixMs: number;
   /** True while the pointer is held, so a lost packet leaves no stale input. */
@@ -237,7 +243,7 @@ export interface PlayerInput {
 
 export interface EntityState {
   entityId: string;
-  quantizedTransform?:
+  quantizedTransform:
     | QuantizedTransform
     | undefined;
   /** Set for avatars so the owner can reconcile its prediction. */
@@ -260,6 +266,8 @@ export interface EntityState {
   /** Named definition animation and a replay counter for repeated starts. */
   spriteAnimation: string;
   animationEpoch: number;
+  /** True when the owner has removed this item from physics and behavior. */
+  itemIsolated: boolean;
 }
 
 export interface QuantizedTransform {
@@ -313,13 +321,14 @@ export interface DurableCommand {
   entityId: string;
   definitionId: string;
   definitionVersion: number;
-  position?: Vec2 | undefined;
+  position: Vec2 | undefined;
   rotation: number;
   z: number;
   configJson: Uint8Array;
   /** True while an owner drags an item, so the host uses a kinematic reposition. */
   preview: boolean;
   scale: number;
+  isolated: boolean;
 }
 
 export interface DurableCommandResult {
@@ -329,7 +338,7 @@ export interface DurableCommandResult {
   sceneRevision: number;
   /** The accepted item instance as JSON, present on accept. */
   itemInstanceJson: Uint8Array;
-  command?: DurableCommand | undefined;
+  command: DurableCommand | undefined;
 }
 
 export interface Checkpoint {
@@ -2069,6 +2078,7 @@ function createBaseEntityState(): EntityState {
     respawning: false,
     spriteAnimation: "",
     animationEpoch: 0,
+    itemIsolated: false,
   };
 }
 
@@ -2109,6 +2119,9 @@ export const EntityState: MessageFns<EntityState> = {
     }
     if (message.animationEpoch !== 0) {
       writer.uint32(136).uint32(message.animationEpoch);
+    }
+    if (message.itemIsolated !== false) {
+      writer.uint32(144).bool(message.itemIsolated);
     }
     return writer;
   },
@@ -2222,6 +2235,14 @@ export const EntityState: MessageFns<EntityState> = {
             message.animationEpoch = reader.uint32();
             continue;
           }
+          case 18: {
+            if (tag !== 144) {
+              break;
+            }
+
+            message.itemIsolated = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2284,6 +2305,11 @@ export const EntityState: MessageFns<EntityState> = {
         : isSet(object.animation_epoch)
         ? globalThis.Number(object.animation_epoch)
         : 0,
+      itemIsolated: isSet(object.itemIsolated)
+        ? globalThis.Boolean(object.itemIsolated)
+        : isSet(object.item_isolated)
+        ? globalThis.Boolean(object.item_isolated)
+        : false,
     };
   },
 
@@ -2325,6 +2351,9 @@ export const EntityState: MessageFns<EntityState> = {
     if (message.animationEpoch !== 0) {
       obj.animationEpoch = Math.round(message.animationEpoch);
     }
+    if (message.itemIsolated !== false) {
+      obj.itemIsolated = message.itemIsolated;
+    }
     return obj;
   },
 
@@ -2347,6 +2376,7 @@ export const EntityState: MessageFns<EntityState> = {
     message.respawning = object.respawning ?? false;
     message.spriteAnimation = object.spriteAnimation ?? "";
     message.animationEpoch = object.animationEpoch ?? 0;
+    message.itemIsolated = object.itemIsolated ?? false;
     return message;
   },
 };
@@ -3063,6 +3093,7 @@ function createBaseDurableCommand(): DurableCommand {
     configJson: new Uint8Array(0),
     preview: false,
     scale: 0,
+    isolated: false,
   };
 }
 
@@ -3100,6 +3131,9 @@ export const DurableCommand: MessageFns<DurableCommand> = {
     }
     if (message.scale !== 0) {
       writer.uint32(93).float(message.scale);
+    }
+    if (message.isolated !== false) {
+      writer.uint32(96).bool(message.isolated);
     }
     return writer;
   },
@@ -3205,6 +3239,14 @@ export const DurableCommand: MessageFns<DurableCommand> = {
             message.scale = reader.float();
             continue;
           }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.isolated = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -3250,6 +3292,7 @@ export const DurableCommand: MessageFns<DurableCommand> = {
         : new Uint8Array(0),
       preview: isSet(object.preview) ? globalThis.Boolean(object.preview) : false,
       scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
+      isolated: isSet(object.isolated) ? globalThis.Boolean(object.isolated) : false,
     };
   },
 
@@ -3288,6 +3331,9 @@ export const DurableCommand: MessageFns<DurableCommand> = {
     if (message.scale !== 0) {
       obj.scale = message.scale;
     }
+    if (message.isolated !== false) {
+      obj.isolated = message.isolated;
+    }
     return obj;
   },
 
@@ -3309,6 +3355,7 @@ export const DurableCommand: MessageFns<DurableCommand> = {
     message.configJson = object.configJson ?? new Uint8Array(0);
     message.preview = object.preview ?? false;
     message.scale = object.scale ?? 0;
+    message.isolated = object.isolated ?? false;
     return message;
   },
 };

@@ -28,6 +28,8 @@ export interface PointerDragOptions {
   grabRadiusPx?: number;
   /** Current local-avatar position in element pixels. Required by avatarDrag. */
   avatarPosition?: () => Vec2 | undefined;
+  /** Lets a live editor reserve pointer-down locations without disabling movement. */
+  allowStart?: (point: Readonly<Vec2>) => boolean;
 }
 
 /**
@@ -46,6 +48,7 @@ export class PointerDragController {
   private readonly deadZonePx: number;
   private readonly grabRadiusPx: number;
   private readonly avatarPosition?: () => Vec2 | undefined;
+  private readonly allowStart?: (point: Readonly<Vec2>) => boolean;
   private readonly detach: () => void;
 
   constructor(
@@ -57,10 +60,12 @@ export class PointerDragController {
     this.deadZonePx = options.deadZonePx ?? 6;
     this.grabRadiusPx = options.grabRadiusPx ?? 32;
     this.avatarPosition = options.avatarPosition;
+    this.allowStart = options.allowStart;
 
     const onDown = (event: PointerEvent) => {
       if (this.activePointerId !== undefined) return;
       const point = this.toLocal(event);
+      if (this.allowStart?.(point) === false) return;
       if (this.mode === "avatarDrag") {
         const avatar = this.avatarPosition?.();
         if (

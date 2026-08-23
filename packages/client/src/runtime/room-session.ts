@@ -1302,6 +1302,7 @@ export class RoomSession {
       z: 0,
       configJson: toJsonBytes(config),
       preview: false,
+      isolated: false,
     });
   }
 
@@ -1349,6 +1350,7 @@ export class RoomSession {
       z: transform.z ?? 0,
       configJson: new Uint8Array(),
       preview,
+      isolated: false,
     });
   }
 
@@ -1365,6 +1367,7 @@ export class RoomSession {
       z: 0,
       configJson: new Uint8Array(),
       preview: false,
+      isolated: false,
     });
   }
 
@@ -1381,6 +1384,7 @@ export class RoomSession {
       z: 0,
       configJson: new Uint8Array(),
       preview: false,
+      isolated: false,
     });
   }
 
@@ -1397,6 +1401,24 @@ export class RoomSession {
       z: 0,
       configJson: toJsonBytes(config),
       preview: false,
+      isolated: false,
+    });
+  }
+
+  setItemIsolation(entityId: string, isolated: boolean): void {
+    this.client.sendDurableCommand({
+      commandId: this.nextCommandId(),
+      kind: DurableCommandKind.DURABLE_SET_ITEM_ISOLATION,
+      entityId,
+      definitionId: "",
+      definitionVersion: 0,
+      position: undefined,
+      rotation: 0,
+      scale: 0,
+      z: 0,
+      configJson: new Uint8Array(),
+      preview: false,
+      isolated,
     });
   }
 
@@ -1413,6 +1435,7 @@ export class RoomSession {
       z: 0,
       configJson: new Uint8Array(),
       preview: false,
+      isolated: false,
     });
   }
 
@@ -1447,6 +1470,7 @@ export class RoomSession {
               ),
             createdAt: new Date().toISOString(),
             sceneRevision: this.client.sceneRevision,
+            isolated: item?.isolated ?? command.isolated,
           },
         });
         break;
@@ -1482,6 +1506,13 @@ export class RoomSession {
         this.driver.send({ type: "setItemConfig", entityId: command.entityId, config });
         break;
       }
+      case DurableCommandKind.DURABLE_SET_ITEM_ISOLATION:
+        this.driver.send({
+          type: "setItemIsolation",
+          entityId: command.entityId,
+          isolated: item?.isolated ?? command.isolated,
+        });
+        break;
     }
   }
 
@@ -1564,6 +1595,7 @@ interface SentSample {
   quarantined?: boolean;
   teleportEpoch?: number;
   respawning?: boolean;
+  isolated?: boolean;
 }
 
 const sentSample = (entity: RenderEntity): SentSample => ({
@@ -1582,6 +1614,7 @@ const sentSample = (entity: RenderEntity): SentSample => ({
   quarantined: entity.quarantined,
   teleportEpoch: entity.teleportEpoch,
   respawning: entity.respawning,
+  isolated: entity.isolated,
 });
 
 /** Movement below these values is not visible at the 100 ms render delay. */
@@ -1606,7 +1639,8 @@ const movedSince = (before: SentSample, now: RenderEntity): boolean =>
   // Addendum A2 and A3. A jump and a respawn must reach every peer on the tick
   // they happen, or a peer slides the sprite across the canvas instead.
   before.teleportEpoch !== now.teleportEpoch ||
-  before.respawning !== now.respawning;
+  before.respawning !== now.respawning ||
+  before.isolated !== now.isolated;
 // The processed input sequence is not a reason to send. It rides on the entity
 // whenever the entity moves, and the 2 Hz keyframe carries it for a still
 // avatar. Sending it alone would put every idle avatar in every delta.
@@ -1647,6 +1681,7 @@ const toEntityState = (
   disabled: entity.disabled ?? false,
   teleportEpoch: entity.teleportEpoch ?? 0,
   respawning: entity.respawning ?? false,
+  itemIsolated: entity.isolated ?? false,
   quantizedTransform: quantizeTransform({
     x: entity.x,
     y: entity.y,
@@ -1684,5 +1719,6 @@ const fromEntityState = (state: EntityState): RenderEntity => {
     disabled: state.disabled,
     teleportEpoch: state.teleportEpoch,
     respawning: state.respawning,
+    isolated: state.itemIsolated,
   };
 };

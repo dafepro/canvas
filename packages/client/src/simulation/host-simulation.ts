@@ -101,6 +101,7 @@ export class HostSimulation {
       ownerUserId: item.ownerUserId,
       transform: { ...item.transform },
       resolvedConfig: item.resolvedConfig,
+      isolated: item.isolated,
       behaviorState: item.behaviorState,
       behaviorStateVersion: item.behaviorStateVersion,
       createdAt: new Date().toISOString(),
@@ -119,6 +120,9 @@ export class HostSimulation {
       stateVersion: entity.behavior.stateVersion,
       persistent: entity.behavior.persistent,
     });
+    if (instance.isolated) {
+      this.behaviors.setDisabled(entity.id, true, this.world.currentTick);
+    }
     entity.behavior.state = slot.state;
     entity.behavior.stateVersion = slot.stateVersion;
     return entity;
@@ -137,6 +141,12 @@ export class HostSimulation {
     return true;
   }
 
+  setItemIsolation(entityId: string, isolated: boolean): boolean {
+    if (!this.world.setItemIsolation(entityId, isolated)) return false;
+    this.behaviors.setDisabled(entityId, isolated, this.world.currentTick);
+    return true;
+  }
+
   addAvatar(spawn: AvatarSpawn): Entity {
     return this.world.addAvatar(spawn);
   }
@@ -151,6 +161,7 @@ export class HostSimulation {
     this.behaviors.emitAll(events);
     // Behaviors that need continuous logic receive one tick event.
     for (const slot of this.behaviors.all()) {
+      if (slot.disabled) continue;
       this.behaviors.emit({
         type: "tick",
         tick,
@@ -187,6 +198,7 @@ export class HostSimulation {
         definitionVersion: entity.render?.definitionVersion ?? 0,
         ownerUserId: entity.ownership?.ownerUserId ?? "",
         transform: { ...entity.transform },
+        isolated: entity.isolated || undefined,
         resolvedConfig: entity.behavior?.config,
       };
       if (slot && persistence?.behaviorState) {

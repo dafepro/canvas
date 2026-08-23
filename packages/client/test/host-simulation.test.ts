@@ -59,6 +59,47 @@ const build = () =>
   new HostSimulation(rocketCanvas, rocketCanvasDefinitions, registry(), 60);
 
 describe("HostSimulation with real physics", () => {
+  it("isolates an item from physics and behavior until it is made live again", () => {
+    const counterBehavior: ItemBehavior<Record<string, never>, { ticks: number }> = {
+      behaviorType: "test.liveCounter",
+      stateVersion: 1,
+      subscribes: ["tick"],
+      initialState: () => ({ ticks: 0 }),
+      onEvent: (_context, _config, state) => ({
+        state: { ticks: state.ticks + 1 },
+        commands: [],
+      }),
+    };
+    const liveDefinition: ItemDefinition = {
+      ...ballDefinition,
+      definitionId: "test-live-ball",
+      behaviorType: counterBehavior.behaviorType,
+      defaultConfig: {},
+    };
+    const simulation = new HostSimulation(
+      rocketCanvas,
+      [liveDefinition],
+      new BehaviorRegistry().register(counterBehavior),
+      60,
+    );
+    simulation.addItem(instance("live-1", liveDefinition, 50, 20));
+    simulation.world.setVelocity("live-1", { x: 6, y: 0 }, 0);
+    simulation.setItemIsolation("live-1", true);
+    const held = { ...simulation.world.registry.require("live-1").transform };
+
+    for (let index = 0; index < 60; index++) simulation.step();
+
+    expect(simulation.world.registry.require("live-1").transform).toMatchObject(held);
+    expect(simulation.behaviors.slot("live-1")?.state).toEqual({ ticks: 0 });
+    expect(simulation.snapshot().items[0]?.isolated).toBe(true);
+
+    simulation.setItemIsolation("live-1", false);
+    for (let index = 0; index < 10; index++) simulation.step();
+    expect(simulation.world.registry.require("live-1").transform.x).toBeGreaterThan(held.x);
+    expect(simulation.behaviors.slot("live-1")?.state).toEqual({ ticks: 10 });
+    simulation.free();
+  });
+
   it("drops a crate onto the ground and stops it there", () => {
     const simulation = build();
     simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));

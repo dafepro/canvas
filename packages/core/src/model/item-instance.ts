@@ -16,6 +16,8 @@ export interface ItemInstance<Config = unknown, State = unknown> {
   definitionVersion: number;
   ownerUserId: string;
   transform: Transform;
+  /** Owner-controlled pause of physics, collision, behavior, and timers. */
+  isolated?: boolean;
   resolvedConfig: Config;
   behaviorState?: State;
   /** Version of behaviorState before any registered migration is applied. */

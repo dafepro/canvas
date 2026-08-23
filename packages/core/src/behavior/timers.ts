@@ -17,6 +17,7 @@ interface TimerRecord {
 export class TimerService {
   private readonly timers = new Map<string, TimerRecord>();
   private readonly byEntity = new Map<EntityId, Set<string>>();
+  private readonly pausedAt = new Map<EntityId, number>();
   private nextId = 1;
 
   constructor(private readonly tickRate: number) {}
@@ -65,18 +66,38 @@ export class TimerService {
   cancelAll(entityId: EntityId): void {
     for (const id of this.byEntity.get(entityId) ?? []) this.timers.delete(id);
     this.byEntity.delete(entityId);
+    this.pausedAt.delete(entityId);
+  }
+
+  /** Pauses an entity's simulation-clock timers without losing their remainder. */
+  setPaused(entityId: EntityId, paused: boolean, currentTick: number): void {
+    const since = this.pausedAt.get(entityId);
+    if (paused) {
+      if (since === undefined) this.pausedAt.set(entityId, currentTick);
+      return;
+    }
+    if (since === undefined) return;
+    const heldTicks = Math.max(0, currentTick - since);
+    for (const id of this.byEntity.get(entityId) ?? []) {
+      const timer = this.timers.get(id);
+      if (!timer) continue;
+      timer.startTick += heldTicks;
+      timer.dueTick += heldTicks;
+    }
+    this.pausedAt.delete(entityId);
   }
 
   /** Captures active timers relative to the checkpoint tick. */
   snapshot(entityId: EntityId, currentTick: number): BehaviorTimerSnapshot[] {
+    const effectiveTick = this.pausedAt.get(entityId) ?? currentTick;
     const timers: BehaviorTimerSnapshot[] = [];
     for (const id of this.byEntity.get(entityId) ?? []) {
       const record = this.timers.get(id);
       if (!record) continue;
       timers.push({
         key: record.key,
-        elapsedTicks: Math.max(0, currentTick - record.startTick),
-        remainingTicks: Math.max(1, record.dueTick - currentTick),
+        elapsedTicks: Math.max(0, effectiveTick - record.startTick),
+        remainingTicks: Math.max(1, record.dueTick - effectiveTick),
       });
     }
     return timers.sort(
@@ -125,7 +146,7 @@ export class TimerService {
   collectDue(tick: number): TimerEvent[] {
     const due: TimerRecord[] = [];
     for (const record of this.timers.values()) {
-      if (record.dueTick <= tick) due.push(record);
+      if (!this.pausedAt.has(record.entityId) && record.dueTick <= tick) due.push(record);
     }
     due.sort((a, b) => a.dueTick - b.dueTick || a.id.localeCompare(b.id));
     for (const record of due) {
@@ -146,6 +167,7 @@ export class TimerService {
   clear(): void {
     this.timers.clear();
     this.byEntity.clear();
+    this.pausedAt.clear();
   }
 
   get pending(): number {

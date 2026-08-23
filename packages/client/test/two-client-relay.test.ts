@@ -138,6 +138,27 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       "the host to apply the owner's durable rotation",
       () => Math.abs((entity(alice, crateId)?.rotation ?? 0) - Math.PI / 4) < 0.1,
     );
+
+    bob.setItemIsolation(crateId, true);
+    await waitFor(
+      "live-edit isolation to reach the host and peer",
+      () => entity(alice, crateId)?.isolated === true && entity(bob, crateId)?.isolated === true,
+    );
+
+    const revisionBeforeUnauthorizedEdit = alice.client.sceneRevision;
+    alice.setItemIsolation(crateId, false);
+    await waitFor(
+      "the server to reject another player's isolation edit",
+      () => alice.diagnostics().lastRejection !== undefined,
+    );
+    expect(alice.client.sceneRevision).toBe(revisionBeforeUnauthorizedEdit);
+    expect(entity(alice, crateId)?.isolated).toBe(true);
+
+    bob.setItemIsolation(crateId, false);
+    await waitFor(
+      "the owner to return the item to live simulation",
+      () => entity(alice, crateId)?.isolated === false && entity(bob, crateId)?.isolated === false,
+    );
   }, 90_000);
 
   it("applies an owner's durable config change to the live behavior", async () => {

@@ -84,6 +84,26 @@ describe("PointerDragController", () => {
     controller.destroy();
   });
 
+  it("does not start movement when a live editor owns that pointer location", () => {
+    const surface = new PointerSurface();
+    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+      deadZonePx: 0,
+      fullRangePx: 40,
+      allowStart: (point) => point.x > 30,
+    });
+
+    surface.emit("pointerdown", 20, 20);
+    surface.emit("pointermove", 60, 20);
+
+    expect(controller.intent).toEqual({
+      direction: { x: 0, y: 0 },
+      intensity: 0,
+      held: false,
+    });
+    expect(surface.captured).toBeUndefined();
+    controller.destroy();
+  });
+
   it("drives the avatar toward the dragged target and stops when it catches up", () => {
     const surface = new PointerSurface();
     let avatar = { x: 50, y: 40 };
