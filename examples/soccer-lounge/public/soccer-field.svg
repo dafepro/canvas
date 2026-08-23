@@ -7,7 +7,6 @@
     <circle cx="60" cy="36" r="9" />
     <circle cx="60" cy="36" r="0.7" fill="#edf7e9" stroke="none" />
     <path d="M10 22h14v28H10M110 22H96v28h14" />
-    <path d="M10 29H2v14h8M110 29h8v14h-8" stroke="#d8e4db" />
     <path d="M10 31h5v10h-5M110 31h-5v10h5" />
     <path d="M10 70h100v8H10z" stroke="#80a78a" stroke-dasharray="1.5 1.5" />
   </g>

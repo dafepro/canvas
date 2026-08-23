@@ -63,6 +63,33 @@ export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
   complexity: "simple",
 };
 
+/** Decorative room-owned goal. Collision stays in the canvas definition. */
+export const soccerGoalDefinition: ItemDefinition<Record<string, never>> = {
+  definitionId: "soccer-goal",
+  version: 1,
+  displayName: "Goal and net",
+  visual: {
+    spriteId: "soccer.goal.net",
+    size: { width: 9, height: 14 },
+    anchor: { x: 0.5, y: 0.5 },
+    zIndex: 3,
+  },
+  body: {
+    mode: "fixed",
+    gravityScale: 0,
+    lockRotation: true,
+  },
+  colliders: [],
+  defaultConfig: {},
+  persistence: {
+    transform: true,
+    behaviorState: false,
+    onRoomSleep: "pause",
+  },
+  complexity: "simple",
+};
+
 export const soccerDefinitions: ItemDefinition[] = [
   soccerBallDefinition as ItemDefinition,
+  soccerGoalDefinition as ItemDefinition,
 ];

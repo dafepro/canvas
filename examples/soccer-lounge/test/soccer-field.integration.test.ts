@@ -14,8 +14,9 @@ import {
 } from "@canvas-physics/client";
 import soccerCanvasJson from "../server/canvases/soccer-lounge.json";
 import soccerBallJson from "../server/definitions/soccer-ball.json";
+import soccerGoalJson from "../server/definitions/soccer-goal.json";
 import { SoccerBallBehavior, type SoccerBallState } from "../src/soccer-ball-behavior.js";
-import { soccerBallDefinition } from "../src/soccer-content.js";
+import { soccerBallDefinition, soccerGoalDefinition } from "../src/soccer-content.js";
 import { soccerAssets } from "../src/assets.js";
 
 const canvas = soccerCanvasJson as unknown as CanvasDefinition;
@@ -57,7 +58,21 @@ describe("soccer field integration", () => {
     expect(soccerBallJson.defaultConfig).toEqual(soccerBallDefinition.defaultConfig);
     expect(soccerBallJson.behaviorType).toBe(SoccerBallBehavior.behaviorType);
     expect(soccerBallJson.visual).toEqual(soccerBallDefinition.visual);
-    expect(validateAssetReferences(soccerAssets, canvas, [soccerBallDefinition])).toEqual([]);
+    expect(soccerGoalJson.visual).toEqual(soccerGoalDefinition.visual);
+    expect(
+      validateAssetReferences(soccerAssets, canvas, [
+        soccerBallDefinition,
+        soccerGoalDefinition,
+      ]),
+    ).toEqual([]);
+    expect(
+      canvas.systemItems
+        .filter(({ definitionId }) => definitionId === soccerGoalDefinition.definitionId)
+        .map(({ entityId, transform }) => ({ entityId, ...transform })),
+    ).toEqual([
+      { entityId: "left-goal", x: 5, y: 36, rotation: 0 },
+      { entityId: "right-goal", x: 115, y: 36, rotation: Math.PI },
+    ]);
   });
 
   it("blocks the ball at a touchline", () => {

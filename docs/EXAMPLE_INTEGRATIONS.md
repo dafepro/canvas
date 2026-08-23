@@ -34,8 +34,9 @@ The first runnable slice must prove:
 1. A top-down field combines an image with matching collision geometry.
 2. A custom worker behavior lets avatars kick a match ball.
 3. The ball cannot leave the pitch except through either goal mouth.
-4. Entering a goal atomically increments shared score state, stops the ball in
-   the goal, and resets it to center after a configured delay.
+4. Entering a goal atomically increments shared score state while ordinary
+   physics continues through a high-damping net region and rear backstop, then
+   resets the ball to center after a configured delay.
 5. A late joiner derives the same scoreboard from canonical behavior state.
 
 One requirement still depends on a generic API rather than a soccer-specific
@@ -50,6 +51,9 @@ versioned asset manifest and preload gate. The field texture is decorative;
 the independently defined static colliders and goal sensors remain the
 authoritative gameplay geometry. The hard-kick atlas animation is started by
 the consumer behavior and synchronized by Canvas's generic animation channel.
+Two immutable goal system items reuse one transparent net texture, with the
+opposing goal expressed by a 180-degree item transform. Net drag, score zones,
+and rear boundaries remain canvas configuration rather than renderer logic.
 
 The canvas definition's `systemItems` materializes exactly one match ball on a
 new room. System items have no participant owner and reject participant move,

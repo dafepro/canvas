@@ -11,7 +11,8 @@ downward. Check an item only after the relevant focused tests pass.
   assets, and documents the product capabilities and library gaps it exercises.
 - [x] Ship the soccer lounge as the first independently runnable reference
   integration, including field art and collision geometry, a custom match-ball
-  behavior, shared scoring, goal stoppage, and center reset.
+  behavior, shared scoring, live damped net physics, rear goal boundaries, and
+  center reset.
 - [x] Exercise every reference integration from clean installs of packed Canvas
   artifacts so examples detect accidental internal imports and missing release
   files.
@@ -54,8 +55,11 @@ work below because they determine the public boundary every consumer will use.
   not download Canvas.
 - [ ] Distinguish stable authenticated participant identity from ephemeral
   connection and physics-entity IDs.
-- [ ] Provide dynamic room-template selection APIs. Static definitions now
-  bootstrap validated system-owned items exactly once for a new room.
+- [ ] Provide dynamic room-template selection and version-reconciliation APIs.
+  Static definitions bootstrap validated system-owned items exactly once for a
+  new room, but a newer canvas version cannot yet add, update, or retire desired
+  system items in an already persisted room. Reconciliation must be explicit
+  and deterministic rather than silently overwriting canonical room state.
 - [ ] Define start, stop, reconnect, remount, background, and route-unmount
   lifecycle behavior with a typed consumer error model.
 - [ ] Provide renderer-safe projection and bounded overlay observation helpers.

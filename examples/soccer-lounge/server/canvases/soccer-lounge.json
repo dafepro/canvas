@@ -1,6 +1,6 @@
 {
   "id": "soccer-lounge",
-  "version": 2,
+  "version": 3,
   "size": { "width": 120, "height": 80 },
   "orientation": "topDown",
   "backgroundAssetId": "soccer-field",
@@ -166,6 +166,20 @@
         "homeGoalTag": "rightGoal",
         "awayGoalTag": "leftGoal"
       }
+    },
+    {
+      "entityId": "left-goal",
+      "definitionId": "soccer-goal",
+      "definitionVersion": 1,
+      "transform": { "x": 5, "y": 36, "rotation": 0 },
+      "resolvedConfig": {}
+    },
+    {
+      "entityId": "right-goal",
+      "definitionId": "soccer-goal",
+      "definitionVersion": 1,
+      "transform": { "x": 115, "y": 36, "rotation": 3.141592653589793 },
+      "resolvedConfig": {}
     }
   ],
   "limits": {
