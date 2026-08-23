@@ -46,7 +46,7 @@ const session = (
 ): RoomSession => {
   const created = new RoomSession({
     transport,
-    canvasId: "rocket-canvas",
+    roomId: "rocket-canvas",
     serverUrl: server.url,
     credentialProvider: async () => devRealtimeCredential(userId),
     definitions: rocketCanvasDefinitions,

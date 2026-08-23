@@ -30,6 +30,7 @@ type Room struct {
 	cfg    *Config
 	server *Server
 
+	roomID        string
 	canvasID      string
 	canvasShape   canvasShape
 	definitionRaw json.RawMessage
@@ -64,7 +65,7 @@ type Room struct {
 	emptyAt    time.Time
 }
 
-func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot SnapshotRecord) (*Room, error) {
+func newRoom(server *Server, roomID string, record CanvasRecord, snapshot SnapshotRecord) (*Room, error) {
 	shape, err := parseCanvasShape(record.DefinitionRaw)
 	if err != nil {
 		return nil, err
@@ -73,7 +74,8 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 	room := &Room{
 		cfg:           &server.cfg,
 		server:        server,
-		canvasID:      canvasID,
+		roomID:        roomID,
+		canvasID:      record.CanvasID,
 		canvasShape:   shape,
 		definitionRaw: record.DefinitionRaw,
 		clients:       make(map[string]*Client),
@@ -92,6 +94,10 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 		if err := json.Unmarshal(snapshot.SnapshotRaw, &room.snapshot); err != nil {
 			return nil, err
 		}
+		if snapshot.RoomID != roomID || snapshot.CanvasID != room.snapshot.CanvasID ||
+			snapshot.CanvasVersion != room.snapshot.CanvasVersion {
+			return nil, ErrRoomTemplateConflict
+		}
 		room.snapshotRaw = snapshot.SnapshotRaw
 		room.sceneRevision = snapshot.SceneRevision
 		room.checkpointNo = snapshot.CheckpointRevision
@@ -100,7 +106,7 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 			room.hostEpoch = room.snapshot.HostEpoch
 		}
 	} else {
-		room.snapshot = emptySnapshot(canvasID, shape.Version, server.cfg.Now())
+		room.snapshot = emptySnapshot(record.CanvasID, shape.Version, server.cfg.Now())
 		if err := room.bootstrapSystemItems(); err != nil {
 			return nil, err
 		}
@@ -236,7 +242,7 @@ func (r *Room) handleJoin(client *Client) {
 	}
 	if len(r.clients) >= r.maxClients() {
 		r.sendTo(client, &pb.RoomEnvelope{
-			RoomId: r.canvasID,
+			RoomId: r.roomID,
 			Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
 				Code:    "room_full",
 				Message: "the canvas has reached its client limit",
@@ -252,10 +258,10 @@ func (r *Room) handleJoin(client *Client) {
 	r.participants[client.UserID] = struct{}{}
 	r.joinOrder = append(r.joinOrder, client.ID)
 	client.joined = true
-	r.cfg.Metrics.ClientJoined(r.canvasID)
+	r.cfg.Metrics.ClientJoined(r.roomID)
 
 	r.sendTo(client, &pb.RoomEnvelope{
-		RoomId:    r.canvasID,
+		RoomId:    r.roomID,
 		HostEpoch: r.hostEpoch,
 		Payload: &pb.RoomEnvelope_JoinAccepted{JoinAccepted: &pb.JoinAccepted{
 			ClientId:             client.ID,
@@ -268,6 +274,7 @@ func (r *Room) handleJoin(client *Client) {
 			TickRate:             r.cfg.TickRate,
 			UserId:               client.UserID,
 			DisplayName:          client.DisplayName,
+			CanvasId:             r.canvasID,
 		}},
 	})
 
@@ -312,7 +319,7 @@ func (r *Room) removeClient(client *Client, reason string) bool {
 		}
 	}
 	client.close()
-	r.cfg.Metrics.ClientLeft(r.canvasID, reason)
+	r.cfg.Metrics.ClientLeft(r.roomID, reason)
 	r.cancelPreviews(client)
 
 	if r.hostClientID == client.ID {
@@ -333,7 +340,7 @@ func (r *Room) maxClients() int {
 func (r *Room) handleMessage(msg inbound) {
 	envelope := msg.envelope
 	client := msg.client
-	r.cfg.Metrics.RelayBytes(r.canvasID, msg.size)
+	r.cfg.Metrics.RelayBytes(r.roomID, msg.size)
 
 	switch payload := envelope.Payload.(type) {
 	case *pb.RoomEnvelope_Heartbeat:
@@ -390,11 +397,11 @@ func (r *Room) checkDefinitions(client *Client) {
 		return
 	}
 
-	r.cfg.Metrics.ProtocolMismatch(r.canvasID)
+	r.cfg.Metrics.ProtocolMismatch(r.roomID)
 	r.cfg.Logger.Warn("client lacks an item definition the scene uses",
-		"canvas", r.canvasID, "client", client.ID, "definitions", missing)
+		"canvas", r.roomID, "client", client.ID, "definitions", missing)
 	r.sendTo(client, &pb.RoomEnvelope{
-		RoomId:    r.canvasID,
+		RoomId:    r.roomID,
 		HostEpoch: r.hostEpoch,
 		Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
 			Code:    "definition_mismatch",
@@ -435,7 +442,7 @@ func (r *Room) relayToHost(from *Client, envelope *pb.RoomEnvelope) {
 		return
 	}
 	envelope.SenderClientId = from.ID
-	envelope.RoomId = r.canvasID
+	envelope.RoomId = r.roomID
 	r.sendTo(host, envelope)
 }
 
@@ -443,21 +450,21 @@ func (r *Room) relayToHost(from *Client, envelope *pb.RoomEnvelope) {
 // active lease and refuses a stale epoch (spec 11.1).
 func (r *Room) relayFromHost(from *Client, envelope *pb.RoomEnvelope) {
 	if from.ID != r.hostClientID {
-		r.cfg.Metrics.DurableRejected(r.canvasID, "state_from_non_host")
+		r.cfg.Metrics.DurableRejected(r.roomID, "state_from_non_host")
 		return
 	}
 	if envelope.HostEpoch != r.hostEpoch {
-		r.cfg.Metrics.DurableRejected(r.canvasID, "stale_host_epoch")
+		r.cfg.Metrics.DurableRejected(r.roomID, "stale_host_epoch")
 		return
 	}
 	if err := r.validateCanonicalState(envelope); err != nil {
 		r.cfg.Logger.Warn("rejected canonical state",
-			"canvas", r.canvasID, "reason", err.Error())
-		r.cfg.Metrics.DurableRejected(r.canvasID, "malformed_state")
+			"canvas", r.roomID, "reason", err.Error())
+		r.cfg.Metrics.DurableRejected(r.roomID, "malformed_state")
 		return
 	}
 	envelope.SenderClientId = from.ID
-	envelope.RoomId = r.canvasID
+	envelope.RoomId = r.roomID
 	r.broadcastExcept(from.ID, envelope)
 }
 
@@ -522,20 +529,20 @@ func (r *Room) knownParticipantAvatar(entityID string) bool {
 
 func (r *Room) handleCheckpoint(from *Client, hostEpoch uint64, checkpoint *pb.Checkpoint) {
 	if from.ID != r.hostClientID {
-		r.cfg.Metrics.DurableRejected(r.canvasID, "checkpoint_from_non_host")
+		r.cfg.Metrics.DurableRejected(r.roomID, "checkpoint_from_non_host")
 		return
 	}
 	if hostEpoch != r.hostEpoch {
-		r.cfg.Metrics.DurableRejected(r.canvasID, "stale_host_epoch")
+		r.cfg.Metrics.DurableRejected(r.roomID, "stale_host_epoch")
 		return
 	}
 	if err := r.acceptCheckpoint(checkpoint); err != nil {
 		r.cfg.Logger.Warn("rejected checkpoint",
-			"canvas", r.canvasID, "reason", err.Error())
-		r.cfg.Metrics.DurableRejected(r.canvasID, "malformed_checkpoint")
+			"canvas", r.roomID, "reason", err.Error())
+		r.cfg.Metrics.DurableRejected(r.roomID, "malformed_checkpoint")
 		return
 	}
-	r.cfg.Metrics.CheckpointStored(r.canvasID, len(checkpoint.SnapshotJson))
+	r.cfg.Metrics.CheckpointStored(r.roomID, len(checkpoint.SnapshotJson))
 	r.persist()
 }
 
@@ -634,7 +641,9 @@ func (r *Room) withinBounds(t Transform) bool {
 
 func (r *Room) persist() {
 	record := SnapshotRecord{
+		RoomID:             r.roomID,
 		CanvasID:           r.canvasID,
+		CanvasVersion:      r.snapshot.CanvasVersion,
 		SceneRevision:      r.sceneRevision,
 		CheckpointRevision: r.checkpointNo,
 		HostEpoch:          r.hostEpoch,
@@ -646,7 +655,7 @@ func (r *Room) persist() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := r.cfg.Store.SaveSnapshot(ctx, record); err != nil {
-		r.cfg.Logger.Error("save snapshot failed", "canvas", r.canvasID, "error", err)
+		r.cfg.Logger.Error("save snapshot failed", "canvas", r.roomID, "error", err)
 	}
 }
 
@@ -659,21 +668,21 @@ func (r *Room) sleep() {
 	// unnormalized instead of making a false claim.
 	r.persist()
 	r.sleeping = true
-	r.cfg.Metrics.RoomSlept(r.canvasID)
-	r.cfg.Logger.Info("room sleeping", "canvas", r.canvasID,
+	r.cfg.Metrics.RoomSlept(r.roomID)
+	r.cfg.Logger.Info("room sleeping", "canvas", r.roomID,
 		"sceneRevision", r.sceneRevision, "items", len(r.snapshot.Items))
-	r.server.removeRoom(r.canvasID)
+	r.server.removeRoom(r.roomID)
 }
 
 // ---------- fan-out ----------
 
 func (r *Room) sendTo(client *Client, envelope *pb.RoomEnvelope) {
 	if envelope.RoomId == "" {
-		envelope.RoomId = r.canvasID
+		envelope.RoomId = r.roomID
 	}
 	if !client.enqueue(envelope) {
 		r.cfg.Logger.Warn("dropped envelope for slow client",
-			"canvas", r.canvasID, "client", client.ID)
+			"canvas", r.roomID, "client", client.ID)
 	}
 }
 
@@ -704,7 +713,7 @@ func (r *Room) broadcastPresence() {
 		}
 	}
 	r.broadcast(&pb.RoomEnvelope{
-		RoomId:    r.canvasID,
+		RoomId:    r.roomID,
 		HostEpoch: r.hostEpoch,
 		Payload:   &pb.RoomEnvelope_Presence{Presence: &pb.Presence{Peers: peers}},
 	})

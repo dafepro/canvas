@@ -47,15 +47,16 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("loaded item definitions", "count", definitionCount, "dir", *definitionDir)
-	loaded, err := loadCanvases(store, *canvasDir)
+	roomTemplates, err := loadCanvases(store, *canvasDir)
 	if err != nil {
 		logger.Error("load canvases failed", "dir", *canvasDir, "error", err)
 		os.Exit(1)
 	}
-	logger.Info("loaded canvas definitions", "count", loaded, "dir", *canvasDir)
+	logger.Info("loaded canvas definitions", "count", len(roomTemplates), "dir", *canvasDir)
 
 	server, err := roomsdk.New(roomsdk.Config{
 		Store:          store,
+		RoomTemplates:  roomTemplates,
 		Auth:           roomsdk.DevAuthenticator(),
 		TickRate:       uint32(*tickRate),
 		Logger:         logger,
@@ -138,38 +139,40 @@ func loadItemDefinitions(store bootstrapStore, dir string) (int, error) {
 	return count, nil
 }
 
-func loadCanvases(store bootstrapStore, dir string) (int, error) {
+func loadCanvases(store bootstrapStore, dir string) (roomsdk.StaticRoomTemplates, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	count := 0
+	roomTemplates := make(roomsdk.StaticRoomTemplates)
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join(dir, entry.Name()))
 		if err != nil {
-			return count, err
+			return nil, err
 		}
 		var probe struct {
 			ID      string `json:"id"`
 			Version uint32 `json:"version"`
 		}
 		if err := json.Unmarshal(raw, &probe); err != nil {
-			return count, err
+			return nil, err
 		}
 		if probe.ID == "" {
-			return count, errors.New("canvas file " + entry.Name() + " has no id")
+			return nil, errors.New("canvas file " + entry.Name() + " has no id")
 		}
 		store.PutCanvas(roomsdk.CanvasRecord{
 			CanvasID:      probe.ID,
 			Version:       probe.Version,
 			DefinitionRaw: raw,
 		})
-		count++
+		roomTemplates[probe.ID] = roomsdk.RoomTemplate{
+			CanvasID: probe.ID, CanvasVersion: probe.Version,
+		}
 	}
-	return count, nil
+	return roomTemplates, nil
 }
 
 // withCORS lets the demo page on another port reach the API.

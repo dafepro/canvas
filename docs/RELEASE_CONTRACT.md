@@ -29,6 +29,11 @@ Any `room.proto` change regenerates both bindings in the same commit. Release
 verification runs the package-artifact, library-boundary, release-contract,
 TypeScript protocol/client, and Go rooms SDK tests before publishing or tagging.
 
+Protocol v4 separates product `room_id` from the server-selected canvas
+template. Its room routes are `/v1/rooms/{id}` and
+`/v1/realtime/rooms/{id}`; the removed canvas-instance routes and JOIN
+`canvas_id` field are not supported.
+
 ## Dependency direction
 
 Reusable packages follow `core <- protocol <- client`. Runtime dependencies are

@@ -63,7 +63,8 @@ export interface RoomSessionRates {
 }
 
 export interface RoomSessionOptions {
-  canvasId: string;
+  /** Product-owned room instance id. The server resolves its canvas template. */
+  roomId: string;
   serverUrl: string;
   /** Required when transport is omitted. Called for every WebSocket attempt. */
   credentialProvider?: RealtimeCredentialProvider;
@@ -254,7 +255,7 @@ export class RoomSession {
         version: definition.version,
       })),
       join: {
-        canvasId: options.canvasId,
+        roomId: options.roomId,
         serverUrl: options.serverUrl,
       },
     });
@@ -1160,7 +1161,7 @@ export class RoomSession {
           type: "addItem",
           instance: {
             entityId: command.entityId,
-            canvasId: this.options.canvasId,
+            canvasId: this.canvasDefinition?.id ?? "",
             definitionId: command.definitionId,
             definitionVersion: command.definitionVersion,
             // The server owns the record, so its item wins over the command.

@@ -21,6 +21,8 @@ import type {
 } from "./transport.js";
 
 export interface RoomJoinResult {
+  roomId: string;
+  canvasId: string;
   clientId: string;
   userId: string;
   displayName: string;
@@ -132,9 +134,9 @@ export class RoomClient {
 
   private sendJoin(): void {
     this.transport.sendReliable(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         join: {
-          canvasId: this.joinDescriptor.canvasId,
+          roomId: this.joinDescriptor.roomId,
           protocolVersion: PROTOCOL_VERSION,
           definitions: this.definitions,
         },
@@ -169,7 +171,7 @@ export class RoomClient {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = setInterval(() => {
       this.transport.sendReliable(
-        newEnvelope(this.joinDescriptor.canvasId, {
+        newEnvelope(this.joinDescriptor.roomId, {
           hostEpoch: this.hostEpoch,
           heartbeat: {
             sentAtUnixMs: Date.now(),
@@ -186,7 +188,7 @@ export class RoomClient {
 
   sendInput(input: PlayerInput): void {
     this.transport.sendRealtime(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         hostEpoch: this.hostEpoch,
         sequence: ++this.sequence,
         playerInput: input,
@@ -206,7 +208,7 @@ export class RoomClient {
   sendStateDelta(delta: StateDelta, tick: number): void {
     if (!this.holdsLease) return;
     this.transport.sendRealtime(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         hostEpoch: this.hostEpoch,
         sequence: ++this.sequence,
         tick,
@@ -218,7 +220,7 @@ export class RoomClient {
   sendFullState(state: FullState, tick: number): void {
     if (!this.holdsLease) return;
     this.transport.sendReliable(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         hostEpoch: this.hostEpoch,
         sequence: ++this.sequence,
         tick,
@@ -230,7 +232,7 @@ export class RoomClient {
   sendEffect(event: EffectEvent, tick: number): void {
     if (!this.holdsLease) return;
     this.transport.sendReliable(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         hostEpoch: this.hostEpoch,
         sequence: ++this.sequence,
         tick,
@@ -242,7 +244,7 @@ export class RoomClient {
   sendCheckpoint(snapshot: CanvasSnapshot, checkpointRevision: number, final = false): void {
     if (!this.holdsLease) return;
     this.transport.sendReliable(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         hostEpoch: this.hostEpoch,
         tick: snapshot.tick,
         checkpoint: {
@@ -257,7 +259,7 @@ export class RoomClient {
 
   sendDurableCommand(command: DurableCommand): void {
     this.transport.sendReliable(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         hostEpoch: this.hostEpoch,
         durableCommand: command,
       }),
@@ -268,7 +270,7 @@ export class RoomClient {
   yieldHost(reason: string): void {
     if (!this.isHost) return;
     this.transport.sendReliable(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         hostEpoch: this.hostEpoch,
         hostControl: {
           kind: HostControlKind.HOST_CONTROL_YIELD,
@@ -285,7 +287,7 @@ export class RoomClient {
 
   setHostEligible(eligible: boolean): void {
     this.transport.sendReliable(
-      newEnvelope(this.joinDescriptor.canvasId, {
+      newEnvelope(this.joinDescriptor.roomId, {
         hostEpoch: this.hostEpoch,
         hostControl: {
           kind: HostControlKind.HOST_CONTROL_ELIGIBILITY,
@@ -328,6 +330,8 @@ export class RoomClient {
         return;
       }
       this.emit("joined", {
+        roomId: this.joinDescriptor.roomId,
+        canvasId: canvas.id,
         clientId: accepted.clientId,
         userId: accepted.userId,
         displayName: accepted.displayName,

@@ -2,9 +2,11 @@
 
 ## Authentication
 
-`roomsdk.Config.Store` and `roomsdk.Config.Auth` are required. The SDK never
-selects development authentication implicitly. The reference `canvasd` opts in
-to `DevAuthenticator` explicitly for local use.
+`roomsdk.Config.Store`, `roomsdk.Config.Auth`, and
+`roomsdk.Config.RoomTemplates` are required. The SDK never selects development
+authentication or a room-to-template mapping implicitly. The reference
+`canvasd` opts in to `DevAuthenticator` and `StaticRoomTemplates` explicitly
+for local use. See `ROOM_TEMPLATES.md` for dynamic product resolution.
 
 The browser's `credentialProvider` returns an opaque, short-lived credential on
 every initial connection and reconnect. `WebSocketRoomTransport` sends two

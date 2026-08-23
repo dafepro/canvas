@@ -30,7 +30,7 @@ const sessions: RoomSession[] = [];
 
 const session = (userId: string, intent: () => InputIntent = () => STILL): RoomSession => {
   const created = new RoomSession({
-    canvasId: "rocket-canvas",
+    roomId: "rocket-canvas",
     serverUrl: server.url,
     credentialProvider: async () => devRealtimeCredential(userId),
     definitions: rocketCanvasDefinitions,

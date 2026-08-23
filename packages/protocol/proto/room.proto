@@ -39,7 +39,7 @@ message Vec2 {
 // ---------- coordination ----------
 
 message Join {
-  string canvas_id = 1;
+  string room_id = 1;
   uint32 protocol_version = 2;
   // Item definition ids and versions the client already has.
   repeated DefinitionVersion definitions = 5;
@@ -64,6 +64,8 @@ message JoinAccepted {
   // Authenticated identity. Client-supplied JOIN identity is not trusted.
   string user_id = 9;
   string display_name = 10;
+  // Reusable template selected by the product for this room instance.
+  string canvas_id = 11;
 }
 
 message Presence {

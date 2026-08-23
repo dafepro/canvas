@@ -146,7 +146,7 @@ describe("asset manifest", () => {
       close: vi.fn(),
     };
     const runtime = new CanvasRuntime({
-      canvasId: "asset-gate",
+      roomId: "asset-gate",
       serverUrl: "http://unused.test",
       mount: {} as HTMLElement,
       definitions: [],

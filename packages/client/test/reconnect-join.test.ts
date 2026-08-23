@@ -75,7 +75,7 @@ describe("RoomClient reconnect handshake", () => {
     const session = new RoomSession({
       transport,
       driver,
-      canvasId: rocketCanvas.id,
+      roomId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
       definitions: rocketCanvasDefinitions,
       rates: { previewHz: 10 },
@@ -112,7 +112,7 @@ describe("RoomClient reconnect handshake", () => {
       heartbeatHz: 1000,
       definitions: [{ definitionId: "rocket", version: 1 }],
       join: {
-        canvasId: "rocket-canvas",
+        roomId: "rocket-canvas",
         serverUrl: "http://localhost:8080",
       },
     });
@@ -146,7 +146,7 @@ describe("RoomClient reconnect handshake", () => {
     const session = new RoomSession({
       transport,
       driver,
-      canvasId: rocketCanvas.id,
+      roomId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
       definitions: rocketCanvasDefinitions,
     });
@@ -218,7 +218,7 @@ describe("RoomClient reconnect handshake", () => {
     const session = new RoomSession({
       transport,
       driver,
-      canvasId: rocketCanvas.id,
+      roomId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
       definitions: rocketCanvasDefinitions,
       projectParticipantAvatar: (participant) =>
@@ -342,7 +342,7 @@ describe("RoomClient reconnect handshake", () => {
     const session = new RoomSession({
       transport,
       driver,
-      canvasId: rocketCanvas.id,
+      roomId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
       definitions: rocketCanvasDefinitions,
     });

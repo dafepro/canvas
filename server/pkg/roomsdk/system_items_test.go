@@ -156,18 +156,21 @@ func TestReconcileRoomTemplateExplicitlyAddsReplacesAndRetiresSystemItems(t *tes
 		t.Fatal(err)
 	}
 	if err := h.store.SaveSnapshot(context.Background(), SnapshotRecord{
-		CanvasID: "test-canvas", SceneRevision: 7, CheckpointRevision: 11,
+		RoomID: "test-canvas", CanvasID: "test-canvas", CanvasVersion: 1,
+		SceneRevision: 7, CheckpointRevision: 11,
 		HostEpoch: 3, Tick: 90, Normalized: true, SnapshotRaw: snapshotRaw,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	result, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas", TemplateReconcileOptions{
-		ExpectedCanvasVersion:    1,
-		AddMissingSystemItems:    true,
-		ReplaceSystemItems:       true,
-		RetireMissingSystemItems: true,
-	})
+	result, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas",
+		RoomTemplate{CanvasID: "test-canvas", CanvasVersion: 2}, TemplateReconcileOptions{
+			ExpectedCanvasID:         "test-canvas",
+			ExpectedCanvasVersion:    1,
+			AddMissingSystemItems:    true,
+			ReplaceSystemItems:       true,
+			RetireMissingSystemItems: true,
+		})
 	if err != nil {
 		t.Fatalf("ReconcileRoomTemplate: %v", err)
 	}
@@ -205,9 +208,11 @@ func TestReconcileRoomTemplateExplicitlyAddsReplacesAndRetiresSystemItems(t *tes
 	if _, ok := items["old-banner"]; ok {
 		t.Fatal("retired system item remains")
 	}
-	if _, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas", TemplateReconcileOptions{
-		ExpectedCanvasVersion: 1,
-	}); !errors.Is(err, ErrCanvasVersionConflict) {
+	if _, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas",
+		RoomTemplate{CanvasID: "test-canvas", CanvasVersion: 2}, TemplateReconcileOptions{
+			ExpectedCanvasID:      "test-canvas",
+			ExpectedCanvasVersion: 1,
+		}); !errors.Is(err, ErrCanvasVersionConflict) {
 		t.Fatalf("stale version error = %v, want ErrCanvasVersionConflict", err)
 	}
 }
@@ -217,9 +222,11 @@ func TestReconcileRoomTemplateRejectsAwakeRooms(t *testing.T) {
 	if _, err := h.server.roomFor(context.Background(), "test-canvas"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas", TemplateReconcileOptions{
-		ExpectedCanvasVersion: 1,
-	}); !errors.Is(err, ErrRoomAwake) {
+	if _, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas",
+		RoomTemplate{CanvasID: "test-canvas", CanvasVersion: 1}, TemplateReconcileOptions{
+			ExpectedCanvasID:      "test-canvas",
+			ExpectedCanvasVersion: 1,
+		}); !errors.Is(err, ErrRoomAwake) {
 		t.Fatalf("awake error = %v, want ErrRoomAwake", err)
 	}
 }

@@ -15,7 +15,9 @@ func TestFileStoreReloadsTheNewestSnapshot(t *testing.T) {
 	}
 
 	older := SnapshotRecord{
+		RoomID:             "team/with spaces",
 		CanvasID:           "canvas/with spaces",
+		CanvasVersion:      1,
 		SceneRevision:      3,
 		CheckpointRevision: 4,
 		HostEpoch:          2,
@@ -40,7 +42,7 @@ func TestFileStoreReloadsTheNewestSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	got, err := reopened.LoadSnapshot(context.Background(), older.CanvasID)
+	got, err := reopened.LoadSnapshot(context.Background(), older.RoomID)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -58,7 +60,10 @@ func TestFileStoreIgnoresAnOlderSnapshotAfterReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFileStore: %v", err)
 	}
-	newer := SnapshotRecord{CanvasID: "canvas", CheckpointRevision: 9, SceneRevision: 2}
+	newer := SnapshotRecord{
+		RoomID: "team", CanvasID: "canvas", CanvasVersion: 1,
+		CheckpointRevision: 9, SceneRevision: 2,
+	}
 	if err := store.SaveSnapshot(context.Background(), newer); err != nil {
 		t.Fatalf("save newer: %v", err)
 	}
@@ -68,11 +73,12 @@ func TestFileStoreIgnoresAnOlderSnapshotAfterReopen(t *testing.T) {
 		t.Fatalf("reopen: %v", err)
 	}
 	if err := reopened.SaveSnapshot(context.Background(), SnapshotRecord{
-		CanvasID: "canvas", CheckpointRevision: 8, SceneRevision: 99,
+		RoomID: "team", CanvasID: "canvas", CanvasVersion: 1,
+		CheckpointRevision: 8, SceneRevision: 99,
 	}); err != nil {
 		t.Fatalf("save stale: %v", err)
 	}
-	got, err := reopened.LoadSnapshot(context.Background(), "canvas")
+	got, err := reopened.LoadSnapshot(context.Background(), "team")
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

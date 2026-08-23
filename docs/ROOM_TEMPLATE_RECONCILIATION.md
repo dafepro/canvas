@@ -4,8 +4,9 @@ Room wake never mutates canonical room contents to match a newer canvas
 definition. A host application must explicitly call
 `Server.ReconcileRoomTemplate` while the room is asleep.
 
-The caller supplies the exact persisted `ExpectedCanvasVersion` and separately
-authorizes three operations:
+The caller names the product room, supplies the exact persisted
+`ExpectedCanvasID` and `ExpectedCanvasVersion`, supplies an exact target
+`RoomTemplate`, and separately authorizes three operations:
 
 - add desired system items that are missing;
 - replace existing system-owned items with the desired definition, transform,
@@ -19,12 +20,14 @@ participant-owned item fails the entire reconciliation.
 
 Reconciliation validates exact definition versions, configuration schemas,
 transforms, item limits, and complex-physics limits before saving anything. A
-successful operation advances canvas, scene, and checkpoint revisions once,
+successful operation updates the persisted room binding, advances scene and
+checkpoint revisions once,
 sorts the resulting items and operation report deterministically, and stores
-one normalized snapshot. An awake room, stale expected version, or older target
-definition fails without changing persisted state.
+one normalized snapshot. An awake room, stale expected binding, unavailable
+target version, or same-canvas version rollback fails without changing
+persisted state.
 
-This API is the offline migration mechanism. Dynamic product room-to-template
-selection remains a separate concern: the product must eventually resolve a
-room instance such as a Zoomigo team lounge to a chosen canvas template before
-the rooms SDK loads or reconciles it.
+This API is the offline migration mechanism. `docs/ROOM_TEMPLATES.md` defines
+how a product dynamically resolves that same room to its target template on
+join. The product must update its resolver-owned binding in coordination with
+this operation; a mismatch fails the next join rather than migrating on wake.

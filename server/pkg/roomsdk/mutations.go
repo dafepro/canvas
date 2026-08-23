@@ -30,9 +30,9 @@ var (
 func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) {
 	accepted, item, reason := r.validateDurable(client, command)
 	if !accepted {
-		r.cfg.Metrics.DurableRejected(r.canvasID, reason)
+		r.cfg.Metrics.DurableRejected(r.roomID, reason)
 		r.sendTo(client, &pb.RoomEnvelope{
-			RoomId:    r.canvasID,
+			RoomId:    r.roomID,
 			HostEpoch: r.hostEpoch,
 			Payload: &pb.RoomEnvelope_DurableResult{DurableResult: &pb.DurableCommandResult{
 				CommandId:     command.CommandId,
@@ -50,7 +50,7 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 	if command.Preview {
 		r.previews[command.EntityId] = client.ID
 		r.relayToHost(client, &pb.RoomEnvelope{
-			RoomId:         r.canvasID,
+			RoomId:         r.roomID,
 			HostEpoch:      r.hostEpoch,
 			SenderClientId: client.ID,
 			Payload:        &pb.RoomEnvelope_DurableCommand{DurableCommand: command},
@@ -87,7 +87,7 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 	// Every client learns the accepted mutation, including the host, which
 	// applies it to the canonical world.
 	r.broadcast(&pb.RoomEnvelope{
-		RoomId:         r.canvasID,
+		RoomId:         r.roomID,
 		HostEpoch:      r.hostEpoch,
 		SenderClientId: client.ID,
 		Payload: &pb.RoomEnvelope_DurableResult{DurableResult: &pb.DurableCommandResult{
@@ -130,7 +130,7 @@ func (r *Room) cancelPreviews(client *Client) {
 			command.Z = float32(*item.Transform.Z)
 		}
 		r.sendTo(host, &pb.RoomEnvelope{
-			RoomId:         r.canvasID,
+			RoomId:         r.roomID,
 			HostEpoch:      r.hostEpoch,
 			SenderClientId: client.ID,
 			Payload:        &pb.RoomEnvelope_DurableCommand{DurableCommand: command},

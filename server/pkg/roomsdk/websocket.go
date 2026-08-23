@@ -21,7 +21,7 @@ const (
 )
 
 func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
-	canvasID := r.PathValue("id")
+	roomID := r.PathValue("id")
 
 	identity, err := s.cfg.Auth.Authenticate(r.Context(), r)
 	if err != nil {
@@ -37,7 +37,7 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		CompressionMode: websocket.CompressionDisabled,
 	})
 	if err != nil {
-		s.cfg.Logger.Warn("websocket upgrade failed", "canvas", canvasID, "error", err)
+		s.cfg.Logger.Warn("websocket upgrade failed", "room", roomID, "error", err)
 		return
 	}
 	conn.SetReadLimit(maxMessageBytes)
@@ -46,14 +46,14 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	defer func() { _ = conn.CloseNow() }()
 
-	join, ok := s.readJoin(ctx, conn, canvasID)
+	join, ok := s.readJoin(ctx, conn, roomID)
 	if !ok {
 		return
 	}
 	if join.ProtocolVersion != s.cfg.ProtocolVersion {
-		s.cfg.Metrics.ProtocolMismatch(canvasID)
+		s.cfg.Metrics.ProtocolMismatch(roomID)
 		s.writeNow(ctx, conn, &pb.RoomEnvelope{
-			RoomId: canvasID,
+			RoomId: roomID,
 			Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
 				Code:                  "protocol_mismatch",
 				Message:               "the client protocol version is not supported",
@@ -63,18 +63,21 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room, err := s.roomFor(ctx, canvasID)
+	room, err := s.roomFor(ctx, roomID)
 	if err != nil {
 		code := "room_unavailable"
 		message := "the room is unavailable"
 		if errors.Is(err, ErrNotFound) {
-			code = "canvas_not_found"
-			message = "the canvas was not found"
+			code = "room_not_found"
+			message = "the room was not found"
+		} else if errors.Is(err, ErrRoomTemplateConflict) {
+			code = "room_template_conflict"
+			message = "the room template binding conflicts with persisted state"
 		} else {
-			s.cfg.Logger.Error("open room failed", "canvas", canvasID, "error", err)
+			s.cfg.Logger.Error("open room failed", "room", roomID, "error", err)
 		}
 		s.writeNow(ctx, conn, &pb.RoomEnvelope{
-			RoomId: canvasID,
+			RoomId: roomID,
 			Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
 				Code: code, Message: message,
 			}},
@@ -108,12 +111,12 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		envelope := &pb.RoomEnvelope{}
 		if err := proto.Unmarshal(data, envelope); err != nil {
 			s.cfg.Logger.Warn("dropped malformed envelope",
-				"canvas", canvasID, "client", client.ID)
+				"room", roomID, "client", client.ID)
 			continue
 		}
 		if envelope.GetJoin() != nil {
 			s.writeNow(ctx, conn, &pb.RoomEnvelope{
-				RoomId: canvasID,
+				RoomId: roomID,
 				Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
 					Code:    "already_joined",
 					Message: "the connection already joined the room",
@@ -130,7 +133,7 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		default:
 			// The room loop is behind. Dropping a realtime packet is correct;
 			// the next keyframe repairs the client.
-			s.cfg.Logger.Warn("room inbox full, dropped envelope", "canvas", canvasID)
+			s.cfg.Logger.Warn("room inbox full, dropped envelope", "room", roomID)
 		}
 	}
 }
@@ -138,7 +141,7 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 func (s *Server) readJoin(
 	ctx context.Context,
 	conn *websocket.Conn,
-	canvasID string,
+	roomID string,
 ) (*pb.Join, bool) {
 	joinCtx, cancel := context.WithTimeout(ctx, joinTimeout)
 	defer cancel()
@@ -147,21 +150,21 @@ func (s *Server) readJoin(
 		return nil, false
 	}
 	if messageType != websocket.MessageBinary {
-		s.writeJoinError(ctx, conn, canvasID, "join_required", "the first message must be JOIN")
+		s.writeJoinError(ctx, conn, roomID, "join_required", "the first message must be JOIN")
 		return nil, false
 	}
 	envelope := &pb.RoomEnvelope{}
 	if err := proto.Unmarshal(data, envelope); err != nil {
-		s.writeJoinError(ctx, conn, canvasID, "malformed_join", "the JOIN envelope is malformed")
+		s.writeJoinError(ctx, conn, roomID, "malformed_join", "the JOIN envelope is malformed")
 		return nil, false
 	}
 	join := envelope.GetJoin()
 	if join == nil {
-		s.writeJoinError(ctx, conn, canvasID, "join_required", "the first message must be JOIN")
+		s.writeJoinError(ctx, conn, roomID, "join_required", "the first message must be JOIN")
 		return nil, false
 	}
-	if join.CanvasId != canvasID || (envelope.RoomId != "" && envelope.RoomId != canvasID) {
-		s.writeJoinError(ctx, conn, canvasID, "canvas_mismatch", "JOIN names a different canvas")
+	if join.RoomId != roomID || (envelope.RoomId != "" && envelope.RoomId != roomID) {
+		s.writeJoinError(ctx, conn, roomID, "room_mismatch", "JOIN names a different room")
 		return nil, false
 	}
 	return join, true
@@ -170,12 +173,12 @@ func (s *Server) readJoin(
 func (s *Server) writeJoinError(
 	ctx context.Context,
 	conn *websocket.Conn,
-	canvasID string,
+	roomID string,
 	code string,
 	message string,
 ) {
 	s.writeNow(ctx, conn, &pb.RoomEnvelope{
-		RoomId: canvasID,
+		RoomId: roomID,
 		Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
 			Code: code, Message: message,
 		}},

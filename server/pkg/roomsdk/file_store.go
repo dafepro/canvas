@@ -36,20 +36,20 @@ func NewFileStore(root string) (*FileStore, error) {
 	return &FileStore{MemoryStore: NewMemoryStore(), root: root}, nil
 }
 
-func (s *FileStore) LoadSnapshot(ctx context.Context, canvasID string) (SnapshotRecord, error) {
+func (s *FileStore) LoadSnapshot(ctx context.Context, roomID string) (SnapshotRecord, error) {
 	if err := ctx.Err(); err != nil {
 		return SnapshotRecord{}, err
 	}
-	if record, err := s.MemoryStore.LoadSnapshot(ctx, canvasID); err == nil {
+	if record, err := s.MemoryStore.LoadSnapshot(ctx, roomID); err == nil {
 		return record, nil
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if record, err := s.MemoryStore.LoadSnapshot(ctx, canvasID); err == nil {
+	if record, err := s.MemoryStore.LoadSnapshot(ctx, roomID); err == nil {
 		return record, nil
 	}
-	record, err := s.loadNewest(canvasID)
+	record, err := s.loadNewest(roomID)
 	if err != nil {
 		return SnapshotRecord{}, err
 	}
@@ -66,9 +66,9 @@ func (s *FileStore) SaveSnapshot(ctx context.Context, snapshot SnapshotRecord) e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	current, err := s.MemoryStore.LoadSnapshot(ctx, snapshot.CanvasID)
+	current, err := s.MemoryStore.LoadSnapshot(ctx, snapshot.RoomID)
 	if err != nil {
-		current, err = s.loadNewest(snapshot.CanvasID)
+		current, err = s.loadNewest(snapshot.RoomID)
 	}
 	if err == nil && snapshotOlder(snapshot, current) {
 		return nil
@@ -81,7 +81,7 @@ func (s *FileStore) SaveSnapshot(ctx context.Context, snapshot SnapshotRecord) e
 	if err != nil {
 		return err
 	}
-	dir := s.snapshotDir(snapshot.CanvasID)
+	dir := s.snapshotDir(snapshot.RoomID)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -121,8 +121,8 @@ func (s *FileStore) SaveSnapshot(ctx context.Context, snapshot SnapshotRecord) e
 	return pruneSnapshots(dir, 2)
 }
 
-func (s *FileStore) loadNewest(canvasID string) (SnapshotRecord, error) {
-	entries, err := os.ReadDir(s.snapshotDir(canvasID))
+func (s *FileStore) loadNewest(roomID string) (SnapshotRecord, error) {
+	entries, err := os.ReadDir(s.snapshotDir(roomID))
 	if errors.Is(err, os.ErrNotExist) {
 		return SnapshotRecord{}, ErrNotFound
 	}
@@ -134,20 +134,20 @@ func (s *FileStore) loadNewest(canvasID string) (SnapshotRecord, error) {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		raw, readErr := os.ReadFile(filepath.Join(s.snapshotDir(canvasID), entry.Name()))
+		raw, readErr := os.ReadFile(filepath.Join(s.snapshotDir(roomID), entry.Name()))
 		if readErr != nil {
 			continue
 		}
 		var record SnapshotRecord
-		if json.Unmarshal(raw, &record) == nil && record.CanvasID == canvasID {
+		if json.Unmarshal(raw, &record) == nil && record.RoomID == roomID {
 			return record, nil
 		}
 	}
 	return SnapshotRecord{}, ErrNotFound
 }
 
-func (s *FileStore) snapshotDir(canvasID string) string {
-	encoded := base64.RawURLEncoding.EncodeToString([]byte(canvasID))
+func (s *FileStore) snapshotDir(roomID string) string {
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(roomID))
 	return filepath.Join(s.root, "snapshots", encoded)
 }
 

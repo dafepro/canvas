@@ -75,7 +75,7 @@ export class WebSocketRoomTransport implements RoomTransport {
   private url(join: JoinDescriptor): string {
     const base = new URL(join.serverUrl);
     base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
-    base.pathname = `/v1/realtime/canvases/${encodeURIComponent(join.canvasId)}`;
+    base.pathname = `/v1/realtime/rooms/${encodeURIComponent(join.roomId)}`;
     base.search = "";
     base.hash = "";
     return base.toString();

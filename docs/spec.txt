@@ -457,24 +457,22 @@ type Entity = {  id: EntityId;  transform: Transform;  render?: RenderComponent;
 internal/  realtime/    websocket.go    room_manager.go    room.go    relay.go    host_lease.go    presence.go    protocol.go  canvas/    service.go    definitions.go    instances.go    ownership.go    mutations.go    snapshot.go    sleep.go  storage/    canvas_repository.go    snapshot_repository.go
 
 [Heading2] 16.3 Room state held by Go
-type Room struct {    CanvasID       string    SceneRevision  uint64    HostEpoch      uint64    HostClientID   string    HostLeaseUntil time.Time    Clients        map[string]*Client    LatestSnapshot []byte    SnapshotTick   uint64    Sleeping       bool}
+type Room struct {    RoomID         string    CanvasID       string    CanvasVersion  uint32    SceneRevision  uint64    HostEpoch      uint64    HostClientID   string    HostLeaseUntil time.Time    Clients        map[string]*Client    LatestSnapshot []byte    SnapshotTick   uint64    Sleeping       bool}
 
 [BodyText] This room object is coordination state, not a physics world. Keep it small. The server can hold many sleeping canvases only in persistent storage and create an in-memory room object when the first client connects.
 [Heading2] 16.4 API shape
 Endpoint / channel
 Purpose
-GET /v1/canvases/{id}
-Canvas definition, scene revision, static item metadata, current snapshot descriptor.
-POST /v1/canvases/{id}/join
-Return room join token/descriptor and protocol compatibility data if needed.
-WSS /v1/realtime/canvases/{id}
+GET /v1/rooms/{id}
+Resolved canvas definition, scene revision, static item metadata, current room snapshot descriptor.
+WSS /v1/realtime/rooms/{id}
 Presence, host lease, inputs, relayed state, durable commands, checkpoints.
 GET /v1/item-definitions/{id}
 Definition metadata / asset manifest when not bundled with the client.
 
 [Heading1] 17. Critical realtime flows
 [Heading2] 17.1 Player joins an active room
-Client -> Go: JOIN(canvasId, protocolVersion)Go -> Client: JOIN_ACCEPTED(sceneRevision, hostEpoch, hostClientId, latestKeyframe)Client: load assets + static geometryClient: build local prediction worldClient -> Host (relayed V1): PLAYER_READYHost -> Client: FULL_STATE(currentTick)Client: begin interpolation and input stream
+Client -> Go: JOIN(roomId, protocolVersion)Go resolves roomId -> exact canvasId@versionGo -> Client: JOIN_ACCEPTED(canvasId, sceneRevision, hostEpoch, hostClientId, latestKeyframe)Client: load assets + static geometryClient: build local prediction worldClient -> Host: PLAYER_READYHost -> Client: FULL_STATE(currentTick)Client: begin interpolation and input stream
 
 [Heading2] 17.2 Avatar kicks a rocket
 Player client  predicts avatar movement immediately  sends INPUT(seq=812, direction, intensity)        |        vSimulation host  applies input during fixed tick  avatar contact/sensor intersects rocket  Kickable -> impulse command  Rapier steps rocket  RocketBehavior receives contact/bounce events  host emits STATE_DELTA + effect/state changes        |        vAll clients  reconcile avatar if needed  interpolate rocket transform  render effect events locally

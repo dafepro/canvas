@@ -15,7 +15,7 @@ import {
   type Canvasd,
 } from "./support/canvasd.js";
 
-interface CanvasResponse {
+interface RoomResponse {
   awake: boolean;
   snapshot?: {
     normalized?: boolean;
@@ -37,7 +37,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
 
   it("persists the last host's normalized final checkpoint", async () => {
     const room = new RoomSession({
-      canvasId: "rocket-canvas",
+      roomId: "rocket-canvas",
       serverUrl: server.url,
       credentialProvider: async () => devRealtimeCredential("alice"),
       definitions: rocketCanvasDefinitions,
@@ -56,12 +56,12 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
     );
     await room.stopGracefully(1_000);
 
-    let stored: CanvasResponse | undefined;
+    let stored: RoomResponse | undefined;
     await waitFor(
       "canvasd to persist a normalized sleeping snapshot",
       async () => {
-        const response = await fetch(`${server.url}/v1/canvases/rocket-canvas`);
-        stored = (await response.json()) as CanvasResponse;
+        const response = await fetch(`${server.url}/v1/rooms/rocket-canvas`);
+        stored = (await response.json()) as RoomResponse;
         return stored.awake === false && stored.snapshot?.normalized === true;
       },
       10_000,
@@ -78,7 +78,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
     let reader: RoomSession | undefined;
     const first = await startCanvasd({ dataDir });
     const writer = new RoomSession({
-      canvasId: "rocket-canvas",
+      roomId: "rocket-canvas",
       serverUrl: first.url,
       credentialProvider: async () => devRealtimeCredential("restart-owner"),
       definitions: rocketCanvasDefinitions,
@@ -96,7 +96,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
 
       restarted = await startCanvasd({ dataDir });
       reader = new RoomSession({
-        canvasId: "rocket-canvas",
+        roomId: "rocket-canvas",
         serverUrl: restarted.url,
         credentialProvider: async () => devRealtimeCredential("restart-reader"),
         definitions: rocketCanvasDefinitions,

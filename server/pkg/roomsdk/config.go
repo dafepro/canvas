@@ -9,6 +9,8 @@ import (
 type Config struct {
 	// Store holds canvas definitions and canonical checkpoints.
 	Store Store
+	// RoomTemplates maps product-owned room ids to reusable canvas templates.
+	RoomTemplates RoomTemplateResolver
 	// Auth turns an HTTP request into an Identity.
 	Auth Authenticator
 	// TickRate the host should simulate at, sent in JoinAccepted (spec 10.3).
@@ -41,7 +43,7 @@ const (
 	defaultHeartbeatInterval = 500 * time.Millisecond
 	defaultSleepGrace        = 2 * time.Second
 	defaultMaxClients        = 20
-	defaultProtocolVersion   = 3
+	defaultProtocolVersion   = 4
 )
 
 func (c *Config) applyDefaults() {

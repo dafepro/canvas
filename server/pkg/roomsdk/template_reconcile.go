@@ -17,6 +17,7 @@ var (
 
 // TemplateReconcileOptions makes every destructive system-item policy explicit.
 type TemplateReconcileOptions struct {
+	ExpectedCanvasID         string
 	ExpectedCanvasVersion    uint32
 	AddMissingSystemItems    bool
 	ReplaceSystemItems       bool
@@ -25,6 +26,7 @@ type TemplateReconcileOptions struct {
 
 type TemplateReconcileResult struct {
 	Changed       bool
+	CanvasID      string
 	CanvasVersion uint32
 	SceneRevision uint64
 	Added         []string
@@ -36,27 +38,32 @@ type TemplateReconcileResult struct {
 // one persisted, sleeping room. Room wake never calls this method implicitly.
 func (s *Server) ReconcileRoomTemplate(
 	ctx context.Context,
-	canvasID string,
+	roomID string,
+	target RoomTemplate,
 	options TemplateReconcileOptions,
 ) (TemplateReconcileResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, awake := s.rooms[canvasID]; awake {
+	if _, awake := s.rooms[roomID]; awake {
 		return TemplateReconcileResult{}, ErrRoomAwake
 	}
-	record, err := s.cfg.Store.LoadCanvas(ctx, canvasID)
+	record, err := s.cfg.Store.LoadCanvas(ctx, target.CanvasID)
 	if err != nil {
 		return TemplateReconcileResult{}, err
 	}
-	snapshotRecord, err := s.cfg.Store.LoadSnapshot(ctx, canvasID)
+	if record.Version != target.CanvasVersion {
+		return TemplateReconcileResult{}, fmt.Errorf("%w: target=%s@%d available=%s@%d",
+			ErrCanvasVersionConflict, target.CanvasID, target.CanvasVersion, record.CanvasID, record.Version)
+	}
+	snapshotRecord, err := s.cfg.Store.LoadSnapshot(ctx, roomID)
 	if err != nil {
 		return TemplateReconcileResult{}, err
 	}
-	room, err := newRoom(s, canvasID, record, snapshotRecord)
+	room, err := newRoom(s, roomID, record, snapshotRecord)
 	if err != nil {
 		return TemplateReconcileResult{}, err
 	}
-	result, err := room.reconcileTemplate(record.Version, options)
+	result, err := room.reconcileTemplate(target, options)
 	if err != nil || !result.Changed {
 		return result, err
 	}
@@ -65,7 +72,9 @@ func (s *Server) ReconcileRoomTemplate(
 		return TemplateReconcileResult{}, err
 	}
 	if err := s.cfg.Store.SaveSnapshot(ctx, SnapshotRecord{
-		CanvasID:           canvasID,
+		RoomID:             roomID,
+		CanvasID:           target.CanvasID,
+		CanvasVersion:      target.CanvasVersion,
 		SceneRevision:      room.snapshot.SceneRevision,
 		CheckpointRevision: room.snapshot.CheckpointRevision,
 		HostEpoch:          room.snapshot.HostEpoch,
@@ -80,21 +89,28 @@ func (s *Server) ReconcileRoomTemplate(
 }
 
 func (r *Room) reconcileTemplate(
-	targetVersion uint32,
+	target RoomTemplate,
 	options TemplateReconcileOptions,
 ) (TemplateReconcileResult, error) {
 	result := TemplateReconcileResult{
+		CanvasID:      r.snapshot.CanvasID,
 		CanvasVersion: r.snapshot.CanvasVersion,
 		SceneRevision: r.snapshot.SceneRevision,
 		Added:         []string{},
 		Replaced:      []string{},
 		Retired:       []string{},
 	}
-	if r.snapshot.CanvasVersion != options.ExpectedCanvasVersion || targetVersion < r.snapshot.CanvasVersion {
-		return result, fmt.Errorf("%w: persisted=%d expected=%d target=%d",
-			ErrCanvasVersionConflict, r.snapshot.CanvasVersion, options.ExpectedCanvasVersion, targetVersion)
+	if r.snapshot.CanvasID != options.ExpectedCanvasID ||
+		r.snapshot.CanvasVersion != options.ExpectedCanvasVersion {
+		return result, fmt.Errorf("%w: persisted=%s@%d expected=%s@%d target=%s@%d",
+			ErrCanvasVersionConflict, r.snapshot.CanvasID, r.snapshot.CanvasVersion,
+			options.ExpectedCanvasID, options.ExpectedCanvasVersion,
+			target.CanvasID, target.CanvasVersion)
 	}
-	if targetVersion == r.snapshot.CanvasVersion {
+	if target.CanvasID == r.snapshot.CanvasID && target.CanvasVersion < r.snapshot.CanvasVersion {
+		return result, fmt.Errorf("%w: target version rolls back the current canvas", ErrCanvasVersionConflict)
+	}
+	if target.CanvasID == r.snapshot.CanvasID && target.CanvasVersion == r.snapshot.CanvasVersion {
 		return result, nil
 	}
 
@@ -165,7 +181,8 @@ func (r *Room) reconcileTemplate(
 	sort.Strings(result.Replaced)
 	sort.Strings(result.Retired)
 	r.snapshot.Items = items
-	r.snapshot.CanvasVersion = targetVersion
+	r.snapshot.CanvasID = target.CanvasID
+	r.snapshot.CanvasVersion = target.CanvasVersion
 	r.snapshot.SceneRevision++
 	r.snapshot.CheckpointRevision++
 	r.snapshot.CapturedAt = r.cfg.Now().UTC().Format("2006-01-02T15:04:05.999999999Z07:00")
@@ -174,7 +191,8 @@ func (r *Room) reconcileTemplate(
 	r.checkpointNo = r.snapshot.CheckpointRevision
 	r.indexItems()
 	result.Changed = true
-	result.CanvasVersion = targetVersion
+	result.CanvasID = target.CanvasID
+	result.CanvasVersion = target.CanvasVersion
 	result.SceneRevision = r.snapshot.SceneRevision
 	return result, nil
 }

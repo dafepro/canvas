@@ -136,6 +136,11 @@ store.PutItemDefinition(roomsdk.ItemDefinitionRecord{
 server, err := roomsdk.New(roomsdk.Config{
     Store: store,
     Auth:  myAuthenticator, // any type with an Authenticate method
+    RoomTemplates: roomsdk.StaticRoomTemplates{
+        "team-42-lounge": {
+            CanvasID: "rocket-canvas", CanvasVersion: 1,
+        },
+    },
 })
 if err != nil {
     return err
@@ -143,8 +148,11 @@ if err != nil {
 mux.Handle("/", server.Handler())
 ```
 
-`Store` and `Authenticator` are the only interfaces you must supply. The store
-holds authoritative canvas, item-definition, schema, and snapshot records.
+`Store`, `Authenticator`, and `RoomTemplateResolver` are the required host
+ports. The resolver maps product room instances to exact reusable canvas
+templates; a production integration can implement it against product data.
+The store holds authoritative canvas, item-definition, schema, and snapshot
+records.
 The reference `canvasd` uses `FileStore` and writes restart-safe snapshots to
 `CANVASD_DATA_DIR` (or `./data`); Docker Compose mounts that directory as the
 named `canvasd-data` volume. Embedded services can use `FileStore` directly or
@@ -158,7 +166,7 @@ import { productCanvasDefinitions } from "./canvas-content.js";
 export const enterCanvasRoute = async () => {
   const { CanvasRuntime } = await import("@canvas-physics/client/runtime");
   const runtime = new CanvasRuntime({
-    canvasId: "product-canvas",
+    roomId: "team-42-lounge",
     serverUrl: "http://localhost:8081",
     credentialProvider: async () => {
       const response = await fetch("/api/canvas-ticket", { method: "POST" });

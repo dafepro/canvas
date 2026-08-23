@@ -59,12 +59,12 @@ describe("WebSocketRoomTransport credentials", () => {
     });
 
     const opening = transport.connect({
-      canvasId: "room one",
+      roomId: "room one",
       serverUrl: "https://rooms.example.test/base?old=value",
     });
     await vi.waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
     expect(FakeWebSocket.sockets[0]).toMatchObject({
-      url: "wss://rooms.example.test/v1/realtime/canvases/room%20one",
+      url: "wss://rooms.example.test/v1/realtime/rooms/room%20one",
       protocols: ["canvas-realtime", "ticket.initial"],
     });
     FakeWebSocket.sockets[0]!.open();

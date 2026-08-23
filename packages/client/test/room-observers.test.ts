@@ -60,7 +60,7 @@ describe("RoomSession observers", () => {
     const session = new RoomSession({
       transport,
       driver,
-      canvasId: rocketCanvas.id,
+      roomId: rocketCanvas.id,
       serverUrl: "http://rooms.test",
       definitions: rocketCanvasDefinitions,
     });
@@ -215,7 +215,7 @@ describe("RoomSession observers", () => {
     const session = new RoomSession({
       transport,
       driver: new SimulationDriver(() => ({ send: () => {}, terminate: () => {} })),
-      canvasId: rocketCanvas.id,
+      roomId: rocketCanvas.id,
       serverUrl: "http://rooms.test",
       definitions: rocketCanvasDefinitions,
     });

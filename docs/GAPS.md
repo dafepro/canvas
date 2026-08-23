@@ -64,12 +64,12 @@ work below because they determine the public boundary every consumer will use.
   connection and physics-entity IDs. Reconnects supersede stale sockets while
   retaining one `avatar:<participantId>` entity and an immutable lifecycle
   tombstone for the observing session.
-- [ ] Provide dynamic room-template selection and version-reconciliation APIs.
-  Static definitions bootstrap validated system-owned items exactly once for a
-  new room. Explicit offline reconciliation can now add, replace, or retire
-  desired system items in a sleeping persisted room with exact version checks
-  and participant-item protection. Dynamic product room-to-template selection
-  remains outstanding.
+- [x] Provide dynamic room-template selection and version-reconciliation APIs.
+  Product room IDs now resolve through a required host port to exact reusable
+  canvas templates, snapshots persist that binding independently per room, and
+  conflicting resolver changes fail closed. Explicit offline reconciliation
+  can adopt a new template/version and add, replace, or retire desired system
+  items with participant-item protection.
 - [ ] Define start, stop, reconnect, remount, background, and route-unmount
   lifecycle behavior with a typed consumer error model.
 - [ ] Provide renderer-safe projection and bounded overlay observation helpers.

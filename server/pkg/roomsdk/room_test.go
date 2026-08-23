@@ -68,8 +68,11 @@ func newHarness(t *testing.T, mutate func(*Config)) *harness {
 		}`),
 	})
 	cfg := Config{
-		Store:             store,
-		Auth:              DevAuthenticator(),
+		Store: store,
+		Auth:  DevAuthenticator(),
+		RoomTemplates: StaticRoomTemplates{
+			"test-canvas": {CanvasID: "test-canvas", CanvasVersion: 1},
+		},
 		Logger:            slog.New(slog.NewTextHandler(io.Discard, nil)),
 		AllowedOrigins:    []string{"*"},
 		HostLeaseTTL:      150 * time.Millisecond,
@@ -89,18 +92,23 @@ func newHarness(t *testing.T, mutate func(*Config)) *harness {
 }
 
 type testClient struct {
-	t    *testing.T
-	conn *websocket.Conn
-	ctx  context.Context
+	t      *testing.T
+	conn   *websocket.Conn
+	ctx    context.Context
+	roomID string
 	// ClientID from JoinAccepted.
 	clientID  string
 	hostEpoch uint64
 }
 
 func (h *harness) dial(user string) *testClient {
+	return h.dialRoom("test-canvas", user)
+}
+
+func (h *harness) dialRoom(roomID, user string) *testClient {
 	h.t.Helper()
 	wsURL := "ws" + strings.TrimPrefix(h.http.URL, "http") +
-		"/v1/realtime/canvases/test-canvas"
+		"/v1/realtime/rooms/" + roomID
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	h.t.Cleanup(cancel)
 	conn, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
@@ -110,7 +118,7 @@ func (h *harness) dial(user string) *testClient {
 		h.t.Fatalf("dial: %v", err)
 	}
 	h.t.Cleanup(func() { _ = conn.CloseNow() })
-	return &testClient{t: h.t, conn: conn, ctx: ctx}
+	return &testClient{t: h.t, conn: conn, ctx: ctx, roomID: roomID}
 }
 
 func (c *testClient) send(envelope *pb.RoomEnvelope) {
@@ -162,10 +170,10 @@ func (c *testClient) sendJoin(definitions ...*pb.DefinitionVersion) {
 		definitions = []*pb.DefinitionVersion{{DefinitionId: "rocket", Version: 1}}
 	}
 	c.send(&pb.RoomEnvelope{
-		RoomId: "test-canvas",
+		RoomId: c.roomID,
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
-			CanvasId:        "test-canvas",
-			ProtocolVersion: 3,
+			RoomId:          c.roomID,
+			ProtocolVersion: 4,
 			Definitions:     definitions,
 		}},
 	})
@@ -1499,7 +1507,7 @@ func TestProtocolMismatchIsRefused(t *testing.T) {
 	client.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
-			CanvasId:        "test-canvas",
+			RoomId:          "test-canvas",
 			ProtocolVersion: 99,
 		}},
 	})
@@ -1507,8 +1515,8 @@ func TestProtocolMismatchIsRefused(t *testing.T) {
 	if got.Code != "protocol_mismatch" {
 		t.Errorf("error code = %q, want protocol_mismatch", got.Code)
 	}
-	if got.ServerProtocolVersion != 3 {
-		t.Errorf("server protocol version = %d, want 3", got.ServerProtocolVersion)
+	if got.ServerProtocolVersion != 4 {
+		t.Errorf("server protocol version = %d, want 4", got.ServerProtocolVersion)
 	}
 }
 
@@ -1531,7 +1539,7 @@ func TestQueryStringIdentityIsRefused(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	wsURL := "ws" + strings.TrimPrefix(h.http.URL, "http") +
-		"/v1/realtime/canvases/test-canvas?user=legacy-client"
+		"/v1/realtime/rooms/test-canvas?user=query-only-client"
 	_, resp, err := websocket.Dial(ctx, wsURL, nil)
 	if err == nil {
 		t.Fatal("dial with only query-string identity succeeded")
@@ -1541,19 +1549,32 @@ func TestQueryStringIdentityIsRefused(t *testing.T) {
 	}
 }
 
-func TestGetCanvasReturnsTheDefinition(t *testing.T) {
+func TestGetRoomReturnsTheResolvedCanvasDefinition(t *testing.T) {
 	h := newHarness(t, nil)
-	resp, err := http.Get(h.http.URL + "/v1/canvases/test-canvas")
+	resp, err := http.Get(h.http.URL + "/v1/rooms/test-canvas")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
 	defer resp.Body.Close()
-	var body canvasResponse
+	var body roomResponse
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.CanvasID != "test-canvas" || body.TickRate != 60 {
+	if body.RoomID != "test-canvas" || body.CanvasID != "test-canvas" ||
+		body.CanvasVersion != 1 || body.TickRate != 60 {
 		t.Errorf("unexpected body: %+v", body)
+	}
+}
+
+func TestRemovedCanvasInstanceRouteDoesNotExist(t *testing.T) {
+	h := newHarness(t, nil)
+	resp, err := http.Get(h.http.URL + "/v1/canvases/test-canvas")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("removed canvas route status = %d, want 404", resp.StatusCode)
 	}
 }
 

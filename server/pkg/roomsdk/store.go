@@ -39,7 +39,9 @@ type ItemDefinitionRecord struct {
 
 // SnapshotRecord is one canonical checkpoint (spec 13.1).
 type SnapshotRecord struct {
+	RoomID             string          `json:"roomId"`
 	CanvasID           string          `json:"canvasId"`
+	CanvasVersion      uint32          `json:"canvasVersion"`
 	SceneRevision      uint64          `json:"sceneRevision"`
 	CheckpointRevision uint64          `json:"checkpointRevision"`
 	HostEpoch          uint64          `json:"hostEpoch"`
@@ -54,7 +56,7 @@ type SnapshotRecord struct {
 type Store interface {
 	LoadCanvas(ctx context.Context, canvasID string) (CanvasRecord, error)
 	LoadItemDefinition(ctx context.Context, definitionID string) (ItemDefinitionRecord, error)
-	LoadSnapshot(ctx context.Context, canvasID string) (SnapshotRecord, error)
+	LoadSnapshot(ctx context.Context, roomID string) (SnapshotRecord, error)
 	SaveSnapshot(ctx context.Context, snapshot SnapshotRecord) error
 }
 
@@ -113,10 +115,10 @@ func (s *MemoryStore) LoadItemDefinition(
 	return record, nil
 }
 
-func (s *MemoryStore) LoadSnapshot(_ context.Context, canvasID string) (SnapshotRecord, error) {
+func (s *MemoryStore) LoadSnapshot(_ context.Context, roomID string) (SnapshotRecord, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	record, ok := s.snapshots[canvasID]
+	record, ok := s.snapshots[roomID]
 	if !ok {
 		return SnapshotRecord{}, ErrNotFound
 	}
@@ -125,13 +127,16 @@ func (s *MemoryStore) LoadSnapshot(_ context.Context, canvasID string) (Snapshot
 
 // SaveSnapshot ignores a checkpoint older than the stored one.
 func (s *MemoryStore) SaveSnapshot(_ context.Context, snapshot SnapshotRecord) error {
+	if snapshot.RoomID == "" || snapshot.CanvasID == "" || snapshot.CanvasVersion == 0 {
+		return errors.New("roomsdk: snapshot room and canvas binding is required")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	current, ok := s.snapshots[snapshot.CanvasID]
+	current, ok := s.snapshots[snapshot.RoomID]
 	if ok && snapshot.CheckpointRevision < current.CheckpointRevision {
 		return nil
 	}
-	s.snapshots[snapshot.CanvasID] = snapshot
+	s.snapshots[snapshot.RoomID] = snapshot
 	return nil
 }
 

@@ -90,7 +90,7 @@ const joinedSession = async (): Promise<{
   const transport = new FakeTransport();
   const effects: EffectEmission[] = [];
   const session = new RoomSession({
-    canvasId: rocketCanvas.id,
+    roomId: rocketCanvas.id,
     serverUrl: "http://127.0.0.1:1",
     definitions: rocketCanvasDefinitions,
     transport,

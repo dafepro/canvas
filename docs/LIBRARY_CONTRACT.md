@@ -46,6 +46,11 @@ placement hook.
 
 ## Room template items
 
+Product room identity is independent from canvas template identity. The host's
+required `RoomTemplateResolver` maps a room such as a Zoomigo team lounge to an
+exact reusable canvas ID and version. Snapshots are isolated by room and retain
+that binding; resolution conflicts fail closed. See `docs/ROOM_TEMPLATES.md`.
+
 `CanvasDefinition.systemItems` declares the immutable baseline items for a new
 room. The rooms service materializes them only when no snapshot exists, validates
 their exact definition versions, resolved configuration, transforms, IDs, and
@@ -63,4 +68,5 @@ host application explicitly reconciles that sleeping room with the policies in
 
 - `EXTENSION_CONTRACT.md` defines application behavior and worker ownership.
 - `HOST_INTEGRATION.md` defines authentication and rooms SDK composition.
+- `ROOM_TEMPLATES.md` defines product room and reusable template identity.
 - `ARCHITECTURE.md` defines authority and dependency direction inside Canvas.

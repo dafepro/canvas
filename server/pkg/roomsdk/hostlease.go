@@ -16,12 +16,12 @@ func (r *Room) grantHost(clientID string, reason string) {
 	r.hostLeaseUntil = r.cfg.Now().Add(r.cfg.HostLeaseTTL)
 	client.lastHeartbeat = r.cfg.Now()
 
-	r.cfg.Metrics.HostLeaseChanged(r.canvasID, r.hostEpoch, reason)
+	r.cfg.Metrics.HostLeaseChanged(r.roomID, r.hostEpoch, reason)
 	r.cfg.Logger.Info("host lease granted",
-		"canvas", r.canvasID, "client", clientID, "epoch", r.hostEpoch, "reason", reason)
+		"canvas", r.roomID, "client", clientID, "epoch", r.hostEpoch, "reason", reason)
 
 	r.sendTo(client, &pb.RoomEnvelope{
-		RoomId:    r.canvasID,
+		RoomId:    r.roomID,
 		HostEpoch: r.hostEpoch,
 		Payload: &pb.RoomEnvelope_HostControl{HostControl: &pb.HostControl{
 			Kind:                 pb.HostControlKind_HOST_CONTROL_GRANTED,
@@ -35,7 +35,7 @@ func (r *Room) grantHost(clientID string, reason string) {
 
 	// Every other client clears its interpolation history when the epoch moves.
 	r.broadcastExcept(clientID, &pb.RoomEnvelope{
-		RoomId:    r.canvasID,
+		RoomId:    r.roomID,
 		HostEpoch: r.hostEpoch,
 		Payload: &pb.RoomEnvelope_HostControl{HostControl: &pb.HostControl{
 			Kind:         pb.HostControlKind_HOST_CONTROL_REVOKED,
@@ -104,7 +104,7 @@ func (r *Room) checkHostLease() {
 		return
 	}
 	r.cfg.Logger.Warn("host lease expired",
-		"canvas", r.canvasID, "client", r.hostClientID, "epoch", r.hostEpoch)
+		"canvas", r.roomID, "client", r.hostClientID, "epoch", r.hostEpoch)
 	host.hostEligible = false
 	previous := r.hostClientID
 	r.hostClientID = ""

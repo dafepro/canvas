@@ -70,7 +70,7 @@ const join = async (): Promise<void> => {
   if (runtime) return;
   joinButton.disabled = true;
   runtime = new CanvasRuntime({
-    canvasId: "rocket-canvas",
+    roomId: "rocket-canvas",
     serverUrl,
     credentialProvider: async () =>
       devRealtimeCredential(userInput.value, userInput.value),

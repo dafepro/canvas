@@ -61,7 +61,7 @@ const join = async (): Promise<void> => {
       name: "soccer-lounge-simulation",
     });
     nextRuntime = new CanvasRuntime({
-      canvasId: "soccer-lounge",
+      roomId: "soccer-lounge",
       serverUrl,
       credentialProvider: async () =>
         devRealtimeCredential(userInput.value, userInput.value),

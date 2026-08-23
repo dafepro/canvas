@@ -37,7 +37,8 @@ import {
 import type { Texture } from "pixi.js";
 
 export interface CanvasRuntimeOptions {
-  canvasId: string;
+  /** Product-owned room instance id. The server resolves its canvas template. */
+  roomId: string;
   serverUrl: string;
   /** Required when transport is omitted. Called for every WebSocket attempt. */
   credentialProvider?: RealtimeCredentialProvider;
@@ -101,7 +102,7 @@ export class CanvasRuntime {
 
   constructor(private readonly options: CanvasRuntimeOptions) {
     this.session = new RoomSession({
-      canvasId: options.canvasId,
+      roomId: options.roomId,
       serverUrl: options.serverUrl,
       credentialProvider: options.credentialProvider,
       definitions: options.definitions,
