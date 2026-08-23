@@ -3,9 +3,11 @@ import type {
   CanvasDefinition,
   ItemDefinition,
   StaticColliderDefinition,
+  Transform,
 } from "@canvas-physics/core";
 import type { RenderEntity } from "../simulation/messages.js";
 import type { DragGesture } from "../input/pointer-drag-controller.js";
+import type { ItemEditState } from "../input/item-edit-controller.js";
 import { Camera } from "./camera.js";
 import { EffectSystem } from "./effect-system.js";
 
@@ -34,11 +36,13 @@ export class PixiScene {
   private readonly entityLayer = new Container();
   private readonly debugLayer = new Container();
   private readonly uiLayer = new Container();
+  private readonly editOverlay = new Graphics();
   private readonly thumbstick = new Graphics();
   private readonly sprites = new Map<string, SpriteRecord>();
   private readonly definitions = new Map<string, ItemDefinition>();
   private readonly screenPositions = new Map<string, { x: number; y: number }>();
   private lastFrameMs = 0;
+  private editState: ItemEditState = {};
   debug: boolean;
 
   constructor(
@@ -64,7 +68,7 @@ export class PixiScene {
     element.appendChild(this.app.canvas);
 
     this.world.addChild(this.backgroundLayer, this.entityLayer, this.debugLayer);
-    this.uiLayer.addChild(this.thumbstick);
+    this.uiLayer.addChild(this.editOverlay, this.thumbstick);
     this.app.stage.addChild(this.world, this.effects.layer, this.uiLayer);
     this.resize();
     this.app.renderer.on("resize", () => this.resize());
@@ -194,6 +198,54 @@ export class PixiScene {
 
     this.effects.setPositions(this.screenPositions);
     this.effects.update(deltaMs);
+    this.drawEditOverlay(entities);
+  }
+
+  setEditState(state: ItemEditState): void {
+    this.editState = state;
+    if (!state.selectedEntityId) this.editOverlay.clear();
+  }
+
+  private drawEditOverlay(entities: RenderEntity[]): void {
+    this.editOverlay.clear();
+    const selected = entities.find(
+      (entity) => entity.id === this.editState.selectedEntityId,
+    );
+    const ghost = this.editState.ghost;
+    if (!selected && !ghost) return;
+
+    const definitionId = ghost?.definitionId ?? selected?.definitionId ?? "";
+    const definition = this.definitions.get(definitionId);
+    const size = definition?.visual.size ?? { width: 2, height: 2 };
+    const transform: Transform = ghost?.transform ?? {
+      x: selected?.x ?? 0,
+      y: selected?.y ?? 0,
+      rotation: selected?.rotation ?? 0,
+      z: selected?.z,
+    };
+    const width = size.width * this.camera.scale;
+    const height = size.height * this.camera.scale;
+    this.editOverlay.position.set(
+      this.camera.toScreenX(transform.x),
+      this.camera.toScreenY(transform.y) - (transform.z ?? 0) * this.camera.scale,
+    );
+    this.editOverlay.rotation = transform.rotation;
+
+    if (ghost) {
+      const shape = definition?.visual.placeholder?.shape ?? "rect";
+      if (shape === "circle") {
+        this.editOverlay.circle(0, 0, width / 2);
+      } else if (shape === "triangle") {
+        this.editOverlay.poly([0, -height / 2, width / 2, height / 2, -width / 2, height / 2]);
+      } else {
+        this.editOverlay.rect(-width / 2, -height / 2, width, height);
+      }
+      this.editOverlay.fill({ color: 0xffd166, alpha: 0.28 });
+    }
+
+    this.editOverlay
+      .rect(-width / 2 - 4, -height / 2 - 4, width + 8, height + 8)
+      .stroke({ color: 0xffd166, width: 2, alpha: 0.95 });
   }
 
   private ensureSprite(entity: RenderEntity): SpriteRecord {

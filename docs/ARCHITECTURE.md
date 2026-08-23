@@ -156,6 +156,7 @@ motion; the false marker records that abrupt fallback accurately.
 | Host state delta | 15 Hz | `RoomSession` |
 | Host keyframe | 2 Hz | `RoomSession` |
 | Checkpoint to the server | 1 Hz | `RoomSession` |
+| Owner edit preview | Up to 15 Hz, coalesced | `RoomSession` |
 | Host heartbeat | 2 Hz | `RoomClient` |
 
 ## Extending the system

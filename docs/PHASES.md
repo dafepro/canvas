@@ -71,7 +71,7 @@ same simulation in the test process.
 | Accept 1 Hz host checkpoints | Done, with validation of bounds, item count, and revision order. |
 | Sleeping-room normalization and zero motion | Done. A graceful last host normalizes behavior state and stops timers before its final checkpoint. After abrupt loss, the server preserves the newest periodic checkpoint as explicitly unnormalized. |
 | First-join wake path | Done and tested. |
-| Exit criterion: rearrange only your own items, leave, return, see the same placement | The Go sleep/wake tests and `graceful-sleep.test.ts` prove persistence through a real service. The drag-to-edit interaction is not built, so a user cannot yet move an item by dragging. |
+| Exit criterion: rearrange only your own items, leave, return, see the same placement | Met. The demo's explicit edit mode hit-tests only owned items, draws a local gold drag ghost/selection ring, relays bounded previews, and commits on release. Verified through the real service in the in-app browser by dragging a crate, leaving, and rejoining at the committed placement. |
 
 ## Phase 5 — Advanced interaction primitives: partly complete
 
@@ -130,23 +130,21 @@ done.
 
 ## Known gaps
 
-1. **No visual verification by me.** No browser tool was available in the
-   sessions that built this. The renderer compiles, the bundle builds, the
-   simulation is tested headlessly, and two headless clients agree through a real
-   server. The user has watched the demo and reported the results below.
-2. **No drag-to-edit.** `RoomSession.moveItem` exists, but no pointer
-   interaction calls it, so Phase 4 editing is API-only.
-3. **The avatar sprite ignores its definition.** The renderer draws a fixed
+1. **Limited visual verification.** Edit-mode selection, dragging, commit, and
+   rejoin persistence were verified in the real browser demo. Collider outlines,
+   every effect, and the full interaction matrix have not been exhaustively
+   inspected visually.
+2. **The avatar sprite ignores its definition.** The renderer draws a fixed
    circle for every avatar rather than reading a definition.
-4. **MemoryStore only.** A restart of `canvasd` loses every placement.
-5. **A stuck body is now freed.** The host watches for a body that is still and
+3. **MemoryStore only.** A restart of `canvasd` loses every placement.
+4. **A stuck body is now freed.** The host watches for a body that is still and
    whose centre lies inside fixed geometry. After half a second it moves the
    body against the local gravity until the body is clear, and it emits an
    `unstuck` event.
-6. **The network budget in a busy scene.** See the Phase 6 table above. The
+5. **The network budget in a busy scene.** See the Phase 6 table above. The
    room is above the 20 KB/s guidance of spec 19.3 when many items move at once.
 
-7. **Behavior state in a delta is JSON.** A keyframe always carries it, and a
+6. **Behavior state in a delta is JSON.** A keyframe always carries it, and a
    delta carries it only after a change. A large behavior state on many items
    would still cost bytes. Spec 22 budgets are not measured.
 

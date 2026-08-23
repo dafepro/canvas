@@ -95,6 +95,12 @@ button:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
+button.active {
+  border-color: #ffd166;
+  background: #493d21;
+  color: #fff1bd;
+}
+
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;

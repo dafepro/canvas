@@ -41,8 +41,8 @@ downward. Check an item only after the relevant focused tests pass.
 - [x] Relay owner move previews to the host without persisting them, coalesce
   preview bursts to a bounded reliable send rate, and send release commits
   immediately.
-- [ ] Add item selection and local drag-ghost UI that drives preview moves and
-  the final release commit.
+- [x] Add explicit edit mode with owner-only item selection, a local drag ghost,
+  rate-limited preview moves, and a final release commit.
 - [ ] Add a durable Store implementation for the reference service so process
   restarts preserve canvases and snapshots.
 

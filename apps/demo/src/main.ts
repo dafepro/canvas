@@ -13,6 +13,7 @@ const joinButton = document.querySelector<HTMLButtonElement>("#join")!;
 const leaveButton = document.querySelector<HTMLButtonElement>("#leave")!;
 const diagnosticsTable = document.querySelector<HTMLTableElement>("#diagnostics")!;
 const disableButton = document.querySelector<HTMLButtonElement>("#disable-avatar")!;
+const editButton = document.querySelector<HTMLButtonElement>("#edit-mode")!;
 
 userInput.value =
   new URLSearchParams(location.search).get("user") ??
@@ -73,6 +74,10 @@ const join = async (): Promise<void> => {
     onAvatarDisabledChange: (disabled) => {
       disableButton.textContent = disabled ? "Enable my avatar" : "Disable my avatar";
     },
+    onEditModeChange: (enabled) => {
+      editButton.textContent = enabled ? "Finish editing" : "Edit my items";
+      editButton.classList.toggle("active", enabled);
+    },
     onDiagnostics: (diagnostics) => {
       const now = performance.now();
       if (now - lastPaintMs < 250) return;
@@ -84,6 +89,7 @@ const join = async (): Promise<void> => {
     await runtime.start();
     leaveButton.disabled = false;
     disableButton.disabled = false;
+    editButton.disabled = false;
   } catch (error) {
     joinButton.disabled = false;
     runtime = undefined;
@@ -102,10 +108,17 @@ const leave = (): void => {
   leaveButton.disabled = true;
   disableButton.disabled = true;
   disableButton.textContent = "Disable my avatar";
+  editButton.disabled = true;
+  editButton.textContent = "Edit my items";
+  editButton.classList.remove("active");
 };
 
 disableButton.addEventListener("click", () => {
   runtime?.toggleAvatarDisabled();
+});
+
+editButton.addEventListener("click", () => {
+  runtime?.toggleEditMode();
 });
 
 joinButton.addEventListener("click", () => void join());

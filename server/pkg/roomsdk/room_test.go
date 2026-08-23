@@ -1002,6 +1002,124 @@ func TestCheckpointCannotRewriteDurableItemMetadata(t *testing.T) {
 	}
 }
 
+func TestCheckpointDoesNotPersistAnUncommittedPreviewTransform(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	host.send(spawnCommand("cmd-spawn", 20, 30))
+	spawned := host.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-spawn"
+	}).GetDurableResult()
+	entityID := spawned.Command.EntityId
+
+	host.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-preview",
+			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
+			EntityId:  entityID,
+			Position:  &pb.Vec2{X: 40, Y: 50},
+			Preview:   true,
+		}},
+	})
+	host.await(func(e *pb.RoomEnvelope) bool {
+		command := e.GetDurableCommand()
+		return command != nil && command.CommandId == "cmd-preview"
+	})
+
+	checkpointRaw, err := json.Marshal(CanvasSnapshot{
+		SchemaVersion: 1,
+		CanvasID:      "test-canvas",
+		SceneRevision: spawned.SceneRevision,
+		Items: []SnapshotItem{{
+			EntityID:          entityID,
+			DefinitionID:      "rocket",
+			DefinitionVersion: 1,
+			OwnerUserID:       "alice",
+			Transform:         Transform{X: 40, Y: 50},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("marshal checkpoint: %v", err)
+	}
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Payload: &pb.RoomEnvelope_Checkpoint{Checkpoint: &pb.Checkpoint{
+			CheckpointRevision: 1,
+			SnapshotJson:       checkpointRaw,
+		}},
+	})
+
+	host.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId:  "cmd-config",
+			Kind:       pb.DurableCommandKind_DURABLE_SET_CONFIG,
+			EntityId:   entityID,
+			ConfigJson: []byte(`{"thrust":30}`),
+		}},
+	})
+	configured := host.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-config"
+	}).GetDurableResult()
+	var item SnapshotItem
+	if err := json.Unmarshal(configured.ItemInstanceJson, &item); err != nil {
+		t.Fatalf("item instance json: %v", err)
+	}
+	if item.Transform.X != 20 || item.Transform.Y != 30 {
+		t.Errorf(
+			"transform = (%v,%v), want committed value (20,30)",
+			item.Transform.X,
+			item.Transform.Y,
+		)
+	}
+}
+
+func TestPreviewRevertsWhenTheEditingPeerDisconnects(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+	peer := h.dial("bob")
+	peer.join()
+
+	peer.send(spawnCommand("cmd-spawn", 20, 30))
+	spawned := peer.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-spawn"
+	}).GetDurableResult()
+	entityID := spawned.Command.EntityId
+
+	peer.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-preview",
+			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
+			EntityId:  entityID,
+			Position:  &pb.Vec2{X: 40, Y: 50},
+			Preview:   true,
+		}},
+	})
+	host.await(func(e *pb.RoomEnvelope) bool {
+		command := e.GetDurableCommand()
+		return command != nil && command.CommandId == "cmd-preview"
+	})
+
+	_ = peer.conn.CloseNow()
+	revert := host.await(func(e *pb.RoomEnvelope) bool {
+		command := e.GetDurableCommand()
+		return command != nil && command.CommandId == "preview-revert-"+entityID
+	}).GetDurableCommand()
+	if revert.Position == nil || revert.Position.X != 20 || revert.Position.Y != 30 {
+		t.Fatalf("revert position = %+v, want (20,30)", revert.Position)
+	}
+}
+
 func TestCheckpointRejectsUnknownEntityIDs(t *testing.T) {
 	h := newHarness(t, nil)
 	host := h.dial("alice")

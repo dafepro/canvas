@@ -48,6 +48,7 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 	// A preview move is not durable. Relay it so the host can show the drag,
 	// but do not move the scene revision or persist it.
 	if command.Preview {
+		r.previews[command.EntityId] = client.ID
 		r.relayToHost(client, &pb.RoomEnvelope{
 			RoomId:         r.canvasID,
 			HostEpoch:      r.hostEpoch,
@@ -55,6 +56,10 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 			Payload:        &pb.RoomEnvelope_DurableCommand{DurableCommand: command},
 		})
 		return
+	}
+	if command.Kind == pb.DurableCommandKind_DURABLE_MOVE_ITEM ||
+		command.Kind == pb.DurableCommandKind_DURABLE_DELETE_ITEM {
+		delete(r.previews, command.EntityId)
 	}
 
 	r.applyDurable(command, item, client)
@@ -94,6 +99,43 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 		}},
 	})
 	r.persist()
+}
+
+// Revert transient placements when their editing client leaves without a
+// release commit. A replacement host rebuilds from the committed snapshot; an
+// existing host receives the same committed transform as one last preview.
+func (r *Room) cancelPreviews(client *Client) {
+	for entityID, clientID := range r.previews {
+		if clientID != client.ID {
+			continue
+		}
+		delete(r.previews, entityID)
+		item := r.items[entityID]
+		host := r.clients[r.hostClientID]
+		if item == nil || host == nil {
+			continue
+		}
+		command := &pb.DurableCommand{
+			CommandId: fmt.Sprintf("preview-revert-%s", entityID),
+			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
+			EntityId:  entityID,
+			Position: &pb.Vec2{
+				X: float32(item.Transform.X),
+				Y: float32(item.Transform.Y),
+			},
+			Rotation: float32(item.Transform.Rotation),
+			Preview:  true,
+		}
+		if item.Transform.Z != nil {
+			command.Z = float32(*item.Transform.Z)
+		}
+		r.sendTo(host, &pb.RoomEnvelope{
+			RoomId:         r.canvasID,
+			HostEpoch:      r.hostEpoch,
+			SenderClientId: client.ID,
+			Payload:        &pb.RoomEnvelope_DurableCommand{DurableCommand: command},
+		})
+	}
 }
 
 // validateDurable returns the item the command targets, or nil for a spawn.

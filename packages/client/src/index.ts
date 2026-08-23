@@ -13,6 +13,7 @@ export * from "./render/pixi-scene.js";
 export * from "./render/effect-system.js";
 export * from "./render/interpolation-buffer.js";
 export * from "./input/pointer-drag-controller.js";
+export * from "./input/item-edit-controller.js";
 export * from "./input/keyboard-controller.js";
 export * from "./runtime/room-session.js";
 export * from "./runtime/canvas-runtime.js";

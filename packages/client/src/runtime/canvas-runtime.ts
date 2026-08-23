@@ -8,7 +8,13 @@ import type { RoomTransport } from "../net/transport.js";
 import { PixiScene, type SceneOptions } from "../render/pixi-scene.js";
 import { KeyboardController } from "../input/keyboard-controller.js";
 import { PointerDragController } from "../input/pointer-drag-controller.js";
+import {
+  ItemEditController,
+  findOwnedItemAt,
+  type ItemEditState,
+} from "../input/item-edit-controller.js";
 import type { SimulationDriver } from "../simulation/driver.js";
+import type { RenderEntity } from "../simulation/messages.js";
 import {
   RoomSession,
   type InputIntent,
@@ -32,6 +38,8 @@ export interface CanvasRuntimeOptions {
   onDiagnostics?: (diagnostics: RuntimeDiagnostics) => void;
   /** Addendum A1. Runs after the local avatar changes its disabled state. */
   onAvatarDisabledChange?: (disabled: boolean) => void;
+  onEditModeChange?: (enabled: boolean) => void;
+  onEditSelectionChange?: (state: ItemEditState) => void;
 }
 
 export interface RuntimeDiagnostics extends SessionDiagnostics {
@@ -47,12 +55,15 @@ export class CanvasRuntime {
   readonly session: RoomSession;
   private scene?: PixiScene;
   private pointer?: PointerDragController;
+  private editor?: ItemEditController;
   private keyboard?: KeyboardController;
   private renderFps = 0;
   private running = false;
   private visibilityListener?: () => void;
   private pageHideListener?: () => void;
   private avatarDisabled = false;
+  private editMode = false;
+  private latestEntities: RenderEntity[] = [];
   private disableKeyListener?: (event: KeyboardEvent) => void;
 
   constructor(private readonly options: CanvasRuntimeOptions) {
@@ -108,6 +119,7 @@ export class CanvasRuntime {
       this.disableKeyListener = undefined;
     }
     this.pointer?.destroy();
+    this.editor?.destroy();
     this.keyboard?.destroy();
   }
 
@@ -116,6 +128,26 @@ export class CanvasRuntime {
     await this.scene.mount(this.options.mount);
     this.pointer = new PointerDragController(
       this.scene.app.canvas as unknown as HTMLElement,
+    );
+    this.editor = new ItemEditController(
+      this.scene.app.canvas as unknown as HTMLElement,
+      {
+        enabled: () => this.editMode,
+        pick: (point) =>
+          findOwnedItemAt(
+            this.latestEntities,
+            this.options.definitions,
+            this.scene!.camera.toWorld(point.x, point.y),
+            this.options.userId,
+          ),
+        toWorld: (point) => this.scene!.camera.toWorld(point.x, point.y),
+        onPreview: (entityId, transform) => this.moveItem(entityId, transform, true),
+        onCommit: (entityId, transform) => this.moveItem(entityId, transform),
+        onChange: (state) => {
+          this.scene?.setEditState(state);
+          this.options.onEditSelectionChange?.(state);
+        },
+      },
     );
     this.keyboard = new KeyboardController();
     this.startRenderLoop();
@@ -142,9 +174,29 @@ export class CanvasRuntime {
     return this.avatarDisabled;
   }
 
+  setEditMode(enabled: boolean): void {
+    if (this.editMode === enabled) return;
+    this.editMode = enabled;
+    if (!enabled) this.editor?.clear();
+    if (this.scene) this.scene.app.canvas.style.cursor = enabled ? "crosshair" : "";
+    this.options.onEditModeChange?.(enabled);
+  }
+
+  toggleEditMode(): boolean {
+    this.setEditMode(!this.editMode);
+    return this.editMode;
+  }
+
+  get isEditMode(): boolean {
+    return this.editMode;
+  }
+
   private mergedIntent(): InputIntent {
     if (this.avatarDisabled) {
       return { direction: { x: 0, y: 0 }, intensity: 0, held: false, disabled: true };
+    }
+    if (this.editMode) {
+      return { direction: { x: 0, y: 0 }, intensity: 0, held: false };
     }
     const pointer = this.pointer?.intent;
     if (pointer && pointer.intensity > 0) return pointer;
@@ -161,8 +213,10 @@ export class CanvasRuntime {
       const nowMs = performance.now();
       const deltaMs = scene.frameDelta(nowMs);
       this.renderFps = deltaMs > 0 ? 1000 / deltaMs : 0;
-      scene.update(this.session.entitiesToDraw(nowMs), deltaMs);
-      scene.setThumbstick(this.pointer?.gesture);
+      const entities = this.session.entitiesToDraw(nowMs);
+      this.latestEntities = entities;
+      scene.update(entities, deltaMs);
+      scene.setThumbstick(this.editMode ? undefined : this.pointer?.gesture);
       this.options.onDiagnostics?.(this.diagnostics());
     });
   }

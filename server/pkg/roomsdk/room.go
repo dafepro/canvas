@@ -48,6 +48,9 @@ type Room struct {
 	snapshotRaw  json.RawMessage
 	checkpointNo uint64
 	items        map[string]*SnapshotItem
+	// previews records transforms shown by the host but not yet committed.
+	// Checkpoints must not turn these transient edits into durable placement.
+	previews     map[string]string
 	definitions  map[string]ItemDefinitionRecord
 	nextEntityNo uint64
 
@@ -72,6 +75,7 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 		definitionRaw: record.DefinitionRaw,
 		clients:       make(map[string]*Client),
 		items:         make(map[string]*SnapshotItem),
+		previews:      make(map[string]string),
 		definitions:   make(map[string]ItemDefinitionRecord),
 		joins:         make(chan *Client, 8),
 		departures:    make(chan departure, 8),
@@ -227,6 +231,7 @@ func (r *Room) handleLeave(gone departure) {
 	}
 	client.close()
 	r.cfg.Metrics.ClientLeft(r.canvasID, gone.reason)
+	r.cancelPreviews(client)
 
 	if r.hostClientID == client.ID {
 		r.hostClientID = ""
@@ -526,7 +531,9 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 	for i := range incoming.Items {
 		item := &incoming.Items[i]
 		stored := r.items[item.EntityID]
-		stored.Transform = item.Transform
+		if _, previewing := r.previews[item.EntityID]; !previewing {
+			stored.Transform = item.Transform
+		}
 		stored.BehaviorState = item.BehaviorState
 		stored.BehaviorStateVer = item.BehaviorStateVer
 		stored.BehaviorTimers = item.BehaviorTimers
