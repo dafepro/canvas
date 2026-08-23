@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>Canvas Physics · Soccer lounge</title>
+  </head>
+  <body>
+    <main id="app">
+      <header>
+        <div>
+          <p class="eyebrow">Canvas Physics reference integration</p>
+          <h1>Soccer lounge</h1>
+        </div>
+        <div id="scoreboard" aria-label="Scoreboard">
+          <span class="team home">Home</span>
+          <strong id="home-score">0</strong>
+          <span class="score-separator">–</span>
+          <strong id="away-score">0</strong>
+          <span class="team away">Away</span>
+        </div>
+        <div class="room-status">
+          <span id="status">Not connected</span>
+          <span><strong id="participant-count">0</strong> online</span>
+        </div>
+      </header>
+
+      <section id="stage" aria-label="Top-down soccer field">
+        <img class="field-art" src="/soccer-field.svg" alt="" />
+        <div class="bench-label">Bench / inactive roster projection</div>
+      </section>
+
+      <aside>
+        <label for="user">Player</label>
+        <input id="user" autocomplete="off" />
+        <div class="actions">
+          <button id="join">Join lounge</button>
+          <button id="leave" disabled>Leave</button>
+          <button id="place-ball" disabled>Place match ball</button>
+          <button id="bench" disabled>Take a break</button>
+        </div>
+        <p>
+          Move with WASD or drag. Run through the ball to kick it. A goal stops
+          the ball, updates the shared score, then resets play at center.
+        </p>
+        <p class="known-gap">
+          The bench label marks the product projection point. Keeping disconnected
+          roster members there awaits the stable participant lifecycle API.
+        </p>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

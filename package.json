@@ -8,7 +8,9 @@
     "build": "pnpm -r --filter \"./packages/*\" build",
     "typecheck": "pnpm -r exec tsc --noEmit",
     "test": "vitest run",
-    "dev": "pnpm --filter @canvas-physics/demo dev"
+    "dev": "pnpm --filter @canvas-physics/demo dev",
+    "example:soccer": "pnpm --filter @canvas-physics/example-soccer-lounge dev",
+    "example:soccer:server": "pnpm --filter @canvas-physics/example-soccer-lounge server"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

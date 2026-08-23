@@ -40,6 +40,28 @@ importers:
         specifier: ^6.0.7
         version: 6.4.3(lightningcss@1.33.0)
 
+  examples/soccer-lounge:
+    dependencies:
+      '@canvas-physics/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@canvas-physics/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@canvas-physics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.7
+        version: 6.4.3(lightningcss@1.33.0)
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(lightningcss@1.33.0)
+
   packages/client:
     dependencies:
       '@canvas-physics/core':
@@ -822,6 +844,7 @@ packages:
   '@xmldom/xmldom@0.8.14':
     resolution: {integrity: sha512-T4EDRUBVZYRldYApjEJiU0e1stYWaRAX7CuSnKzrpwdZKo53zGV8/pqfzV6FfwNl9YThD2OumQYvqtvjvgG7aQ==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}

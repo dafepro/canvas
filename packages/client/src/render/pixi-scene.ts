@@ -90,7 +90,7 @@ export class PixiScene {
         width * this.camera.scale,
         height * this.camera.scale,
       )
-      .fill({ color: 0x131a33 })
+      .fill({ color: this.options.background ?? 0x131a33 })
       .stroke({ color: 0x2a3566, width: 2 });
     this.backgroundLayer.addChild(frame);
 

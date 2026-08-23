@@ -18,6 +18,7 @@ item ownership, and stores canonical checkpoints.
 | `server/pkg/roomsdk` | The Go server SDK. Drop it into an existing Go service. |
 | `server/cmd/canvasd` | Reference binary that wires the SDK to an HTTP listener. |
 | `apps/demo` | Browser demo of the rocket canvas from spec section 18. |
+| `examples/soccer-lounge` | Independently runnable consumer integration with custom soccer behavior, field data/art, and scoreboard UI. |
 | `docker/`, `docker-compose.yml` | The local stack: service, network emulator, demo. |
 
 ## Consume the JavaScript packages
@@ -57,6 +58,20 @@ different `?user=` value to see two clients share one canvas.
 Add `?debug=1` to the demo URL to draw collider outlines.
 
 Stop the stack with `make down`.
+
+## Run a reference integration
+
+Reference integrations consume only public package exports and own their domain
+content. The soccer lounge runs its own frontend and reference-service data:
+
+```bash
+pnpm example:soccer:server # terminal 1; service on :8082
+pnpm example:soccer        # terminal 2; app on :5174
+```
+
+Open <http://localhost:5174>. See `docs/EXAMPLE_INTEGRATIONS.md` for the
+examples contract and the generic gaps the soccer integration is designed to
+expose.
 
 ## Emulate a bad network
 

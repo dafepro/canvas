@@ -1,0 +1,122 @@
+{
+  "id": "soccer-lounge",
+  "version": 1,
+  "size": { "width": 120, "height": 80 },
+  "orientation": "topDown",
+  "backgroundAssetId": "soccer-field",
+  "edges": {
+    "top": "solid",
+    "right": "solid",
+    "bottom": "solid",
+    "left": "solid"
+  },
+  "terrainDefaults": { "avatars": true, "items": true },
+  "staticGeometry": [
+    {
+      "id": "top-touchline",
+      "shape": { "type": "rect", "width": 100, "height": 1 },
+      "position": { "x": 60, "y": 5.5 },
+      "tags": ["pitchBoundary"],
+      "restitution": 0.72,
+      "friction": 0.2
+    },
+    {
+      "id": "bottom-touchline",
+      "shape": { "type": "rect", "width": 100, "height": 1 },
+      "position": { "x": 60, "y": 66.5 },
+      "tags": ["pitchBoundary"],
+      "restitution": 0.72,
+      "friction": 0.2
+    },
+    {
+      "id": "left-goal-line-top",
+      "shape": { "type": "rect", "width": 1, "height": 23 },
+      "position": { "x": 9.5, "y": 17.5 },
+      "tags": ["pitchBoundary"],
+      "restitution": 0.72
+    },
+    {
+      "id": "left-goal-line-bottom",
+      "shape": { "type": "rect", "width": 1, "height": 23 },
+      "position": { "x": 9.5, "y": 54.5 },
+      "tags": ["pitchBoundary"],
+      "restitution": 0.72
+    },
+    {
+      "id": "right-goal-line-top",
+      "shape": { "type": "rect", "width": 1, "height": 23 },
+      "position": { "x": 110.5, "y": 17.5 },
+      "tags": ["pitchBoundary"],
+      "restitution": 0.72
+    },
+    {
+      "id": "right-goal-line-bottom",
+      "shape": { "type": "rect", "width": 1, "height": 23 },
+      "position": { "x": 110.5, "y": 54.5 },
+      "tags": ["pitchBoundary"],
+      "restitution": 0.72
+    },
+    {
+      "id": "left-goal-roof",
+      "shape": { "type": "rect", "width": 9, "height": 1 },
+      "position": { "x": 5.5, "y": 28.5 },
+      "tags": ["goalFrame", "leftGoal"],
+      "restitution": 0.55
+    },
+    {
+      "id": "left-goal-floor",
+      "shape": { "type": "rect", "width": 9, "height": 1 },
+      "position": { "x": 5.5, "y": 43.5 },
+      "tags": ["goalFrame", "leftGoal"],
+      "restitution": 0.55
+    },
+    {
+      "id": "right-goal-roof",
+      "shape": { "type": "rect", "width": 9, "height": 1 },
+      "position": { "x": 114.5, "y": 28.5 },
+      "tags": ["goalFrame", "rightGoal"],
+      "restitution": 0.55
+    },
+    {
+      "id": "right-goal-floor",
+      "shape": { "type": "rect", "width": 9, "height": 1 },
+      "position": { "x": 114.5, "y": 43.5 },
+      "tags": ["goalFrame", "rightGoal"],
+      "restitution": 0.55
+    }
+  ],
+  "regions": [
+    {
+      "id": "left-goal",
+      "shape": { "type": "rect", "x": 0.5, "y": 29, "w": 9.5, "h": 14 },
+      "tags": ["goal", "leftGoal"],
+      "emitEvents": true
+    },
+    {
+      "id": "right-goal",
+      "shape": { "type": "rect", "x": 110, "y": 29, "w": 9.5, "h": 14 },
+      "tags": ["goal", "rightGoal"],
+      "emitEvents": true
+    }
+  ],
+  "environment": {
+    "base": {
+      "gravityXY": { "x": 0, "y": 0 },
+      "linearDrag": 0.42,
+      "angularDrag": 0.55,
+      "softSpeedLimit": 28,
+      "surfaceFrictionMultiplier": 1
+    }
+  },
+  "spawnPoints": [
+    { "id": "home", "position": { "x": 42, "y": 36 } },
+    { "id": "away", "position": { "x": 78, "y": 36 } },
+    { "id": "centre", "position": { "x": 60, "y": 36 } },
+    { "id": "bench", "position": { "x": 60, "y": 74 } }
+  ],
+  "limits": {
+    "maxAvatars": 20,
+    "maxItems": 4,
+    "maxComplexPhysicsItems": 0
+  }
+}
