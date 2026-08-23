@@ -327,6 +327,7 @@ export class RapierWorld implements BehaviorHost {
       transform: { ...instance.transform },
       render: {
         definitionId: definition.definitionId,
+        definitionVersion: instance.definitionVersion,
         zIndex: definition.visual.zIndex ?? 0,
         size: definition.visual.size,
       },
@@ -371,7 +372,7 @@ export class RapierWorld implements BehaviorHost {
         behaviorType: definition.behaviorType,
         config: instance.resolvedConfig,
         state: instance.behaviorState,
-        stateVersion: 1,
+        stateVersion: instance.behaviorStateVersion ?? 1,
         persistent: definition.persistence.behaviorState,
       };
     }

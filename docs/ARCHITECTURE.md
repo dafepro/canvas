@@ -81,6 +81,11 @@ Two rules make a host reproducible and a behavior testable:
 `RapierWorld` implements it for real physics; `BehaviorTestHost` implements it
 with plain objects, so a behavior test needs no engine and no browser.
 
+When a snapshot carries an older `behaviorStateVersion`, `BehaviorRuntime`
+applies the behavior's `MigrationChain` before the state is attached. The
+resulting checkpoint records the migrated behavior version and the item's real
+definition version; neither value is inferred from a global schema constant.
+
 ## Forces are one-tick impulses
 
 Rapier keeps a force added with `addForce` until the force is reset. Applying

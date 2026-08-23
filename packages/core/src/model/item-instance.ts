@@ -16,6 +16,8 @@ export interface ItemInstance<Config = unknown, State = unknown> {
   transform: Transform;
   resolvedConfig: Config;
   behaviorState?: State;
+  /** Version of behaviorState before any registered migration is applied. */
+  behaviorStateVersion?: number;
   createdAt: string;
   sceneRevision: number;
 }

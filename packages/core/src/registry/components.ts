@@ -10,6 +10,7 @@ export type EntityId = string;
 
 export interface RenderComponent {
   definitionId: string;
+  definitionVersion?: number;
   variant?: string;
   animation?: string;
   zIndex: number;

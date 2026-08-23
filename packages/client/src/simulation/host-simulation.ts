@@ -102,6 +102,7 @@ export class HostSimulation {
       transform: { ...item.transform },
       resolvedConfig: item.resolvedConfig,
       behaviorState: item.behaviorState,
+      behaviorStateVersion: item.behaviorStateVersion,
       createdAt: new Date().toISOString(),
       sceneRevision,
     };
@@ -110,13 +111,16 @@ export class HostSimulation {
   addItem(instance: ItemInstance): Entity | undefined {
     const entity = this.world.addItem(instance);
     if (!entity?.behavior) return entity;
-    this.behaviors.attach({
+    const slot = this.behaviors.attach({
       entityId: entity.id,
       behaviorType: entity.behavior.behaviorType,
       config: entity.behavior.config,
       state: entity.behavior.state,
+      stateVersion: entity.behavior.stateVersion,
       persistent: entity.behavior.persistent,
     });
+    entity.behavior.state = slot.state;
+    entity.behavior.stateVersion = slot.stateVersion;
     return entity;
   }
 
@@ -173,7 +177,7 @@ export class HostSimulation {
       const item: SnapshotItem = {
         entityId: entity.id,
         definitionId: entity.render?.definitionId ?? "",
-        definitionVersion: 1,
+        definitionVersion: entity.render?.definitionVersion ?? 0,
         ownerUserId: entity.ownership?.ownerUserId ?? "",
         transform: { ...entity.transform },
         resolvedConfig: entity.behavior?.config,

@@ -124,6 +124,37 @@ describe("BehaviorRuntime", () => {
     runtime.emit({ type: "tick", tick: 1, self: "a", dt: 1 / 60 });
     expect(runtime.step(1).eventsProcessed).toBe(0);
   });
+
+  it("migrates attached persisted state to the behavior's current version", () => {
+    const migrations = new MigrationChain<{ value: number }>(3)
+      .step(1, (state) => ({ value: state.value + 10 }))
+      .step(2, (state) => ({ value: state.value * 2 }));
+    const registry = new BehaviorRegistry().register({
+      behaviorType: "migrating",
+      stateVersion: 3,
+      migrations,
+      initialState: () => ({ value: 0 }),
+      onEvent: (_ctx, _config, state) => ({ state, commands: [] }),
+    } satisfies ItemBehavior<unknown, { value: number }>);
+    const runtime = new BehaviorRuntime(
+      registry,
+      new BehaviorTestHost(),
+      canvas,
+      60,
+    );
+
+    const slot = runtime.attach({
+      entityId: "old-item",
+      behaviorType: "migrating",
+      config: {},
+      state: { value: 1 },
+      stateVersion: 1,
+      persistent: true,
+    });
+
+    expect(slot.state).toEqual({ value: 22 });
+    expect(slot.stateVersion).toBe(3);
+  });
 });
 
 describe("TimerService", () => {

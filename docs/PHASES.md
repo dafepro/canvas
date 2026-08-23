@@ -23,7 +23,7 @@ what is verified, and what is not done.
 | EntityRegistry and component types | Done. `packages/core/src/registry/`. |
 | BehaviorRegistry and the event to command runtime | Done. `packages/core/src/behavior/`. |
 | Timer service based on simulation ticks | Done. `behavior/timers.ts`. |
-| Persistent versus transient behavior state | Done. Persistence rules live on the item definition; `MigrationChain` handles a schema change. |
+| Persistent versus transient behavior state | Done. Persistence rules live on the item definition; snapshot loading applies each behavior's `MigrationChain` and checkpoints the resulting state version. |
 | Data-only item tuning rules | Done. `tuning/resolve.ts`. |
 | Exit criterion: the rocket is a registered behavior type with configuration | Met. `RocketBehavior` reads every value from its config, and the canvas supplies the gravity gradient. |
 

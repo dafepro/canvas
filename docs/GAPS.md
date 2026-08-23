@@ -34,7 +34,7 @@ downward. Check an item only after the relevant focused tests pass.
   workflows resume from their checkpointed remaining duration.
 - [x] Reconcile avatar presence by adding only new peers and removing departed
   peers; eliminate duplicate avatars and ghost colliders.
-- [ ] Wire behavior-state migrations into snapshot loading and preserve actual
+- [x] Wire behavior-state migrations into snapshot loading and preserve actual
   behavior/definition versions in checkpoints.
 - [ ] Complete durable editing: public rotate and set-config APIs, live config
   application, preview handling, selection/ghost UI, rate limiting, and final

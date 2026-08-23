@@ -57,10 +57,30 @@ export class BehaviorRuntime {
     this.timers = new TimerService(tickRate);
   }
 
-  attach(slot: Omit<BehaviorSlot, "state" | "stateVersion"> & { state?: unknown }): BehaviorSlot {
+  attach(
+    slot: Omit<BehaviorSlot, "state" | "stateVersion"> & {
+      state?: unknown;
+      stateVersion?: number;
+    },
+  ): BehaviorSlot {
     const behavior = this.registry.require<any, any>(slot.behaviorType);
-    const state =
-      slot.state === undefined ? behavior.initialState(slot.config) : slot.state;
+    let state = slot.state === undefined ? behavior.initialState(slot.config) : slot.state;
+    if (slot.state !== undefined) {
+      const fromVersion = slot.stateVersion ?? 1;
+      if (fromVersion !== behavior.stateVersion) {
+        if (!behavior.migrations) {
+          throw new Error(
+            `behavior ${behavior.behaviorType} has no migrations from state version ${fromVersion}`,
+          );
+        }
+        if (behavior.migrations.currentVersion !== behavior.stateVersion) {
+          throw new Error(
+            `behavior ${behavior.behaviorType} migration target does not match state version`,
+          );
+        }
+        state = behavior.migrations.migrate(state, fromVersion);
+      }
+    }
     const attached: BehaviorSlot = {
       ...slot,
       state,

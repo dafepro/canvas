@@ -2,10 +2,12 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   BehaviorRegistry,
   KickableBehavior,
+  MigrationChain,
   PortalBehavior,
   RocketBehavior,
   resolveItemConfig,
   type ItemDefinition,
+  type ItemBehavior,
   type ItemInstance,
 } from "@canvas-physics/core";
 import {
@@ -468,6 +470,86 @@ describe("HostSimulation with real physics", () => {
       checkpointRevision: 42,
     });
     first.free();
+  });
+
+  it("writes the loaded item definition version instead of a hard-coded version", () => {
+    const versionedCrate = { ...crateDefinition, version: 7 };
+    const definitions = rocketCanvasDefinitions.map((definition) =>
+      definition.definitionId === versionedCrate.definitionId
+        ? versionedCrate
+        : definition,
+    );
+    const simulation = new HostSimulation(rocketCanvas, definitions, registry(), 60);
+    simulation.addItem(
+      instance("crate-1", versionedCrate as ItemDefinition, 50, 20),
+    );
+
+    expect(simulation.snapshot().items[0]?.definitionVersion).toBe(7);
+    simulation.free();
+  });
+
+  it("migrates snapshot behavior state and checkpoints its current version", () => {
+    const definition: ItemDefinition = {
+      ...crateDefinition,
+      definitionId: "migrating-item",
+      version: 4,
+      behaviorType: "migrating",
+      persistence: {
+        ...crateDefinition.persistence,
+        behaviorState: true,
+      },
+    };
+    const behavior = {
+      behaviorType: "migrating",
+      stateVersion: 2,
+      migrations: new MigrationChain<{ value: number; migrated?: boolean }>(2)
+        .step(1, (state) => ({ ...state, migrated: true })),
+      initialState: () => ({ value: 0, migrated: true }),
+      onEvent: (_ctx, _config, state) => ({ state, commands: [] }),
+    } satisfies ItemBehavior<unknown, { value: number; migrated?: boolean }>;
+    const simulation = new HostSimulation(
+      rocketCanvas,
+      [definition],
+      new BehaviorRegistry().register(behavior),
+      60,
+    );
+    simulation.loadSnapshot(
+      {
+        schemaVersion: 1,
+        canvasId: rocketCanvas.id,
+        canvasVersion: rocketCanvas.version,
+        sceneRevision: 1,
+        hostEpoch: 1,
+        checkpointRevision: 1,
+        tick: 10,
+        capturedAt: new Date().toISOString(),
+        normalized: false,
+        items: [
+          {
+            entityId: "item-1",
+            definitionId: definition.definitionId,
+            definitionVersion: definition.version,
+            ownerUserId: "alice",
+            transform: { x: 50, y: 20, rotation: 0 },
+            resolvedConfig: {},
+            behaviorState: { value: 7 },
+            behaviorStateVersion: 1,
+          },
+        ],
+      },
+      false,
+    );
+
+    expect(simulation.behaviors.slot("item-1")).toMatchObject({
+      state: { value: 7, migrated: true },
+      stateVersion: 2,
+    });
+    expect(simulation.snapshot().items[0]).toMatchObject({
+      definitionVersion: 4,
+      behaviorState: { value: 7, migrated: true },
+      behaviorStateVersion: 2,
+    });
+    simulation.free();
   });
 
   it("resumes an active migration snapshot without applying room wake", () => {
