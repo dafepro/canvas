@@ -96,6 +96,7 @@ describe("RoomSession observers", () => {
       hostEligible: true,
     };
     transport.deliver(envelope({ presence: { peers: [peer] } }));
+    transport.deliver(envelope({ presence: { peers: [] } }));
     transport.deliver(envelope({
       tick: 10,
       fullState: {
@@ -168,7 +169,16 @@ describe("RoomSession observers", () => {
     }));
 
     expect(presence.at(-1)).toMatchObject({
-      participants: [{ userId: "user-1", displayName: "Authenticated User" }],
+      participants: [{
+        participantId: "user-1",
+        userId: "user-1",
+        displayName: "Authenticated User",
+        connectionId: undefined,
+        avatarEntityId: "avatar:user-1",
+        status: "disconnected",
+        isHost: false,
+        hostEligible: false,
+      }],
     });
     expect(Object.isFrozen(presence.at(-1)!.participants)).toBe(true);
     expect(canonical.at(-1)).toMatchObject({
@@ -197,6 +207,87 @@ describe("RoomSession observers", () => {
     const replayed: unknown[] = [];
     session.subscribeCanonicalState((snapshot) => replayed.push(snapshot));
     expect(replayed).toHaveLength(1);
+    session.stop();
+  });
+
+  it("projects canonical disabled avatars as inactive participants", async () => {
+    const transport = new ObserverTransport();
+    const session = new RoomSession({
+      transport,
+      driver: new SimulationDriver(() => ({ send: () => {}, terminate: () => {} })),
+      canvasId: rocketCanvas.id,
+      serverUrl: "http://rooms.test",
+      definitions: rocketCanvasDefinitions,
+    });
+    const presence: PresenceSnapshot[] = [];
+    session.subscribePresence((snapshot) => presence.push(snapshot));
+
+    await session.start();
+    transport.deliver(envelope({
+      joinAccepted: {
+        clientId: "client-1",
+        userId: "user-1",
+        displayName: "Authenticated User",
+        sceneRevision: 0,
+        hostEpoch: 1,
+        hostClientId: "other-host",
+        canvasDefinitionJson: toJsonBytes(rocketCanvas),
+        snapshotJson: toJsonBytes(emptySnapshot(rocketCanvas.id, rocketCanvas.version)),
+        roomWasSleeping: false,
+        tickRate: 60,
+      },
+    }));
+    transport.deliver(envelope({
+      presence: {
+        peers: [{
+          clientId: "client-1",
+          userId: "user-1",
+          displayName: "Authenticated User",
+          isHost: false,
+          hostEligible: true,
+        }],
+      },
+    }));
+    transport.deliver(envelope({
+      tick: 1,
+      fullState: {
+        sceneRevision: 0,
+        tickRate: 60,
+        avatars: [{
+          entityId: "avatar:user-1",
+          clientId: "client-1",
+          userId: "user-1",
+          displayName: "Authenticated User",
+        }],
+        entities: [{
+          entityId: "avatar:user-1",
+          quantizedTransform: {
+            x: 100,
+            y: 200,
+            rotation: 0,
+            vx: 0,
+            vy: 0,
+            angularVelocity: 0,
+            z: 0,
+            vz: 0,
+          },
+          lastProcessedInputSequence: 0,
+          spriteVariant: "",
+          spriteAnimation: "",
+          animationEpoch: 0,
+          behaviorStateJson: new Uint8Array(),
+          quarantined: false,
+          definitionId: "",
+          disabled: true,
+          teleportEpoch: 0,
+          respawning: false,
+        }],
+      },
+    }));
+
+    expect(presence.at(-1)?.participants).toContainEqual(
+      expect.objectContaining({ participantId: "user-1", status: "inactive" }),
+    );
     session.stop();
   });
 });

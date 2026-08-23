@@ -41,6 +41,9 @@ type Room struct {
 	sleeping       bool
 
 	clients map[string]*Client
+	// participants records authenticated identities seen during this active room
+	// lifetime. Their avatar IDs remain valid after a socket disconnects.
+	participants map[string]struct{}
 	// joinOrder keeps election deterministic.
 	joinOrder []string
 
@@ -74,6 +77,7 @@ func newRoom(server *Server, canvasID string, record CanvasRecord, snapshot Snap
 		canvasShape:   shape,
 		definitionRaw: record.DefinitionRaw,
 		clients:       make(map[string]*Client),
+		participants:  make(map[string]struct{}),
 		items:         make(map[string]*SnapshotItem),
 		previews:      make(map[string]string),
 		definitions:   make(map[string]ItemDefinitionRecord),
@@ -223,6 +227,13 @@ func (r *Room) run() {
 // ---------- join and leave ----------
 
 func (r *Room) handleJoin(client *Client) {
+	// One authenticated participant owns at most one live room connection. A
+	// reconnect supersedes its stale socket before capacity is evaluated.
+	for _, existing := range r.clients {
+		if existing.UserID == client.UserID {
+			r.removeClient(existing, "superseded")
+		}
+	}
 	if len(r.clients) >= r.maxClients() {
 		r.sendTo(client, &pb.RoomEnvelope{
 			RoomId: r.canvasID,
@@ -238,6 +249,7 @@ func (r *Room) handleJoin(client *Client) {
 	wasSleeping := r.sleeping
 	r.sleeping = false
 	r.clients[client.ID] = client
+	r.participants[client.UserID] = struct{}{}
 	r.joinOrder = append(r.joinOrder, client.ID)
 	client.joined = true
 	r.cfg.Metrics.ClientJoined(r.canvasID)
@@ -274,8 +286,23 @@ func (r *Room) handleJoin(client *Client) {
 
 func (r *Room) handleLeave(gone departure) {
 	client := gone.client
-	if _, ok := r.clients[client.ID]; !ok {
+	wasHost := client.ID == r.hostClientID
+	if !r.removeClient(client, gone.reason) {
 		return
+	}
+	if wasHost {
+		r.electHost("host_disconnected")
+	}
+	if len(r.clients) > 0 {
+		r.broadcastPresence()
+	}
+}
+
+// removeClient updates connection state without broadcasting or electing. A
+// reconnect uses it to replace a stale socket atomically from presence's view.
+func (r *Room) removeClient(client *Client, reason string) bool {
+	if _, ok := r.clients[client.ID]; !ok {
+		return false
 	}
 	delete(r.clients, client.ID)
 	for i, id := range r.joinOrder {
@@ -285,16 +312,13 @@ func (r *Room) handleLeave(gone departure) {
 		}
 	}
 	client.close()
-	r.cfg.Metrics.ClientLeft(r.canvasID, gone.reason)
+	r.cfg.Metrics.ClientLeft(r.canvasID, reason)
 	r.cancelPreviews(client)
 
 	if r.hostClientID == client.ID {
 		r.hostClientID = ""
-		r.electHost("host_disconnected")
 	}
-	if len(r.clients) > 0 {
-		r.broadcastPresence()
-	}
+	return true
 }
 
 func (r *Room) maxClients() int {
@@ -465,7 +489,7 @@ func (r *Room) validateEntityStates(states []*pb.EntityState) error {
 		seen[state.EntityId] = struct{}{}
 
 		item := r.items[state.EntityId]
-		if item == nil && !r.connectedAvatar(state.EntityId) {
+		if item == nil && !r.knownParticipantAvatar(state.EntityId) {
 			return errUnknownEntity
 		}
 		if item != nil && state.DefinitionId != "" && state.DefinitionId != item.DefinitionID {
@@ -488,11 +512,11 @@ func (r *Room) validateEntityStates(states []*pb.EntityState) error {
 	return nil
 }
 
-func (r *Room) connectedAvatar(entityID string) bool {
+func (r *Room) knownParticipantAvatar(entityID string) bool {
 	if !strings.HasPrefix(entityID, "avatar:") {
 		return false
 	}
-	_, ok := r.clients[strings.TrimPrefix(entityID, "avatar:")]
+	_, ok := r.participants[strings.TrimPrefix(entityID, "avatar:")]
 	return ok
 }
 

@@ -33,6 +33,13 @@ export type SimulationRequest =
   | { type: "addAvatar"; spawn: AvatarSpawn }
   | { type: "removeAvatar"; entityId: string }
   | {
+      type: "setAvatarLifecycle";
+      entityId: string;
+      disabled: boolean;
+      /** Optional product projection, such as an inactive-player bench. */
+      position?: Vec2;
+    }
+  | {
       type: "input";
       entityId: string;
       direction: Vec2;

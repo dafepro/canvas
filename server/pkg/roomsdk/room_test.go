@@ -263,6 +263,79 @@ func TestOnlyOneHostAndPresenceReportsIt(t *testing.T) {
 	}
 }
 
+func TestReconnectSupersedesTheParticipantsOldConnection(t *testing.T) {
+	h := newHarness(t, nil)
+	first := h.dial("alice")
+	first.join()
+	first.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	observer := h.dial("bob")
+	observer.join()
+	observer.await(func(e *pb.RoomEnvelope) bool { return e.GetPresence() != nil })
+
+	reconnected := h.dial("alice")
+	reconnected.join()
+	presence := observer.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetPresence() != nil
+	}).GetPresence()
+
+	aliceConnections := 0
+	for _, peer := range presence.Peers {
+		if peer.UserId == "alice" {
+			aliceConnections++
+			if peer.ClientId != reconnected.clientID {
+				t.Fatalf("alice connection = %q, want %q", peer.ClientId, reconnected.clientID)
+			}
+		}
+	}
+	if aliceConnections != 1 {
+		t.Fatalf("presence has %d alice connections, want 1", aliceConnections)
+	}
+}
+
+func TestHostMayRetainAKnownAvatarAfterDisconnect(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	accepted := host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	peer := h.dial("bob")
+	peer.join()
+	host.await(func(e *pb.RoomEnvelope) bool {
+		presence := e.GetPresence()
+		return presence != nil && len(presence.Peers) == 2
+	})
+	_ = peer.conn.CloseNow()
+	host.await(func(e *pb.RoomEnvelope) bool {
+		presence := e.GetPresence()
+		return presence != nil && len(presence.Peers) == 1
+	})
+	host.heartbeat()
+
+	observer := h.dial("carol")
+	observer.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetPresence() != nil })
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Payload: &pb.RoomEnvelope_StateDelta{StateDelta: &pb.StateDelta{
+			SceneRevision: accepted.SceneRevision,
+			Entities: []*pb.EntityState{{
+				EntityId:           "avatar:bob",
+				QuantizedTransform: &pb.QuantizedTransform{X: 1000, Y: 1000},
+				Disabled:           true,
+			}},
+		}},
+	})
+
+	delta := observer.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetStateDelta() != nil
+	}).GetStateDelta()
+	if len(delta.Entities) != 1 || delta.Entities[0].EntityId != "avatar:bob" {
+		t.Fatalf("relayed entities = %#v, want retained avatar:bob", delta.Entities)
+	}
+}
+
 func TestStateFromNonHostIsNotRelayed(t *testing.T) {
 	h := newHarness(t, nil)
 	host := h.dial("alice")

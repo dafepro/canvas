@@ -20,6 +20,7 @@ import type { RenderEntity } from "../simulation/messages.js";
 import {
   RoomSession,
   type InputIntent,
+  type ParticipantAvatarProjector,
   type RoomSessionRates,
   type SessionDiagnostics,
 } from "./room-session.js";
@@ -59,6 +60,8 @@ export interface CanvasRuntimeOptions {
   onAvatarDisabledChange?: (disabled: boolean) => void;
   onEditModeChange?: (enabled: boolean) => void;
   onEditSelectionChange?: (state: ItemEditState) => void;
+  /** Product-owned placement for inactive or disconnected participants. */
+  projectParticipantAvatar?: ParticipantAvatarProjector;
 }
 
 export interface RuntimeDiagnostics extends SessionDiagnostics {
@@ -106,6 +109,7 @@ export class CanvasRuntime {
       driver: options.driver,
       rates: options.rates,
       intent: () => this.mergedIntent(),
+      projectParticipantAvatar: options.projectParticipantAvatar,
       onJoined: (canvas) => this.mountScene(canvas),
     });
     this.session.subscribeEffects((emission) => this.scene?.effects.apply(emission));

@@ -5,6 +5,7 @@ import type {
 import { soccerDefinitions } from "./soccer-content.js";
 import type { SoccerBallState } from "./soccer-ball-behavior.js";
 import { soccerAssets } from "./assets.js";
+import { projectSoccerParticipantAvatar } from "./participant-projection.js";
 import "./style.css";
 
 const serverUrl =
@@ -68,6 +69,7 @@ const join = async (): Promise<void> => {
       definitions: soccerDefinitions,
       assets: soccerAssets,
       driver: new SimulationDriver(worker),
+      projectParticipantAvatar: projectSoccerParticipantAvatar,
       scene: {
         background: 0x165c31,
         debug: new URLSearchParams(location.search).has("debug"),
@@ -96,7 +98,9 @@ const join = async (): Promise<void> => {
         if (score) renderScore(score.state as SoccerBallState);
       }),
       nextRuntime.subscribePresence((snapshot) => {
-        participantCount.textContent = String(snapshot.participants.length);
+        participantCount.textContent = String(
+          snapshot.participants.filter(({ status }) => status !== "disconnected").length,
+        );
       }),
       nextRuntime.subscribeEffects((effect) => {
         if (effect.effect !== "goal") return;

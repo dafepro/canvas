@@ -136,7 +136,7 @@ describe("RoomClient reconnect handshake", () => {
     client.close();
   });
 
-  it("replaces the local avatar identity assigned to a reconnected socket", async () => {
+  it("retains the stable local avatar identity across a reconnected socket", async () => {
     const transport = new ReconnectTransport();
     const requests: SimulationRequest[] = [];
     const driver = new SimulationDriver(() => ({
@@ -172,7 +172,7 @@ describe("RoomClient reconnect handshake", () => {
       },
     });
     await Promise.resolve();
-    expect(session.avatarId).toBe("avatar:c-first");
+    expect(session.avatarId).toBe("avatar:alice");
 
     transport.setStatus("reconnecting");
     transport.setStatus("open");
@@ -197,12 +197,8 @@ describe("RoomClient reconnect handshake", () => {
     });
     await Promise.resolve();
 
-    expect(session.avatarId).toBe("avatar:c-second");
-    expect(requests).toContainEqual({ type: "removeAvatar", entityId: "avatar:c-first" });
-    expect(requests).toContainEqual({
-      type: "addAvatar",
-      spawn: expect.objectContaining({ entityId: "avatar:c-second", clientId: "c-second" }),
-    });
+    expect(session.avatarId).toBe("avatar:alice");
+    expect(requests).not.toContainEqual({ type: "removeAvatar", entityId: "avatar:alice" });
     session.stop();
   });
 
@@ -225,6 +221,10 @@ describe("RoomClient reconnect handshake", () => {
       canvasId: rocketCanvas.id,
       serverUrl: "http://localhost:8080",
       definitions: rocketCanvasDefinitions,
+      projectParticipantAvatar: (participant) =>
+        participant.status !== "active"
+          ? { position: { x: 50, y: 60 } }
+          : undefined,
     });
 
     await session.start();
@@ -271,7 +271,29 @@ describe("RoomClient reconnect handshake", () => {
       requests
         .filter((request) => request.type === "addAvatar")
         .map((request) => request.spawn.entityId),
-    ).toEqual(["avatar:c-peer"]);
+    ).toEqual(["avatar:bob"]);
+
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 3,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "c-peer",
+      playerInput: {
+        inputSequence: 1,
+        direction: { x: 0, y: 0 },
+        intensity: 0,
+        clientTimeUnixMs: 0,
+        held: false,
+        avatarDisabled: true,
+      },
+    });
+    expect(requests).toContainEqual({
+      type: "setAvatarLifecycle",
+      entityId: "avatar:bob",
+      disabled: true,
+      position: { x: 50, y: 60 },
+    });
 
     transport.deliver({
       roomId: rocketCanvas.id,
@@ -281,7 +303,13 @@ describe("RoomClient reconnect handshake", () => {
       senderClientId: "",
       presence: { peers: [peer("c-host", "alice", true)] },
     });
-    expect(requests).toContainEqual({ type: "removeAvatar", entityId: "avatar:c-peer" });
+    expect(requests).not.toContainEqual({ type: "removeAvatar", entityId: "avatar:bob" });
+    expect(requests).toContainEqual({
+      type: "setAvatarLifecycle",
+      entityId: "avatar:bob",
+      disabled: true,
+      position: { x: 50, y: 60 },
+    });
     session.stop();
   });
 

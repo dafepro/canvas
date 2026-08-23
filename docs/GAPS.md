@@ -18,9 +18,10 @@ downward. Check an item only after the relevant focused tests pass.
   files.
 - [x] Add a server bootstrap API for system-owned template items so a room can
   contain exactly one canonical match ball without a user-owned spawn race.
-- [ ] Add stable participant identity and lifecycle projection so a product can
+- [x] Add stable participant identity and lifecycle projection so a product can
   retain disconnected roster members, deactivate their physics entities, and
-  render them in a bench area.
+  render them in a bench area. The soccer example owns deterministic bench and
+  return-to-field placement through the generic lifecycle projector.
 - [x] Move example art onto the versioned Canvas asset-manifest/preload pipeline.
   The soccer field and generated ball atlas now load as ordinary consumer-owned
   assets; collision geometry remains independent data.
@@ -59,8 +60,10 @@ work below because they determine the public boundary every consumer will use.
   not download Canvas. The public `@canvas-physics/client/runtime` subpath is a
   dynamic-import boundary, the application worker is constructed only on Join,
   and the packed soccer consumer enforces a sub-100 KB eager browser entry.
-- [ ] Distinguish stable authenticated participant identity from ephemeral
-  connection and physics-entity IDs.
+- [x] Distinguish stable authenticated participant identity from ephemeral
+  connection and physics-entity IDs. Reconnects supersede stale sockets while
+  retaining one `avatar:<participantId>` entity and an immutable lifecycle
+  tombstone for the observing session.
 - [ ] Provide dynamic room-template selection and version-reconciliation APIs.
   Static definitions bootstrap validated system-owned items exactly once for a
   new room, but a newer canvas version cannot yet add, update, or retire desired

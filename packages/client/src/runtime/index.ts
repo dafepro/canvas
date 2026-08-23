@@ -4,6 +4,11 @@ export { RoomSession } from "./room-session.js";
 export type {
   CanonicalStateSnapshot,
   InputIntent,
+  ParticipantAvatarProjection,
+  ParticipantAvatarProjectionContext,
+  ParticipantAvatarProjector,
+  ParticipantPresence,
+  ParticipantStatus,
   RoomSessionOptions,
   RoomSessionRates,
   SessionDiagnostics,

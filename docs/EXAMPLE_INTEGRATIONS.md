@@ -39,12 +39,11 @@ The first runnable slice must prove:
    resets the ball to center after a configured delay.
 5. A late joiner derives the same scoreboard from canonical behavior state.
 
-One requirement still depends on a generic API rather than a soccer-specific
-shortcut:
-
-- A stable participant lifecycle projection must retain offline product members
-  after their realtime peer disappears. Zoomigo can then map inactive members
-  to a bench without Canvas learning about teams or benches.
+The stable participant lifecycle projection retains identities after their
+realtime connection disappears. The generic host hook disables their avatar
+and delegates only placement; the soccer integration maps inactive and
+disconnected members to deterministic bench slots without Canvas learning
+about teams or benches.
 
 The product-owned SVG field and generated ball atlas are loaded through the
 versioned asset manifest and preload gate. The field texture is decorative;

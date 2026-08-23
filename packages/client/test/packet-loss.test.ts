@@ -145,7 +145,7 @@ describe.skipIf(!goAvailable())("a room under packet loss", () => {
     await peer.start();
     await waitFor("the peer to join", () => peer.client.clientId !== "");
 
-    const peerAvatar = avatarEntityId(peer.client.clientId);
+    const peerAvatar = avatarEntityId(peer.client.userId);
     await waitFor(
       "the host to add the peer avatar",
       () => entity(host, peerAvatar) !== undefined,

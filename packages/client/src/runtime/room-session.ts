@@ -75,6 +75,8 @@ export interface RoomSessionOptions {
   rates?: RoomSessionRates;
   /** Movement intent for the local avatar. Defaults to no movement. */
   intent?: () => InputIntent;
+  /** Product-owned placement for participant lifecycle transitions. */
+  projectParticipantAvatar?: ParticipantAvatarProjector;
   /** Runs once the room accepts the join, before the send loops start. */
   onJoined?: (
     canvas: CanvasDefinition,
@@ -84,8 +86,39 @@ export interface RoomSessionOptions {
   onError?: (message: string) => void;
 }
 
+export type ParticipantStatus = "active" | "inactive" | "disconnected";
+
+export interface ParticipantPresence {
+  /** Stable authenticated identity. It survives socket reconnects. */
+  readonly participantId: string;
+  readonly userId: string;
+  readonly displayName: string;
+  /** Ephemeral socket identity. Absent after disconnect. */
+  readonly connectionId?: string;
+  /** Stable physics identity derived from participantId. */
+  readonly avatarEntityId: string;
+  readonly status: ParticipantStatus;
+  readonly isHost: boolean;
+  readonly hostEligible: boolean;
+}
+
+export interface ParticipantAvatarProjectionContext {
+  readonly canvas: CanvasDefinition;
+  readonly previousStatus?: ParticipantStatus;
+}
+
+export interface ParticipantAvatarProjection {
+  /** A discontinuous product-owned placement applied on this transition. */
+  readonly position?: Vec2;
+}
+
+export type ParticipantAvatarProjector = (
+  participant: Readonly<ParticipantPresence>,
+  context: Readonly<ParticipantAvatarProjectionContext>,
+) => ParticipantAvatarProjection | undefined;
+
 export interface PresenceSnapshot {
-  readonly participants: readonly Readonly<Peer>[];
+  readonly participants: readonly Readonly<ParticipantPresence>[];
 }
 
 export interface CanonicalStateSnapshot {
@@ -158,6 +191,7 @@ export class RoomSession {
   private currentTick = 0;
   private simulationReady = false;
   private latestPeers?: Peer[];
+  private readonly participantsById = new Map<string, ParticipantPresence>();
   private latestPresenceSnapshot?: PresenceSnapshot;
   private latestCanonicalSource?: { tick: number; entities: RenderEntity[] };
   private latestCanonicalSnapshot?: CanonicalStateSnapshot;
@@ -167,6 +201,7 @@ export class RoomSession {
   private readonly behaviorObservers = new Set<Observer<BehaviorStateSnapshot>>();
   private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
   private readonly hostAvatarIds = new Set<string>();
+  private readonly appliedParticipantStatus = new Map<string, ParticipantStatus>();
   private readonly lastCanonicalAvatarPositions = new Map<string, Vec2>();
   private finalCheckpointSent?: () => void;
   private terminated = false;
@@ -363,6 +398,7 @@ export class RoomSession {
       });
       // Rebuilding the world drops the local avatar, so add it again.
       this.hostAvatarIds.clear();
+      this.appliedParticipantStatus.clear();
       this.spawnLocalAvatar();
       if (this.localAvatarId) this.hostAvatarIds.add(this.localAvatarId);
       this.syncHostAvatars();
@@ -378,13 +414,19 @@ export class RoomSession {
       if (hostClientId !== this.client.clientId) {
         this.driver.send({ type: "setHost", isHost: false });
         this.hostAvatarIds.clear();
+        this.appliedParticipantStatus.clear();
         this.spawnLocalAvatar();
       }
     });
 
     this.client.on("fullState", (state, _epoch, tick) => {
       if (this.client.isHost) return;
-      const entities = state.entities.map(fromEntityState);
+      const avatars = new Map(state.avatars.map((avatar) => [avatar.entityId, avatar]));
+      const entities = state.entities.map((serialized) => {
+        const entity = fromEntityState(serialized);
+        const avatar = avatars.get(entity.id);
+        return avatar ? { ...entity, userId: avatar.userId } : entity;
+      });
       this.rememberFullAvatarState(entities);
       this.buffer.push(tick, entities);
       this.publishCanonicalState(tick, entities);
@@ -417,14 +459,27 @@ export class RoomSession {
 
     this.client.on("playerInput", (input, fromClientId) => {
       if (!this.client.isHost) return;
+      const participant = this.latestPeers?.find(
+        (candidate) => candidate.clientId === fromClientId,
+      );
+      if (!participant) return;
       this.driver.send({
         type: "input",
-        entityId: avatarEntityId(fromClientId),
+        entityId: avatarEntityId(participant.userId),
         direction: input.direction ?? { x: 0, y: 0 },
         intensity: input.intensity,
         inputSequence: input.inputSequence,
         disabled: input.avatarDisabled,
       });
+      if (
+        this.setParticipantStatus(
+          participant.userId,
+          input.avatarDisabled ? "inactive" : "active",
+        )
+      ) {
+        this.publishParticipantSnapshot();
+        this.syncHostAvatars();
+      }
     });
 
     this.client.on("presence", (peers) => {
@@ -454,15 +509,74 @@ export class RoomSession {
   }
 
   private publishPresence(peers: Peer[]): void {
+    const connectedIds = new Set(peers.map((peer) => peer.userId));
+    for (const [participantId, participant] of this.participantsById) {
+      if (connectedIds.has(participantId)) continue;
+      this.participantsById.set(participantId, {
+        ...participant,
+        connectionId: undefined,
+        status: "disconnected",
+        isHost: false,
+        hostEligible: false,
+      });
+    }
+    for (const peer of peers) {
+      const current = this.participantsById.get(peer.userId);
+      this.participantsById.set(peer.userId, {
+        participantId: peer.userId,
+        userId: peer.userId,
+        displayName: peer.displayName,
+        connectionId: peer.clientId,
+        avatarEntityId: avatarEntityId(peer.userId),
+        status:
+          current?.connectionId === peer.clientId && current.status === "inactive"
+            ? "inactive"
+            : "active",
+        isHost: peer.isHost,
+        hostEligible: peer.hostEligible,
+      });
+    }
+    this.publishParticipantSnapshot();
+  }
+
+  private publishParticipantSnapshot(): void {
     const participants = Object.freeze(
-      peers.map((peer) => Object.freeze({ ...peer })),
+      [...this.participantsById.values()]
+        .sort((a, b) => a.participantId.localeCompare(b.participantId))
+        .map((participant) => Object.freeze({ ...participant })),
     );
     const snapshot = Object.freeze({ participants });
     this.latestPresenceSnapshot = snapshot;
     for (const observer of this.presenceObservers) observer(snapshot);
   }
 
+  private setParticipantStatus(
+    participantId: string,
+    status: ParticipantStatus,
+  ): boolean {
+    const participant = this.participantsById.get(participantId);
+    if (!participant || participant.status === "disconnected" || participant.status === status) {
+      return false;
+    }
+    this.participantsById.set(participantId, { ...participant, status });
+    return true;
+  }
+
+  private updateParticipantActivity(entities: RenderEntity[]): void {
+    let changed = false;
+    for (const entity of entities) {
+      if (entity.kind !== "avatar" || !entity.userId) continue;
+      changed =
+        this.setParticipantStatus(
+          entity.userId,
+          entity.disabled ? "inactive" : "active",
+        ) || changed;
+    }
+    if (changed) this.publishParticipantSnapshot();
+  }
+
   private publishCanonicalState(tick: number, source: RenderEntity[]): void {
+    this.updateParticipantActivity(source);
     this.latestCanonicalSource = { tick, entities: source };
     if (this.canonicalObservers.size === 0 && this.behaviorObservers.size === 0) return;
     this.refreshCanonicalSnapshots();
@@ -523,7 +637,7 @@ export class RoomSession {
     snapshot: CanvasSnapshot,
     wasSleeping: boolean,
   ): Promise<void> {
-    const nextAvatarId = avatarEntityId(this.client.clientId);
+    const nextAvatarId = avatarEntityId(this.client.userId);
     if (this.canvasDefinition) {
       if (this.localAvatarId !== nextAvatarId) {
         if (this.localAvatarId) {
@@ -600,27 +714,41 @@ export class RoomSession {
   private syncHostAvatars(): void {
     if (!this.client.isHost || !this.simulationReady || !this.latestPeers) return;
     const desired = new Map(
-      this.latestPeers.map((peer) => [avatarEntityId(peer.clientId), peer]),
+      [...this.participantsById.values()].map((participant) => [
+        participant.avatarEntityId,
+        participant,
+      ]),
     );
 
-    for (const entityId of this.hostAvatarIds) {
-      if (desired.has(entityId)) continue;
-      this.driver.send({ type: "removeAvatar", entityId });
-      this.hostAvatarIds.delete(entityId);
-    }
-
-    for (const [entityId, peer] of desired) {
-      if (this.hostAvatarIds.has(entityId)) continue;
-      this.driver.send({
-        type: "addAvatar",
-        spawn: {
+    for (const [entityId, participant] of desired) {
+      const previousStatus = this.appliedParticipantStatus.get(entityId);
+      const projection = previousStatus === participant.status
+        ? undefined
+        : this.options.projectParticipantAvatar?.(
+            Object.freeze({ ...participant }),
+            Object.freeze({ canvas: this.canvasDefinition!, previousStatus }),
+          );
+      if (!this.hostAvatarIds.has(entityId)) {
+        this.driver.send({
+          type: "addAvatar",
+          spawn: {
+            entityId,
+            clientId: participant.connectionId ?? "",
+            userId: participant.userId,
+            position: projection?.position ?? this.avatarSpawnPosition(entityId),
+          },
+        });
+        this.hostAvatarIds.add(entityId);
+      }
+      if (previousStatus !== participant.status) {
+        this.driver.send({
+          type: "setAvatarLifecycle",
           entityId,
-          clientId: peer.clientId,
-          userId: peer.userId,
-          position: this.avatarSpawnPosition(entityId),
-        },
-      });
-      this.hostAvatarIds.add(entityId);
+          disabled: participant.status !== "active",
+          ...(projection?.position ? { position: projection.position } : {}),
+        });
+        this.appliedParticipantStatus.set(entityId, participant.status);
+      }
     }
   }
 
@@ -645,6 +773,15 @@ export class RoomSession {
     const intent = this.options.intent?.() ?? NO_INTENT;
     this.inputSequence++;
     const disabled = intent.disabled === true;
+    if (
+      this.setParticipantStatus(
+        this.client.userId,
+        disabled ? "inactive" : "active",
+      )
+    ) {
+      this.publishParticipantSnapshot();
+      this.syncHostAvatars();
+    }
     // The host applies its own input directly; a peer sends it through the relay.
     this.driver.send({
       type: "input",
@@ -680,7 +817,8 @@ export class RoomSession {
             .filter((entity) => entity.kind === "avatar")
             .map((entity) => ({
               entityId: entity.id,
-              clientId: clientIdOf(entity.id),
+              clientId:
+                this.participantsById.get(entity.userId ?? "")?.connectionId ?? "",
               userId: entity.userId ?? "",
               displayName: entity.userId ?? "",
             })),
@@ -1211,8 +1349,8 @@ const pickCounters = (traffic: {
   outboundMessages: traffic.outboundMessages,
 });
 
-export const avatarEntityId = (clientId: string): string => `avatar:${clientId}`;
-const clientIdOf = (entityId: string): string => entityId.replace(/^avatar:/, "");
+export const avatarEntityId = (participantId: string): string =>
+  `avatar:${participantId}`;
 
 /**
  * Spec 19.3. A delta leaves out the definition id. A client learns the

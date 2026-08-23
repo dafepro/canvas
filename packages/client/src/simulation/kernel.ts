@@ -119,6 +119,18 @@ export class SimulationKernel {
         this.simulation?.removeAvatar(request.entityId);
         break;
 
+      case "setAvatarLifecycle":
+        if (request.position) {
+          this.simulation?.world.teleport(
+            request.entityId,
+            request.position,
+            undefined,
+            { x: 0, y: 0 },
+          );
+        }
+        this.simulation?.world.setAvatarDisabled(request.entityId, request.disabled);
+        break;
+
       case "input":
         this.simulation?.world.setAvatarDisabled(request.entityId, request.disabled === true);
         this.simulation?.world.setAvatarInput(

@@ -15,8 +15,10 @@ Canvas core.
 
 `RoomSession` and `CanvasRuntime` expose four application-facing subscriptions:
 
-- `subscribePresence` publishes server-authenticated participants. User IDs are
-  stable product identities; client IDs are ephemeral connections.
+- `subscribePresence` publishes server-authenticated participant lifecycle.
+  Participant IDs are stable product identities, connection IDs are ephemeral,
+  avatar entity IDs remain stable through reconnect, and disconnected entries
+  are retained for the life of the observing session.
 - `subscribeCanonicalState` publishes complete, uninterpolated canonical entity
   snapshots with tick and scene revision. It excludes local prediction and
   renderer state.
@@ -37,6 +39,10 @@ canonical snapshot remains complete.
 
 Observer callbacks run synchronously at the source update cadence. Consumers
 must enqueue expensive work rather than block simulation or network handling.
+
+`docs/PARTICIPANT_LIFECYCLE.md` defines identity lifetimes, reconnect
+supersession, inactive/disconnected projection, and the product-owned avatar
+placement hook.
 
 ## Room template items
 

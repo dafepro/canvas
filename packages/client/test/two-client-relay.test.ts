@@ -205,7 +205,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     await bob.start();
     await waitFor("bob to join", () => bob.client.clientId !== "");
 
-    const bobAvatar = avatarEntityId(bob.client.clientId);
+    const bobAvatar = avatarEntityId(bob.client.userId);
     await waitFor("the host to add the peer avatar", () => entity(alice, bobAvatar) !== undefined);
     const startX = entity(alice, bobAvatar)!.x;
 
@@ -306,7 +306,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     await bob.start();
     await waitFor("bob to join", () => bob.client.clientId !== "");
 
-    const bobAvatar = avatarEntityId(bob.client.clientId);
+    const bobAvatar = avatarEntityId(bob.client.userId);
     await waitFor("the host to add the peer avatar", () => entity(alice, bobAvatar) !== undefined);
 
     bobIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true, disabled: true };
@@ -359,25 +359,29 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     alice.stop();
     await waitFor("bob to take the host lease", () => bob.client.isHost);
     await waitFor(
-      "the departed host avatar to disappear",
-      () => entity(bob, oldAliceAvatar) === undefined,
+      "the departed participant avatar to remain disabled",
+      () => entity(bob, oldAliceAvatar)?.disabled === true,
     );
 
     const rejoinedAlice = session("alice");
     await rejoinedAlice.start();
     await waitFor(
-      "the rejoined client to receive stationary avatars and the crate",
+      "the rejoined participant to reactivate its stable avatar and receive the crate",
       () => {
         const rejoinedView = view(rejoinedAlice);
         const crate = rejoinedView.find((candidate) => candidate.id === crateId);
+        const aliceAvatar = rejoinedView.find(
+          (candidate) => candidate.id === oldAliceAvatar,
+        );
         return (
           rejoinedView.some((candidate) => candidate.id === bob.avatarId) &&
-          rejoinedView.some((candidate) => candidate.id === rejoinedAlice.avatarId) &&
+          aliceAvatar?.disabled !== true &&
           crate?.definitionId === crateDefinition.definitionId &&
           Math.abs(crate.y - settledY) < 1
         );
       },
       20_000,
     );
+    expect(rejoinedAlice.avatarId).toBe(oldAliceAvatar);
   }, 90_000);
 });
