@@ -89,6 +89,10 @@ describe("published package artifacts", () => {
           types: "./dist/simulation/simulation.worker.d.ts",
           default: "./dist/simulation/simulation.worker.js",
         });
+        expect(manifest.exports?.["./worker-runtime"]).toEqual({
+          types: "./dist/simulation/worker-runtime.d.ts",
+          default: "./dist/simulation/worker-runtime.js",
+        });
       }
     }
 
@@ -125,7 +129,8 @@ describe("published package artifacts", () => {
         'import { BehaviorRegistry } from "@canvas-physics/core";',
         'import { PROTOCOL_VERSION } from "@canvas-physics/protocol";',
         'import { SimulationDriver } from "@canvas-physics/client";',
-        "if (!BehaviorRegistry || !PROTOCOL_VERSION || !SimulationDriver) process.exit(1);",
+        'import { installSimulationWorker } from "@canvas-physics/client/worker-runtime";',
+        "if (!BehaviorRegistry || !PROTOCOL_VERSION || !SimulationDriver || !installSimulationWorker) process.exit(1);",
       ].join("\n"),
     );
 

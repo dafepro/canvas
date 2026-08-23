@@ -1,13 +1,8 @@
 /// <reference lib="webworker" />
-import { SimulationKernel } from "./kernel.js";
-import type { SimulationRequest } from "./messages.js";
+import { installSimulationWorker } from "./worker-runtime.js";
 
 /**
- * The worker entry point. Every rule lives in SimulationKernel, so this file is
- * only the bridge between the worker port and the kernel.
+ * Default worker entry point with the Canvas built-in behaviors. Applications
+ * that add behavior provide their own entry and call installSimulationWorker.
  */
-const kernel = new SimulationKernel((message) => self.postMessage(message));
-
-self.onmessage = (event: MessageEvent<SimulationRequest>) => {
-  kernel.handle(event.data);
-};
+installSimulationWorker(self);

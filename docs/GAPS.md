@@ -12,7 +12,7 @@ work below because they determine the public boundary every consumer will use.
 
 - [x] Publish JavaScript, declaration, and worker artifacts that can be packed
   and installed outside this workspace.
-- [ ] Let an application register custom behaviors in its simulation worker
+- [x] Let an application register custom behaviors in its simulation worker
   without editing or forking Canvas core.
 - [ ] Replace identity query parameters with an asynchronous credential provider
   that is called for every connection and reconnect. Require production hosts

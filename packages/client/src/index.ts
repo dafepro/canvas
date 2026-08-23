@@ -4,6 +4,7 @@ export * from "./net/room-client.js";
 export * from "./net/avatar-reconciler.js";
 export * from "./simulation/messages.js";
 export * from "./simulation/driver.js";
+export * from "./simulation/behavior-registry.js";
 export * from "./simulation/kernel.js";
 export * from "./simulation/fixed-step-loop.js";
 export * from "./simulation/rapier-world.js";

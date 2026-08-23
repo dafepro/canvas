@@ -13,6 +13,10 @@
     "./worker": {
       "types": "./dist/simulation/simulation.worker.d.ts",
       "default": "./dist/simulation/simulation.worker.js"
+    },
+    "./worker-runtime": {
+      "types": "./dist/simulation/worker-runtime.d.ts",
+      "default": "./dist/simulation/worker-runtime.js"
     }
   },
   "scripts": {

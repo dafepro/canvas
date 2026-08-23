@@ -1,12 +1,10 @@
 import {
-  BehaviorRegistry,
-  KickableBehavior,
-  PortalBehavior,
-  RocketBehavior,
+  type BehaviorRegistry,
   type CanvasDefinition,
   type Entity,
   type ItemDefinition,
 } from "@canvas-physics/core";
+import { createSimulationBehaviorRegistry } from "./behavior-registry.js";
 import { FixedStepLoop } from "./fixed-step-loop.js";
 import { HostSimulation } from "./host-simulation.js";
 import { RapierWorld } from "./rapier-world.js";
@@ -15,12 +13,6 @@ import type {
   SimulationRequest,
   SimulationResponse,
 } from "./messages.js";
-
-const buildRegistry = (): BehaviorRegistry =>
-  new BehaviorRegistry()
-    .register(RocketBehavior)
-    .register(KickableBehavior)
-    .register(PortalBehavior);
 
 const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity => ({
   id: entity.id,
@@ -65,7 +57,10 @@ export class SimulationKernel {
   private driveTimer?: ReturnType<typeof setTimeout>;
   private lastStats = { hz: 0, driftMs: 0, worstStepMs: 0, behaviorErrors: 0 };
 
-  constructor(private readonly post: (message: SimulationResponse) => void) {}
+  constructor(
+    private readonly post: (message: SimulationResponse) => void,
+    private readonly registry: BehaviorRegistry = createSimulationBehaviorRegistry(),
+  ) {}
 
   handle(request: SimulationRequest): void {
     try {
@@ -191,7 +186,7 @@ export class SimulationKernel {
     this.simulation = new HostSimulation(
       this.canvas,
       this.definitions,
-      buildRegistry(),
+      this.registry,
       this.tickRate,
     );
 

@@ -35,7 +35,7 @@ pnpm --filter @canvas-physics/client pack --pack-destination ./artifacts
 Install all three archives in an external application until registry releases
 are configured. `@canvas-physics/client/worker` resolves to the packaged default
 simulation worker. Application-defined worker behavior registration is tracked
-as the next consumer-library Priority 0 item in `docs/GAPS.md`.
+by the build-time worker API in `docs/EXTENSION_CONTRACT.md`.
 
 ## Run the local stack
 

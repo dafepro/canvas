@@ -1,3 +1,5 @@
+import type { ItemBehavior } from "@canvas-physics/core";
+import { createSimulationBehaviorRegistry } from "./behavior-registry.js";
 import { SimulationKernel } from "./kernel.js";
 import type { SimulationRequest, SimulationResponse } from "./messages.js";
 
@@ -43,9 +45,14 @@ export class SimulationDriver {
    * Builds a driver that runs the kernel in this thread. A test uses it to run a
    * full client with no worker. A browser client uses `spawn`.
    */
-  static local(): SimulationDriver {
+  static local(
+    applicationBehaviors: readonly ItemBehavior<any, any>[] = [],
+  ): SimulationDriver {
     return new SimulationDriver((post) => {
-      const kernel = new SimulationKernel(post);
+      const kernel = new SimulationKernel(
+        post,
+        createSimulationBehaviorRegistry(applicationBehaviors),
+      );
       return {
         send: (request) => kernel.handle(request),
         terminate: () => kernel.stop(),
