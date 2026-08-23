@@ -87,7 +87,10 @@ work below because they determine the public boundary every consumer will use.
   - [x] Host authentication adapters through the Go `roomsdktest` package.
   - [x] Host stores, including stale/concurrent ordering and optional durable
     adapter reopen, through the Go `roomsdktest` package.
-  - [ ] Custom room transports.
+  - [x] Custom room transports through the framework-neutral
+    `@canvas-physics/client/testing` fixture, including lifecycle, ordered and
+    realtime delivery, listener cleanup, reconnect recovery, counters, and
+    caller close.
   - [ ] Application-owned worker bundles.
 - [ ] Exercise packed release artifacts from a separate fixture application.
 - [ ] Complete latency, loss, reordering, reconnect, migration, late-join, and

@@ -21,6 +21,10 @@
     "./worker-runtime": {
       "types": "./dist/simulation/worker-runtime.d.ts",
       "default": "./dist/simulation/worker-runtime.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     }
   },
   "scripts": {

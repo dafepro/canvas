@@ -99,6 +99,10 @@ describe("published package artifacts", () => {
           types: "./dist/simulation/worker-runtime.d.ts",
           default: "./dist/simulation/worker-runtime.js",
         });
+        expect(manifest.exports?.["./testing"]).toEqual({
+          types: "./dist/testing/index.d.ts",
+          default: "./dist/testing/index.js",
+        });
       } else if (directory === "core") {
         expect(manifest.exports?.["./testing"]).toEqual({
           types: "./dist/testing/index.d.ts",
@@ -141,8 +145,9 @@ describe("published package artifacts", () => {
         'import { runBehaviorConformance } from "@canvas-physics/core/testing";',
         'import { PROTOCOL_VERSION } from "@canvas-physics/protocol";',
         'import { SimulationDriver } from "@canvas-physics/client/runtime";',
+        'import { runRoomTransportConformance } from "@canvas-physics/client/testing";',
         'import { installSimulationWorker } from "@canvas-physics/client/worker-runtime";',
-        "if (!BehaviorRegistry || !runBehaviorConformance || !PROTOCOL_VERSION || !SimulationDriver || !installSimulationWorker) process.exit(1);",
+        "if (!BehaviorRegistry || !runBehaviorConformance || !PROTOCOL_VERSION || !SimulationDriver || !runRoomTransportConformance || !installSimulationWorker) process.exit(1);",
         "const behavior = { behaviorType: 'fixture.counter', stateVersion: 1, subscribes: ['tick'], initialState: () => ({ ticks: 0 }), onEvent: (_context, _config, state) => ({ state: { ticks: state.ticks + 1 }, commands: [] }) };",
         "const report = runBehaviorConformance(behavior, {}, { scenarios: [{ name: 'tick', exercise: (harness) => { harness.advance(); } }] });",
         "if (!report.ok) throw new Error(JSON.stringify(report.issues));",

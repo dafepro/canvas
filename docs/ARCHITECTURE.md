@@ -182,7 +182,7 @@ without the current transform message.
 | --- | --- |
 | A new interactive item | Register an `ItemBehavior`, then add an `ItemDefinition`. Touch no protocol code. |
 | A new canvas | Write a `CanvasDefinition` and export it with `make export-canvases`. |
-| A different transport | Implement `RoomTransport`. Nothing in the runtime or behaviors changes. |
+| A different transport | Implement `RoomTransport`, then run `runRoomTransportConformance` from `@canvas-physics/client/testing`. Nothing in the runtime or behaviors changes. |
 | A real database | Implement `roomsdk.Store`. |
 | A real session check | Implement `roomsdk.Authenticator`. |
 | A new wire field | Edit `room.proto`, then run `make generate`. |

@@ -11,7 +11,7 @@ authenticator, store, transport, or worker bundle honors the public contract.
   sleep normalization, and durable migration coverage.
 - [x] Host `Authenticator` implementations.
 - [x] Host `Store` implementations.
-- [ ] Custom `RoomTransport` implementations.
+- [x] Custom `RoomTransport` implementations.
 - [ ] Application-owned simulation worker bundles.
 
 The parent P2 backlog item remains open until every kit above is runnable from
@@ -101,3 +101,27 @@ func TestProductStore(t *testing.T) {
     })
 }
 ```
+
+## Room transport kit
+
+Import `runRoomTransportConformance` from
+`@canvas-physics/client/testing`. The fixture creates the consumer transport
+and exposes its test peer: one method observes outbound envelopes, one delivers
+inbound envelopes, and one interrupts the live connection. This lets a local
+WebSocket server, WebRTC remote endpoint, or other adapter-specific harness
+drive the same public checks without Canvas knowing its internals.
+
+```ts
+const report = await runRoomTransportConformance({
+  create: () => openProductTransportFixture(),
+});
+expect(report.issues).toEqual([]);
+```
+
+The suite verifies zeroed cumulative counters, the `idle` → `connecting` →
+`open` lifecycle, ordered reliable delivery, uncongested realtime delivery,
+inbound delivery, listener unsubscription, reconnect recovery in both
+directions, cumulative encoded-byte/message counters, and terminal caller
+close. The immutable report is independent of Vitest or Jest. The test peer is
+responsible for running against the real adapter boundary rather than calling
+private transport methods directly.
