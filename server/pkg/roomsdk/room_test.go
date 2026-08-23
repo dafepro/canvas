@@ -355,6 +355,29 @@ func TestOwnershipIsEnforced(t *testing.T) {
 		t.Errorf("owner = %q, want alice", instance.OwnerUserID)
 	}
 
+	// Only moves have a non-durable preview form. Other command kinds must not
+	// bypass persistence by setting the preview bit.
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-preview-delete",
+			Kind:      pb.DurableCommandKind_DURABLE_DELETE_ITEM,
+			EntityId:  entityID,
+			Preview:   true,
+		}},
+	})
+	previewReject := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-preview-delete"
+	}).GetDurableResult()
+	if previewReject.Accepted || previewReject.RejectReason != "invalid_preview_kind" {
+		t.Errorf(
+			"preview delete: accepted=%v reason=%q, want invalid_preview_kind",
+			previewReject.Accepted,
+			previewReject.RejectReason,
+		)
+	}
+
 	// A non-owner may not move the item.
 	other.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",

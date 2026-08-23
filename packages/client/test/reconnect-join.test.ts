@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { emptySnapshot, type CanvasSnapshot } from "@canvas-physics/core";
 import {
+  DurableCommandKind,
   fromJsonBytes,
   toJsonBytes,
   type Peer,
@@ -65,6 +66,47 @@ class ReconnectTransport implements RoomTransport {
 }
 
 describe("RoomClient reconnect handshake", () => {
+  it("rate-limits preview moves and sends the final transform immediately", async () => {
+    const transport = new ReconnectTransport();
+    const driver = new SimulationDriver(() => ({
+      send: () => {},
+      terminate: () => {},
+    }));
+    const session = new RoomSession({
+      transport,
+      driver,
+      canvasId: rocketCanvas.id,
+      serverUrl: "http://localhost:8080",
+      userId: "alice",
+      displayName: "Alice",
+      definitions: rocketCanvasDefinitions,
+      rates: { previewHz: 10 },
+    });
+    const transform = (x: number) => ({ x, y: 20, rotation: 0 });
+    const sentMoves = () =>
+      transport.sent
+        .map((message) => message.durableCommand)
+        .filter(
+          (command) => command?.kind === DurableCommandKind.DURABLE_MOVE_ITEM,
+        );
+
+    session.moveItem("item-1", transform(1), true);
+    session.moveItem("item-1", transform(2), true);
+    session.moveItem("item-1", transform(3), true);
+
+    expect(sentMoves()).toHaveLength(1);
+    await new Promise((resolve) => setTimeout(resolve, 130));
+    expect(sentMoves()).toHaveLength(2);
+    expect(sentMoves()[1]?.position?.x).toBe(3);
+
+    session.moveItem("item-1", transform(4), true);
+    session.moveItem("item-1", transform(5));
+    expect(sentMoves().at(-1)).toMatchObject({ preview: false, position: { x: 5 } });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(sentMoves()).toHaveLength(3);
+    session.stop();
+  });
+
   it("resends JOIN and drops a stale host role before reconnecting", async () => {
     const transport = new ReconnectTransport();
     const client = new RoomClient({

@@ -41,6 +41,8 @@ export interface RoomSessionRates {
   deltaHz?: number;
   keyframeHz?: number;
   checkpointHz?: number;
+  /** Maximum reliable preview moves per second. Defaults to 15. */
+  previewHz?: number;
 }
 
 export interface RoomSessionOptions {
@@ -109,6 +111,10 @@ export class RoomSession {
   private readonly reconciler = new AvatarReconciler();
   private canvasDefinition?: CanvasDefinition;
   private timers: ReturnType<typeof setInterval>[] = [];
+  private previewTimer?: ReturnType<typeof setTimeout>;
+  private pendingPreview?: { entityId: string; transform: Transform };
+  private lastPreviewSentAt = Number.NEGATIVE_INFINITY;
+  private readonly previewIntervalMs: number;
   private localAvatarId = "";
   private inputSequence = 0;
   private hostEntities: RenderEntity[] = [];
@@ -154,6 +160,7 @@ export class RoomSession {
   };
 
   constructor(private readonly options: RoomSessionOptions) {
+    this.previewIntervalMs = 1000 / Math.max(1, options.rates?.previewHz ?? 15);
     const transport = options.transport ?? new WebSocketRoomTransport();
     this.driver = options.driver ?? SimulationDriver.spawn();
     this.client = new RoomClient({
@@ -240,6 +247,9 @@ export class RoomSession {
   private clearTimers(): void {
     for (const timer of this.timers) clearInterval(timer);
     this.timers = [];
+    if (this.previewTimer) clearTimeout(this.previewTimer);
+    this.previewTimer = undefined;
+    this.pendingPreview = undefined;
   }
 
   private finishStop(): void {
@@ -338,6 +348,11 @@ export class RoomSession {
 
     this.client.on("durableAccepted", (command, _revision, itemJson) => {
       this.applyAcceptedCommand(command, itemJson as SnapshotItem | undefined);
+    });
+
+    this.client.on("durablePreview", (command) => {
+      if (!this.client.isHost) return;
+      this.applyAcceptedCommand(command);
     });
 
     this.client.on("durableRejected", (_command, reason) => {
@@ -761,6 +776,37 @@ export class RoomSession {
   }
 
   moveItem(entityId: string, transform: Transform, preview = false): void {
+    if (preview) {
+      this.queuePreview(entityId, transform);
+      return;
+    }
+    if (this.previewTimer) clearTimeout(this.previewTimer);
+    this.previewTimer = undefined;
+    this.pendingPreview = undefined;
+    this.sendMoveItem(entityId, transform, false);
+  }
+
+  private queuePreview(entityId: string, transform: Transform): void {
+    const now = Date.now();
+    const remaining = this.previewIntervalMs - (now - this.lastPreviewSentAt);
+    if (remaining <= 0) {
+      this.lastPreviewSentAt = now;
+      this.sendMoveItem(entityId, transform, true);
+      return;
+    }
+    this.pendingPreview = { entityId, transform };
+    if (this.previewTimer) return;
+    this.previewTimer = setTimeout(() => {
+      this.previewTimer = undefined;
+      const pending = this.pendingPreview;
+      this.pendingPreview = undefined;
+      if (!pending) return;
+      this.lastPreviewSentAt = Date.now();
+      this.sendMoveItem(pending.entityId, pending.transform, true);
+    }, remaining);
+  }
+
+  private sendMoveItem(entityId: string, transform: Transform, preview: boolean): void {
     this.client.sendDurableCommand({
       commandId: this.nextCommandId(),
       kind: DurableCommandKind.DURABLE_MOVE_ITEM,

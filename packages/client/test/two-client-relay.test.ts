@@ -113,6 +113,25 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     // The server owns the record, so the spawning user owns the item.
     expect(hostCrate.ownerUserId).toBe("bob");
 
+    const beforePreviewRevision = bob.client.sceneRevision;
+    const previewTransform = {
+      x: hostCrate.x + 4,
+      y: hostCrate.y,
+      rotation: hostCrate.rotation,
+    };
+    bob.moveItem(crateId, previewTransform, true);
+    await waitFor(
+      "the host to apply the owner's preview move",
+      () => Math.abs((entity(alice, crateId)?.x ?? 0) - previewTransform.x) < 0.5,
+    );
+    expect(bob.client.sceneRevision).toBe(beforePreviewRevision);
+
+    bob.moveItem(crateId, previewTransform);
+    await waitFor(
+      "the final move to advance the scene revision",
+      () => bob.client.sceneRevision > beforePreviewRevision,
+    );
+
     bob.rotateItem(crateId, Math.PI / 4);
     await waitFor(
       "the host to apply the owner's durable rotation",

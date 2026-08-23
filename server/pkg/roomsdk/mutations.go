@@ -101,6 +101,9 @@ func (r *Room) validateDurable(
 	client *Client,
 	command *pb.DurableCommand,
 ) (bool, *SnapshotItem, string) {
+	if command.Preview && command.Kind != pb.DurableCommandKind_DURABLE_MOVE_ITEM {
+		return false, nil, "invalid_preview_kind"
+	}
 	switch command.Kind {
 	case pb.DurableCommandKind_DURABLE_SPAWN_ITEM:
 		if len(r.snapshot.Items) >= r.canvasShape.Limits.MaxItems {

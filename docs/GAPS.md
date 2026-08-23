@@ -38,8 +38,11 @@ downward. Check an item only after the relevant focused tests pass.
   behavior/definition versions in checkpoints.
 - [x] Add public rotate and set-config APIs, use server-authoritative accepted
   transforms, and apply accepted configuration to the live host behavior.
-- [ ] Complete durable editing previews, selection/ghost UI, rate limiting, and
-  final release commits.
+- [x] Relay owner move previews to the host without persisting them, coalesce
+  preview bursts to a bounded reliable send rate, and send release commits
+  immediately.
+- [ ] Add item selection and local drag-ghost UI that drives preview moves and
+  the final release commit.
 - [ ] Add a durable Store implementation for the reference service so process
   restarts preserve canvases and snapshots.
 

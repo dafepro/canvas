@@ -42,6 +42,7 @@ export interface RoomClientEvents {
   stateDelta(delta: StateDelta, epoch: number, tick: number): void;
   effect(event: EffectEvent, tick: number): void;
   playerInput(input: PlayerInput, fromClientId: string): void;
+  durablePreview(command: DurableCommand, fromClientId: string): void;
   durableAccepted(command: DurableCommand, sceneRevision: number, itemJson?: unknown): void;
   durableRejected(command: DurableCommand, reason: string): void;
   status(status: TransportStatus, detail?: string): void;
@@ -375,6 +376,11 @@ export class RoomClient {
     }
     if (message.playerInput) {
       this.emit("playerInput", message.playerInput, message.senderClientId);
+      return;
+    }
+    if (message.durableCommand) {
+      if (message.hostEpoch !== this.hostEpoch || !message.durableCommand.preview) return;
+      this.emit("durablePreview", message.durableCommand, message.senderClientId);
       return;
     }
     if (message.durableResult) {
