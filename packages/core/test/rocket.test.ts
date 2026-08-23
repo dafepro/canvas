@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  BehaviorTestHarness,
   RocketBehavior,
-  avatarParty,
   defaultRocketConfig,
-  staticParty,
   type RocketConfig,
   type RocketState,
 } from "../src/index.js";
+import {
+  BehaviorTestHarness,
+  avatarParty,
+  staticParty,
+} from "../src/testing/index.js";
 
 const harness = (overrides: Partial<RocketConfig> = {}) =>
   new BehaviorTestHarness<RocketConfig, RocketState>(RocketBehavior, {

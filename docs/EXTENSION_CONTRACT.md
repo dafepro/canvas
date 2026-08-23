@@ -47,6 +47,8 @@ const joinCanvas = async () => {
 
 Pass `driver` to `RoomSession`. Tests that do not need a real worker can call
 `SimulationDriver.local([SoccerBallBehavior])` with the same behavior list.
+Framework-neutral behavior checks and the headless harness are exported from
+`@canvas-physics/core/testing`; see `CONFORMANCE_KITS.md`.
 
 ## Behavior requirements
 
@@ -62,6 +64,8 @@ Pass `driver` to `RoomSession`. Tests that do not need a real worker can call
 
 ## Acceptance test
 
+The soccer integration runs its domain behavior through
+`runBehaviorConformance` from the packed testing subpath.
 `packages/client/test/custom-worker-runtime.test.ts` installs a custom behavior
 through the public worker bootstrap, adds an item that uses it, and observes its
 state advancing in worker responses. `test/package-artifacts.test.ts` also

@@ -5,4 +5,3 @@ export * from "./behavior/index.js";
 export * from "./tuning/index.js";
 export * from "./environment/index.js";
 export * from "./validation/index.js";
-export * from "./testing/index.js";

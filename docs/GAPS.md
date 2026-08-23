@@ -78,6 +78,12 @@ work below because they determine the public boundary every consumer will use.
 
 - [ ] Add external-consumer conformance kits for behaviors, authentication,
   stores, transports, and custom worker bundles.
+  - [x] Behavior metadata, deterministic replay, sleep normalization, and
+    durable migration cases through `@canvas-physics/core/testing`.
+  - [ ] Host authentication adapters.
+  - [ ] Host stores.
+  - [ ] Custom room transports.
+  - [ ] Application-owned worker bundles.
 - [ ] Exercise packed release artifacts from a separate fixture application.
 - [ ] Complete latency, loss, reordering, reconnect, migration, late-join, and
   mobile backgrounding coverage.

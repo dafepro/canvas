@@ -82,4 +82,5 @@ host application explicitly reconciles that sleeping room with the policies in
 - `ROOM_TEMPLATES.md` defines product room and reusable template identity.
 - `RUNTIME_LIFECYCLE.md` defines readiness, reconnect, teardown, and typed errors.
 - `OVERLAY_PROJECTION.md` defines bounded DOM/UI projection observation.
+- `CONFORMANCE_KITS.md` tracks external extension and adapter verification.
 - `ARCHITECTURE.md` defines authority and dependency direction inside Canvas.

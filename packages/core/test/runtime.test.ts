@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   BehaviorRegistry,
   BehaviorRuntime,
-  BehaviorTestHost,
   MigrationChain,
   sortEvents,
   type BehaviorEvent,
   type ItemBehavior,
 } from "../src/index.js";
+import { BehaviorTestHost } from "../src/testing/index.js";
 
 const canvas = { id: "c", width: 100, height: 70, orientation: "side" as const };
 

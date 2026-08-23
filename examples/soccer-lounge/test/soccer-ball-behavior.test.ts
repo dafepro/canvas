@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { BehaviorTestHarness, avatarParty } from "@canvas-physics/core";
+import {
+  BehaviorTestHarness,
+  avatarParty,
+  runBehaviorConformance,
+} from "@canvas-physics/core/testing";
 import {
   SoccerBallBehavior,
   defaultSoccerBallConfig,
@@ -15,6 +19,46 @@ const harness = () =>
   );
 
 describe("SoccerBallBehavior", () => {
+  it("passes the public external-behavior conformance kit", () => {
+    const report = runBehaviorConformance(
+      SoccerBallBehavior,
+      defaultSoccerBallConfig,
+      {
+        harness: { canvas: { orientation: "topDown", width: 120, height: 80 } },
+        scenarios: [
+          {
+            name: "kick and score",
+            exercise: (candidate) => {
+              candidate.host.body(candidate.entityId).transform = {
+                x: 50,
+                y: 40,
+                rotation: 0,
+              };
+              candidate.host.body("avatar-1", { x: 47, y: 40 }).velocity = { x: 8, y: 0 };
+              candidate
+                .send({
+                  type: "contact.enter",
+                  selfColliderId: "kick",
+                  other: avatarParty("avatar-1"),
+                })
+                .flush()
+                .send({
+                  type: "region.enter",
+                  regionId: "right-goal",
+                  tags: ["goal", "rightGoal"],
+                })
+                .flush()
+                .advanceSeconds(defaultSoccerBallConfig.resetSeconds);
+            },
+          },
+        ],
+      },
+    );
+
+    expect(report.issues).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
   it("starts a scoreless match", () => {
     expect(harness().state).toMatchObject({
       phase: "playing",

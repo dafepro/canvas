@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   EntityRegistry,
   KickableBehavior,
-  BehaviorTestHarness,
-  avatarParty,
   defaultKickableConfig,
   PortalBehavior,
   defaultPortalConfig,
@@ -27,6 +25,7 @@ import {
   type PortalConfig,
   type PortalState,
 } from "../src/index.js";
+import { BehaviorTestHarness, avatarParty } from "../src/testing/index.js";
 
 const canvas: CanvasDefinition = {
   id: "rocket-canvas",
