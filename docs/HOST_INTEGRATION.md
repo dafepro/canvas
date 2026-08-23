@@ -35,3 +35,7 @@ authentication mechanism for a deployed product.
 
 Non-browser tests may supply `X-User-Id` and `X-Display-Name` to
 `DevAuthenticator`. Query-string identity is not supported.
+
+An external host should run `roomsdktest.RunAuthenticatorConformance` against
+its production adapter with representative valid, missing, expired, and
+malformed tickets. See `CONFORMANCE_KITS.md`.

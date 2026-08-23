@@ -9,7 +9,7 @@ authenticator, store, transport, or worker bundle honors the public contract.
 
 - [x] Behavior metadata, JSON data, deterministic initialization/replay,
   sleep normalization, and durable migration coverage.
-- [ ] Host `Authenticator` implementations.
+- [x] Host `Authenticator` implementations.
 - [ ] Host `Store` implementations.
 - [ ] Custom `RoomTransport` implementations.
 - [ ] Application-owned simulation worker bundles.
@@ -54,3 +54,23 @@ tick, and the complete fake-body state. Scenarios are mandatory because generic
 metadata inspection cannot discover which domain events matter to a consumer.
 The soccer lounge runs its kick/score/reset path through this public kit.
 
+## Authenticator kit
+
+Go hosts import `github.com/dafepro/canvas/server/pkg/roomsdktest` and call
+`RunAuthenticatorConformance` from their own `_test.go` file. Each case supplies
+an HTTP request and either the exact expected stable `roomsdk.Identity` or an
+unauthorized expectation. The suite requires at least one success and one
+rejection, requires successful identities to contain both names, and requires a
+rejection to return `roomsdk.ErrUnauthorized` with no partial identity.
+
+```go
+func TestProductAuthenticator(t *testing.T) {
+    roomsdktest.RunAuthenticatorConformance(t, productAuth, []roomsdktest.AuthenticatorCase{
+        {Name: "valid ticket", Request: valid, WantIdentity: expected},
+        {Name: "expired ticket", Request: expired, Unauthorized: true},
+    })
+}
+```
+
+The host owns ticket issuance, expiration, origin policy, and replay semantics;
+the kit owns only the identity/error boundary visible to Canvas.

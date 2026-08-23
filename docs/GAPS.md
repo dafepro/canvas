@@ -80,7 +80,7 @@ work below because they determine the public boundary every consumer will use.
   stores, transports, and custom worker bundles.
   - [x] Behavior metadata, deterministic replay, sleep normalization, and
     durable migration cases through `@canvas-physics/core/testing`.
-  - [ ] Host authentication adapters.
+  - [x] Host authentication adapters through the Go `roomsdktest` package.
   - [ ] Host stores.
   - [ ] Custom room transports.
   - [ ] Application-owned worker bundles.
