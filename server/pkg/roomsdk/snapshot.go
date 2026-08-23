@@ -36,7 +36,14 @@ type SnapshotItem struct {
 	ResolvedConfig    json.RawMessage `json:"resolvedConfig,omitempty"`
 	BehaviorState     json.RawMessage `json:"behaviorState,omitempty"`
 	BehaviorStateVer  uint32          `json:"behaviorStateVersion,omitempty"`
+	BehaviorTimers    []BehaviorTimer `json:"behaviorTimers,omitempty"`
 	VisualVariant     string          `json:"visualVariant,omitempty"`
+}
+
+type BehaviorTimer struct {
+	Key            string `json:"key"`
+	ElapsedTicks   uint64 `json:"elapsedTicks"`
+	RemainingTicks uint64 `json:"remainingTicks"`
 }
 
 // CanvasSnapshot mirrors the client CanvasSnapshot type.

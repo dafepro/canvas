@@ -1,4 +1,5 @@
 import type { EntityId } from "../registry/components.js";
+import type { BehaviorTimerSnapshot } from "../model/snapshot.js";
 import type { TimerEvent } from "./events.js";
 
 interface TimerRecord {
@@ -64,6 +65,51 @@ export class TimerService {
   cancelAll(entityId: EntityId): void {
     for (const id of this.byEntity.get(entityId) ?? []) this.timers.delete(id);
     this.byEntity.delete(entityId);
+  }
+
+  /** Captures active timers relative to the checkpoint tick. */
+  snapshot(entityId: EntityId, currentTick: number): BehaviorTimerSnapshot[] {
+    const timers: BehaviorTimerSnapshot[] = [];
+    for (const id of this.byEntity.get(entityId) ?? []) {
+      const record = this.timers.get(id);
+      if (!record) continue;
+      timers.push({
+        key: record.key,
+        elapsedTicks: Math.max(0, currentTick - record.startTick),
+        remainingTicks: Math.max(1, record.dueTick - currentTick),
+      });
+    }
+    return timers.sort(
+      (a, b) =>
+        a.remainingTicks - b.remainingTicks ||
+        a.key.localeCompare(b.key) ||
+        a.elapsedTicks - b.elapsedTicks,
+    );
+  }
+
+  /** Recreates timers captured by an active host checkpoint. */
+  restore(
+    entityId: EntityId,
+    timers: readonly BehaviorTimerSnapshot[],
+    currentTick: number,
+  ): void {
+    for (const timer of timers) {
+      const id = `t${this.nextId++}`;
+      const record: TimerRecord = {
+        id,
+        entityId,
+        key: timer.key,
+        startTick: currentTick - Math.max(0, Math.floor(timer.elapsedTicks)),
+        dueTick: currentTick + Math.max(1, Math.floor(timer.remainingTicks)),
+      };
+      this.timers.set(id, record);
+      let ids = this.byEntity.get(entityId);
+      if (!ids) {
+        ids = new Set();
+        this.byEntity.set(entityId, ids);
+      }
+      ids.add(id);
+    }
   }
 
   /** Remaining ticks for a timer, or undefined when none is pending. */

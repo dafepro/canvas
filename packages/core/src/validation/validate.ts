@@ -129,6 +129,31 @@ export const validateSnapshot = (
         problems.push({ path: `items[${i}].transform.${problem.path}`, message: problem.message });
       }
     }
+    const timers = item.behaviorTimers ?? [];
+    if (snapshot.normalized && timers.length > 0) {
+      problems.push({
+        path: `items[${i}].behaviorTimers`,
+        message: "sleep-normalized snapshots cannot contain active timers",
+      });
+    }
+    if (timers.length > 64) {
+      problems.push({
+        path: `items[${i}].behaviorTimers`,
+        message: "contains more than 64 timers",
+      });
+    }
+    timers.forEach((timer, timerIndex) => {
+      const path = `items[${i}].behaviorTimers[${timerIndex}]`;
+      if (!timer.key || timer.key.length > 128) {
+        problems.push({ path: `${path}.key`, message: "must be 1 to 128 characters" });
+      }
+      if (!Number.isSafeInteger(timer.elapsedTicks) || timer.elapsedTicks < 0) {
+        problems.push({ path: `${path}.elapsedTicks`, message: "must be a non-negative integer" });
+      }
+      if (!Number.isSafeInteger(timer.remainingTicks) || timer.remainingTicks < 1) {
+        problems.push({ path: `${path}.remainingTicks`, message: "must be a positive integer" });
+      }
+    });
   });
   return result(problems);
 };

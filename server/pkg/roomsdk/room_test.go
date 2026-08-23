@@ -789,6 +789,36 @@ func TestFinalCheckpointRequiresANormalizedSnapshot(t *testing.T) {
 			Final:              true,
 		}},
 	})
+	badTimers, err := json.Marshal(CanvasSnapshot{
+		SchemaVersion:      1,
+		CanvasID:           "test-canvas",
+		CanvasVersion:      1,
+		SceneRevision:      result.SceneRevision,
+		HostEpoch:          host.hostEpoch,
+		CheckpointRevision: 2,
+		CapturedAt:         time.Now().UTC().Format(time.RFC3339Nano),
+		Normalized:         true,
+		Items: []SnapshotItem{{
+			EntityID:  result.Command.EntityId,
+			Transform: Transform{X: 20, Y: 30},
+			BehaviorTimers: []BehaviorTimer{{
+				Key:            "countdown",
+				RemainingTicks: 10,
+			}},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("marshal timer checkpoint: %v", err)
+	}
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Payload: &pb.RoomEnvelope_Checkpoint{Checkpoint: &pb.Checkpoint{
+			CheckpointRevision: 2,
+			SnapshotJson:       badTimers,
+			Final:              true,
+		}},
+	})
 	// A later durable result proves the room processed the checkpoint first.
 	host.send(spawnCommand("cmd-after-checkpoint", 40, 30))
 	host.await(func(e *pb.RoomEnvelope) bool {
@@ -886,7 +916,12 @@ func TestCheckpointCannotRewriteDurableItemMetadata(t *testing.T) {
 			ResolvedConfig:    json.RawMessage(`{"admin":true}`),
 			BehaviorState:     json.RawMessage(`{"phase":"flying"}`),
 			BehaviorStateVer:  7,
-			VisualVariant:     "flying",
+			BehaviorTimers: []BehaviorTimer{{
+				Key:            "countdown",
+				ElapsedTicks:   120,
+				RemainingTicks: 60,
+			}},
+			VisualVariant: "flying",
 		}},
 	})
 	if err != nil {
@@ -938,6 +973,9 @@ func TestCheckpointCannotRewriteDurableItemMetadata(t *testing.T) {
 	}
 	if item.VisualVariant != "flying" {
 		t.Errorf("visual variant = %q, want flying", item.VisualVariant)
+	}
+	if len(item.BehaviorTimers) != 1 || item.BehaviorTimers[0].RemainingTicks != 60 {
+		t.Errorf("behavior timers = %+v, want countdown with 60 ticks remaining", item.BehaviorTimers)
 	}
 }
 

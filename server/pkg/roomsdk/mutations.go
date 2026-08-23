@@ -22,6 +22,7 @@ var (
 	errDefinitionMismatch = errors.New("canonical state definition does not match the durable item")
 	errInvalidBehavior    = errors.New("canonical behavior state is not valid json")
 	errNormalizationFlag  = errors.New("checkpoint final flag does not match snapshot normalization")
+	errInvalidTimer       = errors.New("checkpoint contains invalid behavior timer state")
 )
 
 // handleDurableCommand enforces ownership before the command reaches the

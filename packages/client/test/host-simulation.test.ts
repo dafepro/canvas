@@ -523,6 +523,63 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("restores the remaining behavior timer across active host migration", () => {
+    const simulation = build();
+    const snapshot = {
+      schemaVersion: 1,
+      canvasId: rocketCanvas.id,
+      canvasVersion: rocketCanvas.version,
+      sceneRevision: 9,
+      hostEpoch: 6,
+      checkpointRevision: 43,
+      tick: 400,
+      capturedAt: new Date().toISOString(),
+      normalized: false,
+      items: [
+        {
+          entityId: "rocket-1",
+          definitionId: rocketDefinition.definitionId,
+          definitionVersion: rocketDefinition.version,
+          ownerUserId: "alice",
+          transform: { x: 70, y: 62, rotation: 0 },
+          resolvedConfig: resolveItemConfig(
+            rocketDefinition as ItemDefinition<Record<string, unknown>>,
+            {
+              width: rocketCanvas.size.width,
+              height: rocketCanvas.size.height,
+              orientation: rocketCanvas.orientation,
+            },
+          ),
+          behaviorState: {
+            phase: "arming" as const,
+            armedAtTick: 280,
+            countdownTicks: 180,
+            qualifyingContacts: 1,
+            thrustTicksRemaining: 0,
+            launchCount: 0,
+          },
+          behaviorStateVersion: 1,
+          behaviorTimers: [
+            { key: "countdown", elapsedTicks: 120, remainingTicks: 2 },
+          ],
+          visualVariant: "arming",
+        },
+      ],
+    };
+
+    simulation.loadSnapshot(snapshot, false);
+    simulation.step();
+    expect(simulation.behaviors.slot("rocket-1")?.state).toMatchObject({
+      phase: "arming",
+    });
+    simulation.step();
+    expect(simulation.behaviors.slot("rocket-1")?.state).toMatchObject({
+      phase: "flying",
+      launchCount: 1,
+    });
+    simulation.free();
+  });
+
   it("reports only the entities whose transform changed", () => {
     const simulation = build();
     simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));

@@ -5,6 +5,7 @@ import {
   SimulationDriver,
   avatarEntityId,
   crateDefinition,
+  rocketDefinition,
   rocketCanvasDefinitions,
   type InputIntent,
   type RenderEntity,
@@ -162,6 +163,52 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
         return migrated !== undefined && distance(migrated, beforeMigration) < 2;
       },
       20_000,
+    );
+  }, 90_000);
+
+  it("resumes a timer-driven workflow on the replacement host", async () => {
+    const alice = session("alice");
+    await alice.start();
+    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+
+    const bob = session("bob");
+    await bob.start();
+    await waitFor("bob to receive host state", () => view(bob).length > 0);
+
+    // The local avatar spawns around x=50, so the rocket's arm sensor sees it.
+    alice.spawnItem(rocketDefinition.definitionId, { x: 50, y: 62 });
+    await waitFor(
+      "the rocket countdown to arm",
+      () =>
+        items(alice).some(
+          (item) =>
+            item.definitionId === rocketDefinition.definitionId &&
+            (item.behaviorState as { phase?: string } | undefined)?.phase === "arming",
+        ),
+      10_000,
+    );
+    // Cross a periodic checkpoint boundary, but disconnect before the
+    // three-second countdown can complete on the old host.
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    expect(
+      items(alice).find((item) => item.definitionId === rocketDefinition.definitionId)
+        ?.behaviorState,
+    ).toMatchObject({ phase: "arming", launchCount: 0 });
+
+    alice.stop();
+    await waitFor("bob to become host", () => bob.client.isHost);
+    await waitFor(
+      "the replacement host to finish the restored countdown",
+      () => {
+        const rocket = items(bob).find(
+          (item) => item.definitionId === rocketDefinition.definitionId,
+        );
+        const state = rocket?.behaviorState as
+          | { phase?: string; launchCount?: number }
+          | undefined;
+        return state?.phase === "flying" && state.launchCount === 1;
+      },
+      6_000,
     );
   }, 90_000);
 

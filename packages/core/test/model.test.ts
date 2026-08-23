@@ -160,6 +160,24 @@ describe("validation", () => {
     }));
     expect(validateSnapshot(snapshot, canvas).ok).toBe(false);
   });
+
+  it("refuses invalid active timer state in a snapshot", () => {
+    const snapshot = emptySnapshot(canvas.id, canvas.version);
+    snapshot.normalized = false;
+    snapshot.items = [{
+      entityId: "rocket-1",
+      definitionId: "rocket",
+      definitionVersion: 1,
+      ownerUserId: "u1",
+      transform: { x: 50, y: 35, rotation: 0 },
+      resolvedConfig: {},
+      behaviorTimers: [{ key: "countdown", elapsedTicks: 20, remainingTicks: 0 }],
+    }];
+    expect(validateSnapshot(snapshot, canvas)).toMatchObject({
+      ok: false,
+      problems: [expect.objectContaining({ path: expect.stringContaining("remainingTicks") })],
+    });
+  });
 });
 
 describe("EntityRegistry", () => {

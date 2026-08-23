@@ -505,6 +505,19 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 		if !r.withinBounds(item.Transform) {
 			return errOutOfBounds
 		}
+		if incoming.Normalized && len(item.BehaviorTimers) > 0 {
+			return errInvalidTimer
+		}
+		if len(item.BehaviorTimers) > 64 {
+			return errInvalidTimer
+		}
+		const maxSafeInteger = uint64(1<<53 - 1)
+		for _, timer := range item.BehaviorTimers {
+			if timer.Key == "" || len(timer.Key) > 128 || timer.RemainingTicks == 0 ||
+				timer.ElapsedTicks > maxSafeInteger || timer.RemainingTicks > maxSafeInteger {
+				return errInvalidTimer
+			}
+		}
 	}
 
 	// The host owns canonical physics and behavior outcomes, but durable item
@@ -516,6 +529,7 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 		stored.Transform = item.Transform
 		stored.BehaviorState = item.BehaviorState
 		stored.BehaviorStateVer = item.BehaviorStateVer
+		stored.BehaviorTimers = item.BehaviorTimers
 		stored.VisualVariant = item.VisualVariant
 	}
 

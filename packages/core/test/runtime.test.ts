@@ -150,6 +150,22 @@ describe("TimerService", () => {
     expect(runtime.timers.pending).toBe(0);
   });
 
+  it("captures and restores elapsed and remaining ticks for host migration", () => {
+    const first = build30().runtime;
+    first.timers.schedule("a", "countdown", 2, 100);
+    const snapshot = first.timers.snapshot("a", 130);
+    expect(snapshot).toEqual([
+      { key: "countdown", elapsedTicks: 30, remainingTicks: 30 },
+    ]);
+
+    const second = build30().runtime;
+    second.timers.restore("a", snapshot, 500);
+    expect(second.timers.collectDue(529)).toHaveLength(0);
+    expect(second.timers.collectDue(530)).toEqual([
+      expect.objectContaining({ key: "countdown", elapsedTicks: 60 }),
+    ]);
+  });
+
   function build30() {
     const registry = new BehaviorRegistry().register(Recorder);
     const runtime = new BehaviorRuntime(registry, new BehaviorTestHost(), canvas, 30);

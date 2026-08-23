@@ -111,8 +111,11 @@ crashed tab sends no event.
 
 An active host migration resumes the checkpoint tick and checkpointed behavior
 state without emitting `room.wake`. The promoted peer seeds avatars from the
-last canonical keyframe/delta positions it received. A true sleeping-room wake
-is marked separately and does emit `room.wake` so transient workflows reset.
+last canonical keyframe/delta positions it received. Periodic active checkpoints
+carry behavior timers as elapsed and remaining ticks, allowing a replacement
+host to rebuild them against the resumed canonical tick. A true sleeping-room
+wake is marked separately, contains no active timers, and emits `room.wake` so
+transient workflows reset.
 
 ## Durable versus canonical
 

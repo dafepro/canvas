@@ -66,6 +66,13 @@ export class HostSimulation {
       if (item.visualVariant) {
         this.world.setSpriteVariant(item.entityId, item.visualVariant);
       }
+      if (!wakeFromSleep && item.behaviorTimers?.length) {
+        this.behaviors.timers.restore(
+          item.entityId,
+          item.behaviorTimers,
+          snapshot.tick,
+        );
+      }
     }
     // A sleeping room resets transient workflows. An active host migration
     // resumes the checkpointed state without masquerading as a room wake.
@@ -174,6 +181,13 @@ export class HostSimulation {
       if (slot && persistence?.behaviorState) {
         item.behaviorState = slot.state;
         item.behaviorStateVersion = slot.stateVersion;
+        if (!normalized) {
+          const timers = this.behaviors.timers.snapshot(
+            entity.id,
+            this.world.currentTick,
+          );
+          if (timers.length > 0) item.behaviorTimers = timers;
+        }
       }
       if (entity.render?.variant) item.visualVariant = entity.render.variant;
       items.push(item);

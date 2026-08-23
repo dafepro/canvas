@@ -30,8 +30,16 @@ export interface SnapshotItem {
   /** Present only when the item definition declares behaviorState durable. */
   behaviorState?: unknown;
   behaviorStateVersion?: number;
+  /** Active timers used only to resume a live host migration. */
+  behaviorTimers?: BehaviorTimerSnapshot[];
   /** Persistent visual variant needed to rebuild the item. */
   visualVariant?: string;
+}
+
+export interface BehaviorTimerSnapshot {
+  key: string;
+  elapsedTicks: number;
+  remainingTicks: number;
 }
 
 export const emptySnapshot = (
