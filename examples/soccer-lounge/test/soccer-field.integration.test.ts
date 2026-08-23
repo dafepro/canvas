@@ -59,6 +59,19 @@ describe("soccer field integration", () => {
     expect(soccerBallJson.behaviorType).toBe(SoccerBallBehavior.behaviorType);
     expect(soccerBallJson.visual).toEqual(soccerBallDefinition.visual);
     expect(soccerGoalJson.visual).toEqual(soccerGoalDefinition.visual);
+    expect(soccerBallDefinition.visual.size).toEqual({ width: 6, height: 6 });
+    expect(soccerBallDefinition.body.lockRotation).not.toBe(true);
+    expect(soccerBallDefinition.colliders[0]?.shape).toEqual({
+      type: "circle",
+      radius: 3,
+    });
+    expect(soccerGoalDefinition.visual.size).toEqual({ width: 10, height: 22 });
+    expect(soccerAssets.textures.find(({ id }) => id === "soccer.goal.net")?.frame).toEqual({
+      x: 121,
+      y: 62,
+      width: 612,
+      height: 1642,
+    });
     expect(
       validateAssetReferences(soccerAssets, canvas, [
         soccerBallDefinition,
@@ -73,6 +86,19 @@ describe("soccer field integration", () => {
       { entityId: "left-goal", x: 5, y: 36, rotation: 0 },
       { entityId: "right-goal", x: 115, y: 36, rotation: Math.PI },
     ]);
+  });
+
+  it("preserves ball spin after an off-centre hit", () => {
+    const simulation = build();
+    simulation.addItem(instance(60, 36));
+    simulation.world.setVelocity("match-ball", { x: 8, y: 0 }, 12);
+
+    for (let tick = 0; tick < 12; tick++) simulation.step();
+
+    const ball = simulation.world.registry.require("match-ball");
+    expect(Math.abs(ball.transform.rotation)).toBeGreaterThan(0.1);
+    expect(Math.abs(ball.rigidBody?.angularVelocity ?? 0)).toBeGreaterThan(0.1);
+    simulation.free();
   });
 
   it("blocks the ball at a touchline", () => {
@@ -139,6 +165,17 @@ describe("soccer field integration", () => {
     expect(canvas.staticGeometry.map(({ id }) => id)).toEqual(
       expect.arrayContaining(["left-goal-backstop", "right-goal-backstop"]),
     );
+    expect(canvas.staticGeometry.find(({ id }) => id === "left-goal-roof")).toMatchObject({
+      shape: { type: "rect", width: 10, height: 1 },
+      position: { x: 5, y: 24.5 },
+    });
+    expect(canvas.regions.find(({ id }) => id === "left-goal")?.shape).toEqual({
+      type: "rect",
+      x: 0.5,
+      y: 25,
+      w: 9.5,
+      h: 22,
+    });
     simulation.free();
   });
 });

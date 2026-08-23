@@ -1,6 +1,6 @@
 {
   "id": "soccer-lounge",
-  "version": 3,
+  "version": 4,
   "size": { "width": 120, "height": 80 },
   "orientation": "topDown",
   "backgroundAssetId": "soccer-field",
@@ -30,63 +30,63 @@
     },
     {
       "id": "left-goal-line-top",
-      "shape": { "type": "rect", "width": 1, "height": 23 },
-      "position": { "x": 9.5, "y": 17.5 },
+      "shape": { "type": "rect", "width": 1, "height": 19 },
+      "position": { "x": 9.5, "y": 15.5 },
       "tags": ["pitchBoundary"],
       "restitution": 0.72
     },
     {
       "id": "left-goal-line-bottom",
-      "shape": { "type": "rect", "width": 1, "height": 23 },
-      "position": { "x": 9.5, "y": 54.5 },
+      "shape": { "type": "rect", "width": 1, "height": 19 },
+      "position": { "x": 9.5, "y": 56.5 },
       "tags": ["pitchBoundary"],
       "restitution": 0.72
     },
     {
       "id": "right-goal-line-top",
-      "shape": { "type": "rect", "width": 1, "height": 23 },
-      "position": { "x": 110.5, "y": 17.5 },
+      "shape": { "type": "rect", "width": 1, "height": 19 },
+      "position": { "x": 110.5, "y": 15.5 },
       "tags": ["pitchBoundary"],
       "restitution": 0.72
     },
     {
       "id": "right-goal-line-bottom",
-      "shape": { "type": "rect", "width": 1, "height": 23 },
-      "position": { "x": 110.5, "y": 54.5 },
+      "shape": { "type": "rect", "width": 1, "height": 19 },
+      "position": { "x": 110.5, "y": 56.5 },
       "tags": ["pitchBoundary"],
       "restitution": 0.72
     },
     {
       "id": "left-goal-roof",
-      "shape": { "type": "rect", "width": 9, "height": 1 },
-      "position": { "x": 5.5, "y": 28.5 },
+      "shape": { "type": "rect", "width": 10, "height": 1 },
+      "position": { "x": 5, "y": 24.5 },
       "tags": ["goalFrame", "leftGoal"],
       "restitution": 0.55
     },
     {
       "id": "left-goal-floor",
-      "shape": { "type": "rect", "width": 9, "height": 1 },
-      "position": { "x": 5.5, "y": 43.5 },
+      "shape": { "type": "rect", "width": 10, "height": 1 },
+      "position": { "x": 5, "y": 47.5 },
       "tags": ["goalFrame", "leftGoal"],
       "restitution": 0.55
     },
     {
       "id": "right-goal-roof",
-      "shape": { "type": "rect", "width": 9, "height": 1 },
-      "position": { "x": 114.5, "y": 28.5 },
+      "shape": { "type": "rect", "width": 10, "height": 1 },
+      "position": { "x": 115, "y": 24.5 },
       "tags": ["goalFrame", "rightGoal"],
       "restitution": 0.55
     },
     {
       "id": "right-goal-floor",
-      "shape": { "type": "rect", "width": 9, "height": 1 },
-      "position": { "x": 114.5, "y": 43.5 },
+      "shape": { "type": "rect", "width": 10, "height": 1 },
+      "position": { "x": 115, "y": 47.5 },
       "tags": ["goalFrame", "rightGoal"],
       "restitution": 0.55
     },
     {
       "id": "left-goal-backstop",
-      "shape": { "type": "rect", "width": 1, "height": 16 },
+      "shape": { "type": "rect", "width": 1, "height": 24 },
       "position": { "x": 0.5, "y": 36 },
       "tags": ["goalFrame", "leftGoal", "backstop"],
       "restitution": 0.35,
@@ -94,7 +94,7 @@
     },
     {
       "id": "right-goal-backstop",
-      "shape": { "type": "rect", "width": 1, "height": 16 },
+      "shape": { "type": "rect", "width": 1, "height": 24 },
       "position": { "x": 119.5, "y": 36 },
       "tags": ["goalFrame", "rightGoal", "backstop"],
       "restitution": 0.35,
@@ -104,13 +104,13 @@
   "regions": [
     {
       "id": "left-goal",
-      "shape": { "type": "rect", "x": 0.5, "y": 29, "w": 9.5, "h": 14 },
+      "shape": { "type": "rect", "x": 0.5, "y": 25, "w": 9.5, "h": 22 },
       "tags": ["goal", "leftGoal"],
       "emitEvents": true
     },
     {
       "id": "right-goal",
-      "shape": { "type": "rect", "x": 110, "y": 29, "w": 9.5, "h": 14 },
+      "shape": { "type": "rect", "x": 110, "y": 25, "w": 9.5, "h": 22 },
       "tags": ["goal", "rightGoal"],
       "emitEvents": true
     }
@@ -126,7 +126,7 @@
     "regions": [
       {
         "id": "left-net-damping",
-        "shape": { "type": "rect", "x": 0.5, "y": 29, "w": 7.5, "h": 14 },
+        "shape": { "type": "rect", "x": 0.5, "y": 25, "w": 7.5, "h": 22 },
         "blend": "step",
         "priority": 10,
         "linearDrag": 3.5,
@@ -135,7 +135,7 @@
       },
       {
         "id": "right-net-damping",
-        "shape": { "type": "rect", "x": 112, "y": 29, "w": 7.5, "h": 14 },
+        "shape": { "type": "rect", "x": 112, "y": 25, "w": 7.5, "h": 22 },
         "blend": "step",
         "priority": 10,
         "linearDrag": 3.5,
@@ -154,7 +154,7 @@
     {
       "entityId": "match-ball",
       "definitionId": "soccer-ball",
-      "definitionVersion": 2,
+      "definitionVersion": 3,
       "transform": { "x": 60, "y": 36, "rotation": 0 },
       "resolvedConfig": {
         "sensorId": "kick",
@@ -170,14 +170,14 @@
     {
       "entityId": "left-goal",
       "definitionId": "soccer-goal",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "transform": { "x": 5, "y": 36, "rotation": 0 },
       "resolvedConfig": {}
     },
     {
       "entityId": "right-goal",
       "definitionId": "soccer-goal",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "transform": { "x": 115, "y": 36, "rotation": 3.141592653589793 },
       "resolvedConfig": {}
     }

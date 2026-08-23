@@ -4,7 +4,7 @@ import type { AssetManifest } from "@canvas-physics/client";
 export const soccerAssets: AssetManifest = {
   schemaVersion: 1,
   id: "soccer-lounge",
-  revision: "2026-08-23.2",
+  revision: "2026-08-23.3",
   sources: [
     { id: "field-art", src: "/soccer-field.svg", required: true },
     {
@@ -20,7 +20,12 @@ export const soccerAssets: AssetManifest = {
   ],
   textures: [
     { id: "soccer-field", sourceId: "field-art" },
-    { id: "soccer.goal.net", sourceId: "goal-net-art" },
+    {
+      id: "soccer.goal.net",
+      sourceId: "goal-net-art",
+      // Crop to opaque content so the front post lands exactly on the goal line.
+      frame: { x: 121, y: 62, width: 612, height: 1642 },
+    },
     {
       id: "soccer.ball.idle",
       sourceId: "ball-impact-atlas",

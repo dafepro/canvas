@@ -24,6 +24,10 @@ downward. Check an item only after the relevant focused tests pass.
 - [x] Move example art onto the versioned Canvas asset-manifest/preload pipeline.
   The soccer field and generated ball atlas now load as ordinary consumer-owned
   assets; collision geometry remains independent data.
+- [ ] Specify and tune avatar-to-item tangential contact for sports integrations.
+  The soccer ball should keep physically expressive spin, while consumers can
+  tune angular impulse and verify that simulation and renderer rotation signs
+  produce intuitive glancing kicks without forking Canvas.
 
 ## Consumer-library Priority 0 — current structural blockers
 

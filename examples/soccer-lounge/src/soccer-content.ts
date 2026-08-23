@@ -6,11 +6,11 @@ import {
 
 export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
   definitionId: "soccer-ball",
-  version: 2,
+  version: 3,
   displayName: "Match ball",
   visual: {
     spriteId: "soccer.ball.idle",
-    size: { width: 3.3, height: 3.3 },
+    size: { width: 6, height: 6 },
     placeholder: { shape: "circle", color: 0xf7f4e9 },
     zIndex: 6,
     variants: {
@@ -42,7 +42,7 @@ export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
     {
       id: "solid",
       role: "itemSolid",
-      shape: { type: "circle", radius: 1.65 },
+      shape: { type: "circle", radius: 3 },
       restitution: 0.9,
       friction: 0.2,
       collisionMask: 0b0000_1100,
@@ -50,7 +50,7 @@ export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
     {
       id: "kick",
       role: "itemSensor",
-      shape: { type: "circle", radius: 2.55 },
+      shape: { type: "circle", radius: 4.2 },
     },
   ],
   behaviorType: "soccerBall",
@@ -66,11 +66,11 @@ export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
 /** Decorative room-owned goal. Collision stays in the canvas definition. */
 export const soccerGoalDefinition: ItemDefinition<Record<string, never>> = {
   definitionId: "soccer-goal",
-  version: 1,
+  version: 2,
   displayName: "Goal and net",
   visual: {
     spriteId: "soccer.goal.net",
-    size: { width: 9, height: 14 },
+    size: { width: 10, height: 22 },
     anchor: { x: 0.5, y: 0.5 },
     zIndex: 3,
   },

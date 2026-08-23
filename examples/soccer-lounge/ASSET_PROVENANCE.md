@@ -30,26 +30,35 @@ physics.
 ## Goal and net
 
 `public/assets/soccer-goal-net.png` was generated with OpenAI image generation
-on 2026-08-23. It is a transparent portrait sprite used by both room-owned goal
-items; the right-side item rotates the same texture 180 degrees.
+on 2026-08-23. It is an 860×1828 transparent portrait sprite used by both
+room-owned goal items; the right-side item rotates the same texture 180
+degrees. The asset manifest crops its alpha content to pixels
+`121,62–732,1703`, making the front post the exact outer texture edge that is
+placed on the configured goal line.
 
-Final generation prompt:
+Final composition prompt:
 
-> Use case: stylized-concept. Asset type: top-down 2D multiplayer game
-> environment sprite with transparent alpha. Primary request: create one
-> shallow soccer goal and net viewed directly from above, for a top-down soccer
-> field; overall physical footprint is 9 units deep horizontally by 14 units
-> tall vertically. Scene/backdrop: GENUINELY TRANSPARENT ALPHA, not a
-> checkerboard pattern and not a colored backdrop. Subject: a single white
-> metal goal; open goal mouth on the RIGHT side spanning the tall vertical
-> dimension; shallow net extends backward toward the LEFT to a rear frame; taut
-> white mesh connects the front posts to the rear frame. Style/medium: polished
-> clean 2D game sprite, subtle hand-painted shading, crisp orthographic overhead
-> silhouette. Composition/framing: portrait-oriented image and object footprint,
-> approximately 9:14 width-to-height; full goal centered with modest transparent
-> padding; exact direct top-down view suitable for 180-degree rotation for the
-> opposite goal. Color palette: off-white posts, pale gray net cord, restrained
-> cool-gray shading. Constraints: real transparent alpha; exactly one goal;
-> shallow net depth; tall goal mouth; no checkerboard; no grass; no field; no
-> ball; no players; no text; no logos; no watermark; no perspective tilt; no
-> background; no extra objects.
+> Create a 3D orthographic PLAN-VIEW render of one soccer goal for an overhead
+> video game. The camera looks almost straight down at the goal from the sky,
+> tilted only 15 degrees toward the pitch. The goal must appear as a shallow
+> rectangular/trapezoidal footprint, approximately 10 units wide horizontally
+> by 22 units tall vertically in the portrait image—not as a tall upright
+> front-facing rectangle. Think architectural roof plan or drone view: the roof
+> net fills the shallow rectangle; the front crossbar/uprights rise only
+> slightly and are visible as a small 3D offset. Layout coordinates: a perfectly
+> straight vertical front goal-line frame near the RIGHT edge from y=10% to
+> y=90%; a parallel rear frame near the LEFT edge; short top and bottom side
+> frames connect them; netting spans the roof and rear. Opening faces RIGHT.
+> White metal tubes and white net, polished but readable game art, orthographic
+> projection, no shadow. Place the isolated goal on a uniform saturated
+> royal-blue chroma-key background (#0000FF) with no texture, gradient,
+> checkerboard, field, ball, players, text, or logo. Large object, clean margins.
+
+Final transparency pass:
+
+> Preserve the soccer goal object, its exact overhead 15-degree camera angle,
+> dimensions, framing, white posts, and net. Remove only the saturated
+> royal-blue chroma background and replace it with true RGBA transparency. Clean
+> any blue spill from the white edges. Do not add, remove, rotate, redraw, crop,
+> or change the goal. No checkerboard pattern, shadow, field, or new background.
+> The PNG pixels outside the goal must have alpha 0.

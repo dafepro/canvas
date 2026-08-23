@@ -1,10 +1,10 @@
 {
   "definitionId": "soccer-ball",
-  "version": 2,
+  "version": 3,
   "displayName": "Match ball",
   "visual": {
     "spriteId": "soccer.ball.idle",
-    "size": { "width": 3.3, "height": 3.3 },
+    "size": { "width": 6, "height": 6 },
     "placeholder": { "shape": "circle", "color": 16250089 },
     "zIndex": 6,
     "variants": {
@@ -36,7 +36,7 @@
     {
       "id": "solid",
       "role": "itemSolid",
-      "shape": { "type": "circle", "radius": 1.65 },
+      "shape": { "type": "circle", "radius": 3 },
       "restitution": 0.9,
       "friction": 0.2,
       "collisionMask": 12
@@ -44,7 +44,7 @@
     {
       "id": "kick",
       "role": "itemSensor",
-      "shape": { "type": "circle", "radius": 2.55 }
+      "shape": { "type": "circle", "radius": 4.2 }
     }
   ],
   "behaviorType": "soccerBall",
