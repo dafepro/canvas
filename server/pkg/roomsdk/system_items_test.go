@@ -3,6 +3,7 @@ package roomsdk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	pb "github.com/dafepro/canvas/server/gen/canvasphysicsv1"
@@ -85,5 +86,140 @@ func TestRoomRejectsInvalidSystemItemConfig(t *testing.T) {
 
 	if _, err := h.server.roomFor(context.Background(), "test-canvas"); err == nil {
 		t.Fatal("roomFor accepted an invalid system item config")
+	}
+}
+
+func TestReconcileRoomTemplateExplicitlyAddsReplacesAndRetiresSystemItems(t *testing.T) {
+	h := newHarness(t, nil)
+	h.store.PutItemDefinition(ItemDefinitionRecord{
+		DefinitionID: "rocket",
+		Version:      2,
+		Complexity:   ItemComplexitySimple,
+		ConfigSchema: json.RawMessage(`{
+			"type":"object",
+			"properties":{"thrust":{"type":"number"}},
+			"required":["thrust"],
+			"additionalProperties":false
+		}`),
+	})
+	var definition map[string]any
+	if err := json.Unmarshal([]byte(canvasWithSystemItemJSON), &definition); err != nil {
+		t.Fatal(err)
+	}
+	definition["version"] = float64(2)
+	definition["limits"].(map[string]any)["maxItems"] = float64(5)
+	definition["systemItems"] = []any{
+		map[string]any{
+			"entityId": "match-ball", "definitionId": "rocket",
+			"definitionVersion": float64(2),
+			"transform":         map[string]any{"x": float64(60), "y": float64(35), "rotation": float64(0)},
+			"resolvedConfig":    map[string]any{"thrust": float64(24)},
+		},
+		map[string]any{
+			"entityId": "scoreboard", "definitionId": "rocket",
+			"definitionVersion": float64(2),
+			"transform":         map[string]any{"x": float64(50), "y": float64(5), "rotation": float64(0)},
+			"resolvedConfig":    map[string]any{"thrust": float64(0)},
+		},
+	}
+	definitionRaw, err := json.Marshal(definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.store.PutCanvas(CanvasRecord{
+		CanvasID: "test-canvas", Version: 2, DefinitionRaw: definitionRaw,
+	})
+
+	snapshot := CanvasSnapshot{
+		SchemaVersion: 1, CanvasID: "test-canvas", CanvasVersion: 1,
+		SceneRevision: 7, CheckpointRevision: 11, HostEpoch: 3, Tick: 90,
+		CapturedAt: "2026-01-01T00:00:00Z", Normalized: true,
+		Items: []SnapshotItem{
+			{
+				EntityID: "match-ball", DefinitionID: "rocket", DefinitionVersion: 1,
+				Transform: Transform{X: 40, Y: 35}, ResolvedConfig: json.RawMessage(`{"thrust":12}`),
+				BehaviorState: json.RawMessage(`{"old":true}`),
+			},
+			{
+				EntityID: "old-banner", DefinitionID: "rocket", DefinitionVersion: 1,
+				Transform: Transform{X: 10, Y: 10}, ResolvedConfig: json.RawMessage(`{"thrust":0}`),
+			},
+			{
+				EntityID: "alice-crate", DefinitionID: "rocket", DefinitionVersion: 1,
+				OwnerUserID: "alice", Transform: Transform{X: 20, Y: 20},
+				ResolvedConfig: json.RawMessage(`{"thrust":8}`),
+			},
+		},
+	}
+	snapshotRaw, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SaveSnapshot(context.Background(), SnapshotRecord{
+		CanvasID: "test-canvas", SceneRevision: 7, CheckpointRevision: 11,
+		HostEpoch: 3, Tick: 90, Normalized: true, SnapshotRaw: snapshotRaw,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas", TemplateReconcileOptions{
+		ExpectedCanvasVersion:    1,
+		AddMissingSystemItems:    true,
+		ReplaceSystemItems:       true,
+		RetireMissingSystemItems: true,
+	})
+	if err != nil {
+		t.Fatalf("ReconcileRoomTemplate: %v", err)
+	}
+	if !result.Changed || result.CanvasVersion != 2 || result.SceneRevision != 8 {
+		t.Fatalf("result = %#v", result)
+	}
+	if len(result.Added) != 1 || result.Added[0] != "scoreboard" ||
+		len(result.Replaced) != 1 || result.Replaced[0] != "match-ball" ||
+		len(result.Retired) != 1 || result.Retired[0] != "old-banner" {
+		t.Fatalf("operations = %#v", result)
+	}
+
+	stored, err := h.store.LoadSnapshot(context.Background(), "test-canvas")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reconciled CanvasSnapshot
+	if err := json.Unmarshal(stored.SnapshotRaw, &reconciled); err != nil {
+		t.Fatal(err)
+	}
+	if reconciled.CanvasVersion != 2 || reconciled.CheckpointRevision != 12 || len(reconciled.Items) != 3 {
+		t.Fatalf("snapshot = %#v", reconciled)
+	}
+	items := make(map[string]SnapshotItem)
+	for _, item := range reconciled.Items {
+		items[item.EntityID] = item
+	}
+	if items["alice-crate"].OwnerUserID != "alice" {
+		t.Fatal("participant-owned item changed")
+	}
+	if items["match-ball"].DefinitionVersion != 2 || items["match-ball"].Transform.X != 60 ||
+		len(items["match-ball"].BehaviorState) != 0 {
+		t.Fatalf("replacement = %#v", items["match-ball"])
+	}
+	if _, ok := items["old-banner"]; ok {
+		t.Fatal("retired system item remains")
+	}
+	if _, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas", TemplateReconcileOptions{
+		ExpectedCanvasVersion: 1,
+	}); !errors.Is(err, ErrCanvasVersionConflict) {
+		t.Fatalf("stale version error = %v, want ErrCanvasVersionConflict", err)
+	}
+}
+
+func TestReconcileRoomTemplateRejectsAwakeRooms(t *testing.T) {
+	h := newHarness(t, nil)
+	if _, err := h.server.roomFor(context.Background(), "test-canvas"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.server.ReconcileRoomTemplate(context.Background(), "test-canvas", TemplateReconcileOptions{
+		ExpectedCanvasVersion: 1,
+	}); !errors.Is(err, ErrRoomAwake) {
+		t.Fatalf("awake error = %v, want ErrRoomAwake", err)
 	}
 }

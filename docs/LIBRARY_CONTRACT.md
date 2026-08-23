@@ -53,9 +53,11 @@ canvas limits, and gives them no participant owner. Participant durable move,
 rotate, reconfigure, and delete commands therefore reject them as
 `system_owned`. Physics and behavior commands still affect them normally.
 
-Template items are definition data, not a compatibility or migration mechanism.
+Template items are definition data, not an implicit migration mechanism.
 Changing a template requires a new canvas version and coordinated consumer
-release; an existing room continues from its canonical snapshot.
+release; an existing room continues from its canonical snapshot unless the
+host application explicitly reconciles that sleeping room with the policies in
+`docs/ROOM_TEMPLATE_RECONCILIATION.md`.
 
 ## Related contracts
 
