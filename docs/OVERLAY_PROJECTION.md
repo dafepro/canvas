@@ -36,7 +36,7 @@ It returns immutable world/screen coordinates plus canvas/viewport containment,
 or `undefined` before the scene is mounted. The pure `projectOverlayPoint`
 helper supports consumer-owned renderer adapters using the same value contract.
 
-The soccer lounge's DOM `Match ball` marker is the reference integration. It
-filters to the ball definition, requests one entity at 10 Hz, and positions the
-HTML element without importing or inspecting Pixi.
-
+The soccer lounge's opt-in `?overlay=1` DOM `Match ball` marker is the reference
+integration. It filters to the ball definition, requests one entity at 10 Hz,
+and positions the HTML element without importing or inspecting Pixi. The marker
+is deliberately absent from the normal lounge experience.
