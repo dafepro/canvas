@@ -97,32 +97,35 @@ same simulation in the test process.
 | NaN and out-of-bounds protection, item quarantine | Done. A NaN value and a body more than one canvas width outside the canvas are both quarantined. |
 | Definition and protocol compatibility checks | Done. The client declares its item definitions on join. A client that lacks a definition the scene uses, or holds an older version, receives a `definition_mismatch` refusal and loses the host lease. |
 | Asset preloading and reconnect behavior | Partly done. The transport reconnects with backoff, and a client that reconnects no longer keeps a host role the room gave to somebody else. There is no asset preload step, because the renderer draws placeholder shapes only. |
-| Exit criterion: the scene stays responsive and recoverable at the room limits | Met for the simulation and the repair path. Not met for the network budget in a busy scene; see the measurement below. |
+| Fixed-point realtime transforms | Done. Position and linear velocity use 1/100-unit precision; rotation and angular velocity use 1/1000-radian precision. The prerelease protocol has no float-transform compatibility path. |
+| Exit criterion: the scene stays responsive and recoverable at the room limits | Met for the simulation and the repair path. Busy-scene traffic is lower after quantization but remains above the network guidance; see the measurement below. |
 
 ### The measured room, 20 avatars and 50 items
 
 The load test reports these numbers. They come from one developer machine, so
 read them as a baseline for a change, not as a device target.
 
-| Window | Inbound to one peer | Note |
-| --- | --- | --- |
-| Items at rest, avatars still | 12.9 KB/s | Inside the 20 KB/s guidance of spec 19.3. |
-| Items at rest, avatars moving | 47.4 KB/s | Above the guidance. |
-| Every item falling | 46.3 KB/s | Above the guidance. |
+| Window | Float baseline | Fixed point | Change |
+| --- | ---: | ---: | ---: |
+| Items at rest, avatars still | 15.2 KB/s | 13.4 KB/s | -11.8% |
+| Items at rest, avatars moving | 46.4 KB/s | 37.1 KB/s | -20.0% |
+| Every item falling | 41.6 KB/s | 32.7 KB/s | -21.4% |
 
-The host held 59.8 Hz with a worst step of 1.00 ms and 129 active colliders,
+The quantized run held 60.2 Hz with a worst step of 0.88 ms and 127 active colliders,
 inside the 150 collider budget of spec 19.1.
 
 Spec 19.3 states the 20 KB/s figure for a scene with "only avatars and a handful
 of moving items". A room where 20 avatars push a pile of 50 items is above it.
-Four changes already cut the cost: a resting body now sleeps, a delta carries
+Four earlier changes cut the cost: a resting body now sleeps, a delta carries
 only an entity that changed, the server names an item `i7` rather than
 `rocket-canvas-i7`, and a delta leaves out the definition id. Together they took
 the falling case from 73 KB/s to 46 KB/s.
 
-The next lever is transform quantization, which spec 19.2 rule 7 holds back
-until a measurement justifies it. This measurement justifies it. It is not
-done.
+Fixed-point transforms now reduce the transform-heavy state-delta portion from
+31.03 to 22.62 KB/s in the same full-churn scenario. The total remains above
+the 20 KB/s guidance because that scenario moves all 50 items and also includes
+keyframes, presence, durable results, and effects. The next step is profiling on
+representative devices before selecting another network or rendering tradeoff.
 
 ## Phase 7 — Optional WebRTC transport: not started
 

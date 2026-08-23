@@ -3,7 +3,6 @@ package roomsdk
 import (
 	"context"
 	"encoding/json"
-	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -401,7 +400,7 @@ func (r *Room) validateCanonicalState(envelope *pb.RoomEnvelope) error {
 func (r *Room) validateEntityStates(states []*pb.EntityState) error {
 	seen := make(map[string]struct{}, len(states))
 	for _, state := range states {
-		if state == nil || state.Position == nil || state.Velocity == nil {
+		if state == nil || state.QuantizedTransform == nil {
 			return errMissingStateVector
 		}
 		if _, duplicate := seen[state.EntityId]; duplicate {
@@ -420,26 +419,13 @@ func (r *Room) validateEntityStates(states []*pb.EntityState) error {
 			return errInvalidBehavior
 		}
 
-		values := []float64{
-			float64(state.Position.X),
-			float64(state.Position.Y),
-			float64(state.Rotation),
-			float64(state.Velocity.X),
-			float64(state.Velocity.Y),
-			float64(state.AngularVelocity),
-			float64(state.Z),
-			float64(state.Vz),
+		quantized := state.QuantizedTransform
+		transform := Transform{
+			X:        float64(quantized.X) / 100,
+			Y:        float64(quantized.Y) / 100,
+			Rotation: float64(quantized.Rotation) / 1000,
 		}
-		for _, value := range values {
-			if math.IsNaN(value) || math.IsInf(value, 0) {
-				return errNonFiniteTransform
-			}
-		}
-		if !r.withinBounds(Transform{
-			X:        float64(state.Position.X),
-			Y:        float64(state.Position.Y),
-			Rotation: float64(state.Rotation),
-		}) {
+		if !r.withinBounds(transform) {
 			return errOutOfBounds
 		}
 	}

@@ -121,12 +121,7 @@ message PlayerInput {
 
 message EntityState {
   string entity_id = 1;
-  Vec2 position = 2;
-  float rotation = 3;
-  Vec2 velocity = 4;
-  float angular_velocity = 5;
-  float z = 6;
-  float vz = 7;
+  QuantizedTransform quantized_transform = 2;
   // Set for avatars so the owner can reconcile its prediction.
   uint32 last_processed_input_sequence = 8;
   string sprite_variant = 9;
@@ -142,6 +137,21 @@ message EntityState {
   uint32 teleport_epoch = 14;
   // Addendum A3. True while the body waits out its respawn delay.
   bool respawning = 15;
+}
+
+message QuantizedTransform {
+  // Position and elevation use 1/100 canvas unit precision.
+  sint32 x = 1;
+  sint32 y = 2;
+  // Rotation uses 1/1000 radian precision.
+  sint32 rotation = 3;
+  // Linear velocity uses 1/100 canvas unit per second precision.
+  sint32 vx = 4;
+  sint32 vy = 5;
+  // Angular velocity uses 1/1000 radian per second precision.
+  sint32 angular_velocity = 6;
+  sint32 z = 7;
+  sint32 vz = 8;
 }
 
 message StateDelta {

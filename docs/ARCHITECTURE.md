@@ -151,6 +151,18 @@ canonical `SnapshotRecord` values in `FileStore`. Each save writes a new atomic,
 version-named JSON file and retains a previous version for recovery. The CLI
 reloads the newest valid record from `CANVASD_DATA_DIR` after a process restart.
 
+## Realtime transform encoding
+
+`EntityState` carries one fixed-point `QuantizedTransform`. Position, elevation,
+and linear velocity are signed integers at 1/100-unit precision. Rotation and
+angular velocity are signed integers at 1/1000-radian precision. This keeps the
+host's 15 Hz deltas compact while keeping maximum round-trip error at 0.005
+canvas units and 0.0005 radians.
+
+The wire protocol is prerelease: superseded transform fields are removed rather
+than decoded through a compatibility branch. The server rejects canonical state
+without the current transform message.
+
 ## Rates
 
 | Loop | Rate | Set in |

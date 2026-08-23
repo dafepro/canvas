@@ -228,12 +228,9 @@ export interface PlayerInput {
 
 export interface EntityState {
   entityId: string;
-  position?: Vec2 | undefined;
-  rotation: number;
-  velocity?: Vec2 | undefined;
-  angularVelocity: number;
-  z: number;
-  vz: number;
+  quantizedTransform?:
+    | QuantizedTransform
+    | undefined;
   /** Set for avatars so the owner can reconcile its prediction. */
   lastProcessedInputSequence: number;
   spriteVariant: string;
@@ -251,6 +248,21 @@ export interface EntityState {
   teleportEpoch: number;
   /** Addendum A3. True while the body waits out its respawn delay. */
   respawning: boolean;
+}
+
+export interface QuantizedTransform {
+  /** Position and elevation use 1/100 canvas unit precision. */
+  x: number;
+  y: number;
+  /** Rotation uses 1/1000 radian precision. */
+  rotation: number;
+  /** Linear velocity uses 1/100 canvas unit per second precision. */
+  vx: number;
+  vy: number;
+  /** Angular velocity uses 1/1000 radian per second precision. */
+  angularVelocity: number;
+  z: number;
+  vz: number;
 }
 
 export interface StateDelta {
@@ -2008,12 +2020,7 @@ export const PlayerInput: MessageFns<PlayerInput> = {
 function createBaseEntityState(): EntityState {
   return {
     entityId: "",
-    position: undefined,
-    rotation: 0,
-    velocity: undefined,
-    angularVelocity: 0,
-    z: 0,
-    vz: 0,
+    quantizedTransform: undefined,
     lastProcessedInputSequence: 0,
     spriteVariant: "",
     behaviorStateJson: new Uint8Array(0),
@@ -2030,23 +2037,8 @@ export const EntityState: MessageFns<EntityState> = {
     if (message.entityId !== "") {
       writer.uint32(10).string(message.entityId);
     }
-    if (message.position !== undefined) {
-      Vec2.encode(message.position, writer.uint32(18).fork()).join();
-    }
-    if (message.rotation !== 0) {
-      writer.uint32(29).float(message.rotation);
-    }
-    if (message.velocity !== undefined) {
-      Vec2.encode(message.velocity, writer.uint32(34).fork()).join();
-    }
-    if (message.angularVelocity !== 0) {
-      writer.uint32(45).float(message.angularVelocity);
-    }
-    if (message.z !== 0) {
-      writer.uint32(53).float(message.z);
-    }
-    if (message.vz !== 0) {
-      writer.uint32(61).float(message.vz);
+    if (message.quantizedTransform !== undefined) {
+      QuantizedTransform.encode(message.quantizedTransform, writer.uint32(18).fork()).join();
     }
     if (message.lastProcessedInputSequence !== 0) {
       writer.uint32(64).uint32(message.lastProcessedInputSequence);
@@ -2101,47 +2093,7 @@ export const EntityState: MessageFns<EntityState> = {
               break;
             }
 
-            message.position = Vec2.decode(reader, reader.uint32());
-            continue;
-          }
-          case 3: {
-            if (tag !== 29) {
-              break;
-            }
-
-            message.rotation = reader.float();
-            continue;
-          }
-          case 4: {
-            if (tag !== 34) {
-              break;
-            }
-
-            message.velocity = Vec2.decode(reader, reader.uint32());
-            continue;
-          }
-          case 5: {
-            if (tag !== 45) {
-              break;
-            }
-
-            message.angularVelocity = reader.float();
-            continue;
-          }
-          case 6: {
-            if (tag !== 53) {
-              break;
-            }
-
-            message.z = reader.float();
-            continue;
-          }
-          case 7: {
-            if (tag !== 61) {
-              break;
-            }
-
-            message.vz = reader.float();
+            message.quantizedTransform = QuantizedTransform.decode(reader, reader.uint32());
             continue;
           }
           case 8: {
@@ -2227,16 +2179,11 @@ export const EntityState: MessageFns<EntityState> = {
         : isSet(object.entity_id)
         ? globalThis.String(object.entity_id)
         : "",
-      position: isSet(object.position) ? Vec2.fromJSON(object.position) : undefined,
-      rotation: isSet(object.rotation) ? globalThis.Number(object.rotation) : 0,
-      velocity: isSet(object.velocity) ? Vec2.fromJSON(object.velocity) : undefined,
-      angularVelocity: isSet(object.angularVelocity)
-        ? globalThis.Number(object.angularVelocity)
-        : isSet(object.angular_velocity)
-        ? globalThis.Number(object.angular_velocity)
-        : 0,
-      z: isSet(object.z) ? globalThis.Number(object.z) : 0,
-      vz: isSet(object.vz) ? globalThis.Number(object.vz) : 0,
+      quantizedTransform: isSet(object.quantizedTransform)
+        ? QuantizedTransform.fromJSON(object.quantizedTransform)
+        : isSet(object.quantized_transform)
+        ? QuantizedTransform.fromJSON(object.quantized_transform)
+        : undefined,
       lastProcessedInputSequence: isSet(object.lastProcessedInputSequence)
         ? globalThis.Number(object.lastProcessedInputSequence)
         : isSet(object.last_processed_input_sequence)
@@ -2273,23 +2220,8 @@ export const EntityState: MessageFns<EntityState> = {
     if (message.entityId !== "") {
       obj.entityId = message.entityId;
     }
-    if (message.position !== undefined) {
-      obj.position = Vec2.toJSON(message.position);
-    }
-    if (message.rotation !== 0) {
-      obj.rotation = message.rotation;
-    }
-    if (message.velocity !== undefined) {
-      obj.velocity = Vec2.toJSON(message.velocity);
-    }
-    if (message.angularVelocity !== 0) {
-      obj.angularVelocity = message.angularVelocity;
-    }
-    if (message.z !== 0) {
-      obj.z = message.z;
-    }
-    if (message.vz !== 0) {
-      obj.vz = message.vz;
+    if (message.quantizedTransform !== undefined) {
+      obj.quantizedTransform = QuantizedTransform.toJSON(message.quantizedTransform);
     }
     if (message.lastProcessedInputSequence !== 0) {
       obj.lastProcessedInputSequence = Math.round(message.lastProcessedInputSequence);
@@ -2324,16 +2256,9 @@ export const EntityState: MessageFns<EntityState> = {
   fromPartial<I extends Exact<DeepPartial<EntityState>, I>>(object: I): EntityState {
     const message = createBaseEntityState();
     message.entityId = object.entityId ?? "";
-    message.position = (object.position !== undefined && object.position !== null)
-      ? Vec2.fromPartial(object.position)
+    message.quantizedTransform = (object.quantizedTransform !== undefined && object.quantizedTransform !== null)
+      ? QuantizedTransform.fromPartial(object.quantizedTransform)
       : undefined;
-    message.rotation = object.rotation ?? 0;
-    message.velocity = (object.velocity !== undefined && object.velocity !== null)
-      ? Vec2.fromPartial(object.velocity)
-      : undefined;
-    message.angularVelocity = object.angularVelocity ?? 0;
-    message.z = object.z ?? 0;
-    message.vz = object.vz ?? 0;
     message.lastProcessedInputSequence = object.lastProcessedInputSequence ?? 0;
     message.spriteVariant = object.spriteVariant ?? "";
     message.behaviorStateJson = object.behaviorStateJson ?? new Uint8Array(0);
@@ -2342,6 +2267,191 @@ export const EntityState: MessageFns<EntityState> = {
     message.disabled = object.disabled ?? false;
     message.teleportEpoch = object.teleportEpoch ?? 0;
     message.respawning = object.respawning ?? false;
+    return message;
+  },
+};
+
+function createBaseQuantizedTransform(): QuantizedTransform {
+  return { x: 0, y: 0, rotation: 0, vx: 0, vy: 0, angularVelocity: 0, z: 0, vz: 0 };
+}
+
+export const QuantizedTransform: MessageFns<QuantizedTransform> = {
+  encode(message: QuantizedTransform, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.x !== 0) {
+      writer.uint32(8).sint32(message.x);
+    }
+    if (message.y !== 0) {
+      writer.uint32(16).sint32(message.y);
+    }
+    if (message.rotation !== 0) {
+      writer.uint32(24).sint32(message.rotation);
+    }
+    if (message.vx !== 0) {
+      writer.uint32(32).sint32(message.vx);
+    }
+    if (message.vy !== 0) {
+      writer.uint32(40).sint32(message.vy);
+    }
+    if (message.angularVelocity !== 0) {
+      writer.uint32(48).sint32(message.angularVelocity);
+    }
+    if (message.z !== 0) {
+      writer.uint32(56).sint32(message.z);
+    }
+    if (message.vz !== 0) {
+      writer.uint32(64).sint32(message.vz);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QuantizedTransform {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseQuantizedTransform();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.x = reader.sint32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.y = reader.sint32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.rotation = reader.sint32();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.vx = reader.sint32();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.vy = reader.sint32();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.angularVelocity = reader.sint32();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.z = reader.sint32();
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.vz = reader.sint32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): QuantizedTransform {
+    return {
+      x: isSet(object.x) ? globalThis.Number(object.x) : 0,
+      y: isSet(object.y) ? globalThis.Number(object.y) : 0,
+      rotation: isSet(object.rotation) ? globalThis.Number(object.rotation) : 0,
+      vx: isSet(object.vx) ? globalThis.Number(object.vx) : 0,
+      vy: isSet(object.vy) ? globalThis.Number(object.vy) : 0,
+      angularVelocity: isSet(object.angularVelocity)
+        ? globalThis.Number(object.angularVelocity)
+        : isSet(object.angular_velocity)
+        ? globalThis.Number(object.angular_velocity)
+        : 0,
+      z: isSet(object.z) ? globalThis.Number(object.z) : 0,
+      vz: isSet(object.vz) ? globalThis.Number(object.vz) : 0,
+    };
+  },
+
+  toJSON(message: QuantizedTransform): unknown {
+    const obj: any = {};
+    if (message.x !== 0) {
+      obj.x = Math.round(message.x);
+    }
+    if (message.y !== 0) {
+      obj.y = Math.round(message.y);
+    }
+    if (message.rotation !== 0) {
+      obj.rotation = Math.round(message.rotation);
+    }
+    if (message.vx !== 0) {
+      obj.vx = Math.round(message.vx);
+    }
+    if (message.vy !== 0) {
+      obj.vy = Math.round(message.vy);
+    }
+    if (message.angularVelocity !== 0) {
+      obj.angularVelocity = Math.round(message.angularVelocity);
+    }
+    if (message.z !== 0) {
+      obj.z = Math.round(message.z);
+    }
+    if (message.vz !== 0) {
+      obj.vz = Math.round(message.vz);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<QuantizedTransform>, I>>(base?: I): QuantizedTransform {
+    return QuantizedTransform.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<QuantizedTransform>, I>>(object: I): QuantizedTransform {
+    const message = createBaseQuantizedTransform();
+    message.x = object.x ?? 0;
+    message.y = object.y ?? 0;
+    message.rotation = object.rotation ?? 0;
+    message.vx = object.vx ?? 0;
+    message.vy = object.vy ?? 0;
+    message.angularVelocity = object.angularVelocity ?? 0;
+    message.z = object.z ?? 0;
+    message.vz = object.vz ?? 0;
     return message;
   },
 };

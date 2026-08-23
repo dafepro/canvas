@@ -1091,14 +1091,9 @@ func (x *PlayerInput) GetAvatarDisabled() bool {
 }
 
 type EntityState struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	EntityId        string                 `protobuf:"bytes,1,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
-	Position        *Vec2                  `protobuf:"bytes,2,opt,name=position,proto3" json:"position,omitempty"`
-	Rotation        float32                `protobuf:"fixed32,3,opt,name=rotation,proto3" json:"rotation,omitempty"`
-	Velocity        *Vec2                  `protobuf:"bytes,4,opt,name=velocity,proto3" json:"velocity,omitempty"`
-	AngularVelocity float32                `protobuf:"fixed32,5,opt,name=angular_velocity,json=angularVelocity,proto3" json:"angular_velocity,omitempty"`
-	Z               float32                `protobuf:"fixed32,6,opt,name=z,proto3" json:"z,omitempty"`
-	Vz              float32                `protobuf:"fixed32,7,opt,name=vz,proto3" json:"vz,omitempty"`
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	EntityId           string                 `protobuf:"bytes,1,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	QuantizedTransform *QuantizedTransform    `protobuf:"bytes,2,opt,name=quantized_transform,json=quantizedTransform,proto3" json:"quantized_transform,omitempty"`
 	// Set for avatars so the owner can reconcile its prediction.
 	LastProcessedInputSequence uint32 `protobuf:"varint,8,opt,name=last_processed_input_sequence,json=lastProcessedInputSequence,proto3" json:"last_processed_input_sequence,omitempty"`
 	SpriteVariant              string `protobuf:"bytes,9,opt,name=sprite_variant,json=spriteVariant,proto3" json:"sprite_variant,omitempty"`
@@ -1155,46 +1150,11 @@ func (x *EntityState) GetEntityId() string {
 	return ""
 }
 
-func (x *EntityState) GetPosition() *Vec2 {
+func (x *EntityState) GetQuantizedTransform() *QuantizedTransform {
 	if x != nil {
-		return x.Position
+		return x.QuantizedTransform
 	}
 	return nil
-}
-
-func (x *EntityState) GetRotation() float32 {
-	if x != nil {
-		return x.Rotation
-	}
-	return 0
-}
-
-func (x *EntityState) GetVelocity() *Vec2 {
-	if x != nil {
-		return x.Velocity
-	}
-	return nil
-}
-
-func (x *EntityState) GetAngularVelocity() float32 {
-	if x != nil {
-		return x.AngularVelocity
-	}
-	return 0
-}
-
-func (x *EntityState) GetZ() float32 {
-	if x != nil {
-		return x.Z
-	}
-	return 0
-}
-
-func (x *EntityState) GetVz() float32 {
-	if x != nil {
-		return x.Vz
-	}
-	return 0
 }
 
 func (x *EntityState) GetLastProcessedInputSequence() uint32 {
@@ -1253,6 +1213,110 @@ func (x *EntityState) GetRespawning() bool {
 	return false
 }
 
+type QuantizedTransform struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Position and elevation use 1/100 canvas unit precision.
+	X int32 `protobuf:"zigzag32,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y int32 `protobuf:"zigzag32,2,opt,name=y,proto3" json:"y,omitempty"`
+	// Rotation uses 1/1000 radian precision.
+	Rotation int32 `protobuf:"zigzag32,3,opt,name=rotation,proto3" json:"rotation,omitempty"`
+	// Linear velocity uses 1/100 canvas unit per second precision.
+	Vx int32 `protobuf:"zigzag32,4,opt,name=vx,proto3" json:"vx,omitempty"`
+	Vy int32 `protobuf:"zigzag32,5,opt,name=vy,proto3" json:"vy,omitempty"`
+	// Angular velocity uses 1/1000 radian per second precision.
+	AngularVelocity int32 `protobuf:"zigzag32,6,opt,name=angular_velocity,json=angularVelocity,proto3" json:"angular_velocity,omitempty"`
+	Z               int32 `protobuf:"zigzag32,7,opt,name=z,proto3" json:"z,omitempty"`
+	Vz              int32 `protobuf:"zigzag32,8,opt,name=vz,proto3" json:"vz,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *QuantizedTransform) Reset() {
+	*x = QuantizedTransform{}
+	mi := &file_room_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QuantizedTransform) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QuantizedTransform) ProtoMessage() {}
+
+func (x *QuantizedTransform) ProtoReflect() protoreflect.Message {
+	mi := &file_room_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QuantizedTransform.ProtoReflect.Descriptor instead.
+func (*QuantizedTransform) Descriptor() ([]byte, []int) {
+	return file_room_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *QuantizedTransform) GetX() int32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *QuantizedTransform) GetY() int32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *QuantizedTransform) GetRotation() int32 {
+	if x != nil {
+		return x.Rotation
+	}
+	return 0
+}
+
+func (x *QuantizedTransform) GetVx() int32 {
+	if x != nil {
+		return x.Vx
+	}
+	return 0
+}
+
+func (x *QuantizedTransform) GetVy() int32 {
+	if x != nil {
+		return x.Vy
+	}
+	return 0
+}
+
+func (x *QuantizedTransform) GetAngularVelocity() int32 {
+	if x != nil {
+		return x.AngularVelocity
+	}
+	return 0
+}
+
+func (x *QuantizedTransform) GetZ() int32 {
+	if x != nil {
+		return x.Z
+	}
+	return 0
+}
+
+func (x *QuantizedTransform) GetVz() int32 {
+	if x != nil {
+		return x.Vz
+	}
+	return 0
+}
+
 type StateDelta struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Entities         []*EntityState         `protobuf:"bytes,1,rep,name=entities,proto3" json:"entities,omitempty"`
@@ -1264,7 +1328,7 @@ type StateDelta struct {
 
 func (x *StateDelta) Reset() {
 	*x = StateDelta{}
-	mi := &file_room_proto_msgTypes[11]
+	mi := &file_room_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1276,7 +1340,7 @@ func (x *StateDelta) String() string {
 func (*StateDelta) ProtoMessage() {}
 
 func (x *StateDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[11]
+	mi := &file_room_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1289,7 +1353,7 @@ func (x *StateDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateDelta.ProtoReflect.Descriptor instead.
 func (*StateDelta) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{11}
+	return file_room_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *StateDelta) GetEntities() []*EntityState {
@@ -1325,7 +1389,7 @@ type FullState struct {
 
 func (x *FullState) Reset() {
 	*x = FullState{}
-	mi := &file_room_proto_msgTypes[12]
+	mi := &file_room_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1337,7 +1401,7 @@ func (x *FullState) String() string {
 func (*FullState) ProtoMessage() {}
 
 func (x *FullState) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[12]
+	mi := &file_room_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1350,7 +1414,7 @@ func (x *FullState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FullState.ProtoReflect.Descriptor instead.
 func (*FullState) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{12}
+	return file_room_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FullState) GetEntities() []*EntityState {
@@ -1393,7 +1457,7 @@ type AvatarPresence struct {
 
 func (x *AvatarPresence) Reset() {
 	*x = AvatarPresence{}
-	mi := &file_room_proto_msgTypes[13]
+	mi := &file_room_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1405,7 +1469,7 @@ func (x *AvatarPresence) String() string {
 func (*AvatarPresence) ProtoMessage() {}
 
 func (x *AvatarPresence) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[13]
+	mi := &file_room_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1418,7 +1482,7 @@ func (x *AvatarPresence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AvatarPresence.ProtoReflect.Descriptor instead.
 func (*AvatarPresence) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{13}
+	return file_room_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AvatarPresence) GetEntityId() string {
@@ -1462,7 +1526,7 @@ type EffectEvent struct {
 
 func (x *EffectEvent) Reset() {
 	*x = EffectEvent{}
-	mi := &file_room_proto_msgTypes[14]
+	mi := &file_room_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1474,7 +1538,7 @@ func (x *EffectEvent) String() string {
 func (*EffectEvent) ProtoMessage() {}
 
 func (x *EffectEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[14]
+	mi := &file_room_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1487,7 +1551,7 @@ func (x *EffectEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EffectEvent.ProtoReflect.Descriptor instead.
 func (*EffectEvent) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{14}
+	return file_room_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *EffectEvent) GetEntityId() string {
@@ -1537,7 +1601,7 @@ type DurableCommand struct {
 
 func (x *DurableCommand) Reset() {
 	*x = DurableCommand{}
-	mi := &file_room_proto_msgTypes[15]
+	mi := &file_room_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1549,7 +1613,7 @@ func (x *DurableCommand) String() string {
 func (*DurableCommand) ProtoMessage() {}
 
 func (x *DurableCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[15]
+	mi := &file_room_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1562,7 +1626,7 @@ func (x *DurableCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DurableCommand.ProtoReflect.Descriptor instead.
 func (*DurableCommand) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{15}
+	return file_room_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DurableCommand) GetCommandId() string {
@@ -1650,7 +1714,7 @@ type DurableCommandResult struct {
 
 func (x *DurableCommandResult) Reset() {
 	*x = DurableCommandResult{}
-	mi := &file_room_proto_msgTypes[16]
+	mi := &file_room_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1662,7 +1726,7 @@ func (x *DurableCommandResult) String() string {
 func (*DurableCommandResult) ProtoMessage() {}
 
 func (x *DurableCommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[16]
+	mi := &file_room_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1675,7 +1739,7 @@ func (x *DurableCommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DurableCommandResult.ProtoReflect.Descriptor instead.
 func (*DurableCommandResult) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{16}
+	return file_room_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *DurableCommandResult) GetCommandId() string {
@@ -1732,7 +1796,7 @@ type Checkpoint struct {
 
 func (x *Checkpoint) Reset() {
 	*x = Checkpoint{}
-	mi := &file_room_proto_msgTypes[17]
+	mi := &file_room_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1744,7 +1808,7 @@ func (x *Checkpoint) String() string {
 func (*Checkpoint) ProtoMessage() {}
 
 func (x *Checkpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[17]
+	mi := &file_room_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1757,7 +1821,7 @@ func (x *Checkpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Checkpoint.ProtoReflect.Descriptor instead.
 func (*Checkpoint) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{17}
+	return file_room_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Checkpoint) GetCheckpointRevision() uint64 {
@@ -1799,7 +1863,7 @@ type ProtocolError struct {
 
 func (x *ProtocolError) Reset() {
 	*x = ProtocolError{}
-	mi := &file_room_proto_msgTypes[18]
+	mi := &file_room_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1811,7 +1875,7 @@ func (x *ProtocolError) String() string {
 func (*ProtocolError) ProtoMessage() {}
 
 func (x *ProtocolError) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[18]
+	mi := &file_room_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1824,7 +1888,7 @@ func (x *ProtocolError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtocolError.ProtoReflect.Descriptor instead.
 func (*ProtocolError) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{18}
+	return file_room_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ProtocolError) GetCode() string {
@@ -1930,15 +1994,10 @@ const file_room_proto_rawDesc = "" +
 	"\tintensity\x18\x03 \x01(\x02R\tintensity\x12-\n" +
 	"\x13client_time_unix_ms\x18\x04 \x01(\x04R\x10clientTimeUnixMs\x12\x12\n" +
 	"\x04held\x18\x05 \x01(\bR\x04held\x12'\n" +
-	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xbb\x04\n" +
+	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xc5\x03\n" +
 	"\vEntityState\x12\x1b\n" +
-	"\tentity_id\x18\x01 \x01(\tR\bentityId\x122\n" +
-	"\bposition\x18\x02 \x01(\v2\x16.canvasphysics.v1.Vec2R\bposition\x12\x1a\n" +
-	"\brotation\x18\x03 \x01(\x02R\brotation\x122\n" +
-	"\bvelocity\x18\x04 \x01(\v2\x16.canvasphysics.v1.Vec2R\bvelocity\x12)\n" +
-	"\x10angular_velocity\x18\x05 \x01(\x02R\x0fangularVelocity\x12\f\n" +
-	"\x01z\x18\x06 \x01(\x02R\x01z\x12\x0e\n" +
-	"\x02vz\x18\a \x01(\x02R\x02vz\x12A\n" +
+	"\tentity_id\x18\x01 \x01(\tR\bentityId\x12U\n" +
+	"\x13quantized_transform\x18\x02 \x01(\v2$.canvasphysics.v1.QuantizedTransformR\x12quantizedTransform\x12A\n" +
 	"\x1dlast_processed_input_sequence\x18\b \x01(\rR\x1alastProcessedInputSequence\x12%\n" +
 	"\x0esprite_variant\x18\t \x01(\tR\rspriteVariant\x12.\n" +
 	"\x13behavior_state_json\x18\n" +
@@ -1949,7 +2008,16 @@ const file_room_proto_rawDesc = "" +
 	"\x0eteleport_epoch\x18\x0e \x01(\rR\rteleportEpoch\x12\x1e\n" +
 	"\n" +
 	"respawning\x18\x0f \x01(\bR\n" +
-	"respawning\"\x9c\x01\n" +
+	"respawning\"\xb5\x01\n" +
+	"\x12QuantizedTransform\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x11R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x11R\x01y\x12\x1a\n" +
+	"\brotation\x18\x03 \x01(\x11R\brotation\x12\x0e\n" +
+	"\x02vx\x18\x04 \x01(\x11R\x02vx\x12\x0e\n" +
+	"\x02vy\x18\x05 \x01(\x11R\x02vy\x12)\n" +
+	"\x10angular_velocity\x18\x06 \x01(\x11R\x0fangularVelocity\x12\f\n" +
+	"\x01z\x18\a \x01(\x11R\x01z\x12\x0e\n" +
+	"\x02vz\x18\b \x01(\x11R\x02vz\"\x9c\x01\n" +
 	"\n" +
 	"StateDelta\x129\n" +
 	"\bentities\x18\x01 \x03(\v2\x1d.canvasphysics.v1.EntityStateR\bentities\x12,\n" +
@@ -2031,7 +2099,7 @@ func file_room_proto_rawDescGZIP() []byte {
 }
 
 var file_room_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_room_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_room_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_room_proto_goTypes = []any{
 	(HostControlKind)(0),         // 0: canvasphysics.v1.HostControlKind
 	(DurableCommandKind)(0),      // 1: canvasphysics.v1.DurableCommandKind
@@ -2046,46 +2114,46 @@ var file_room_proto_goTypes = []any{
 	(*Heartbeat)(nil),            // 10: canvasphysics.v1.Heartbeat
 	(*PlayerInput)(nil),          // 11: canvasphysics.v1.PlayerInput
 	(*EntityState)(nil),          // 12: canvasphysics.v1.EntityState
-	(*StateDelta)(nil),           // 13: canvasphysics.v1.StateDelta
-	(*FullState)(nil),            // 14: canvasphysics.v1.FullState
-	(*AvatarPresence)(nil),       // 15: canvasphysics.v1.AvatarPresence
-	(*EffectEvent)(nil),          // 16: canvasphysics.v1.EffectEvent
-	(*DurableCommand)(nil),       // 17: canvasphysics.v1.DurableCommand
-	(*DurableCommandResult)(nil), // 18: canvasphysics.v1.DurableCommandResult
-	(*Checkpoint)(nil),           // 19: canvasphysics.v1.Checkpoint
-	(*ProtocolError)(nil),        // 20: canvasphysics.v1.ProtocolError
+	(*QuantizedTransform)(nil),   // 13: canvasphysics.v1.QuantizedTransform
+	(*StateDelta)(nil),           // 14: canvasphysics.v1.StateDelta
+	(*FullState)(nil),            // 15: canvasphysics.v1.FullState
+	(*AvatarPresence)(nil),       // 16: canvasphysics.v1.AvatarPresence
+	(*EffectEvent)(nil),          // 17: canvasphysics.v1.EffectEvent
+	(*DurableCommand)(nil),       // 18: canvasphysics.v1.DurableCommand
+	(*DurableCommandResult)(nil), // 19: canvasphysics.v1.DurableCommandResult
+	(*Checkpoint)(nil),           // 20: canvasphysics.v1.Checkpoint
+	(*ProtocolError)(nil),        // 21: canvasphysics.v1.ProtocolError
 }
 var file_room_proto_depIdxs = []int32{
 	4,  // 0: canvasphysics.v1.RoomEnvelope.join:type_name -> canvasphysics.v1.Join
 	6,  // 1: canvasphysics.v1.RoomEnvelope.join_accepted:type_name -> canvasphysics.v1.JoinAccepted
 	7,  // 2: canvasphysics.v1.RoomEnvelope.presence:type_name -> canvasphysics.v1.Presence
 	11, // 3: canvasphysics.v1.RoomEnvelope.player_input:type_name -> canvasphysics.v1.PlayerInput
-	13, // 4: canvasphysics.v1.RoomEnvelope.state_delta:type_name -> canvasphysics.v1.StateDelta
-	14, // 5: canvasphysics.v1.RoomEnvelope.full_state:type_name -> canvasphysics.v1.FullState
-	16, // 6: canvasphysics.v1.RoomEnvelope.effect_event:type_name -> canvasphysics.v1.EffectEvent
+	14, // 4: canvasphysics.v1.RoomEnvelope.state_delta:type_name -> canvasphysics.v1.StateDelta
+	15, // 5: canvasphysics.v1.RoomEnvelope.full_state:type_name -> canvasphysics.v1.FullState
+	17, // 6: canvasphysics.v1.RoomEnvelope.effect_event:type_name -> canvasphysics.v1.EffectEvent
 	9,  // 7: canvasphysics.v1.RoomEnvelope.host_control:type_name -> canvasphysics.v1.HostControl
-	17, // 8: canvasphysics.v1.RoomEnvelope.durable_command:type_name -> canvasphysics.v1.DurableCommand
-	18, // 9: canvasphysics.v1.RoomEnvelope.durable_result:type_name -> canvasphysics.v1.DurableCommandResult
-	19, // 10: canvasphysics.v1.RoomEnvelope.checkpoint:type_name -> canvasphysics.v1.Checkpoint
+	18, // 8: canvasphysics.v1.RoomEnvelope.durable_command:type_name -> canvasphysics.v1.DurableCommand
+	19, // 9: canvasphysics.v1.RoomEnvelope.durable_result:type_name -> canvasphysics.v1.DurableCommandResult
+	20, // 10: canvasphysics.v1.RoomEnvelope.checkpoint:type_name -> canvasphysics.v1.Checkpoint
 	10, // 11: canvasphysics.v1.RoomEnvelope.heartbeat:type_name -> canvasphysics.v1.Heartbeat
-	20, // 12: canvasphysics.v1.RoomEnvelope.error:type_name -> canvasphysics.v1.ProtocolError
+	21, // 12: canvasphysics.v1.RoomEnvelope.error:type_name -> canvasphysics.v1.ProtocolError
 	5,  // 13: canvasphysics.v1.Join.definitions:type_name -> canvasphysics.v1.DefinitionVersion
 	8,  // 14: canvasphysics.v1.Presence.peers:type_name -> canvasphysics.v1.Peer
 	0,  // 15: canvasphysics.v1.HostControl.kind:type_name -> canvasphysics.v1.HostControlKind
 	3,  // 16: canvasphysics.v1.PlayerInput.direction:type_name -> canvasphysics.v1.Vec2
-	3,  // 17: canvasphysics.v1.EntityState.position:type_name -> canvasphysics.v1.Vec2
-	3,  // 18: canvasphysics.v1.EntityState.velocity:type_name -> canvasphysics.v1.Vec2
-	12, // 19: canvasphysics.v1.StateDelta.entities:type_name -> canvasphysics.v1.EntityState
-	12, // 20: canvasphysics.v1.FullState.entities:type_name -> canvasphysics.v1.EntityState
-	15, // 21: canvasphysics.v1.FullState.avatars:type_name -> canvasphysics.v1.AvatarPresence
-	1,  // 22: canvasphysics.v1.DurableCommand.kind:type_name -> canvasphysics.v1.DurableCommandKind
-	3,  // 23: canvasphysics.v1.DurableCommand.position:type_name -> canvasphysics.v1.Vec2
-	17, // 24: canvasphysics.v1.DurableCommandResult.command:type_name -> canvasphysics.v1.DurableCommand
-	25, // [25:25] is the sub-list for method output_type
-	25, // [25:25] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	13, // 17: canvasphysics.v1.EntityState.quantized_transform:type_name -> canvasphysics.v1.QuantizedTransform
+	12, // 18: canvasphysics.v1.StateDelta.entities:type_name -> canvasphysics.v1.EntityState
+	12, // 19: canvasphysics.v1.FullState.entities:type_name -> canvasphysics.v1.EntityState
+	16, // 20: canvasphysics.v1.FullState.avatars:type_name -> canvasphysics.v1.AvatarPresence
+	1,  // 21: canvasphysics.v1.DurableCommand.kind:type_name -> canvasphysics.v1.DurableCommandKind
+	3,  // 22: canvasphysics.v1.DurableCommand.position:type_name -> canvasphysics.v1.Vec2
+	18, // 23: canvasphysics.v1.DurableCommandResult.command:type_name -> canvasphysics.v1.DurableCommand
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_room_proto_init() }
@@ -2114,7 +2182,7 @@ func file_room_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_room_proto_rawDesc), len(file_room_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

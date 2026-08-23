@@ -63,12 +63,16 @@ const blank = (): RoomEnvelope => ({
 
 const entityState = (behaviorState: unknown): EntityState => ({
   entityId: "rocket-1",
-  position: { x: 70, y: 60 },
-  rotation: 0,
-  velocity: { x: 0, y: 0 },
-  angularVelocity: 0,
-  z: 0,
-  vz: 0,
+  quantizedTransform: {
+    x: 7000,
+    y: 6000,
+    rotation: 0,
+    vx: 0,
+    vy: 0,
+    angularVelocity: 0,
+    z: 0,
+    vz: 0,
+  },
   lastProcessedInputSequence: 0,
   spriteVariant: "armed",
   behaviorStateJson: toJsonBytes(behaviorState),

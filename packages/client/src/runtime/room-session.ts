@@ -17,6 +17,7 @@ import {
   type Peer,
 } from "@canvas-physics/protocol";
 import { AvatarReconciler } from "../net/avatar-reconciler.js";
+import { dequantizeTransform, quantizeTransform } from "../net/quantization.js";
 import { RoomClient } from "../net/room-client.js";
 import type { RoomTransport } from "../net/transport.js";
 import { WebSocketRoomTransport } from "../net/websocket-transport.js";
@@ -1075,12 +1076,6 @@ const toEntityState = (
   keyframe = true,
 ): EntityState => ({
   entityId: entity.id,
-  position: { x: entity.x, y: entity.y },
-  rotation: entity.rotation,
-  velocity: { x: entity.vx, y: entity.vy },
-  angularVelocity: entity.angularVelocity,
-  z: entity.z ?? 0,
-  vz: 0,
   lastProcessedInputSequence: entity.lastProcessedInputSequence ?? 0,
   spriteVariant: entity.variant ?? "",
   behaviorStateJson,
@@ -1089,24 +1084,38 @@ const toEntityState = (
   disabled: entity.disabled ?? false,
   teleportEpoch: entity.teleportEpoch ?? 0,
   respawning: entity.respawning ?? false,
+  quantizedTransform: quantizeTransform({
+    x: entity.x,
+    y: entity.y,
+    rotation: entity.rotation,
+    vx: entity.vx,
+    vy: entity.vy,
+    angularVelocity: entity.angularVelocity,
+    z: entity.z,
+    vz: 0,
+  }),
 });
 
-const fromEntityState = (state: EntityState): RenderEntity => ({
-  id: state.entityId,
-  kind: state.entityId.startsWith("avatar:") ? "avatar" : "item",
-  definitionId: state.definitionId,
-  x: state.position?.x ?? 0,
-  y: state.position?.y ?? 0,
-  rotation: state.rotation,
-  z: state.z || undefined,
-  vx: state.velocity?.x ?? 0,
-  vy: state.velocity?.y ?? 0,
-  angularVelocity: state.angularVelocity,
-  variant: state.spriteVariant || undefined,
-  lastProcessedInputSequence: state.lastProcessedInputSequence,
-  behaviorState: fromJsonBytes(state.behaviorStateJson),
-  quarantined: state.quarantined,
-  disabled: state.disabled,
-  teleportEpoch: state.teleportEpoch,
-  respawning: state.respawning,
-});
+const fromEntityState = (state: EntityState): RenderEntity => {
+  const transform = dequantizeTransform(state.quantizedTransform!);
+
+  return {
+    id: state.entityId,
+    kind: state.entityId.startsWith("avatar:") ? "avatar" : "item",
+    definitionId: state.definitionId,
+    x: transform.x,
+    y: transform.y,
+    rotation: transform.rotation,
+    z: transform.z || undefined,
+    vx: transform.vx,
+    vy: transform.vy,
+    angularVelocity: transform.angularVelocity,
+    variant: state.spriteVariant || undefined,
+    lastProcessedInputSequence: state.lastProcessedInputSequence,
+    behaviorState: fromJsonBytes(state.behaviorStateJson),
+    quarantined: state.quarantined,
+    disabled: state.disabled,
+    teleportEpoch: state.teleportEpoch,
+    respawning: state.respawning,
+  };
+};

@@ -1319,8 +1319,10 @@ func TestCanonicalStateValidation(t *testing.T) {
 					SceneRevision: sceneRevision,
 					Entities: []*pb.EntityState{{
 						EntityId: entityID,
-						Position: &pb.Vec2{X: 25, Y: 30},
-						Velocity: &pb.Vec2{},
+						QuantizedTransform: &pb.QuantizedTransform{
+							X: 2500,
+							Y: 3000,
+						},
 					}},
 				}
 			},
@@ -1332,22 +1334,20 @@ func TestCanonicalStateValidation(t *testing.T) {
 				return &pb.StateDelta{
 					SceneRevision: sceneRevision,
 					Entities: []*pb.EntityState{{
-						EntityId: "host-invented-item",
-						Position: &pb.Vec2{X: 25, Y: 30},
-						Velocity: &pb.Vec2{},
+						EntityId:           "host-invented-item",
+						QuantizedTransform: &pb.QuantizedTransform{X: 2500, Y: 3000},
 					}},
 				}
 			},
 		},
 		{
-			name: "non-finite transform",
+			name: "out-of-bounds transform",
 			state: func(entityID string, sceneRevision uint64) *pb.StateDelta {
 				return &pb.StateDelta{
 					SceneRevision: sceneRevision,
 					Entities: []*pb.EntityState{{
-						EntityId: entityID,
-						Position: &pb.Vec2{X: float32(math.NaN()), Y: 30},
-						Velocity: &pb.Vec2{},
+						EntityId:           entityID,
+						QuantizedTransform: &pb.QuantizedTransform{X: math.MaxInt32},
 					}},
 				}
 			},
@@ -1358,9 +1358,8 @@ func TestCanonicalStateValidation(t *testing.T) {
 				return &pb.StateDelta{
 					SceneRevision: 0,
 					Entities: []*pb.EntityState{{
-						EntityId: entityID,
-						Position: &pb.Vec2{X: 25, Y: 30},
-						Velocity: &pb.Vec2{},
+						EntityId:           entityID,
+						QuantizedTransform: &pb.QuantizedTransform{X: 2500, Y: 3000},
 					}},
 				}
 			},

@@ -48,7 +48,11 @@ downward. Check an item only after the relevant focused tests pass.
 
 ## Priority 2 — next phases
 
-- [ ] Quantize transforms and remeasure the roughly 20 KB/s per-peer target.
+- [x] Quantize transforms and remeasure the roughly 20 KB/s per-peer target.
+  Fixed-point transforms reduced the measured full-churn rate from 41.6 to
+  32.7 KB/s and the moving-avatar rate from 46.4 to 37.1 KB/s. Busy scenes
+  remain above the guidance and should be addressed only after device profiles
+  identify whether bandwidth or rendering is the next limiting resource.
 - [ ] Profile host simulation and rendering on representative low-, mid-, and
   high-tier mobile devices, including suspended/background behavior.
 - [ ] Add asset manifests, preloading, texture-atlas rendering, animation
