@@ -4,7 +4,7 @@ import type { AssetManifest } from "@canvas-physics/client";
 export const playgroundAssets: AssetManifest = {
   schemaVersion: 1,
   id: "item-playground",
-  revision: "2026-08-23.1",
+  revision: "2026-08-23.2",
   sources: [
     { id: "workbench-art", src: "/workbench.svg", required: true },
     { id: "emoji-art", src: "/assets/party-emoji.svg", required: true },
@@ -14,6 +14,10 @@ export const playgroundAssets: AssetManifest = {
     { id: "orb-violet-art", src: "/assets/orb-violet.svg", required: true },
     { id: "orb-pulse-art", src: "/assets/orb-pulse.svg", required: true },
     { id: "stamp-art", src: "/assets/system-stamp.svg", required: true },
+    { id: "ball-art", src: "/assets/live-ball.svg", required: true },
+    { id: "tile-mint-art", src: "/assets/tile-mint.svg", required: true },
+    { id: "tile-coral-art", src: "/assets/tile-coral.svg", required: true },
+    { id: "tile-violet-art", src: "/assets/tile-violet.svg", required: true },
   ],
   textures: [
     { id: "playground.workbench", sourceId: "workbench-art" },
@@ -24,5 +28,9 @@ export const playgroundAssets: AssetManifest = {
     { id: "playground.orb.violet", sourceId: "orb-violet-art" },
     { id: "playground.orb.pulse", sourceId: "orb-pulse-art" },
     { id: "playground.system.stamp", sourceId: "stamp-art" },
+    { id: "playground.ball", sourceId: "ball-art" },
+    { id: "playground.tile.mint", sourceId: "tile-mint-art" },
+    { id: "playground.tile.coral", sourceId: "tile-coral-art" },
+    { id: "playground.tile.violet", sourceId: "tile-violet-art" },
   ],
 };

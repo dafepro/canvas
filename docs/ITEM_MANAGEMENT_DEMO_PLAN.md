@@ -26,6 +26,11 @@ interaction behavior while importing only published Canvas package exports.
    bundle, and clean packed-artifact installation are covered. The existing
    real-server two-client suite verifies ownership metadata on both clients;
    browser smoke testing covers accepted and rejected playground workflows.
+6. [x] **Always-live in-canvas editing.** Spawn and owner-only Manage popovers,
+   local ownership outlines, a private item-adjacent icon toolbar, recoloring,
+   and an always-moving system ball replace the separate inspector/mode UI.
+   Optional owner-authorized isolation durably pauses an edited item's physics,
+   collision, behavior, and timers without pausing the canvas.
 
 ## Alignment decisions
 
@@ -33,6 +38,9 @@ interaction behavior while importing only published Canvas package exports.
   shapes atomically. Non-uniform scaling stays out of this example.
 - Owner-only move/rotate/scale/configure/delete remains the default;
   sharing, transfer, and claim policies are separate later capabilities.
+- Editing is a local interaction state, not a room or simulation mode. Durable
+  isolation is explicit per item and server-authorized; selection chrome stays
+  entirely local.
 - Pictures are bundled. Durable uploads require product-owned storage and are
   not implied by the Canvas room service.
 - Emoji use a consumer texture so rendering is deterministic across clients;

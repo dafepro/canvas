@@ -7,6 +7,8 @@ import emojiJson from "../server/definitions/emoji-party.json";
 import photoJson from "../server/definitions/photo-card.json";
 import orbJson from "../server/definitions/reactive-orb.json";
 import stampJson from "../server/definitions/system-stamp.json";
+import bouncerJson from "../server/definitions/live-bouncer.json";
+import colorTileJson from "../server/definitions/color-tile.json";
 import { playgroundAssets } from "../src/assets.js";
 import {
   playgroundDefinitions,
@@ -16,6 +18,7 @@ import {
   ReactiveOrbBehavior,
   defaultReactiveOrbConfig,
 } from "../src/reactive-orb-behavior.js";
+import { LiveBouncerBehavior } from "../src/live-bouncer-behavior.js";
 
 const canvas = canvasJson as unknown as CanvasDefinition;
 
@@ -29,11 +32,22 @@ describe("compact item playground", () => {
         entityId: "room-owned-stamp",
         definitionId: "system-stamp",
       }),
+      expect.objectContaining({
+        entityId: "always-live-ball",
+        definitionId: "live-bouncer",
+      }),
     ]);
   });
 
   it("keeps client definitions, server contracts, and consumer assets aligned", () => {
-    const serverDefinitions = [emojiJson, photoJson, orbJson, stampJson];
+    const serverDefinitions = [
+      emojiJson,
+      photoJson,
+      orbJson,
+      stampJson,
+      bouncerJson,
+      colorTileJson,
+    ];
     for (const definition of playgroundDefinitions.filter(
       ({ definitionId }) => definitionId !== "avatar",
     )) {
@@ -76,5 +90,19 @@ describe("compact item playground", () => {
       expect.objectContaining({ effect: "portalFlash", mode: "oneShot" }),
     ]);
     expect(harness.state.activations).toBe(1);
+  });
+
+  it("keeps the room-owned demo ball moving without an editor", () => {
+    const harness = new BehaviorTestHarness(
+      LiveBouncerBehavior,
+      { minimumSpeed: 3, velocity: { x: 7, y: 5 } },
+      { canvas: { width: 36, height: 24, orientation: "topDown" } },
+    );
+
+    harness.advance();
+    expect(harness.host.body(harness.entityId).velocity).toEqual({ x: 7, y: 5 });
+    harness.host.body(harness.entityId).velocity = { x: 1, y: 0 };
+    harness.advance();
+    expect(harness.host.body(harness.entityId).velocity).toEqual({ x: 7, y: 5 });
   });
 });

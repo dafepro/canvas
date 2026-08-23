@@ -29,13 +29,20 @@ large-on-screen gallery shows that a consumer can supply pictures, rasterized
 emoji-style art, texture variants, animation frames, and behavior effects
 without adding product concepts to Canvas.
 
-The management panel exercises the public durable mutation surface: spawn,
-direct placement, rotation, uniform visual-and-collider scaling,
-configuration, and deletion. A selected item may belong to the current user,
-another participant, or the room. The UI does not hide unauthorized controls;
-it lets a user try them so the server's `not_owner` and `system_owned`
-rejections are visible. This makes ownership a tested authority boundary rather
-than a disabled-button convention.
+The in-canvas Spawn and Manage popovers exercise the public durable mutation
+surface: spawn, direct placement, rotation, uniform visual-and-collider
+scaling, configuration, optional simulation isolation, and deletion. Thin
+green projections mark items owned by the local user. Selection and icon edit
+controls are local DOM overlays, so another participant receives the canonical
+item updates but not the editor's private UI state. The server remains the
+authority even though this consumer chooses to list only editable items.
+
+Editing never changes the room into a separate mode. A room-owned gold ball
+bounces continuously while item controls are open. Consumers may explicitly
+isolate an owned item while manipulating it; Canvas then preserves its pose and
+pauses its collision, physics, behavior, and simulation-clock timers until it
+is returned to live simulation. A configurable color tile makes item-specific
+controls concrete without adding color concepts to the engine.
 
 The bundled picture is intentionally not an upload flow. Canvas handles asset
 identity and loading, not durable media storage. A product can put uploaded

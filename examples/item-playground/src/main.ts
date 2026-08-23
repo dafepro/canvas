@@ -1,6 +1,7 @@
 import type {
   CanvasRuntime,
   CanonicalStateSnapshot,
+  OverlayProjectionSnapshot,
 } from "@canvas-physics/client/runtime";
 import type { RenderEntity } from "@canvas-physics/client";
 import { playgroundAssets } from "./assets.js";
@@ -15,57 +16,69 @@ const stage = document.querySelector<HTMLElement>("#stage")!;
 const userInput = document.querySelector<HTMLInputElement>("#user")!;
 const joinButton = document.querySelector<HTMLButtonElement>("#join")!;
 const leaveButton = document.querySelector<HTMLButtonElement>("#leave")!;
-const modeButton = document.querySelector<HTMLButtonElement>("#mode")!;
-const itemList = document.querySelector<HTMLElement>("#item-list")!;
+const spawnToggle = document.querySelector<HTMLButtonElement>("#spawn-toggle")!;
+const manageToggle = document.querySelector<HTMLButtonElement>("#manage-toggle")!;
+const spawnPopover = document.querySelector<HTMLElement>("#spawn-popover")!;
+const managePopover = document.querySelector<HTMLElement>("#manage-popover")!;
+const ownedList = document.querySelector<HTMLElement>("#owned-list")!;
+const ownershipLayer = document.querySelector<HTMLElement>("#ownership-layer")!;
+const editToolbar = document.querySelector<HTMLElement>("#edit-toolbar")!;
+const colorTools = document.querySelector<HTMLElement>("#color-tools")!;
 const connectionStatus = document.querySelector<HTMLElement>("#connection-status")!;
 const actionStatus = document.querySelector<HTMLElement>("#action-status")!;
-const selectionName = document.querySelector<HTMLElement>("#selection-name")!;
-const selectionId = document.querySelector<HTMLElement>("#selection-id")!;
-const selectionOwner = document.querySelector<HTMLElement>("#selection-owner")!;
 const rotateLeft = document.querySelector<HTMLButtonElement>("#rotate-left")!;
 const rotateRight = document.querySelector<HTMLButtonElement>("#rotate-right")!;
-const scaleInput = document.querySelector<HTMLInputElement>("#scale")!;
-const scaleValue = document.querySelector<HTMLOutputElement>("#scale-value")!;
-const themeControls = document.querySelector<HTMLFieldSetElement>("#theme-controls")!;
+const scaleDown = document.querySelector<HTMLButtonElement>("#scale-down")!;
+const scaleUp = document.querySelector<HTMLButtonElement>("#scale-up")!;
+const isolateButton = document.querySelector<HTMLButtonElement>("#isolate")!;
 const deleteButton = document.querySelector<HTMLButtonElement>("#delete")!;
+const paletteButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-spawn]")];
 
-userInput.value =
-  params.get("user") ?? `maker-${Math.random().toString(36).slice(2, 6)}`;
+userInput.value = params.get("user") ?? `maker-${Math.random().toString(36).slice(2, 6)}`;
 
 let runtime: CanvasRuntime | undefined;
 let joining = false;
-let unsubscribe: (() => void) | undefined;
+let unsubscribeState: (() => void) | undefined;
+let unsubscribeOverlay: (() => void) | undefined;
 let entities: readonly Readonly<RenderEntity>[] = [];
 let selectedEntityId: string | undefined;
 let pendingAfterRevision: number | undefined;
 let spawnCursor = 0;
 let idsBeforeSpawn = new Set<string>();
 let pendingSpawnDefinition: string | undefined;
-let lastUiSignature = "";
-const paletteButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-spawn]")];
-paletteButtons.forEach((button) => { button.disabled = true; });
+let lastManageSignature = "";
 
-const definitionNames = new Map(
-  playgroundDefinitions.map(({ definitionId, displayName }) => [definitionId, displayName]),
+const definitionById = new Map(
+  playgroundDefinitions.map((definition) => [definition.definitionId, definition]),
 );
+const editableColors = new Set(["reactive-orb", "color-tile"]);
 const spawnPositions = [
-  { x: 7, y: 6 },
-  { x: 14, y: 6 },
-  { x: 22, y: 6 },
-  { x: 29, y: 6 },
-  { x: 7, y: 13 },
-  { x: 14, y: 13 },
-  { x: 22, y: 13 },
-  { x: 29, y: 13 },
+  { x: 7, y: 6 }, { x: 14, y: 6 }, { x: 22, y: 6 }, { x: 29, y: 6 },
+  { x: 7, y: 14 }, { x: 14, y: 14 }, { x: 22, y: 14 }, { x: 29, y: 14 },
 ];
 
 const selectedEntity = (): Readonly<RenderEntity> | undefined =>
   entities.find(({ id }) => id === selectedEntityId);
 
-const ownerLabel = (entity: Readonly<RenderEntity>): string => {
-  if (!entity.ownerUserId) return "room / system";
-  if (entity.ownerUserId === userInput.value) return "you";
-  return entity.ownerUserId;
+const isOwned = (entity: Readonly<RenderEntity>): boolean =>
+  entity.kind === "item" && entity.ownerUserId === userInput.value;
+
+const closePopovers = (except?: HTMLElement): void => {
+  for (const [button, panel] of [
+    [spawnToggle, spawnPopover],
+    [manageToggle, managePopover],
+  ] as const) {
+    if (panel === except) continue;
+    panel.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  }
+};
+
+const togglePopover = (button: HTMLButtonElement, panel: HTMLElement): void => {
+  const open = panel.hidden;
+  closePopovers(panel);
+  panel.hidden = !open;
+  button.setAttribute("aria-expanded", String(open));
 };
 
 const requestMutation = (message: string, action: () => void): void => {
@@ -76,60 +89,33 @@ const requestMutation = (message: string, action: () => void): void => {
   action();
 };
 
-const renderInspector = (): void => {
-  const entity = selectedEntity();
-  const enabled = Boolean(entity && runtime);
-  rotateLeft.disabled = !enabled;
-  rotateRight.disabled = !enabled;
-  scaleInput.disabled = !enabled;
-  deleteButton.disabled = !enabled;
-  themeControls.disabled = !enabled || entity?.definitionId !== "reactive-orb";
-
-  if (!entity) {
-    selectionName.textContent = "Select an item";
-    selectionId.textContent = "—";
-    selectionOwner.textContent = "nothing selected";
-    scaleInput.value = "1";
-    scaleValue.value = "1.00×";
+const renderOwnedList = (): void => {
+  const owned = entities.filter(isOwned);
+  const signature = owned
+    .map(({ id, definitionId, isolated }) => `${id}:${definitionId}:${isolated}`)
+    .join("|");
+  if (signature === lastManageSignature) return;
+  lastManageSignature = signature;
+  if (owned.length === 0) {
+    ownedList.innerHTML = '<p class="empty">Nothing spawned yet.</p>';
     return;
   }
-
-  selectionName.textContent = definitionNames.get(entity.definitionId) ?? entity.definitionId;
-  selectionId.textContent = entity.id;
-  selectionOwner.textContent = `owned by ${ownerLabel(entity)}`;
-  const scale = entity.scale ?? 1;
-  scaleInput.value = String(scale);
-  scaleValue.value = `${scale.toFixed(2)}×`;
-  document.querySelectorAll<HTMLButtonElement>("[data-theme]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.theme === entity.variant);
-  });
-};
-
-const renderList = (): void => {
-  const items = entities.filter(({ kind }) => kind === "item");
-  if (items.length === 0) {
-    itemList.innerHTML = '<p class="empty">No items yet. Spawn one above.</p>';
-    renderInspector();
-    return;
-  }
-  itemList.replaceChildren(
-    ...items.map((entity) => {
+  ownedList.replaceChildren(
+    ...owned.map((entity) => {
       const button = document.createElement("button");
-      button.className = "item-row";
+      button.className = "owned-row";
       button.classList.toggle("selected", entity.id === selectedEntityId);
-      button.dataset.entityId = entity.id;
-      const owned = ownerLabel(entity);
-      button.innerHTML =
-        `<span><b>${definitionNames.get(entity.definitionId) ?? entity.definitionId}</b>` +
-        `<small>${entity.id}</small></span><em>${owned}</em>`;
+      const definition = definitionById.get(entity.definitionId);
+      button.innerHTML = `<span>${definition?.displayName ?? entity.definitionId}</span><small>${entity.isolated ? "paused" : "live"}</small>`;
       button.addEventListener("click", () => {
         selectedEntityId = entity.id;
-        renderList();
+        closePopovers();
+        lastManageSignature = "";
+        renderOwnedList();
       });
       return button;
     }),
   );
-  renderInspector();
 };
 
 const observeState = (snapshot: CanonicalStateSnapshot): void => {
@@ -152,20 +138,77 @@ const observeState = (snapshot: CanonicalStateSnapshot): void => {
   }
   if (pendingAfterRevision !== undefined && snapshot.sceneRevision > pendingAfterRevision) {
     pendingAfterRevision = undefined;
-    actionStatus.textContent = "Accepted · authoritative scene updated";
+    actionStatus.textContent = "Accepted · room updated";
     actionStatus.dataset.kind = "accepted";
   }
-  const itemSignature = entities
-    .filter(({ kind }) => kind === "item")
-    .map(({ id, ownerUserId, definitionId, rotation, scale, variant }) =>
-      [id, ownerUserId, definitionId, rotation, scale, variant].join(":"),
-    )
-    .join("|");
-  const uiSignature = `${snapshot.sceneRevision}/${selectedEntityId ?? ""}/${itemSignature}`;
-  if (uiSignature !== lastUiSignature) {
-    lastUiSignature = uiSignature;
-    renderList();
+  renderOwnedList();
+};
+
+const ensureOutline = (entityId: string): HTMLElement => {
+  let outline = ownershipLayer.querySelector<HTMLElement>(
+    `[data-outline-id="${CSS.escape(entityId)}"]`,
+  );
+  if (!outline) {
+    outline = document.createElement("div");
+    outline.className = "owned-outline";
+    outline.dataset.outlineId = entityId;
+    ownershipLayer.append(outline);
   }
+  return outline;
+};
+
+const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => {
+  const ownedIds = new Set(entities.filter(isOwned).map(({ id }) => id));
+  ownershipLayer.querySelectorAll<HTMLElement>("[data-outline-id]").forEach((outline) => {
+    if (!ownedIds.has(outline.dataset.outlineId!)) outline.remove();
+  });
+
+  for (const projection of snapshot.entities) {
+    const entity = entities.find(({ id }) => id === projection.entityId);
+    if (!entity || !isOwned(entity)) continue;
+    const definition = definitionById.get(entity.definitionId);
+    if (!definition) continue;
+    const outline = ensureOutline(entity.id);
+    const scale = (entity.scale ?? 1) * snapshot.viewport.scale;
+    outline.style.width = `${definition.visual.size.width * scale}px`;
+    outline.style.height = `${definition.visual.size.height * scale}px`;
+    outline.style.left = `${projection.screen.x}px`;
+    outline.style.top = `${projection.screen.y}px`;
+    outline.style.transform = `translate(-50%, -50%) rotate(${projection.rotation}rad)`;
+    outline.classList.toggle("selected", entity.id === selectedEntityId);
+    outline.classList.toggle("isolated", entity.isolated === true);
+    outline.hidden = !projection.visible;
+  }
+
+  const entity = selectedEntity();
+  const projection = snapshot.entities.find(({ entityId }) => entityId === entity?.id);
+  if (!entity || !projection || !isOwned(entity) || !projection.visible) {
+    editToolbar.hidden = true;
+    return;
+  }
+  editToolbar.hidden = false;
+  editToolbar.style.left = `${projection.screen.x}px`;
+  const definition = definitionById.get(entity.definitionId);
+  const halfHeight =
+    ((definition?.visual.size.height ?? 3) *
+      (entity.scale ?? 1) *
+      snapshot.viewport.scale) /
+    2;
+  editToolbar.style.top = `${Math.max(52, projection.screen.y - halfHeight - 9)}px`;
+  editToolbar.classList.toggle("below", projection.screen.y - halfHeight < 100);
+  colorTools.hidden = !editableColors.has(entity.definitionId);
+  isolateButton.classList.toggle("active", entity.isolated === true);
+  isolateButton.textContent = entity.isolated ? "▶" : "◌";
+  isolateButton.setAttribute(
+    "aria-label",
+    entity.isolated ? "Resume physics" : "Pause physics while editing",
+  );
+  isolateButton.title = entity.isolated
+    ? "Resume physics, collision, and behavior"
+    : "Pause physics, collision, and behavior";
+  document.querySelectorAll<HTMLButtonElement>("[data-color]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.color === entity.variant);
+  });
 };
 
 const join = async (): Promise<void> => {
@@ -183,9 +226,10 @@ const join = async (): Promise<void> => {
       name: "item-playground-simulation",
     });
     nextRuntime = new CanvasRuntime({
-      roomId: "item-playground",
+      roomId: "item-playground-live",
       serverUrl,
-      credentialProvider: async () => devRealtimeCredential(userInput.value, userInput.value),
+      credentialProvider: async () =>
+        devRealtimeCredential(userInput.value, userInput.value),
       mount: stage,
       definitions: playgroundDefinitions,
       assets: playgroundAssets,
@@ -194,10 +238,11 @@ const join = async (): Promise<void> => {
       pointer: { mode: "thumbstick", deadZonePx: 4, fullRangePx: 60 },
       onEditSelectionChange: ({ selectedEntityId: id }) => {
         selectedEntityId = id;
-        renderList();
+        lastManageSignature = "";
+        renderOwnedList();
       },
       onAssetProgress: ({ loaded, total }) => {
-        connectionStatus.textContent = `Loading consumer assets… ${loaded}/${total}`;
+        connectionStatus.textContent = `Loading assets… ${loaded}/${total}`;
       },
       onError: (error) => {
         pendingAfterRevision = undefined;
@@ -209,19 +254,28 @@ const join = async (): Promise<void> => {
       },
     });
     runtime = nextRuntime;
-    unsubscribe = nextRuntime.subscribeCanonicalState(observeState);
+    unsubscribeState = nextRuntime.subscribeCanonicalState(observeState);
+    unsubscribeOverlay = nextRuntime.subscribeOverlayProjection(renderOverlays, {
+      maxHz: 60,
+      kinds: ["item"],
+    });
     await nextRuntime.start();
     await nextRuntime.whenReady();
     nextRuntime.setEditMode(true);
     leaveButton.disabled = false;
-    modeButton.disabled = false;
-    paletteButtons.forEach((button) => { button.disabled = false; });
-    actionStatus.textContent = "Ready · spawn or select an item";
+    spawnToggle.disabled = false;
+    manageToggle.disabled = false;
+    paletteButtons.forEach((button) => {
+      button.disabled = false;
+    });
+    actionStatus.textContent = "Ready · editing is live";
   } catch (error) {
     runtime = undefined;
     nextRuntime?.stop();
-    unsubscribe?.();
-    unsubscribe = undefined;
+    unsubscribeState?.();
+    unsubscribeOverlay?.();
+    unsubscribeState = undefined;
+    unsubscribeOverlay = undefined;
     joinButton.disabled = false;
     connectionStatus.textContent = `Join failed: ${String(error)}`;
   } finally {
@@ -232,86 +286,116 @@ const join = async (): Promise<void> => {
 const leave = (): void => {
   const leaving = runtime;
   runtime = undefined;
-  unsubscribe?.();
-  unsubscribe = undefined;
+  unsubscribeState?.();
+  unsubscribeOverlay?.();
+  unsubscribeState = undefined;
+  unsubscribeOverlay = undefined;
   void (leaving?.stopGracefully() ?? Promise.resolve()).finally(() => {
     stage.querySelectorAll("canvas").forEach((canvas) => canvas.remove());
     joinButton.disabled = false;
   });
   leaveButton.disabled = true;
-  modeButton.disabled = true;
-  modeButton.textContent = "Edit mode";
-  modeButton.classList.remove("active");
-  paletteButtons.forEach((button) => { button.disabled = true; });
+  spawnToggle.disabled = true;
+  manageToggle.disabled = true;
+  paletteButtons.forEach((button) => {
+    button.disabled = true;
+  });
+  closePopovers();
   entities = [];
   selectedEntityId = undefined;
-  lastUiSignature = "";
+  ownershipLayer.replaceChildren();
+  editToolbar.hidden = true;
+  lastManageSignature = "";
   connectionStatus.textContent = "Not connected";
   actionStatus.textContent = "Ready";
-  renderList();
+  renderOwnedList();
 };
 
-paletteButtons.forEach((button) => {
+spawnToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  togglePopover(spawnToggle, spawnPopover);
+});
+manageToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  togglePopover(manageToggle, managePopover);
+});
+spawnPopover.addEventListener("click", (event) => event.stopPropagation());
+managePopover.addEventListener("click", (event) => event.stopPropagation());
+document.addEventListener("click", () => closePopovers());
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closePopovers();
+});
+
+paletteButtons.forEach((button) =>
   button.addEventListener("click", () => {
     const definitionId = button.dataset.spawn!;
     const position = spawnPositions[spawnCursor++ % spawnPositions.length]!;
     idsBeforeSpawn = new Set(entities.map(({ id }) => id));
     pendingSpawnDefinition = definitionId;
-    requestMutation(`Spawning ${definitionNames.get(definitionId)}…`, () =>
-      runtime!.spawnItem(definitionId, position),
+    closePopovers();
+    requestMutation(
+      `Spawning ${definitionById.get(definitionId)?.displayName ?? definitionId}…`,
+      () => runtime!.spawnItem(definitionId, position),
     );
-  });
-});
+  }),
+);
 
 rotateLeft.addEventListener("click", () => {
   const entity = selectedEntity();
   if (!entity) return;
-  requestMutation("Rotating item…", () =>
+  requestMutation("Rotating…", () =>
     runtime!.rotateItem(entity.id, entity.rotation - Math.PI / 12),
   );
 });
 rotateRight.addEventListener("click", () => {
   const entity = selectedEntity();
   if (!entity) return;
-  requestMutation("Rotating item…", () =>
+  requestMutation("Rotating…", () =>
     runtime!.rotateItem(entity.id, entity.rotation + Math.PI / 12),
   );
 });
-scaleInput.addEventListener("input", () => {
-  scaleValue.value = `${Number(scaleInput.value).toFixed(2)}×`;
-});
-scaleInput.addEventListener("change", () => {
+scaleDown.addEventListener("click", () => {
   const entity = selectedEntity();
   if (!entity) return;
-  requestMutation("Scaling visual and collider…", () =>
-    runtime!.scaleItem(entity.id, Number(scaleInput.value)),
+  requestMutation("Scaling…", () =>
+    runtime!.scaleItem(entity.id, Math.max(0.5, (entity.scale ?? 1) - 0.15)),
   );
 });
-document.querySelectorAll<HTMLButtonElement>("[data-theme]").forEach((button) => {
+scaleUp.addEventListener("click", () => {
+  const entity = selectedEntity();
+  if (!entity) return;
+  requestMutation("Scaling…", () =>
+    runtime!.scaleItem(entity.id, Math.min(2.5, (entity.scale ?? 1) + 0.15)),
+  );
+});
+isolateButton.addEventListener("click", () => {
+  const entity = selectedEntity();
+  if (!entity) return;
+  const isolated = entity.isolated !== true;
+  requestMutation(
+    isolated
+      ? "Pausing this item's simulation…"
+      : "Returning item to live simulation…",
+    () => runtime!.setItemIsolation(entity.id, isolated),
+  );
+});
+document.querySelectorAll<HTMLButtonElement>("[data-color]").forEach((button) =>
   button.addEventListener("click", () => {
     const entity = selectedEntity();
     if (!entity) return;
-    const theme = button.dataset.theme as OrbTheme;
-    requestMutation(`Applying ${theme} config…`, () =>
+    const theme = button.dataset.color as OrbTheme;
+    requestMutation(`Applying ${theme}…`, () =>
       runtime!.setItemConfig(entity.id, { theme }),
     );
-  });
-});
+  }),
+);
 deleteButton.addEventListener("click", () => {
   const entity = selectedEntity();
   if (!entity) return;
-  requestMutation("Deleting item…", () => runtime!.deleteItem(entity.id));
+  requestMutation("Deleting…", () => runtime!.deleteItem(entity.id));
 });
 joinButton.addEventListener("click", () => void join());
 leaveButton.addEventListener("click", leave);
-modeButton.addEventListener("click", () => {
-  const editing = runtime?.toggleEditMode() ?? false;
-  modeButton.textContent = editing ? "Edit mode" : "Play mode";
-  modeButton.classList.toggle("active", !editing);
-  actionStatus.textContent = editing
-    ? "Edit mode · drag owned items"
-    : "Play mode · move the visitor and touch the orb";
-});
 
-renderList();
+renderOwnedList();
 if (params.has("autojoin")) void join();

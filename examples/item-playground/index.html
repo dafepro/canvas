@@ -3,88 +3,76 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Canvas Physics · Item playground</title>
+    <title>Canvas Physics · Live item studio</title>
   </head>
   <body>
     <main id="app">
       <header>
         <div>
           <p class="eyebrow">Canvas Physics reference integration</p>
-          <h1>Item playground</h1>
+          <h1>Live item studio</h1>
         </div>
-        <p class="intro">A compact 36 × 24 canvas for inspecting large, editable items.</p>
+        <p class="intro">Spawn and edit in the room itself—the simulation never becomes a separate editor.</p>
         <div class="connection">
           <input id="user" aria-label="User name" autocomplete="off" />
           <button id="join">Join</button>
           <button id="leave" disabled>Leave</button>
-          <button id="mode" disabled>Edit mode</button>
         </div>
       </header>
 
       <section class="workspace">
-        <div id="stage" aria-label="Compact item management canvas">
-          <div class="stage-hint">Edit mode · drag your items directly</div>
+        <div id="stage" aria-label="Compact live item management canvas">
+          <div class="stage-tools" aria-label="Item tools">
+            <button id="spawn-toggle" class="tool-button" disabled aria-expanded="false" aria-controls="spawn-popover" title="Spawn an item">
+              <span class="tool-icon" aria-hidden="true">＋</span><span>Spawn</span>
+            </button>
+            <button id="manage-toggle" class="tool-button" disabled aria-expanded="false" aria-controls="manage-popover" title="Manage your items">
+              <span class="tool-icon" aria-hidden="true">◇</span><span>Manage</span>
+            </button>
+
+            <section id="spawn-popover" class="popover" hidden>
+              <div class="popover-title"><strong>Spawn something</strong><small>Owned by you</small></div>
+              <div class="spawn-grid">
+                <button data-spawn="emoji-party"><b>🥳</b><span>Emoji</span></button>
+                <button data-spawn="photo-card"><b>▧</b><span>Picture</span></button>
+                <button data-spawn="reactive-orb"><b>●</b><span>Orb</span></button>
+                <button data-spawn="color-tile"><b class="rainbow">■</b><span>Color tile</span></button>
+              </div>
+            </section>
+
+            <section id="manage-popover" class="popover" hidden>
+              <div class="popover-title"><strong>Your items</strong><small>Choose one to edit</small></div>
+              <div id="owned-list" class="owned-list"><p class="empty">Nothing spawned yet.</p></div>
+            </section>
+          </div>
+
+          <div id="ownership-layer" class="ownership-layer" aria-hidden="true"></div>
+          <div id="edit-toolbar" class="edit-toolbar" hidden>
+            <div id="color-tools" class="color-tools" hidden>
+              <button data-color="mint" aria-label="Make mint" title="Mint"><i class="mint"></i></button>
+              <button data-color="coral" aria-label="Make coral" title="Coral"><i class="coral"></i></button>
+              <button data-color="violet" aria-label="Make violet" title="Violet"><i class="violet"></i></button>
+            </div>
+            <div class="edit-actions">
+              <button id="rotate-left" aria-label="Rotate left" title="Rotate left">↶</button>
+              <button id="rotate-right" aria-label="Rotate right" title="Rotate right">↷</button>
+              <button id="scale-down" aria-label="Make smaller" title="Make smaller">−</button>
+              <button id="scale-up" aria-label="Make larger" title="Make larger">＋</button>
+              <button id="isolate" aria-label="Pause physics while editing" title="Pause physics, collision, and behavior">◌</button>
+              <button id="delete" class="danger" aria-label="Delete item" title="Delete">⌫</button>
+            </div>
+          </div>
+
+          <div class="live-proof"><span aria-hidden="true">●</span> The gold ball stays live while you edit</div>
+          <div class="status-card">
+            <span id="connection-status">Not connected</span>
+            <strong id="action-status">Ready</strong>
+          </div>
         </div>
         <p class="canvas-note">
-          Edit mode lets you drag your items. Switch to play mode, then use WASD or
-          the pointer joystick to touch the orb and trigger its consumer behavior.
+          Your editable items have a thin green outline. Click or drag one for its private in-canvas controls. Use WASD or drag empty space as a joystick to move.
         </p>
       </section>
-
-      <aside>
-        <section class="panel palette-panel">
-          <div class="panel-heading">
-            <div><span>1</span><h2>Spawn</h2></div>
-            <small>ordinary owned items</small>
-          </div>
-          <div id="palette" class="palette">
-            <button data-spawn="emoji-party"><b>🥳</b><span>Emoji</span></button>
-            <button data-spawn="photo-card"><b>▧</b><span>Picture</span></button>
-            <button data-spawn="reactive-orb"><b>●</b><span>Orb</span></button>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-heading">
-            <div><span>2</span><h2>Select</h2></div>
-            <small>ownership is authoritative</small>
-          </div>
-          <div id="item-list" class="item-list">
-            <p class="empty">Join to inspect room items.</p>
-          </div>
-        </section>
-
-        <section class="panel inspector">
-          <div class="panel-heading">
-            <div><span>3</span><h2>Manage</h2></div>
-            <small id="selection-owner">nothing selected</small>
-          </div>
-          <strong id="selection-name">Select an item</strong>
-          <code id="selection-id">—</code>
-          <div class="transform-grid">
-            <button id="rotate-left" disabled aria-label="Rotate left">↶ 15°</button>
-            <button id="rotate-right" disabled aria-label="Rotate right">↷ 15°</button>
-          </div>
-          <label for="scale">Uniform scale <output id="scale-value">1.00×</output></label>
-          <input id="scale" type="range" min="0.5" max="2.5" step="0.05" value="1" disabled />
-          <fieldset id="theme-controls" disabled>
-            <legend>Orb configuration</legend>
-            <button data-theme="mint">Mint</button>
-            <button data-theme="coral">Coral</button>
-            <button data-theme="violet">Violet</button>
-          </fieldset>
-          <button id="delete" class="danger" disabled>Delete item</button>
-          <p class="ownership-note">
-            Select another user’s item or the room-owned stamp and try an edit. The
-            server will reject it instead of trusting this UI.
-          </p>
-        </section>
-
-        <div class="status-card">
-          <span id="connection-status">Not connected</span>
-          <strong id="action-status">Ready</strong>
-        </div>
-      </aside>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

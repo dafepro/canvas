@@ -1,5 +1,5 @@
 {
-  "id": "item-playground",
+  "id": "item-playground-live",
   "version": 1,
   "size": { "width": 36, "height": 24 },
   "orientation": "topDown",
@@ -17,8 +17,8 @@
   "environment": {
     "base": {
       "gravityXY": { "x": 0, "y": 0 },
-      "linearDrag": 1,
-      "angularDrag": 1,
+      "linearDrag": 0.03,
+      "angularDrag": 0.08,
       "softSpeedLimit": 12,
       "surfaceFrictionMultiplier": 1
     }
@@ -34,6 +34,13 @@
       "definitionVersion": 1,
       "transform": { "x": 31.5, "y": 21, "rotation": -0.08, "scale": 1 },
       "resolvedConfig": {}
+    },
+    {
+      "entityId": "always-live-ball",
+      "definitionId": "live-bouncer",
+      "definitionVersion": 1,
+      "transform": { "x": 18, "y": 10, "rotation": 0, "scale": 1 },
+      "resolvedConfig": { "minimumSpeed": 3, "velocity": { "x": 7, "y": 5 } }
     }
   ],
   "limits": {

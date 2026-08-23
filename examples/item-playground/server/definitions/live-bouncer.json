@@ -1,0 +1,48 @@
+{
+  "definitionId": "live-bouncer",
+  "version": 1,
+  "displayName": "Always-live ball",
+  "visual": {
+    "spriteId": "playground.ball",
+    "size": { "width": 3.6, "height": 3.6 },
+    "placeholder": { "shape": "circle", "color": 16242507 },
+    "zIndex": 8
+  },
+  "body": {
+    "mode": "dynamic",
+    "gravityScale": 0,
+    "linearDamping": 0,
+    "angularDamping": 0.05,
+    "canSleep": false
+  },
+  "colliders": [
+    {
+      "id": "solid",
+      "role": "itemSolid",
+      "shape": { "type": "circle", "radius": 1.75 },
+      "restitution": 1,
+      "friction": 0
+    }
+  ],
+  "behaviorType": "liveBouncer",
+  "defaultConfig": { "minimumSpeed": 3, "velocity": { "x": 7, "y": 5 } },
+  "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "minimumSpeed": { "type": "number", "minimum": 0, "maximum": 20 },
+      "velocity": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number", "minimum": -20, "maximum": 20 },
+          "y": { "type": "number", "minimum": -20, "maximum": 20 }
+        },
+        "required": ["x", "y"],
+        "additionalProperties": false
+      }
+    },
+    "required": ["minimumSpeed", "velocity"],
+    "additionalProperties": false
+  }
+}

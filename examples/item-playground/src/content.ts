@@ -3,6 +3,10 @@ import {
   defaultReactiveOrbConfig,
   type ReactiveOrbConfig,
 } from "./reactive-orb-behavior.js";
+import {
+  defaultLiveBouncerConfig,
+  type LiveBouncerConfig,
+} from "./live-bouncer-behavior.js";
 
 const durableFixed = {
   body: { mode: "fixed" as const, gravityScale: 0, lockRotation: true },
@@ -109,6 +113,65 @@ export const systemStampDefinition: ItemDefinition<Record<string, never>> = {
   defaultConfig: {},
 };
 
+export const colorTileDefinition: ItemDefinition<ReactiveOrbConfig> = {
+  definitionId: "color-tile",
+  version: 1,
+  displayName: "Color tile",
+  visual: {
+    spriteId: "playground.tile.mint",
+    size: { width: 6, height: 4.5 },
+    placeholder: { shape: "rect", color: 0x68e0c2 },
+    zIndex: 5,
+    variants: {
+      mint: { spriteId: "playground.tile.mint" },
+      coral: { spriteId: "playground.tile.coral" },
+      violet: { spriteId: "playground.tile.violet" },
+    },
+  },
+  ...durableFixed,
+  behaviorType: "reactiveOrb",
+  colliders: [
+    { id: "solid", role: "itemSolid", shape: { type: "rect", width: 6, height: 4.5 } },
+  ],
+  defaultConfig: defaultReactiveOrbConfig,
+};
+
+export const liveBouncerDefinition: ItemDefinition<LiveBouncerConfig> = {
+  definitionId: "live-bouncer",
+  version: 1,
+  displayName: "Always-live ball",
+  visual: {
+    spriteId: "playground.ball",
+    size: { width: 3.6, height: 3.6 },
+    placeholder: { shape: "circle", color: 0xf7d74b },
+    zIndex: 8,
+  },
+  body: {
+    mode: "dynamic",
+    gravityScale: 0,
+    linearDamping: 0,
+    angularDamping: 0.05,
+    canSleep: false,
+  },
+  colliders: [
+    {
+      id: "solid",
+      role: "itemSolid",
+      shape: { type: "circle", radius: 1.75 },
+      restitution: 1,
+      friction: 0,
+    },
+  ],
+  behaviorType: "liveBouncer",
+  defaultConfig: defaultLiveBouncerConfig,
+  persistence: {
+    transform: true,
+    behaviorState: true,
+    onRoomSleep: "pause",
+  },
+  complexity: "simple",
+};
+
 export const playgroundAvatarDefinition: ItemDefinition<Record<string, never>> = {
   definitionId: "avatar",
   version: 1,
@@ -132,6 +195,8 @@ export const playgroundDefinitions: ItemDefinition[] = [
   partyEmojiDefinition,
   photoCardDefinition,
   reactiveOrbDefinition as ItemDefinition,
+  colorTileDefinition as ItemDefinition,
+  liveBouncerDefinition as ItemDefinition,
   systemStampDefinition,
   playgroundAvatarDefinition,
 ];

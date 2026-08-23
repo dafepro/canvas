@@ -1,0 +1,32 @@
+{
+  "definitionId": "color-tile",
+  "version": 1,
+  "displayName": "Color tile",
+  "visual": {
+    "spriteId": "playground.tile.mint",
+    "size": { "width": 6, "height": 4.5 },
+    "placeholder": { "shape": "rect", "color": 6873282 },
+    "zIndex": 5,
+    "variants": {
+      "mint": { "spriteId": "playground.tile.mint" },
+      "coral": { "spriteId": "playground.tile.coral" },
+      "violet": { "spriteId": "playground.tile.violet" }
+    }
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [
+    { "id": "solid", "role": "itemSolid", "shape": { "type": "rect", "width": 6, "height": 4.5 } }
+  ],
+  "behaviorType": "reactiveOrb",
+  "defaultConfig": { "theme": "mint" },
+  "persistence": { "transform": true, "behaviorState": false, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "theme": { "type": "string", "enum": ["mint", "coral", "violet"] }
+    },
+    "required": ["theme"],
+    "additionalProperties": false
+  }
+}
