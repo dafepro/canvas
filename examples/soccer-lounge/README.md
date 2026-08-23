@@ -26,6 +26,13 @@ The room template materializes one system-owned match ball exactly once when no
 snapshot exists. Participants can kick it but cannot move, reconfigure, rotate,
 or delete it through durable authoring commands.
 
+The example's ball behavior separates `kickStrength`, which turns player motion
+into a kick, from `pinchStrength`, which amplifies a ball returning toward a
+player. Repeated player-wall contacts can therefore build speed, while
+`maxImpulse` and the canvas `softSpeedLimit` keep the effect bounded. These are
+consumer-owned soccer settings; the Canvas engine needs no soccer-specific
+physics path.
+
 Run its focused checks with:
 
 ```bash

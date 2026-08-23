@@ -13,6 +13,7 @@ import {
 export interface SoccerBallConfig {
   sensorId: string;
   kickStrength: number;
+  pinchStrength: number;
   maxImpulse: number;
   tangentialStrength: number;
   maxTangentialImpulse: number;
@@ -38,6 +39,7 @@ export interface SoccerBallState {
 export const defaultSoccerBallConfig: SoccerBallConfig = {
   sensorId: "kick",
   kickStrength: 1.7,
+  pinchStrength: 2.6,
   maxImpulse: 24,
   tangentialStrength: 0.35,
   maxTangentialImpulse: 5,
@@ -158,8 +160,14 @@ export const SoccerBallBehavior: ItemBehavior<SoccerBallConfig, SoccerBallState>
     const avatarVelocity = ctx.velocity(event.other.entityId) ?? { x: 0, y: 0 };
     const ballVelocity = ctx.velocity() ?? { x: 0, y: 0 };
     const relativeVelocity = sub(avatarVelocity, ballVelocity);
-    const closingSpeed = Math.max(0, dot(relativeVelocity, normal));
-    const magnitude = clamp(config.kickStrength * closingSpeed, 0, config.maxImpulse);
+    const playerClosingSpeed = Math.max(0, dot(avatarVelocity, normal));
+    const incomingBallSpeed = Math.max(0, -dot(ballVelocity, normal));
+    const magnitude = clamp(
+      config.kickStrength * playerClosingSpeed +
+        config.pinchStrength * incomingBallSpeed,
+      0,
+      config.maxImpulse,
+    );
     if (magnitude === 0) return { state: state as SoccerBallState, commands: [] };
 
     // In screen/world coordinates +Y points down. This tangent is clockwise

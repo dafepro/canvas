@@ -1,6 +1,6 @@
 {
   "definitionId": "soccer-ball",
-  "version": 4,
+  "version": 5,
   "displayName": "Match ball",
   "visual": {
     "spriteId": "soccer.ball.idle",
@@ -51,6 +51,7 @@
   "defaultConfig": {
     "sensorId": "kick",
     "kickStrength": 1.7,
+    "pinchStrength": 2.6,
     "maxImpulse": 24,
     "tangentialStrength": 0.35,
     "maxTangentialImpulse": 5,
@@ -74,6 +75,7 @@
     "properties": {
       "sensorId": { "type": "string" },
       "kickStrength": { "type": "number" },
+      "pinchStrength": { "type": "number", "minimum": 0 },
       "maxImpulse": { "type": "number" },
       "tangentialStrength": { "type": "number", "minimum": 0 },
       "maxTangentialImpulse": { "type": "number", "minimum": 0 },
@@ -97,6 +99,7 @@
     "required": [
       "sensorId",
       "kickStrength",
+      "pinchStrength",
       "maxImpulse",
       "tangentialStrength",
       "maxTangentialImpulse",

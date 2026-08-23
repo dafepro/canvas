@@ -6,7 +6,7 @@ import {
 
 export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
   definitionId: "soccer-ball",
-  version: 4,
+  version: 5,
   displayName: "Match ball",
   visual: {
     spriteId: "soccer.ball.idle",

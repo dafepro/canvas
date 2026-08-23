@@ -87,6 +87,52 @@ describe("SoccerBallBehavior", () => {
     expect(h.host.body(h.entityId).velocity.x).toBeGreaterThan(0);
   });
 
+  it("amplifies an incoming ball pinched against a stationary avatar", () => {
+    const h = harness();
+    h.host.body(h.entityId).transform = { x: 50, y: 40, rotation: 0 };
+    h.host.body(h.entityId).velocity = { x: -8, y: 0 };
+    h.host.body("avatar-1", { x: 47, y: 40 }).velocity = { x: 0, y: 0 };
+
+    h.send({
+      type: "contact.enter",
+      selfColliderId: "kick",
+      other: avatarParty("avatar-1"),
+    }).flush();
+
+    expect(h.host.body(h.entityId).velocity.x).toBeGreaterThan(8);
+  });
+
+  it("builds speed over repeated bounded player-wall pinches", () => {
+    const h = harness();
+    h.host.body(h.entityId).transform = { x: 50, y: 40, rotation: 0 };
+    h.host.body(h.entityId).velocity = { x: -8, y: 0 };
+    h.host.body("avatar-1", { x: 47, y: 40 }).velocity = { x: 0, y: 0 };
+
+    h.send({
+      type: "contact.enter",
+      selfColliderId: "kick",
+      other: avatarParty("avatar-1"),
+    }).flush();
+    const firstOutgoingSpeed = h.host.body(h.entityId).velocity.x;
+
+    // Return the ball as if it bounced off the nearby wall. The configured
+    // wall restitution is 0.72, so pinching must overcome that energy loss.
+    h.host.body(h.entityId).velocity = { x: -firstOutgoingSpeed * 0.72, y: 0 };
+    h.advanceSeconds(defaultSoccerBallConfig.cooldownSeconds);
+    h.send({
+      type: "contact.stay",
+      selfColliderId: "kick",
+      other: avatarParty("avatar-1"),
+      dwellTicks: 1,
+    }).flush();
+
+    expect(firstOutgoingSpeed).toBeGreaterThan(8);
+    expect(h.host.body(h.entityId).velocity.x).toBeGreaterThan(firstOutgoingSpeed);
+    expect(h.commands("applyImpulse").at(-1)?.impulse.x).toBeLessThanOrEqual(
+      defaultSoccerBallConfig.maxImpulse,
+    );
+  });
+
   it("turns a glancing kick into lateral motion and matching clockwise spin", () => {
     const h = harness();
     h.host.body(h.entityId).transform = { x: 50, y: 40, rotation: 0 };
