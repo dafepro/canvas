@@ -167,6 +167,7 @@ export const SoccerBallBehavior: ItemBehavior<SoccerBallConfig, SoccerBallState>
           type: "applyImpulse",
           impulse: { x: normal.x * magnitude, y: normal.y * magnitude },
         },
+        { type: "startAnimation", animation: "hardKick", loop: false },
         { type: "emitEffect", effect: "kickPuff", params: { magnitude } },
       ],
     };

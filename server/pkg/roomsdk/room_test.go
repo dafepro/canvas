@@ -165,7 +165,7 @@ func (c *testClient) sendJoin(definitions ...*pb.DefinitionVersion) {
 		RoomId: "test-canvas",
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
 			CanvasId:        "test-canvas",
-			ProtocolVersion: 2,
+			ProtocolVersion: 3,
 			Definitions:     definitions,
 		}},
 	})
@@ -1434,8 +1434,8 @@ func TestProtocolMismatchIsRefused(t *testing.T) {
 	if got.Code != "protocol_mismatch" {
 		t.Errorf("error code = %q, want protocol_mismatch", got.Code)
 	}
-	if got.ServerProtocolVersion != 2 {
-		t.Errorf("server protocol version = %d, want 2", got.ServerProtocolVersion)
+	if got.ServerProtocolVersion != 3 {
+		t.Errorf("server protocol version = %d, want 3", got.ServerProtocolVersion)
 	}
 }
 

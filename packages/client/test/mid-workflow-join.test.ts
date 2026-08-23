@@ -75,6 +75,8 @@ const entityState = (behaviorState: unknown): EntityState => ({
   },
   lastProcessedInputSequence: 0,
   spriteVariant: "armed",
+  spriteAnimation: "",
+  animationEpoch: 0,
   behaviorStateJson: toJsonBytes(behaviorState),
   quarantined: false,
   definitionId: "rocket",

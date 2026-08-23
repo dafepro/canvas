@@ -13,6 +13,8 @@ export interface RenderComponent {
   definitionVersion?: number;
   variant?: string;
   animation?: string;
+  /** Rises whenever an animation starts, including replaying the same name. */
+  animationEpoch?: number;
   zIndex: number;
   size: { width: number; height: number };
 }

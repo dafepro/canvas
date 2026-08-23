@@ -27,6 +27,7 @@ const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity =
   angularVelocity: entity.rigidBody?.angularVelocity ?? 0,
   variant: entity.render?.variant,
   animation: entity.render?.animation,
+  animationEpoch: entity.render?.animationEpoch,
   userId: entity.avatar?.userId,
   ownerUserId: entity.ownership?.ownerUserId,
   lastProcessedInputSequence: entity.avatar?.lastProcessedInputSeq,

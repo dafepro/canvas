@@ -185,6 +185,14 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       },
       1_500,
     );
+    await waitFor(
+      "the launch animation to reach the peer",
+      () => {
+        const onPeer = entity(bob, rocketId);
+        return onPeer?.animation === "launch" && (onPeer.animationEpoch ?? 0) > 0;
+      },
+      2_000,
+    );
   }, 90_000);
 
   it("moves the peer avatar on the host from relayed input", async () => {

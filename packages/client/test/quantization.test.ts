@@ -31,6 +31,8 @@ describe("realtime transform quantization", () => {
       entityId: "avatar:c-12345678",
       lastProcessedInputSequence: 42,
       spriteVariant: "",
+      spriteAnimation: "",
+      animationEpoch: 0,
       behaviorStateJson: new Uint8Array(),
       quarantined: false,
       definitionId: "",

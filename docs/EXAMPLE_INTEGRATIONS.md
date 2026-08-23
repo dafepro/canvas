@@ -45,9 +45,11 @@ shortcut:
   after their realtime peer disappears. Zoomigo can then map inactive members
   to a bench without Canvas learning about teams or benches.
 
-The example's SVG overlay is deliberately product-owned. It will adopt the
-versioned asset manifest and preload gate when that generic Priority 1 contract
-is available.
+The product-owned SVG field and generated ball atlas are loaded through the
+versioned asset manifest and preload gate. The field texture is decorative;
+the independently defined static colliders and goal sensors remain the
+authoritative gameplay geometry. The hard-kick atlas animation is started by
+the consumer behavior and synchronized by Canvas's generic animation channel.
 
 The canvas definition's `systemItems` materializes exactly one match ball on a
 new room. System items have no participant owner and reject participant move,

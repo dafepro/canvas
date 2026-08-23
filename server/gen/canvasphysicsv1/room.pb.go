@@ -1109,9 +1109,12 @@ type EntityState struct {
 	// a respawn. A client that sees a new value snaps instead of interpolating.
 	TeleportEpoch uint32 `protobuf:"varint,14,opt,name=teleport_epoch,json=teleportEpoch,proto3" json:"teleport_epoch,omitempty"`
 	// Addendum A3. True while the body waits out its respawn delay.
-	Respawning    bool `protobuf:"varint,15,opt,name=respawning,proto3" json:"respawning,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Respawning bool `protobuf:"varint,15,opt,name=respawning,proto3" json:"respawning,omitempty"`
+	// Named definition animation and a replay counter for repeated starts.
+	SpriteAnimation string `protobuf:"bytes,16,opt,name=sprite_animation,json=spriteAnimation,proto3" json:"sprite_animation,omitempty"`
+	AnimationEpoch  uint32 `protobuf:"varint,17,opt,name=animation_epoch,json=animationEpoch,proto3" json:"animation_epoch,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *EntityState) Reset() {
@@ -1212,6 +1215,20 @@ func (x *EntityState) GetRespawning() bool {
 		return x.Respawning
 	}
 	return false
+}
+
+func (x *EntityState) GetSpriteAnimation() string {
+	if x != nil {
+		return x.SpriteAnimation
+	}
+	return ""
+}
+
+func (x *EntityState) GetAnimationEpoch() uint32 {
+	if x != nil {
+		return x.AnimationEpoch
+	}
+	return 0
 }
 
 type QuantizedTransform struct {
@@ -1996,7 +2013,7 @@ const file_room_proto_rawDesc = "" +
 	"\tintensity\x18\x03 \x01(\x02R\tintensity\x12-\n" +
 	"\x13client_time_unix_ms\x18\x04 \x01(\x04R\x10clientTimeUnixMs\x12\x12\n" +
 	"\x04held\x18\x05 \x01(\bR\x04held\x12'\n" +
-	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xc5\x03\n" +
+	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\x99\x04\n" +
 	"\vEntityState\x12\x1b\n" +
 	"\tentity_id\x18\x01 \x01(\tR\bentityId\x12U\n" +
 	"\x13quantized_transform\x18\x02 \x01(\v2$.canvasphysics.v1.QuantizedTransformR\x12quantizedTransform\x12A\n" +
@@ -2010,7 +2027,9 @@ const file_room_proto_rawDesc = "" +
 	"\x0eteleport_epoch\x18\x0e \x01(\rR\rteleportEpoch\x12\x1e\n" +
 	"\n" +
 	"respawning\x18\x0f \x01(\bR\n" +
-	"respawning\"\xb5\x01\n" +
+	"respawning\x12)\n" +
+	"\x10sprite_animation\x18\x10 \x01(\tR\x0fspriteAnimation\x12'\n" +
+	"\x0fanimation_epoch\x18\x11 \x01(\rR\x0eanimationEpoch\"\xb5\x01\n" +
 	"\x12QuantizedTransform\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x11R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x11R\x01y\x12\x1a\n" +

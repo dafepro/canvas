@@ -24,6 +24,7 @@ interface SpriteRecord {
   definitionId: string;
   variant?: string;
   animation?: string;
+  animationEpoch?: number;
 }
 
 /**
@@ -117,33 +118,35 @@ export class PixiScene {
       this.backgroundLayer.addChild(art);
     }
 
-    // Region bands make the environment gradient visible (spec 21.4).
-    for (const region of this.canvas.environment.regions ?? []) {
-      const shape = region.shape;
-      const band = new Graphics();
-      if (shape.type === "rect") {
-        band
-          .rect(
-            this.camera.toScreenX(shape.x),
-            this.camera.toScreenY(shape.y),
-            shape.w * this.camera.scale,
-            shape.h * this.camera.scale,
-          )
-          .fill({ color: 0x2b4c7e, alpha: 0.25 });
-      } else {
-        band
-          .circle(
-            this.camera.toScreenX(shape.x),
-            this.camera.toScreenY(shape.y),
-            shape.radius * this.camera.scale,
-          )
-          .fill({ color: 0x2b4c7e, alpha: 0.25 });
+    if (this.debug) {
+      // Region bands and collider geometry are diagnostic overlays (spec 21.4).
+      for (const region of this.canvas.environment.regions ?? []) {
+        const shape = region.shape;
+        const band = new Graphics();
+        if (shape.type === "rect") {
+          band
+            .rect(
+              this.camera.toScreenX(shape.x),
+              this.camera.toScreenY(shape.y),
+              shape.w * this.camera.scale,
+              shape.h * this.camera.scale,
+            )
+            .fill({ color: 0x2b4c7e, alpha: 0.25 });
+        } else {
+          band
+            .circle(
+              this.camera.toScreenX(shape.x),
+              this.camera.toScreenY(shape.y),
+              shape.radius * this.camera.scale,
+            )
+            .fill({ color: 0x2b4c7e, alpha: 0.25 });
+        }
+        this.backgroundLayer.addChild(band);
       }
-      this.backgroundLayer.addChild(band);
-    }
 
-    for (const geometry of this.canvas.staticGeometry) {
-      this.backgroundLayer.addChild(this.drawStatic(geometry));
+      for (const geometry of this.canvas.staticGeometry) {
+        this.backgroundLayer.addChild(this.drawStatic(geometry));
+      }
     }
   }
 
@@ -277,7 +280,8 @@ export class PixiScene {
       existing &&
       existing.definitionId === entity.definitionId &&
       existing.variant === entity.variant &&
-      existing.animation === entity.animation
+      existing.animation === entity.animation &&
+      existing.animationEpoch === entity.animationEpoch
     ) {
       return existing;
     }
@@ -292,6 +296,7 @@ export class PixiScene {
       definitionId: entity.definitionId,
       variant: entity.variant,
       animation: entity.animation,
+      animationEpoch: entity.animationEpoch,
     };
     this.entityLayer.addChild(display);
     this.sprites.set(entity.id, record);

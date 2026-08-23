@@ -65,6 +65,7 @@ export interface RenderEntity {
   angularVelocity: number;
   variant?: string;
   animation?: string;
+  animationEpoch?: number;
   userId?: string;
   ownerUserId?: string;
   lastProcessedInputSequence?: number;

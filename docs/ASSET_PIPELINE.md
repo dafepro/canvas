@@ -61,7 +61,8 @@ never silently select another asset.
 - `VisualDefinition.spriteId` selects an item's normal texture.
 - `visual.variants[name].spriteId` may replace it for a named variant.
 - `visual.animations[name].frames` lists texture IDs. `fps` and `loop` control
-  playback.
+  playback. `startAnimation` synchronizes the name plus a replay epoch, so
+  starting the same animation twice restarts it on every peer.
 - World-unit `visual.size` and `anchor` control display geometry. Source pixel
   dimensions do not affect collision or world scale.
 - Placeholder shapes remain the intentional asset-free and failure rendering

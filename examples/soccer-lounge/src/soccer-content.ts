@@ -9,11 +9,25 @@ export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
   version: 1,
   displayName: "Match ball",
   visual: {
+    spriteId: "soccer.ball.idle",
     size: { width: 2.6, height: 2.6 },
     placeholder: { shape: "circle", color: 0xf7f4e9 },
     zIndex: 6,
     variants: {
       goal: { color: 0xffd166 },
+    },
+    animations: {
+      hardKick: {
+        frames: [
+          "soccer.ball.idle",
+          "soccer.ball.impact",
+          "soccer.ball.stretch",
+          "soccer.ball.settle",
+          "soccer.ball.idle",
+        ],
+        fps: 18,
+        loop: false,
+      },
     },
   },
   body: {

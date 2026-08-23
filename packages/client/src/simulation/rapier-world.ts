@@ -1282,7 +1282,10 @@ export class RapierWorld implements BehaviorHost {
 
   startAnimation(id: EntityId, animation: string): void {
     const render = this.registry.get(id)?.render;
-    if (render) render.animation = animation;
+    if (render) {
+      render.animation = animation;
+      render.animationEpoch = (render.animationEpoch ?? 0) + 1;
+    }
   }
 
   emitEffect(emission: EffectEmission): void {

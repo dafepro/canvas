@@ -3,11 +3,25 @@
   "version": 1,
   "displayName": "Match ball",
   "visual": {
+    "spriteId": "soccer.ball.idle",
     "size": { "width": 2.6, "height": 2.6 },
     "placeholder": { "shape": "circle", "color": 16250089 },
     "zIndex": 6,
     "variants": {
       "goal": { "color": 16765286 }
+    },
+    "animations": {
+      "hardKick": {
+        "frames": [
+          "soccer.ball.idle",
+          "soccer.ball.impact",
+          "soccer.ball.stretch",
+          "soccer.ball.settle",
+          "soccer.ball.idle"
+        ],
+        "fps": 18,
+        "loop": false
+      }
     }
   },
   "body": {

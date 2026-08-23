@@ -1,5 +1,5 @@
 /** Bump the major value when the wire contract changes incompatibly. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const isCompatible = (clientVersion: number): boolean =>
   clientVersion === PROTOCOL_VERSION;

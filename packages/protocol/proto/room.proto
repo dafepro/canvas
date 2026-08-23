@@ -138,6 +138,9 @@ message EntityState {
   uint32 teleport_epoch = 14;
   // Addendum A3. True while the body waits out its respawn delay.
   bool respawning = 15;
+  // Named definition animation and a replay counter for repeated starts.
+  string sprite_animation = 16;
+  uint32 animation_epoch = 17;
 }
 
 message QuantizedTransform {

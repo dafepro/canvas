@@ -6,6 +6,7 @@ import {
 } from "@canvas-physics/client";
 import { soccerDefinitions } from "./soccer-content.js";
 import type { SoccerBallState } from "./soccer-ball-behavior.js";
+import { soccerAssets } from "./assets.js";
 import "./style.css";
 
 const serverUrl =
@@ -60,10 +61,17 @@ const join = async (): Promise<void> => {
       devRealtimeCredential(userInput.value, userInput.value),
     mount: stage,
     definitions: soccerDefinitions,
+    assets: soccerAssets,
     driver: new SimulationDriver(worker),
     scene: {
       background: 0x165c31,
       debug: new URLSearchParams(location.search).has("debug"),
+    },
+    onAssetProgress: ({ loaded, total }) => {
+      status.textContent = `Loading lounge art… ${loaded}/${total}`;
+    },
+    onAssetWarning: (warning) => {
+      console.warn(`[soccer assets] ${warning.message}`, warning.cause);
     },
     onAvatarDisabledChange: (disabled) => {
       benchButton.textContent = disabled ? "Return to play" : "Take a break";

@@ -1148,6 +1148,8 @@ interface SentSample {
   vy: number;
   angularVelocity: number;
   variant?: string;
+  animation?: string;
+  animationEpoch?: number;
   disabled?: boolean;
   quarantined?: boolean;
   teleportEpoch?: number;
@@ -1163,6 +1165,8 @@ const sentSample = (entity: RenderEntity): SentSample => ({
   vy: entity.vy,
   angularVelocity: entity.angularVelocity,
   variant: entity.variant,
+  animation: entity.animation,
+  animationEpoch: entity.animationEpoch,
   disabled: entity.disabled,
   quarantined: entity.quarantined,
   teleportEpoch: entity.teleportEpoch,
@@ -1183,6 +1187,8 @@ const movedSince = (before: SentSample, now: RenderEntity): boolean =>
   Math.abs(before.vy - now.vy) > VELOCITY_EPSILON ||
   Math.abs(before.angularVelocity - now.angularVelocity) > VELOCITY_EPSILON ||
   before.variant !== now.variant ||
+  before.animation !== now.animation ||
+  before.animationEpoch !== now.animationEpoch ||
   before.disabled !== now.disabled ||
   before.quarantined !== now.quarantined ||
   // Addendum A2 and A3. A jump and a respawn must reach every peer on the tick
@@ -1221,6 +1227,8 @@ const toEntityState = (
   entityId: entity.id,
   lastProcessedInputSequence: entity.lastProcessedInputSequence ?? 0,
   spriteVariant: entity.variant ?? "",
+  spriteAnimation: entity.animation ?? "",
+  animationEpoch: entity.animationEpoch ?? 0,
   behaviorStateJson,
   quarantined: entity.quarantined ?? false,
   definitionId: keyframe ? entity.definitionId : "",
@@ -1254,6 +1262,8 @@ const fromEntityState = (state: EntityState): RenderEntity => {
     vy: transform.vy,
     angularVelocity: transform.angularVelocity,
     variant: state.spriteVariant || undefined,
+    animation: state.spriteAnimation || undefined,
+    animationEpoch: state.animationEpoch || undefined,
     lastProcessedInputSequence: state.lastProcessedInputSequence,
     behaviorState: fromJsonBytes(state.behaviorStateJson),
     quarantined: state.quarantined,

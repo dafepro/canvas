@@ -20,9 +20,9 @@ downward. Check an item only after the relevant focused tests pass.
 - [ ] Add stable participant identity and lifecycle projection so a product can
   retain disconnected roster members, deactivate their physics entities, and
   render them in a bench area.
-- [ ] Move example art onto the versioned Canvas asset-manifest/preload pipeline
-  once the Priority 1 asset contract lands. Until then, examples may layer
-  product-owned art above the renderer without teaching Canvas domain concepts.
+- [x] Move example art onto the versioned Canvas asset-manifest/preload pipeline.
+  The soccer field and generated ball atlas now load as ordinary consumer-owned
+  assets; collision geometry remains independent data.
 
 ## Consumer-library Priority 0 — current structural blockers
 
@@ -48,7 +48,7 @@ work below because they determine the public boundary every consumer will use.
 
 ## Consumer-library Priority 1 — major completeness gaps
 
-- [ ] Complete asset manifests, preload gates, backgrounds, sprites, atlases,
+- [x] Complete asset manifests, preload gates, backgrounds, sprites, atlases,
   animations, deterministic asset versions, and failure fallbacks.
 - [ ] Make the runtime and worker lazy-loadable so unrelated consumer routes do
   not download Canvas.
@@ -129,8 +129,10 @@ work below because they determine the public boundary every consumer will use.
   high-tier mobile devices, including suspended/background behavior. Rolling
   p95/worst/long-frame metrics, background duration counters, and the repeatable
   capture protocol are in place; physical-device results remain outstanding.
-- [ ] Add asset manifests, preloading, texture-atlas rendering, animation
-  playback, and bundle splitting.
+- [x] Add asset manifests, preloading, texture-atlas rendering, and synchronized
+  animation playback.
+- [ ] Split the renderer and simulation worker into lazy consumer bundles. This
+  remains tracked by the consumer-library Priority 1 lazy-loading item above.
 - [ ] Finish elevation rendering and behavior: scale, shadows, and
   elevation-dependent ground collision participation.
 - [ ] Complete multiplayer coverage for packet reordering, 50/100/200 ms
@@ -142,8 +144,8 @@ work below because they determine the public boundary every consumer will use.
 ## Priority 3 — smaller follow-ups
 
 - [ ] Render avatars from definition data.
-- [ ] Connect `startAnimation` to the renderer/network path. Networked effect
-  parameters are now preserved by the public effect subscription.
+- [x] Connect `startAnimation` to the renderer/network path, including replaying
+  the same named animation through a synchronized animation epoch.
 - [x] Correct peer item counts.
 - [ ] Correct host-migration diagnostics.
 - [ ] Add collision, network, environment, and behavior visual laboratories.

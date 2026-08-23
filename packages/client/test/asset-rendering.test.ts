@@ -7,6 +7,8 @@ import {
   type AssetManifest,
 } from "../src/assets/index.js";
 import { buildEntityDisplay } from "../src/render/entity-display.js";
+import { PixiScene } from "../src/render/pixi-scene.js";
+import type { CanvasDefinition } from "@canvas-physics/core";
 
 vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
 vi.stubGlobal("cancelAnimationFrame", vi.fn());
@@ -56,6 +58,46 @@ const definition: ItemDefinition = {
 };
 
 describe("asset rendering", () => {
+  it("draws background art while keeping collision geometry debug-only", () => {
+    const canvas = {
+      size: { width: 100, height: 50 },
+      backgroundAssetId: "ball.idle",
+      environment: {
+        base: { gravityXY: { x: 0, y: 0 }, linearDrag: 0 },
+        regions: [
+          {
+            id: "slow",
+            shape: { type: "rect", x: 0, y: 0, w: 4, h: 4 },
+            blend: "step",
+            priority: 1,
+          },
+        ],
+      },
+      regions: [],
+      staticGeometry: [
+        {
+          id: "wall",
+          shape: { type: "rect", width: 2, height: 5 },
+          position: { x: 1, y: 1 },
+        },
+      ],
+    } as CanvasDefinition;
+    const normal = new PixiScene(canvas, [], {}, assets);
+    const debug = new PixiScene(canvas, [], { debug: true }, assets);
+
+    (normal as unknown as { drawBackground(): void }).drawBackground();
+    (debug as unknown as { drawBackground(): void }).drawBackground();
+
+    expect(
+      (normal as unknown as { backgroundLayer: { children: unknown[] } }).backgroundLayer
+        .children,
+    ).toHaveLength(2);
+    expect(
+      (debug as unknown as { backgroundLayer: { children: unknown[] } }).backgroundLayer
+        .children,
+    ).toHaveLength(4);
+  });
+
   it("crops atlas frames and rejects frames outside the decoded source", () => {
     const cropped = pixiAssetLoader.frame(
       Texture.WHITE,

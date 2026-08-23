@@ -7,11 +7,16 @@ import {
   type ItemDefinition,
   type ItemInstance,
 } from "@canvas-physics/core";
-import { HostSimulation, RapierWorld } from "@canvas-physics/client";
+import {
+  HostSimulation,
+  RapierWorld,
+  validateAssetReferences,
+} from "@canvas-physics/client";
 import soccerCanvasJson from "../server/canvases/soccer-lounge.json";
 import soccerBallJson from "../server/definitions/soccer-ball.json";
 import { SoccerBallBehavior, type SoccerBallState } from "../src/soccer-ball-behavior.js";
 import { soccerBallDefinition } from "../src/soccer-content.js";
+import { soccerAssets } from "../src/assets.js";
 
 const canvas = soccerCanvasJson as unknown as CanvasDefinition;
 
@@ -51,6 +56,8 @@ describe("soccer field integration", () => {
     expect(validateCanvasDefinition(canvas)).toEqual({ ok: true });
     expect(soccerBallJson.defaultConfig).toEqual(soccerBallDefinition.defaultConfig);
     expect(soccerBallJson.behaviorType).toBe(SoccerBallBehavior.behaviorType);
+    expect(soccerBallJson.visual).toEqual(soccerBallDefinition.visual);
+    expect(validateAssetReferences(soccerAssets, canvas, [soccerBallDefinition])).toEqual([]);
   });
 
   it("blocks the ball at a touchline", () => {

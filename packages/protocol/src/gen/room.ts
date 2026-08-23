@@ -249,6 +249,9 @@ export interface EntityState {
   teleportEpoch: number;
   /** Addendum A3. True while the body waits out its respawn delay. */
   respawning: boolean;
+  /** Named definition animation and a replay counter for repeated starts. */
+  spriteAnimation: string;
+  animationEpoch: number;
 }
 
 export interface QuantizedTransform {
@@ -2032,6 +2035,8 @@ function createBaseEntityState(): EntityState {
     disabled: false,
     teleportEpoch: 0,
     respawning: false,
+    spriteAnimation: "",
+    animationEpoch: 0,
   };
 }
 
@@ -2066,6 +2071,12 @@ export const EntityState: MessageFns<EntityState> = {
     }
     if (message.respawning !== false) {
       writer.uint32(120).bool(message.respawning);
+    }
+    if (message.spriteAnimation !== "") {
+      writer.uint32(130).string(message.spriteAnimation);
+    }
+    if (message.animationEpoch !== 0) {
+      writer.uint32(136).uint32(message.animationEpoch);
     }
     return writer;
   },
@@ -2163,6 +2174,22 @@ export const EntityState: MessageFns<EntityState> = {
             message.respawning = reader.bool();
             continue;
           }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.spriteAnimation = reader.string();
+            continue;
+          }
+          case 17: {
+            if (tag !== 136) {
+              break;
+            }
+
+            message.animationEpoch = reader.uint32();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2215,6 +2242,16 @@ export const EntityState: MessageFns<EntityState> = {
         ? globalThis.Number(object.teleport_epoch)
         : 0,
       respawning: isSet(object.respawning) ? globalThis.Boolean(object.respawning) : false,
+      spriteAnimation: isSet(object.spriteAnimation)
+        ? globalThis.String(object.spriteAnimation)
+        : isSet(object.sprite_animation)
+        ? globalThis.String(object.sprite_animation)
+        : "",
+      animationEpoch: isSet(object.animationEpoch)
+        ? globalThis.Number(object.animationEpoch)
+        : isSet(object.animation_epoch)
+        ? globalThis.Number(object.animation_epoch)
+        : 0,
     };
   },
 
@@ -2250,6 +2287,12 @@ export const EntityState: MessageFns<EntityState> = {
     if (message.respawning !== false) {
       obj.respawning = message.respawning;
     }
+    if (message.spriteAnimation !== "") {
+      obj.spriteAnimation = message.spriteAnimation;
+    }
+    if (message.animationEpoch !== 0) {
+      obj.animationEpoch = Math.round(message.animationEpoch);
+    }
     return obj;
   },
 
@@ -2270,6 +2313,8 @@ export const EntityState: MessageFns<EntityState> = {
     message.disabled = object.disabled ?? false;
     message.teleportEpoch = object.teleportEpoch ?? 0;
     message.respawning = object.respawning ?? false;
+    message.spriteAnimation = object.spriteAnimation ?? "";
+    message.animationEpoch = object.animationEpoch ?? 0;
     return message;
   },
 };

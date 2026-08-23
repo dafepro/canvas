@@ -37,6 +37,9 @@ describe("SoccerBallBehavior", () => {
 
     expect(h.state.kickCount).toBe(1);
     expect(h.commands("applyImpulse")).toHaveLength(1);
+    expect(h.commands("startAnimation")).toEqual([
+      { type: "startAnimation", animation: "hardKick", loop: false },
+    ]);
     expect(h.host.body(h.entityId).velocity.x).toBeGreaterThan(0);
   });
 
