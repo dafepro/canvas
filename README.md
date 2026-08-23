@@ -113,8 +113,10 @@ mux.Handle("/", server.Handler())
 
 `Store` and `Authenticator` are the only interfaces you must supply. The store
 holds authoritative canvas, item-definition, schema, and snapshot records.
-Replace `MemoryStore` with a database-backed type to persist a canvas between
-restarts.
+The reference `canvasd` uses `FileStore` and writes restart-safe snapshots to
+`CANVASD_DATA_DIR` (or `./data`); Docker Compose mounts that directory as the
+named `canvasd-data` volume. Embedded services can use `FileStore` directly or
+replace it with a database-backed implementation.
 
 ## Use the client library
 

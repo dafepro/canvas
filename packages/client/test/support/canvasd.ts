@@ -13,6 +13,9 @@ export interface Canvasd {
   stop(): void;
 }
 
+export const createCanvasdDataDir = (): string =>
+  mkdtempSync(path.join(tmpdir(), "canvasd-data-"));
+
 /** True when the Go toolchain is present, so the test can build canvasd. */
 export const goAvailable = (): boolean => {
   try {
@@ -57,7 +60,9 @@ const waitForHealth = async (url: string, deadlineMs: number): Promise<void> => 
  * Builds and starts one canvasd process for a test. The test owns the process,
  * so it must call `stop`.
  */
-export const startCanvasd = async (): Promise<Canvasd> => {
+export const startCanvasd = async (
+  options: { dataDir?: string } = {},
+): Promise<Canvasd> => {
   const binaryName = process.platform === "win32" ? "canvasd.exe" : "canvasd";
   const binary = path.join(mkdtempSync(path.join(tmpdir(), "canvasd-")), binaryName);
   execFileSync("go", ["build", "-o", binary, "./cmd/canvasd"], {
@@ -73,6 +78,8 @@ export const startCanvasd = async (): Promise<Canvasd> => {
       `127.0.0.1:${port}`,
       "-canvases",
       path.join(serverDir, "canvases"),
+      "-data-dir",
+      options.dataDir ?? createCanvasdDataDir(),
       "-log-level",
       "error",
     ],

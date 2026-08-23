@@ -67,7 +67,7 @@ same simulation in the test process.
 | --- | --- |
 | Durable commands: spawn, delete, move, rotate, set config | Done in the protocol, the server, and the client API. |
 | The server enforces the owner before broadcasting | Done and tested, including the reject reasons. |
-| Persist item instances and the scene revision | Done through the snapshot record. |
+| Persist item instances and the scene revision | Done. The reference service atomically retains versioned snapshot records in `FileStore`; a real-process restart test verifies restoration from the same data directory. |
 | Accept 1 Hz host checkpoints | Done, with validation of bounds, item count, and revision order. |
 | Sleeping-room normalization and zero motion | Done. A graceful last host normalizes behavior state and stops timers before its final checkpoint. After abrupt loss, the server preserves the newest periodic checkpoint as explicitly unnormalized. |
 | First-join wake path | Done and tested. |
@@ -136,15 +136,14 @@ done.
    inspected visually.
 2. **The avatar sprite ignores its definition.** The renderer draws a fixed
    circle for every avatar rather than reading a definition.
-3. **MemoryStore only.** A restart of `canvasd` loses every placement.
-4. **A stuck body is now freed.** The host watches for a body that is still and
+3. **A stuck body is now freed.** The host watches for a body that is still and
    whose centre lies inside fixed geometry. After half a second it moves the
    body against the local gravity until the body is clear, and it emits an
    `unstuck` event.
-5. **The network budget in a busy scene.** See the Phase 6 table above. The
+4. **The network budget in a busy scene.** See the Phase 6 table above. The
    room is above the 20 KB/s guidance of spec 19.3 when many items move at once.
 
-6. **Behavior state in a delta is JSON.** A keyframe always carries it, and a
+5. **Behavior state in a delta is JSON.** A keyframe always carries it, and a
    delta carries it only after a change. A large behavior state on many items
    would still cost bytes. Spec 22 budgets are not measured.
 

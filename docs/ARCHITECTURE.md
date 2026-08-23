@@ -146,6 +146,11 @@ checkpoint. It does not claim that developer-authored behavior normalization
 ran. Snapshots contain no velocity, so wake still rebuilds bodies with zero
 motion; the false marker records that abrupt fallback accurately.
 
+The reference `canvasd` keeps definitions in their source JSON files and stores
+canonical `SnapshotRecord` values in `FileStore`. Each save writes a new atomic,
+version-named JSON file and retains a previous version for recovery. The CLI
+reloads the newest valid record from `CANVASD_DATA_DIR` after a process restart.
+
 ## Rates
 
 | Loop | Rate | Set in |

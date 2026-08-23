@@ -25,6 +25,8 @@ func main() {
 		"directory of canvas definition JSON files")
 	definitionDir := flag.String("definitions", envOr("CANVASD_DEFINITION_DIR", "./definitions"),
 		"directory of item definition JSON files")
+	dataDir := flag.String("data-dir", envOr("CANVASD_DATA_DIR", "./data"),
+		"directory for durable canonical snapshots")
 	origins := flag.String("allowed-origins", envOr("CANVASD_ALLOWED_ORIGINS", "*"),
 		"comma separated WebSocket origin patterns")
 	tickRate := flag.Uint("tick-rate", 60, "simulation tick rate advertised to the host")
@@ -34,7 +36,11 @@ func main() {
 	logger := newLogger(*logLevel)
 	slog.SetDefault(logger)
 
-	store := roomsdk.NewMemoryStore()
+	store, err := roomsdk.NewFileStore(*dataDir)
+	if err != nil {
+		logger.Error("open durable store failed", "dir", *dataDir, "error", err)
+		os.Exit(1)
+	}
 	definitionCount, err := loadItemDefinitions(store, *definitionDir)
 	if err != nil {
 		logger.Error("load item definitions failed", "dir", *definitionDir, "error", err)
@@ -85,7 +91,12 @@ func main() {
 	_ = httpServer.Shutdown(shutdownCtx)
 }
 
-func loadItemDefinitions(store *roomsdk.MemoryStore, dir string) (int, error) {
+type bootstrapStore interface {
+	PutCanvas(roomsdk.CanvasRecord)
+	PutItemDefinition(roomsdk.ItemDefinitionRecord)
+}
+
+func loadItemDefinitions(store bootstrapStore, dir string) (int, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return 0, err
@@ -127,7 +138,7 @@ func loadItemDefinitions(store *roomsdk.MemoryStore, dir string) (int, error) {
 	return count, nil
 }
 
-func loadCanvases(store *roomsdk.MemoryStore, dir string) (int, error) {
+func loadCanvases(store bootstrapStore, dir string) (int, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return 0, err

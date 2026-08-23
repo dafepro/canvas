@@ -7,7 +7,9 @@ COPY server/ ./
 RUN CGO_ENABLED=0 go build -trimpath -o /out/canvasd ./cmd/canvasd
 
 FROM alpine:3.21
-RUN adduser -D -u 10001 canvasd
+RUN adduser -D -u 10001 canvasd && \
+    mkdir -p /var/lib/canvasd && \
+    chown canvasd:canvasd /var/lib/canvasd
 COPY --from=build /out/canvasd /usr/local/bin/canvasd
 COPY server/canvases /etc/canvasd/canvases
 COPY server/definitions /etc/canvasd/definitions
@@ -16,5 +18,6 @@ EXPOSE 8080
 ENV CANVASD_ADDR=":8080" \
     CANVASD_CANVAS_DIR="/etc/canvasd/canvases" \
     CANVASD_DEFINITION_DIR="/etc/canvasd/definitions" \
+    CANVASD_DATA_DIR="/var/lib/canvasd" \
     CANVASD_ALLOWED_ORIGINS="*"
 ENTRYPOINT ["/usr/local/bin/canvasd"]

@@ -1,3 +1,4 @@
 # The compiled binary in the server directory. The leading slash keeps the rule
 # off cmd/canvasd, which holds the source of the service.
 /canvasd
+/data/
