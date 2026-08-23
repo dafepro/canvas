@@ -1,0 +1,80 @@
+import { describe, expect, it } from "vitest";
+import { validateCanvasDefinition, type CanvasDefinition } from "@canvas-physics/core";
+import { BehaviorTestHarness } from "@canvas-physics/core/testing";
+import { validateAssetReferences } from "@canvas-physics/client";
+import canvasJson from "../server/canvases/item-playground.json";
+import emojiJson from "../server/definitions/emoji-party.json";
+import photoJson from "../server/definitions/photo-card.json";
+import orbJson from "../server/definitions/reactive-orb.json";
+import stampJson from "../server/definitions/system-stamp.json";
+import { playgroundAssets } from "../src/assets.js";
+import {
+  playgroundDefinitions,
+  reactiveOrbDefinition,
+} from "../src/content.js";
+import {
+  ReactiveOrbBehavior,
+  defaultReactiveOrbConfig,
+} from "../src/reactive-orb-behavior.js";
+
+const canvas = canvasJson as unknown as CanvasDefinition;
+
+describe("compact item playground", () => {
+  it("keeps the independently served scene intentionally small", () => {
+    expect(validateCanvasDefinition(canvas)).toEqual({ ok: true });
+    expect(canvas.size).toEqual({ width: 36, height: 24 });
+    expect(canvas.limits.maxItems).toBeGreaterThanOrEqual(30);
+    expect(canvas.systemItems).toEqual([
+      expect.objectContaining({
+        entityId: "room-owned-stamp",
+        definitionId: "system-stamp",
+      }),
+    ]);
+  });
+
+  it("keeps client definitions, server contracts, and consumer assets aligned", () => {
+    const serverDefinitions = [emojiJson, photoJson, orbJson, stampJson];
+    for (const definition of playgroundDefinitions.filter(
+      ({ definitionId }) => definitionId !== "avatar",
+    )) {
+      const server = serverDefinitions.find(
+        ({ definitionId }) => definitionId === definition.definitionId,
+      );
+      expect(server, definition.definitionId).toBeDefined();
+      expect(server?.version).toBe(definition.version);
+      expect(server?.visual).toEqual(definition.visual);
+      expect(server?.defaultConfig).toEqual(definition.defaultConfig);
+    }
+
+    expect(validateAssetReferences(playgroundAssets, canvas, playgroundDefinitions)).toEqual([]);
+  });
+
+  it("applies configured color and plays an effect on avatar contact", () => {
+    const harness = new BehaviorTestHarness(
+      ReactiveOrbBehavior,
+      { ...defaultReactiveOrbConfig, theme: "coral" },
+      { canvas: { width: 36, height: 24, orientation: "topDown" } },
+    );
+
+    harness.advance();
+    expect(harness.host.body(harness.entityId).variant).toBe("coral");
+
+    harness.send({
+      type: "contact.enter",
+      selfColliderId: "touch",
+      other: {
+        entityId: "avatar:visitor",
+        colliderId: "body",
+        kind: "avatar",
+        tags: [],
+        userId: "visitor",
+      },
+    }).advance(1, false);
+
+    expect(harness.host.body(harness.entityId).animation).toBe("pulse");
+    expect(harness.host.effects).toEqual([
+      expect.objectContaining({ effect: "portalFlash", mode: "oneShot" }),
+    ]);
+    expect(harness.state.activations).toBe(1);
+  });
+});

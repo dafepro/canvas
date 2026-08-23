@@ -1,0 +1,19 @@
+{
+  "definitionId": "emoji-party",
+  "version": 1,
+  "displayName": "Party emoji",
+  "visual": {
+    "spriteId": "playground.emoji.party",
+    "size": { "width": 5, "height": 5 },
+    "placeholder": { "shape": "circle", "color": 16767053 },
+    "zIndex": 5
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [
+    { "id": "solid", "role": "itemSolid", "shape": { "type": "circle", "radius": 2.25 } }
+  ],
+  "defaultConfig": {},
+  "persistence": { "transform": true, "behaviorState": false, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": { "type": "object", "additionalProperties": false }
+}

@@ -19,6 +19,7 @@ item ownership, and stores canonical checkpoints.
 | `server/cmd/canvasd` | Reference binary that wires the SDK to an HTTP listener. |
 | `apps/demo` | Browser demo of the rocket canvas from spec section 18. |
 | `examples/soccer-lounge` | Independently runnable consumer integration with custom soccer behavior, field data/art, and scoreboard UI. |
+| `examples/item-playground` | Compact item-management integration covering spawn, drag, rotate, scale, configuration, deletion, effects, and ownership. |
 | `docker/`, `docker-compose.yml` | The local stack: service, network emulator, demo. |
 
 ## Consume the JavaScript packages
@@ -72,6 +73,16 @@ pnpm example:soccer        # terminal 2; app on :5174
 Open <http://localhost:5174>. See `docs/EXAMPLE_INTEGRATIONS.md` for the
 examples contract and the generic gaps the soccer integration is designed to
 expose.
+
+For the compact item-management playground:
+
+```bash
+pnpm example:items:server # terminal 1; service on :8083
+pnpm example:items        # terminal 2; app on :5175
+```
+
+Open <http://localhost:5175>. Add `?autojoin=1&user=alex` for a named client;
+open a second tab with a different user to demonstrate owner-only edits.
 
 ## Emulate a bad network
 

@@ -209,6 +209,11 @@ export class RoomSession {
   private readonly behaviorObservers = new Set<Observer<BehaviorStateSnapshot>>();
   private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
   private readonly hostAvatarIds = new Set<string>();
+  /** Durable metadata is learned from JOIN/results, not repeated in physics frames. */
+  private readonly itemMetadataById = new Map<
+    string,
+    Readonly<{ definitionId: string; ownerUserId: string }>
+  >();
   private readonly appliedParticipantStatus = new Map<string, ParticipantStatus>();
   private readonly lastCanonicalAvatarPositions = new Map<string, Vec2>();
   private finalCheckpointSent?: () => void;
@@ -527,6 +532,7 @@ export class RoomSession {
 
   private wireClient(): void {
     this.client.on("joined", (result) => {
+      this.rememberItemMetadata(result.snapshot);
       void this.acceptJoin(result.canvas, result.snapshot, result.roomWasSleeping);
     });
 
@@ -598,7 +604,7 @@ export class RoomSession {
       if (this.client.isHost) return;
       const avatars = new Map(state.avatars.map((avatar) => [avatar.entityId, avatar]));
       const entities = state.entities.map((serialized) => {
-        const entity = fromEntityState(serialized);
+        const entity = this.withItemMetadata(fromEntityState(serialized));
         const avatar = avatars.get(entity.id);
         return avatar ? { ...entity, userId: avatar.userId } : entity;
       });
@@ -611,7 +617,9 @@ export class RoomSession {
 
     this.client.on("stateDelta", (delta, _epoch, tick) => {
       if (this.client.isHost) return;
-      const entities = delta.entities.map(fromEntityState);
+      const entities = delta.entities.map((serialized) =>
+        this.withItemMetadata(fromEntityState(serialized)),
+      );
       this.rememberAvatarDelta(entities, delta.removedEntityIds);
       this.buffer.pushDelta(tick, entities, delta.removedEntityIds);
       this.publishCanonicalState(tick, this.buffer.latest());
@@ -664,7 +672,16 @@ export class RoomSession {
     });
 
     this.client.on("durableAccepted", (command, _revision, itemJson) => {
-      this.applyAcceptedCommand(command, itemJson as SnapshotItem | undefined);
+      const item = itemJson as SnapshotItem | undefined;
+      if (command.kind === DurableCommandKind.DURABLE_DELETE_ITEM) {
+        this.itemMetadataById.delete(command.entityId);
+      } else if (item) {
+        this.itemMetadataById.set(item.entityId, Object.freeze({
+          definitionId: item.definitionId,
+          ownerUserId: item.ownerUserId,
+        }));
+      }
+      this.applyAcceptedCommand(command, item);
     });
 
     this.client.on("durablePreview", (command) => {
@@ -892,6 +909,27 @@ export class RoomSession {
   private avatarSpawnPosition(entityId: string): Vec2 {
     const canonical = this.lastCanonicalAvatarPositions.get(entityId);
     return canonical ? { ...canonical } : this.spawnPosition();
+  }
+
+  private rememberItemMetadata(snapshot: CanvasSnapshot): void {
+    this.itemMetadataById.clear();
+    for (const item of snapshot.items) {
+      this.itemMetadataById.set(item.entityId, Object.freeze({
+        definitionId: item.definitionId,
+        ownerUserId: item.ownerUserId,
+      }));
+    }
+  }
+
+  private withItemMetadata(entity: RenderEntity): RenderEntity {
+    if (entity.kind !== "item") return entity;
+    const metadata = this.itemMetadataById.get(entity.id);
+    if (!metadata) return entity;
+    return {
+      ...entity,
+      definitionId: entity.definitionId || metadata.definitionId,
+      ownerUserId: metadata.ownerUserId,
+    };
   }
 
   private rememberFullAvatarState(entities: RenderEntity[]): void {

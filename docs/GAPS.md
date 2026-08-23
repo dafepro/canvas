@@ -13,6 +13,9 @@ downward. Check an item only after the relevant focused tests pass.
   integration, including field art and collision geometry, a custom match-ball
   behavior, shared scoring, live damped net physics, rear goal boundaries, and
   center reset.
+- [x] Ship a compact item-management playground demonstrating consumer-owned
+  art, behavior effects, spawn, drag, rotate, scale, configure, delete, and
+  server-enforced participant and system ownership.
 - [x] Exercise every reference integration from clean installs of packed Canvas
   artifacts so examples detect accidental internal imports and missing release
   files.
@@ -95,7 +98,8 @@ work below because they determine the public boundary every consumer will use.
   - [x] Application-owned worker bundles through
     `runSimulationWorkerConformance`, including readiness, snapshots,
     representative application behavior, listener cleanup, and quiet stop.
-- [ ] Exercise packed release artifacts from a separate fixture application.
+- [x] Exercise packed release artifacts from separate fixture applications,
+  including both reference integrations and their custom worker bundles.
 - [ ] Complete latency, loss, reordering, reconnect, migration, late-join, and
   mobile backgrounding coverage.
 - [ ] Record physical-device resource profiles and enforce measured budgets.
@@ -141,6 +145,8 @@ work below because they determine the public boundary every consumer will use.
   behavior/definition versions in checkpoints.
 - [x] Add public rotate and set-config APIs, use server-authoritative accepted
   transforms, and apply accepted configuration to the live host behavior.
+- [x] Add authoritative uniform item scaling across durable transforms,
+  protocol, persistence, interpolation, rendering, and collider geometry.
 - [x] Relay owner move previews to the host without persisting them, coalesce
   preview bursts to a bounded reliable send rate, and send release commits
   immediately.

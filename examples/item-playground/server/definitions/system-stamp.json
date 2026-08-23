@@ -1,0 +1,17 @@
+{
+  "definitionId": "system-stamp",
+  "version": 1,
+  "displayName": "Room-owned stamp",
+  "visual": {
+    "spriteId": "playground.system.stamp",
+    "size": { "width": 6, "height": 3.5 },
+    "placeholder": { "shape": "rect", "color": 1582394 },
+    "zIndex": 3
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [],
+  "defaultConfig": {},
+  "persistence": { "transform": true, "behaviorState": false, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": { "type": "object", "additionalProperties": false }
+}

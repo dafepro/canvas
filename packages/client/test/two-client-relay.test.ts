@@ -112,6 +112,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
 
     // The server owns the record, so the spawning user owns the item.
     expect(hostCrate.ownerUserId).toBe("bob");
+    expect(peerCrate.ownerUserId).toBe("bob");
 
     const beforePreviewRevision = bob.client.sceneRevision;
     const previewTransform = {

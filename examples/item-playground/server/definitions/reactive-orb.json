@@ -1,0 +1,45 @@
+{
+  "definitionId": "reactive-orb",
+  "version": 1,
+  "displayName": "Reactive orb",
+  "visual": {
+    "spriteId": "playground.orb.mint",
+    "size": { "width": 5, "height": 5 },
+    "placeholder": { "shape": "circle", "color": 6873282 },
+    "zIndex": 6,
+    "variants": {
+      "mint": { "spriteId": "playground.orb.mint" },
+      "coral": { "spriteId": "playground.orb.coral" },
+      "violet": { "spriteId": "playground.orb.violet" }
+    },
+    "animations": {
+      "pulse": {
+        "frames": [
+          "playground.orb.mint",
+          "playground.orb.pulse",
+          "playground.orb.violet",
+          "playground.orb.mint"
+        ],
+        "fps": 12,
+        "loop": false
+      }
+    }
+  },
+  "body": { "mode": "fixed", "gravityScale": 0 },
+  "colliders": [
+    { "id": "solid", "role": "itemSolid", "shape": { "type": "circle", "radius": 2.1 } },
+    { "id": "touch", "role": "itemSensor", "shape": { "type": "circle", "radius": 2.7 } }
+  ],
+  "behaviorType": "reactiveOrb",
+  "defaultConfig": { "theme": "mint" },
+  "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "theme": { "type": "string", "enum": ["mint", "coral", "violet"] }
+    },
+    "required": ["theme"],
+    "additionalProperties": false
+  }
+}

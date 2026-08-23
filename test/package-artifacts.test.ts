@@ -173,58 +173,60 @@ describe("published package artifacts", () => {
       stdio: "pipe",
     });
 
-    const soccerSource = join(workspaceRoot, "examples", "soccer-lounge");
-    const soccerConsumer = join(fixtureRoot, "soccer-lounge");
-    mkdirSync(soccerConsumer, { recursive: true });
-    for (const path of ["src", "public"]) {
-      cpSync(join(soccerSource, path), join(soccerConsumer, path), { recursive: true });
-    }
-    for (const path of ["index.html", "tsconfig.json", "vite.config.ts"]) {
-      cpSync(join(soccerSource, path), join(soccerConsumer, path));
-    }
-    writeFileSync(
-      join(soccerConsumer, "package.json"),
-      JSON.stringify({
-        name: "canvas-packed-soccer-consumer",
-        private: true,
-        type: "module",
-        scripts: { build: "vite build" },
-        dependencies: fileDependencies,
-        devDependencies: { typescript: "^5.7.2", vite: "^6.0.7" },
-      }),
-    );
-    writeFileSync(
-      join(soccerConsumer, "pnpm-workspace.yaml"),
-      [
-        "overrides:",
-        ...Object.entries(fileDependencies).map(
-          ([name, archive]) => `  '${name}': '${archive}'`,
+    for (const example of ["soccer-lounge", "item-playground"] as const) {
+      const exampleSource = join(workspaceRoot, "examples", example);
+      const exampleConsumer = join(fixtureRoot, example);
+      mkdirSync(exampleConsumer, { recursive: true });
+      for (const path of ["src", "public"]) {
+        cpSync(join(exampleSource, path), join(exampleConsumer, path), { recursive: true });
+      }
+      for (const path of ["index.html", "tsconfig.json", "vite.config.ts"]) {
+        cpSync(join(exampleSource, path), join(exampleConsumer, path));
+      }
+      writeFileSync(
+        join(exampleConsumer, "package.json"),
+        JSON.stringify({
+          name: `canvas-packed-${example}-consumer`,
+          private: true,
+          type: "module",
+          scripts: { build: "vite build" },
+          dependencies: fileDependencies,
+          devDependencies: { typescript: "^5.7.2", vite: "^6.0.7" },
+        }),
+      );
+      writeFileSync(
+        join(exampleConsumer, "pnpm-workspace.yaml"),
+        [
+          "overrides:",
+          ...Object.entries(fileDependencies).map(
+            ([name, archive]) => `  '${name}': '${archive}'`,
+          ),
+          "",
+        ].join("\n"),
+      );
+
+      runPnpm(["install", "--prefer-offline", "--ignore-scripts"], exampleConsumer);
+      runPnpm(["exec", "vite", "build", "--manifest"], exampleConsumer);
+      expect(existsSync(join(exampleConsumer, "dist", "index.html"))).toBe(true);
+      expect(
+        readdirSync(join(exampleConsumer, "dist", "assets")).some((name) =>
+          name.startsWith("canvas.worker-"),
         ),
-        "",
-      ].join("\n"),
-    );
+      ).toBe(true);
 
-    runPnpm(["install", "--prefer-offline", "--ignore-scripts"], soccerConsumer);
-    runPnpm(["exec", "vite", "build", "--manifest"], soccerConsumer);
-    expect(existsSync(join(soccerConsumer, "dist", "index.html"))).toBe(true);
-    expect(
-      readdirSync(join(soccerConsumer, "dist", "assets")).some((name) =>
-        name.startsWith("canvas.worker-"),
-      ),
-    ).toBe(true);
-
-    const viteManifest = JSON.parse(
-      readFileSync(join(soccerConsumer, "dist", ".vite", "manifest.json"), "utf8"),
-    ) as Record<
-      string,
-      { file: string; isEntry?: boolean; imports?: string[]; dynamicImports?: string[] }
-    >;
-    const browserEntry = Object.values(viteManifest).find(({ isEntry }) => isEntry);
-    expect(browserEntry, "soccer browser entry").toBeDefined();
-    expect(browserEntry?.dynamicImports?.length).toBeGreaterThan(0);
-    expect(
-      statSync(join(soccerConsumer, "dist", browserEntry!.file)).size,
-      "unrelated routes must not eagerly download the Canvas runtime",
-    ).toBeLessThan(100_000);
-  }, 90_000);
+      const viteManifest = JSON.parse(
+        readFileSync(join(exampleConsumer, "dist", ".vite", "manifest.json"), "utf8"),
+      ) as Record<
+        string,
+        { file: string; isEntry?: boolean; imports?: string[]; dynamicImports?: string[] }
+      >;
+      const browserEntry = Object.values(viteManifest).find(({ isEntry }) => isEntry);
+      expect(browserEntry, `${example} browser entry`).toBeDefined();
+      expect(browserEntry?.dynamicImports?.length).toBeGreaterThan(0);
+      expect(
+        statSync(join(exampleConsumer, "dist", browserEntry!.file)).size,
+        `${example} must not eagerly download the Canvas runtime`,
+      ).toBeLessThan(100_000);
+    }
+  }, 120_000);
 });

@@ -1,0 +1,19 @@
+{
+  "definitionId": "photo-card",
+  "version": 1,
+  "displayName": "Picture card",
+  "visual": {
+    "spriteId": "playground.photo",
+    "size": { "width": 6, "height": 5 },
+    "placeholder": { "shape": "rect", "color": 10344703 },
+    "zIndex": 4
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [
+    { "id": "solid", "role": "itemSolid", "shape": { "type": "rect", "width": 6, "height": 5 } }
+  ],
+  "defaultConfig": {},
+  "persistence": { "transform": true, "behaviorState": false, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": { "type": "object", "additionalProperties": false }
+}

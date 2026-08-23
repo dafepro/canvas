@@ -22,6 +22,26 @@ Examples are not compatibility fixtures. This repository is prerelease, so a
 public contract change updates the examples in the same release and removes the
 superseded path.
 
+## Item playground reference integration
+
+`examples/item-playground` is a deliberately compact 36 × 24 workbench. Its
+large-on-screen gallery shows that a consumer can supply pictures, rasterized
+emoji-style art, texture variants, animation frames, and behavior effects
+without adding product concepts to Canvas.
+
+The management panel exercises the public durable mutation surface: spawn,
+direct placement, rotation, uniform visual-and-collider scaling,
+configuration, and deletion. A selected item may belong to the current user,
+another participant, or the room. The UI does not hide unauthorized controls;
+it lets a user try them so the server's `not_owner` and `system_owned`
+rejections are visible. This makes ownership a tested authority boundary rather
+than a disabled-button convention.
+
+The bundled picture is intentionally not an upload flow. Canvas handles asset
+identity and loading, not durable media storage. A product can put uploaded
+media behind its own stable URL and then express it through the same manifest
+contract.
+
 ## Soccer lounge reference integration
 
 `examples/soccer-lounge` is the first reference integration and the model for a

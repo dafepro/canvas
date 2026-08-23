@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Canvas Physics · Item playground</title>
+  </head>
+  <body>
+    <main id="app">
+      <header>
+        <div>
+          <p class="eyebrow">Canvas Physics reference integration</p>
+          <h1>Item playground</h1>
+        </div>
+        <p class="intro">A compact 36 × 24 canvas for inspecting large, editable items.</p>
+        <div class="connection">
+          <input id="user" aria-label="User name" autocomplete="off" />
+          <button id="join">Join</button>
+          <button id="leave" disabled>Leave</button>
+          <button id="mode" disabled>Edit mode</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div id="stage" aria-label="Compact item management canvas">
+          <div class="stage-hint">Edit mode · drag your items directly</div>
+        </div>
+        <p class="canvas-note">
+          Edit mode lets you drag your items. Switch to play mode, then use WASD or
+          the pointer joystick to touch the orb and trigger its consumer behavior.
+        </p>
+      </section>
+
+      <aside>
+        <section class="panel palette-panel">
+          <div class="panel-heading">
+            <div><span>1</span><h2>Spawn</h2></div>
+            <small>ordinary owned items</small>
+          </div>
+          <div id="palette" class="palette">
+            <button data-spawn="emoji-party"><b>🥳</b><span>Emoji</span></button>
+            <button data-spawn="photo-card"><b>▧</b><span>Picture</span></button>
+            <button data-spawn="reactive-orb"><b>●</b><span>Orb</span></button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div><span>2</span><h2>Select</h2></div>
+            <small>ownership is authoritative</small>
+          </div>
+          <div id="item-list" class="item-list">
+            <p class="empty">Join to inspect room items.</p>
+          </div>
+        </section>
+
+        <section class="panel inspector">
+          <div class="panel-heading">
+            <div><span>3</span><h2>Manage</h2></div>
+            <small id="selection-owner">nothing selected</small>
+          </div>
+          <strong id="selection-name">Select an item</strong>
+          <code id="selection-id">—</code>
+          <div class="transform-grid">
+            <button id="rotate-left" disabled aria-label="Rotate left">↶ 15°</button>
+            <button id="rotate-right" disabled aria-label="Rotate right">↷ 15°</button>
+          </div>
+          <label for="scale">Uniform scale <output id="scale-value">1.00×</output></label>
+          <input id="scale" type="range" min="0.5" max="2.5" step="0.05" value="1" disabled />
+          <fieldset id="theme-controls" disabled>
+            <legend>Orb configuration</legend>
+            <button data-theme="mint">Mint</button>
+            <button data-theme="coral">Coral</button>
+            <button data-theme="violet">Violet</button>
+          </fieldset>
+          <button id="delete" class="danger" disabled>Delete item</button>
+          <p class="ownership-note">
+            Select another user’s item or the room-owned stamp and try an edit. The
+            server will reject it instead of trusting this UI.
+          </p>
+        </section>
+
+        <div class="status-card">
+          <span id="connection-status">Not connected</span>
+          <strong id="action-status">Ready</strong>
+        </div>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -7,36 +7,33 @@ Canvas's item model understandable without soccer context. It should demonstrate
 content variety, authoritative editing, ownership enforcement, and custom
 interaction behavior while importing only published Canvas package exports.
 
-## Proposed slices
+## Delivered slices
 
-1. **Close structural gaps first.** Audit the current spawn/move/rotate/configure/
-   delete APIs from a packed consumer. Specify uniform item scaling as an
-   authoritative persisted transform that also scales collider geometry; do not
-   disguise scale as product config. Decide whether emoji need a generic text
-   visual or ship as consumer-generated textures.
-2. **Runnable content gallery.** Add a palette with emoji/textures, uploaded or
-   bundled pictures, an atlas animation, and one behavior-driven interactive
-   effect. Every entry is an ordinary item definition plus asset manifest data.
-3. **Management workflow.** Demonstrate selection, placement preview/commit,
-   rotation, uniform scaling, configuration, and deletion with clear selected,
-   pending, accepted, and rejected states.
-4. **Ownership scenarios.** Run two clients side by side. Owners can manage
-   their items; non-owners see authoritative updates and explicit rejections.
-   Include system-owned and optionally unowned/claimable items only if those
-   policies are deliberately selected.
-5. **Consumer proof.** Add multi-client end-to-end coverage, packed-artifact
-   installation/build verification, and documentation mapping each feature to
-   either generic Canvas capability or demo-owned product policy.
+1. [x] **Structural scaling.** Uniform scale is an authoritative persisted
+   transform, travels through the protocol, and atomically scales visuals and
+   collider geometry. Emoji remain deterministic consumer textures.
+2. [x] **Runnable content gallery.** The compact workbench includes bundled
+   emoji-style art, a picture, a variant-configurable animated orb, and a
+   behavior-driven contact effect. Every entry is ordinary definition and asset
+   data owned by the example.
+3. [x] **Management workflow.** Selection, drag preview/commit, rotation,
+   uniform scaling, configuration, deletion, and pending/accepted/rejected UI
+   use public runtime APIs.
+4. [x] **Ownership scenarios.** Two named clients see the same items. The item
+   list permits attempts against another user's items and a room-owned stamp so
+   authoritative rejections are observable.
+5. [x] **Consumer proof.** The definition/asset/behavior contract, production
+   bundle, and clean packed-artifact installation are covered. The existing
+   real-server two-client suite verifies ownership metadata on both clients;
+   browser smoke testing covers accepted and rejected playground workflows.
 
-## Alignment decisions before implementation
+## Alignment decisions
 
-- Recommended: uniform scale belongs in `Transform` and scales visuals plus all
-  collider shapes atomically. Non-uniform scaling stays out of the first slice.
-- Recommended: owner-only move/rotate/scale/configure/delete remains the default;
+- Uniform scale belongs in `Transform` and scales visuals plus all collider
+  shapes atomically. Non-uniform scaling stays out of this example.
+- Owner-only move/rotate/scale/configure/delete remains the default;
   sharing, transfer, and claim policies are separate later capabilities.
-- Choose whether “pictures” are bundled examples only or include a local file
-  picker/object-URL flow. Durable remote uploads require a product storage port
-  and should not be implied by the Canvas room service.
-- Choose whether emoji must be live text. Raster emoji textures work today and
-  are cross-renderer deterministic; live text would add a new font/text asset
-  contract.
+- Pictures are bundled. Durable uploads require product-owned storage and are
+  not implied by the Canvas room service.
+- Emoji use a consumer texture so rendering is deterministic across clients;
+  live text would require a separate font/text asset contract.

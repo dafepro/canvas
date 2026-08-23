@@ -1,0 +1,22 @@
+{
+  "name": "@canvas-physics/example-item-playground",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5175",
+    "build": "vite build",
+    "test": "vitest run test",
+    "server": "go -C ../../server run ./cmd/canvasd -addr :8083 -canvases ../examples/item-playground/server/canvases -definitions ../examples/item-playground/server/definitions -data-dir ../examples/item-playground/.data"
+  },
+  "dependencies": {
+    "@canvas-physics/client": "workspace:*",
+    "@canvas-physics/core": "workspace:*",
+    "@canvas-physics/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}
