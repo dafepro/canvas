@@ -12,7 +12,7 @@ export function buildEntityDisplay(
 ): Container {
   const container = new Container();
 
-  if (entity.kind === "avatar") {
+  if (entity.kind === "avatar" && !definition) {
     const radius = 1.2 * scale;
     container.addChild(
       new Graphics()

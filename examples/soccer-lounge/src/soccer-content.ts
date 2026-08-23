@@ -89,7 +89,30 @@ export const soccerGoalDefinition: ItemDefinition<Record<string, never>> = {
   complexity: "simple",
 };
 
+/** Consumer-owned avatar art; Canvas continues to own avatar physics. */
+export const soccerAvatarDefinition: ItemDefinition<Record<string, never>> = {
+  definitionId: "avatar",
+  version: 1,
+  displayName: "Soccer player",
+  visual: {
+    spriteId: "soccer.player.avatar",
+    size: { width: 4.5, height: 7.5 },
+    anchor: { x: 0.5, y: 0.55 },
+    placeholder: { shape: "circle", color: 0x23b5a9 },
+    zIndex: 10,
+  },
+  colliders: [],
+  defaultConfig: {},
+  persistence: {
+    transform: false,
+    behaviorState: false,
+    onRoomSleep: "pause",
+  },
+  complexity: "simple",
+};
+
 export const soccerDefinitions: ItemDefinition[] = [
   soccerBallDefinition as ItemDefinition,
   soccerGoalDefinition as ItemDefinition,
+  soccerAvatarDefinition as ItemDefinition,
 ];

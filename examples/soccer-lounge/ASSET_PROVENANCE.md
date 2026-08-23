@@ -62,3 +62,28 @@ Final transparency pass:
 > any blue spill from the white edges. Do not add, remove, rotate, redraw, crop,
 > or change the goal. No checkerboard pattern, shadow, field, or new background.
 > The PNG pixels outside the goal must have alpha 0.
+
+## Player avatar
+
+`public/assets/soccer-player-avatar.png` was generated with OpenAI image
+generation on 2026-08-23. It is a 1280×1280 transparent sprite. The asset
+manifest crops the generation padding while the consumer-owned `avatar`
+definition controls its world size; Canvas continues to own avatar physics.
+
+Final generation prompt:
+
+> Use case: stylized-concept. Asset type: transparent game sprite for a
+> top-down multiplayer soccer lounge. Primary request: one friendly,
+> gender-neutral soccer player avatar viewed directly from above, full body,
+> compact readable silhouette, slightly oversized head and shoulders for
+> visibility at small size. Scene/backdrop: genuinely transparent background
+> with clean alpha, isolated single character only. Style/medium: polished
+> playful 3D game illustration, soft rounded forms, consistent with a casual
+> social game. Composition/framing: centered square sprite, player facing
+> upward, entire body visible with generous transparent padding, symmetric
+> enough to rotate with movement. Color palette: teal jersey, navy shorts,
+> white socks, warm neutral skin tone, small coral accent. Lighting/mood: soft
+> ambient game lighting, cheerful and inviting. Constraints: no ball, no goal,
+> no stars, no crown, no text, no letters, no numbers, no logo, no watermark,
+> no ground plane, no cast shadow, exactly one character, actual transparent
+> background.

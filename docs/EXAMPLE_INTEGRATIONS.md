@@ -45,7 +45,15 @@ and delegates only placement; the soccer integration maps inactive and
 disconnected members to deterministic bench slots without Canvas learning
 about teams or benches.
 
-The product-owned SVG field and generated ball atlas are loaded through the
+The example registers consumer-owned artwork for Canvas's reserved `avatar`
+visual definition. A bounded avatar projection then drives product-owned DOM
+decoration: each participant gets a compact name label and a deterministic
+one-to-five-star crown. The same label follows the stable avatar into the bench
+projection, demonstrating that roster presentation can evolve independently of
+Canvas physics and rendering internals.
+
+The product-owned SVG field, generated ball atlas, goal texture, and player
+sprite are loaded through the
 versioned asset manifest and preload gate. The field texture is decorative;
 the independently defined static colliders and goal sensors remain the
 authoritative gameplay geometry. The hard-kick atlas animation is started by

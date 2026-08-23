@@ -4,7 +4,7 @@ import type { AssetManifest } from "@canvas-physics/client";
 export const soccerAssets: AssetManifest = {
   schemaVersion: 1,
   id: "soccer-lounge",
-  revision: "2026-08-23.3",
+  revision: "2026-08-23.4",
   sources: [
     { id: "field-art", src: "/soccer-field.svg", required: true },
     {
@@ -17,9 +17,20 @@ export const soccerAssets: AssetManifest = {
       src: "/assets/soccer-goal-net.png",
       required: true,
     },
+    {
+      id: "player-avatar-art",
+      src: "/assets/soccer-player-avatar.png",
+      required: true,
+    },
   ],
   textures: [
     { id: "soccer-field", sourceId: "field-art" },
+    {
+      id: "soccer.player.avatar",
+      sourceId: "player-avatar-art",
+      // Remove the generation padding so the configured world size describes the player.
+      frame: { x: 300, y: 0, width: 680, height: 1200 },
+    },
     {
       id: "soccer.goal.net",
       sourceId: "goal-net-art",

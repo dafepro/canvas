@@ -143,6 +143,41 @@ describe("asset rendering", () => {
     expect((sprite as Sprite).tint).toBe(0xff0000);
   });
 
+  it("renders avatars from the same consumer definition and asset pipeline", () => {
+    const avatarDefinition = {
+      ...definition,
+      definitionId: "avatar",
+      displayName: "Player avatar",
+      visual: {
+        spriteId: "ball.idle",
+        size: { width: 5, height: 6 },
+        anchor: { x: 0.5, y: 0.55 },
+        zIndex: 10,
+      },
+    } satisfies ItemDefinition;
+
+    const display = buildEntityDisplay(
+      {
+        id: "avatar:alice",
+        kind: "avatar",
+        definitionId: "avatar",
+        x: 0,
+        y: 0,
+        rotation: 0,
+        vx: 0,
+        vy: 0,
+        angularVelocity: 0,
+      },
+      avatarDefinition,
+      10,
+      assets,
+    );
+
+    expect(display.children[0]).toBeInstanceOf(Sprite);
+    expect(display.children[0]).toMatchObject({ width: 50, height: 60 });
+    expect(display.zIndex).toBe(10);
+  });
+
   it("plays named atlas animations at the declared rate", () => {
     const display = buildEntityDisplay(
       {

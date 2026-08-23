@@ -22,6 +22,10 @@ downward. Check an item only after the relevant focused tests pass.
   retain disconnected roster members, deactivate their physics entities, and
   render them in a bench area. The soccer example owns deterministic bench and
   return-to-field placement through the generic lifecycle projector.
+- [x] Connect the player presentation layer in the soccer integration. Canvas
+  renders consumer-configured avatar art while the product owns compact names,
+  deterministic one-to-five-star crowns, and lifecycle-aware bench styling via
+  bounded overlay projections.
 - [x] Move example art onto the versioned Canvas asset-manifest/preload pipeline.
   The soccer field and generated ball atlas now load as ordinary consumer-owned
   assets; collision geometry remains independent data.
@@ -164,7 +168,9 @@ work below because they determine the public boundary every consumer will use.
 
 ## Priority 3 — smaller follow-ups
 
-- [ ] Render avatars from definition data.
+- [x] Render avatars from definition data. A consumer may register visual data
+  for the reserved `avatar` definition; the neutral Canvas circle remains the
+  fallback when no avatar visual is supplied.
 - [x] Connect `startAnimation` to the renderer/network path, including replaying
   the same named animation through a synchronized animation epoch.
 - [x] Correct peer item counts.

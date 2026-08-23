@@ -43,3 +43,15 @@ replicated through ordinary canonical state.
 
 The soccer lounge uses this hook to place inactive or disconnected members in
 stable bench slots and return reactivated members to a team-side spawn.
+
+## Presentation
+
+An application may register consumer-owned visual data using the reserved
+`avatar` definition ID. The renderer applies its sprite, size, anchor,
+animation, and z-order, while Canvas retains authority over the avatar body and
+collision model. If the definition is absent, Canvas draws a neutral fallback.
+
+Participant names and product metadata are intentionally not baked into that
+sprite contract. The soccer lounge combines `subscribePresence` with a bounded
+avatar overlay projection to render its name labels and one-to-five-star
+crowns, including their inactive bench state.

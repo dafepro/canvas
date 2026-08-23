@@ -1,11 +1,14 @@
 import type {
   CanvasRuntime,
   CanonicalStateSnapshot,
+  OverlayProjectionSnapshot,
+  ParticipantPresence,
 } from "@canvas-physics/client/runtime";
 import { soccerDefinitions } from "./soccer-content.js";
 import type { SoccerBallState } from "./soccer-ball-behavior.js";
 import { soccerAssets } from "./assets.js";
 import { projectSoccerParticipantAvatar } from "./participant-projection.js";
+import { playerStarCount } from "./player-overlay.js";
 import "./style.css";
 
 const serverUrl =
@@ -22,6 +25,7 @@ const status = document.querySelector<HTMLElement>("#status")!;
 const participantCount = document.querySelector<HTMLElement>("#participant-count")!;
 const scoreBoard = document.querySelector<HTMLElement>("#scoreboard")!;
 const ballMarker = document.querySelector<HTMLElement>("#ball-marker")!;
+const playerOverlayLayer = document.querySelector<HTMLElement>("#player-overlays")!;
 const showProjectionOverlay = new URLSearchParams(location.search).has("overlay");
 
 userInput.value =
@@ -31,6 +35,8 @@ userInput.value =
 let runtime: CanvasRuntime | undefined;
 let joining = false;
 let ballIds = new Set<string>();
+let participantsByAvatar = new Map<string, Readonly<ParticipantPresence>>();
+const playerLabels = new Map<string, HTMLElement>();
 let unsubscribers: (() => void)[] = [];
 
 const renderScore = (state: SoccerBallState): void => {
@@ -45,6 +51,48 @@ const observeEntities = (snapshot: CanonicalStateSnapshot): void => {
       .filter((entity) => entity.kind === "item" && entity.definitionId === "soccer-ball")
       .map((entity) => entity.id),
   );
+};
+
+const renderPlayerOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => {
+  const seen = new Set<string>();
+  for (const avatar of snapshot.entities) {
+    const participant = participantsByAvatar.get(avatar.entityId);
+    if (!participant) continue;
+    seen.add(avatar.entityId);
+    let label = playerLabels.get(avatar.entityId);
+    if (!label) {
+      label = document.createElement("div");
+      label.className = "player-label";
+      const stars = document.createElement("span");
+      stars.className = "player-stars";
+      stars.textContent = "★".repeat(playerStarCount(participant.participantId));
+      const name = document.createElement("span");
+      name.className = "player-name";
+      label.append(stars, name);
+      playerOverlayLayer.appendChild(label);
+      playerLabels.set(avatar.entityId, label);
+    }
+    const name = label.querySelector<HTMLElement>(".player-name")!;
+    name.textContent = participant.displayName;
+    label.dataset.status = participant.status;
+    label.hidden = !avatar.visible || !avatar.inViewport;
+    if (!label.hidden) {
+      const labelY = avatar.screen.y - 4.2 * snapshot.viewport.scale;
+      label.style.transform =
+        `translate(${avatar.screen.x}px, ${labelY}px) translate(-50%, -100%)`;
+    }
+  }
+  for (const [entityId, label] of playerLabels) {
+    if (seen.has(entityId)) continue;
+    label.remove();
+    playerLabels.delete(entityId);
+  }
+};
+
+const clearPlayerOverlays = (): void => {
+  participantsByAvatar.clear();
+  playerLabels.clear();
+  playerOverlayLayer.replaceChildren();
 };
 
 const join = async (): Promise<void> => {
@@ -100,6 +148,12 @@ const join = async (): Promise<void> => {
         if (score) renderScore(score.state as SoccerBallState);
       }),
       nextRuntime.subscribePresence((snapshot) => {
+        participantsByAvatar = new Map(
+          snapshot.participants.map((participant) => [
+            participant.avatarEntityId,
+            participant,
+          ]),
+        );
         participantCount.textContent = String(
           snapshot.participants.filter(({ status }) => status !== "disconnected").length,
         );
@@ -108,6 +162,11 @@ const join = async (): Promise<void> => {
         if (effect.effect !== "goal") return;
         scoreBoard.classList.remove("goal-flash");
         requestAnimationFrame(() => scoreBoard.classList.add("goal-flash"));
+      }),
+      nextRuntime.subscribeOverlayProjection(renderPlayerOverlays, {
+        maxHz: 15,
+        maxEntities: 64,
+        kinds: ["avatar"],
       }),
       ...(showProjectionOverlay
         ? [nextRuntime.subscribeOverlayProjection((snapshot) => {
@@ -152,6 +211,7 @@ const leave = (): void => {
   benchButton.disabled = true;
   status.textContent = "Not connected";
   participantCount.textContent = "0";
+  clearPlayerOverlays();
   ballMarker.hidden = true;
 };
 

@@ -161,6 +161,53 @@ h1 {
   will-change: transform;
 }
 
+.player-overlays {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.player-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  min-width: 48px;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 70%));
+  will-change: transform;
+}
+
+.player-stars {
+  color: #ffd95a;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: -1px;
+  white-space: nowrap;
+}
+
+.player-name {
+  max-width: 96px;
+  overflow: hidden;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgb(3 18 10 / 76%);
+  color: #f5fff7;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-label[data-status="inactive"],
+.player-label[data-status="disconnected"] {
+  opacity: 0.52;
+}
+
 aside {
   padding: 22px;
   border-left: 1px solid #2b5238;

@@ -55,6 +55,19 @@ failures use `CanvasConsumerError`, not string parsing. See
 supersession, inactive/disconnected projection, and the product-owned avatar
 placement hook.
 
+## Avatar presentation
+
+Consumers may register an item definition with the reserved ID `avatar` to
+configure avatar sprite, size, anchor, variants, animation, and z-order through
+the ordinary asset and visual-definition contracts. Canvas still owns avatar
+body creation and collision; item body, collider, persistence, and behavior
+fields are not an avatar-physics extension seam. When no `avatar` definition is
+registered, the renderer uses its product-neutral circle fallback.
+
+Names, ranks, crowns, teams, and roster state remain product UI. Consumers can
+align those decorations with drawn avatars through the bounded overlay
+projection API without importing Pixi or observing the render loop.
+
 ## Room template items
 
 Product room identity is independent from canvas template identity. The host's
