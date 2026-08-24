@@ -11,6 +11,12 @@ describe("cross-platform release verification", () => {
 
     expect(workflow).toContain("ubuntu-latest");
     expect(workflow).toContain("windows-latest");
+    expect(workflow).toContain("actions/checkout@v7");
+    expect(workflow).toContain("pnpm/setup@v2");
+    expect(workflow).toContain("actions/setup-go@v7");
+    expect(workflow).not.toContain("actions/setup-node@");
+    expect(workflow).not.toContain("pnpm/action-setup@");
+    expect(workflow).not.toContain("arduino/setup-protoc@");
     expect(workflow).toContain("pnpm install --frozen-lockfile");
     expect(workflow).toContain("pnpm vitest run");
     expect(workflow).toContain('pnpm -r --filter "./packages/*" build');
