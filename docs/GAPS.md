@@ -104,6 +104,10 @@ work below because they determine the public boundary every consumer will use.
   mobile backgrounding coverage.
 - [ ] Record physical-device resource profiles and enforce measured budgets.
 - [ ] Add reproducible Windows/Linux release CI with generated-code verification.
+- [ ] Expose an owner-authorized transient item-action path from the public
+  runtime through the relay to the host behavior. This is needed for generic
+  Play, Restart, and named trigger controls that should not masquerade as
+  durable configuration changes.
 
 ## Consumer-library Priority 3 — optional follow-ups
 

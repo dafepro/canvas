@@ -53,8 +53,6 @@ let entities: readonly Readonly<RenderEntity>[] = [];
 let selectedEntityId: string | undefined;
 let pendingAfterRevision: number | undefined;
 let spawnCursor = 0;
-let idsBeforeSpawn = new Set<string>();
-let pendingSpawnDefinition: string | undefined;
 let lastManageSignature = "";
 stage.dataset.ownedStyle = "aurora";
 
@@ -125,11 +123,9 @@ const renderOwnedList = (): void => {
       const definition = definitionById.get(entity.definitionId);
       button.innerHTML = `<span>${definition?.displayName ?? entity.definitionId}</span><small>${entity.isolated ? "paused" : "live"}</small>`;
       button.addEventListener("click", () => {
-        selectedEntityId = entity.id;
+        if (!runtime?.selectItemForEdit(entity.id)) return;
         closeMoreMenu();
         closePopovers();
-        lastManageSignature = "";
-        renderOwnedList();
       });
       return button;
     }),
@@ -138,19 +134,6 @@ const renderOwnedList = (): void => {
 
 const observeState = (snapshot: CanonicalStateSnapshot): void => {
   entities = snapshot.entities;
-  if (pendingSpawnDefinition) {
-    const spawned = entities.find(
-      (entity) =>
-        entity.kind === "item" &&
-        entity.definitionId === pendingSpawnDefinition &&
-        entity.ownerUserId === userInput.value &&
-        !idsBeforeSpawn.has(entity.id),
-    );
-    if (spawned) {
-      selectedEntityId = spawned.id;
-      pendingSpawnDefinition = undefined;
-    }
-  }
   if (selectedEntityId && !entities.some(({ id }) => id === selectedEntityId)) {
     selectedEntityId = undefined;
     closeMoreMenu();
@@ -388,8 +371,7 @@ paletteButtons.forEach((button) =>
   button.addEventListener("click", () => {
     const definitionId = button.dataset.spawn!;
     const position = spawnPositions[spawnCursor++ % spawnPositions.length]!;
-    idsBeforeSpawn = new Set(entities.map(({ id }) => id));
-    pendingSpawnDefinition = definitionId;
+    runtime?.clearItemEditSelection();
     closePopovers();
     requestMutation(
       `Spawning ${definitionById.get(definitionId)?.displayName ?? definitionId}…`,

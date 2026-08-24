@@ -19,7 +19,9 @@ its sides, and finish/delete/more actions below it. Those controls may extend
 outside the canvas instead of being clipped at an edge. Only a completed tap
 selects an item; dragging from an unselected item does nothing. A later drag
 manipulates the selected item with a display-rate local presentation while
-authoritative preview messages remain rate-limited. The private
+authoritative preview messages remain rate-limited. Newly spawned items remain
+unselected; tapping one or choosing it through Manage enters the same editor
+selection state. The private
 More menu holds item-specific controls such as three color presets, a custom
 color picker, freeze, and collisions. Each user can drag, rotate, scale,
 recolor, freeze, make collisionless, and delete their own items. The visitor
@@ -38,3 +40,11 @@ The example imports only public Canvas package exports. It owns its canvas
 definition, server item metadata, behavior worker, asset manifest, artwork, and
 product UI. Canvas provides the generic projection, durable mutation, and
 owner-authorized simulation-isolation seams.
+
+The reactive orb is the editable behavior example: avatar contact triggers its
+one-shot `pulse` animation and effect, while its color is durable configuration.
+The color tile reuses the color-applying portion without a contact sensor. The
+room-owned gold ball runs the constant-speed behavior. The current overlay does
+not configure animation trigger policy or expose Play/Restart; that follow-up
+requires a public transient owner-action path in addition to the existing
+durable `setItemConfig` API.

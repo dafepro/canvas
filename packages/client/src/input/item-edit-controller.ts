@@ -291,11 +291,16 @@ export class ItemEditController {
   }
 
   clear(): void {
+    this.select(undefined);
+  }
+
+  /** Synchronizes a product-owned list/menu selection with pointer editing. */
+  select(entity: RenderEntity | undefined): void {
     this.releasePointer(this.pendingTap?.pointerId);
     this.releasePointer(this.drag?.pointerId);
     this.pendingTap = undefined;
     this.drag = undefined;
-    this.selected = undefined;
+    this.selected = entity;
     this.emit();
   }
 

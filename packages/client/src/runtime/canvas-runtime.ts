@@ -399,6 +399,21 @@ export class CanvasRuntime {
     this.editPresentation.clear();
   }
 
+  /** Selects an owned item through product UI using the same state as pointer editing. */
+  selectItemForEdit(entityId: string): boolean {
+    if (!this.editMode || !this.editor) return false;
+    const entity = this.latestEntities.find(
+      (candidate) =>
+        candidate.id === entityId &&
+        candidate.kind === "item" &&
+        candidate.ownerUserId === this.session.userId &&
+        candidate.respawning !== true,
+    );
+    if (!entity) return false;
+    this.editor.select(entity);
+    return true;
+  }
+
   private mergedIntent(): InputIntent {
     if (this.avatarDisabled) {
       return { direction: { x: 0, y: 0 }, intensity: 0, held: false, disabled: true };

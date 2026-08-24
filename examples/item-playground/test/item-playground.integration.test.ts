@@ -85,6 +85,8 @@ describe("compact item playground", () => {
     expect(html).toContain('aria-label="Delete item"');
     expect(main).toContain("Finished editing · frozen state preserved");
     expect(main).not.toContain("runtime!.setItemIsolation(entity.id, false)");
+    expect(main).toContain("runtime?.selectItemForEdit(entity.id)");
+    expect(main).not.toContain("selectedEntityId = spawned.id");
   });
 
   it("applies an arbitrary consumer color as a replicated sprite tint", () => {

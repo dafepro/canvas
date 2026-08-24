@@ -194,4 +194,25 @@ describe("item edit interaction", () => {
     presentation.commit("item-1", { ...preview, x: 19 }, 200);
     expect(presentation.apply(canonical, 1_701)[0]).toMatchObject({ x: 10, y: 5 });
   });
+
+  it("lets product UI synchronize a selection before direct manipulation", () => {
+    const surface = new PointerSurface();
+    const previews: number[] = [];
+    const selections: Array<string | undefined> = [];
+    const controller = new ItemEditController(surface as unknown as HTMLElement, {
+      enabled: () => true,
+      pick: () => item(),
+      toWorld: (point) => ({ x: point.x / 2, y: point.y / 2 }),
+      onPreview: (_id, transform) => previews.push(transform.x),
+      onCommit: () => {},
+      onChange: (state) => selections.push(state.selectedEntityId),
+    });
+
+    controller.select(item());
+    expect(selections).toEqual(["item-1"]);
+    surface.emit("pointerdown", 20, 10);
+    surface.emit("pointermove", 30, 14);
+    expect(previews).toEqual([15]);
+    controller.destroy();
+  });
 });
