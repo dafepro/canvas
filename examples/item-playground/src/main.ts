@@ -14,6 +14,7 @@ import {
   type GraffitiStyle,
 } from "./graffiti-behavior.js";
 import type { OrbTheme } from "./reactive-orb-behavior.js";
+import { clampFloatingRect } from "./overlay-geometry.js";
 import "./style.css";
 
 const params = new URLSearchParams(location.search);
@@ -74,6 +75,7 @@ let pendingAfterRevision: number | undefined;
 let spawnCursor = 0;
 let lastManageSignature = "";
 let graffitiDraft: GraffitiConfig = { ...defaultGraffitiConfig };
+let moreMenuClampFrame: number | undefined;
 stage.dataset.ownedStyle = "aurora";
 
 const definitionById = new Map(
@@ -149,6 +151,33 @@ const closePopovers = (except?: HTMLElement): void => {
 const closeMoreMenu = (): void => {
   moreMenu.hidden = true;
   moreToggle.setAttribute("aria-expanded", "false");
+};
+
+const clampMoreMenu = (): void => {
+  moreMenuClampFrame = undefined;
+  if (moreMenu.hidden) return;
+  const currentX = Number.parseFloat(moreMenu.style.getPropertyValue("--menu-shift-x")) || 0;
+  const currentY = Number.parseFloat(moreMenu.style.getPropertyValue("--menu-shift-y")) || 0;
+  const shown = moreMenu.getBoundingClientRect();
+  const base = {
+    left: shown.left - currentX,
+    right: shown.right - currentX,
+    top: shown.top - currentY,
+    bottom: shown.bottom - currentY,
+    width: shown.width,
+    height: shown.height,
+  };
+  const shift = clampFloatingRect(base, {
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight,
+  });
+  moreMenu.style.setProperty("--menu-shift-x", `${shift.x}px`);
+  moreMenu.style.setProperty("--menu-shift-y", `${shift.y}px`);
+};
+
+const queueMoreMenuClamp = (): void => {
+  if (moreMenu.hidden || moreMenuClampFrame !== undefined) return;
+  moreMenuClampFrame = requestAnimationFrame(clampMoreMenu);
 };
 
 const togglePopover = (button: HTMLButtonElement, panel: HTMLElement): void => {
@@ -329,6 +358,7 @@ const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => 
   if (entity.variant === "custom" && entity.tint !== undefined) {
     customColorPicker.value = `#${entity.tint.toString(16).padStart(6, "0")}`;
   }
+  queueMoreMenuClamp();
 };
 
 const join = async (): Promise<void> => {
@@ -462,8 +492,10 @@ moreToggle.addEventListener("click", (event) => {
   const open = moreMenu.hidden;
   moreMenu.hidden = !open;
   moreToggle.setAttribute("aria-expanded", String(open));
+  queueMoreMenuClamp();
 });
 moreMenu.addEventListener("click", (event) => event.stopPropagation());
+window.addEventListener("resize", queueMoreMenuClamp);
 highlightButtons.forEach((button) =>
   button.addEventListener("click", () => {
     const style = button.dataset.highlight!;

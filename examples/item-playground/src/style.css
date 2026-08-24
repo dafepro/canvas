@@ -249,9 +249,12 @@ button:hover:not(:disabled) { border-color: #536c8e; background: #f4f8fd; }
   top: 39px;
   left: 50%;
   width: 184px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow: auto;
   display: grid;
   gap: 7px;
-  translate: -50% 0;
+  translate: calc(-50% + var(--menu-shift-x, 0px)) var(--menu-shift-y, 0px);
   padding: 9px;
   border: 1px solid #aebccd;
   border-radius: 11px;

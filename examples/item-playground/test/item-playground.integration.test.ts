@@ -53,6 +53,7 @@ import {
   GraffitiBehavior,
   defaultGraffitiConfig,
 } from "../src/graffiti-behavior.js";
+import { clampFloatingRect } from "../src/overlay-geometry.js";
 
 const canvas = canvasJson as unknown as CanvasDefinition;
 
@@ -61,6 +62,21 @@ beforeAll(async () => {
 }, 30_000);
 
 describe("compact item playground", () => {
+  it("keeps floating item controls inside the visible frame with left-edge priority", () => {
+    expect(clampFloatingRect(
+      { left: -92, top: 400, right: 174, bottom: 1300, width: 266, height: 900 },
+      { width: 360, height: 800 },
+    )).toEqual({ x: 100, y: -392 });
+    expect(clampFloatingRect(
+      { left: 120, top: 120, right: 304, bottom: 360, width: 184, height: 240 },
+      { width: 360, height: 800 },
+    )).toEqual({ x: 0, y: 0 });
+    expect(clampFloatingRect(
+      { left: 240, top: 640, right: 424, bottom: 880, width: 184, height: 240 },
+      { width: 360, height: 800 },
+    )).toEqual({ x: -72, y: -88 });
+  });
+
   it("keeps the independently served scene intentionally small", () => {
     expect(validateCanvasDefinition(canvas)).toEqual({ ok: true });
     expect(canvas.size).toEqual({ width: 36, height: 24 });
