@@ -73,8 +73,7 @@ const join = async (): Promise<void> => {
         driver: new SimulationDriver(worker),
         scene: { background: request.roomId === "linked-cave" ? 0x111629 : 0xbde7b2 },
         pointer: { mode: "thumbstick", deadZonePx: 4, fullRangePx: 55 },
-        spawnPointId: request.arrivalSpawnPointId ??
-          (request.roomId === "linked-village" ? "village-square" : "cave-depths"),
+        spawnPointId: request.arrivalSpawnPointId,
         onAssetProgress: ({ loaded, total }) => {
           status.textContent = `Preparing ${names[request.roomId] ?? request.roomId} · assets ${loaded}/${total}`;
         },

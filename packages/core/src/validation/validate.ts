@@ -206,5 +206,23 @@ export const validateSnapshot = (
       }
     });
   });
+  snapshot.avatars.forEach((avatar, i) => {
+    if (ids.has(avatar.entityId)) {
+      problems.push({ path: `avatars[${i}].entityId`, message: "duplicate entity id" });
+    }
+    ids.add(avatar.entityId);
+    if (!avatar.entityId || !avatar.userId) {
+      problems.push({ path: `avatars[${i}]`, message: "entity and user ids are required" });
+    }
+    const transform = validateTransform(
+      { x: avatar.position.x, y: avatar.position.y, rotation: 0 },
+      canvas,
+    );
+    if (!transform.ok) {
+      for (const problem of transform.problems) {
+        problems.push({ path: `avatars[${i}].position.${problem.path}`, message: problem.message });
+      }
+    }
+  });
   return result(problems);
 };

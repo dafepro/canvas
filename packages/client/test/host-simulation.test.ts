@@ -59,6 +59,24 @@ const build = () =>
   new HostSimulation(rocketCanvas, rocketCanvasDefinitions, registry(), 60);
 
 describe("HostSimulation with real physics", () => {
+  it("checkpoints canonical avatar positions for reconnects", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:alice",
+      clientId: "client-alice",
+      userId: "alice",
+      position: { x: 24, y: 18 },
+    });
+    simulation.world.teleport("avatar:alice", { x: 31.25, y: 22.5 });
+
+    expect(simulation.snapshot().avatars).toEqual([{
+      entityId: "avatar:alice",
+      userId: "alice",
+      position: { x: 31.25, y: 22.5 },
+    }]);
+    simulation.free();
+  });
+
   it("isolates an item from physics and behavior until it is made live again", () => {
     const counterBehavior: ItemBehavior<Record<string, never>, { ticks: number }> = {
       behaviorType: "test.liveCounter",

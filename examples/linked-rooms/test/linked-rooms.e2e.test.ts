@@ -35,7 +35,7 @@ const sessions: RoomSession[] = [];
 const open = (
   roomId: "linked-village" | "linked-cave",
   userId: string,
-  spawnPointId: string,
+  spawnPointId?: string,
   intent: () => InputIntent = () => STILL,
 ): RoomSession => {
   const session = new RoomSession({
@@ -130,9 +130,10 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
       () => (view(host).find((entity) => entity.id === returnedAvatar)?.x ?? startX) > startX + 1,
     );
     returningIntent = STILL;
+    const movedX = view(host).find((entity) => entity.id === returnedAvatar)!.x;
 
     await returned.stopGracefully();
-    const reloaded = open("linked-village", "peer", "from-cave");
+    const reloaded = open("linked-village", "peer");
     await reloaded.start();
     await reloaded.whenPresented();
     await waitFor(
@@ -145,6 +146,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
 
     expect(host.client.isHost).toBe(true);
     expect(hasDoor(host, "village-cave-door")).toBe(true);
+    expect(view(host).find((entity) => entity.id === reloaded.avatarId)!.x).toBeCloseTo(movedX, 0);
   }, 60_000);
 
   it("requests travel only after the avatar reaches the door midpoint", () => {

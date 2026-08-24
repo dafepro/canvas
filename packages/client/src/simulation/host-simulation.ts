@@ -9,6 +9,7 @@ import {
   type ItemDefinition,
   type ItemInstance,
   type SnapshotItem,
+  type SnapshotAvatar,
 } from "@canvas-physics/core";
 import type { AvatarSpawn } from "./rapier-world.js";
 import { RapierWorld } from "./rapier-world.js";
@@ -196,6 +197,7 @@ export class HostSimulation {
     metadata: { sceneRevision?: number; hostEpoch?: number } = {},
   ): CanvasSnapshot {
     const items: SnapshotItem[] = [];
+    const avatars: SnapshotAvatar[] = [];
     for (const entity of this.world.registry.ofKind("item")) {
       const persistence = entity.persistence;
       if (persistence && !persistence.transform) continue;
@@ -225,6 +227,14 @@ export class HostSimulation {
       if (entity.render?.tint !== undefined) item.visualTint = entity.render.tint;
       items.push(item);
     }
+    for (const entity of this.world.registry.ofKind("avatar")) {
+      avatars.push({
+        entityId: entity.id,
+        userId: entity.avatar?.userId ?? "",
+        position: { x: entity.transform.x, y: entity.transform.y },
+      });
+    }
+    avatars.sort((left, right) => left.entityId.localeCompare(right.entityId));
     return {
       schemaVersion: 1,
       canvasId: this.canvas.id,
@@ -236,6 +246,7 @@ export class HostSimulation {
       capturedAt: new Date().toISOString(),
       normalized,
       items,
+      avatars,
     };
   }
 

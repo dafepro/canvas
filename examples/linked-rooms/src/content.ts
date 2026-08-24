@@ -80,8 +80,8 @@ export const villageCanvas: CanvasDefinition = {
   id: "linked-village",
   backgroundAssetId: "linked.village",
   spawnPoints: [
-    { id: "from-cave", position: { x: 36, y: 15 } },
     { id: "village-square", position: { x: 12, y: 15 } },
+    { id: "from-cave", position: { x: 36, y: 15 } },
   ],
   systemItems: [
     {
@@ -99,8 +99,8 @@ export const caveCanvas: CanvasDefinition = {
   id: "linked-cave",
   backgroundAssetId: "linked.cave",
   spawnPoints: [
-    { id: "from-village", position: { x: 12, y: 15 } },
     { id: "cave-depths", position: { x: 36, y: 15 } },
+    { id: "from-village", position: { x: 12, y: 15 } },
   ],
   systemItems: [
     {

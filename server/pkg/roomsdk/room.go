@@ -48,10 +48,11 @@ type Room struct {
 	// joinOrder keeps election deterministic.
 	joinOrder []string
 
-	snapshot     CanvasSnapshot
-	snapshotRaw  json.RawMessage
-	checkpointNo uint64
-	items        map[string]*SnapshotItem
+	snapshot        CanvasSnapshot
+	snapshotRaw     json.RawMessage
+	checkpointNo    uint64
+	items           map[string]*SnapshotItem
+	avatarPositions map[string]SnapshotAvatar
 	// previews records transforms shown by the host but not yet committed.
 	// Checkpoints must not turn these transient edits into durable placement.
 	previews     map[string]string
@@ -78,25 +79,26 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 	}
 
 	room := &Room{
-		cfg:           &server.cfg,
-		server:        server,
-		roomID:        roomID,
-		canvasID:      record.CanvasID,
-		canvasShape:   shape,
-		definitionRaw: record.DefinitionRaw,
-		clients:       make(map[string]*Client),
-		participants:  make(map[string]struct{}),
-		items:         make(map[string]*SnapshotItem),
-		previews:      make(map[string]string),
-		definitions:   make(map[string]ItemDefinitionRecord),
-		joins:         make(chan *Client, 8),
-		departures:    make(chan departure, 8),
-		messages:      make(chan inbound, 512),
-		done:          make(chan struct{}),
-		persistQueue:  make(chan SnapshotRecord, 1),
-		persistStop:   make(chan struct{}),
-		persistDone:   make(chan struct{}),
-		sleeping:      true,
+		cfg:             &server.cfg,
+		server:          server,
+		roomID:          roomID,
+		canvasID:        record.CanvasID,
+		canvasShape:     shape,
+		definitionRaw:   record.DefinitionRaw,
+		clients:         make(map[string]*Client),
+		participants:    make(map[string]struct{}),
+		items:           make(map[string]*SnapshotItem),
+		avatarPositions: make(map[string]SnapshotAvatar),
+		previews:        make(map[string]string),
+		definitions:     make(map[string]ItemDefinitionRecord),
+		joins:           make(chan *Client, 8),
+		departures:      make(chan departure, 8),
+		messages:        make(chan inbound, 512),
+		done:            make(chan struct{}),
+		persistQueue:    make(chan SnapshotRecord, 1),
+		persistStop:     make(chan struct{}),
+		persistDone:     make(chan struct{}),
+		sleeping:        true,
 	}
 
 	if len(snapshot.SnapshotRaw) > 0 {
@@ -126,6 +128,9 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 		room.snapshotRaw = raw
 	}
 	room.indexItems()
+	for _, avatar := range room.snapshot.Avatars {
+		room.avatarPositions[avatar.EntityID] = avatar
+	}
 	return room, nil
 }
 
@@ -287,7 +292,7 @@ func (r *Room) handleJoin(client *Client) {
 			HostEpoch:            r.hostEpoch,
 			HostClientId:         r.hostClientID,
 			CanvasDefinitionJson: r.definitionRaw,
-			SnapshotJson:         r.snapshotRaw,
+			SnapshotJson:         r.snapshotForClient(),
 			RoomWasSleeping:      wasSleeping,
 			TickRate:             r.cfg.TickRate,
 			UserId:               client.UserID,
@@ -481,6 +486,7 @@ func (r *Room) relayFromHost(from *Client, envelope *pb.RoomEnvelope) {
 		r.cfg.Metrics.DurableRejected(r.roomID, "malformed_state")
 		return
 	}
+	r.captureAvatarPositions(envelope)
 	envelope.SenderClientId = from.ID
 	envelope.RoomId = r.roomID
 	r.broadcastExcept(from.ID, envelope)
@@ -543,6 +549,45 @@ func (r *Room) knownParticipantAvatar(entityID string) bool {
 	}
 	_, ok := r.participants[strings.TrimPrefix(entityID, "avatar:")]
 	return ok
+}
+
+func (r *Room) captureAvatarPositions(envelope *pb.RoomEnvelope) {
+	var states []*pb.EntityState
+	if delta := envelope.GetStateDelta(); delta != nil {
+		states = delta.Entities
+	} else if full := envelope.GetFullState(); full != nil {
+		states = full.Entities
+	}
+	for _, state := range states {
+		if state == nil || state.QuantizedTransform == nil || !r.knownParticipantAvatar(state.EntityId) {
+			continue
+		}
+		userID := strings.TrimPrefix(state.EntityId, "avatar:")
+		r.avatarPositions[state.EntityId] = SnapshotAvatar{
+			EntityID: state.EntityId,
+			UserID:   userID,
+			Position: Vec2{
+				X: float64(state.QuantizedTransform.X) / 100,
+				Y: float64(state.QuantizedTransform.Y) / 100,
+			},
+		}
+	}
+}
+
+func (r *Room) snapshotForClient() json.RawMessage {
+	snapshot := r.snapshot
+	snapshot.Avatars = make([]SnapshotAvatar, 0, len(r.avatarPositions))
+	for _, avatar := range r.avatarPositions {
+		snapshot.Avatars = append(snapshot.Avatars, avatar)
+	}
+	sort.Slice(snapshot.Avatars, func(i, j int) bool {
+		return snapshot.Avatars[i].EntityID < snapshot.Avatars[j].EntityID
+	})
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		return r.snapshotRaw
+	}
+	return raw
 }
 
 func (r *Room) handleCheckpoint(from *Client, hostEpoch uint64, checkpoint *pb.Checkpoint) {
@@ -615,6 +660,23 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 			}
 		}
 	}
+	seenAvatars := make(map[string]struct{}, len(incoming.Avatars))
+	for _, avatar := range incoming.Avatars {
+		if _, duplicate := seenAvatars[avatar.EntityID]; duplicate {
+			return errDuplicateEntity
+		}
+		seenAvatars[avatar.EntityID] = struct{}{}
+		if avatar.EntityID != "avatar:"+avatar.UserID || !r.knownParticipantAvatar(avatar.EntityID) {
+			return errUnknownEntity
+		}
+		transform := Transform{X: avatar.Position.X, Y: avatar.Position.Y, Scale: 1}
+		if !transform.finite() {
+			return errNonFiniteTransform
+		}
+		if !r.withinBounds(transform) {
+			return errOutOfBounds
+		}
+	}
 
 	// The host owns canonical physics and behavior outcomes, but durable item
 	// identity and authorship remain server-authoritative. Merge only the
@@ -631,6 +693,16 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 		stored.VisualVariant = item.VisualVariant
 		stored.VisualTint = item.VisualTint
 	}
+	for _, avatar := range incoming.Avatars {
+		r.avatarPositions[avatar.EntityID] = avatar
+	}
+	r.snapshot.Avatars = make([]SnapshotAvatar, 0, len(r.avatarPositions))
+	for _, avatar := range r.avatarPositions {
+		r.snapshot.Avatars = append(r.snapshot.Avatars, avatar)
+	}
+	sort.Slice(r.snapshot.Avatars, func(i, j int) bool {
+		return r.snapshot.Avatars[i].EntityID < r.snapshot.Avatars[j].EntityID
+	})
 
 	// The server keeps all durable snapshot metadata. Only runtime checkpoint
 	// bookkeeping comes from the accepted host checkpoint.

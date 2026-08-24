@@ -27,6 +27,7 @@ describe("SimulationKernel host promotion", () => {
       tick: 600,
       capturedAt: new Date().toISOString(),
       normalized: false,
+      avatars: [],
       items: [{
         entityId: "durable-crate",
         definitionId: crateDefinition.definitionId,

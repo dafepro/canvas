@@ -348,6 +348,7 @@ export class RoomClient {
           capturedAt: new Date().toISOString(),
           normalized: true,
           items: [],
+          avatars: [],
         },
         sceneRevision: accepted.sceneRevision,
         hostEpoch: accepted.hostEpoch,

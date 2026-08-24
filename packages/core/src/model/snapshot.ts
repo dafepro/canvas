@@ -1,8 +1,10 @@
+import type { Vec2 } from "../math/vec2.js";
 import type { Transform } from "./item-instance.js";
 
 /**
  * A durable canonical checkpoint (spec 13.1). Velocities, forces, particles,
- * contact sets, and avatars are not part of it.
+ * contact sets, and forces are not part of it. Avatar positions are durable so
+ * reconnecting participants resume from the room's last canonical location.
  */
 export interface CanvasSnapshot {
   schemaVersion: number;
@@ -18,6 +20,13 @@ export interface CanvasSnapshot {
   /** True after the room sleep normalization ran. */
   normalized: boolean;
   items: SnapshotItem[];
+  avatars: SnapshotAvatar[];
+}
+
+export interface SnapshotAvatar {
+  entityId: string;
+  userId: string;
+  position: Vec2;
 }
 
 export interface SnapshotItem {
@@ -61,4 +70,5 @@ export const emptySnapshot = (
   capturedAt: new Date(0).toISOString(),
   normalized: true,
   items: [],
+  avatars: [],
 });

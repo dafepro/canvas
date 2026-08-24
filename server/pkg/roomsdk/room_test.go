@@ -329,6 +329,46 @@ func TestReconnectSupersedesTheParticipantsOldConnection(t *testing.T) {
 	}
 }
 
+func TestReconnectReceivesTheLatestRelayedAvatarPosition(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	accepted := host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	peer := h.dial("bob")
+	peer.join()
+	host.await(func(e *pb.RoomEnvelope) bool {
+		presence := e.GetPresence()
+		return presence != nil && len(presence.Peers) == 2
+	})
+
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Payload: &pb.RoomEnvelope_StateDelta{StateDelta: &pb.StateDelta{
+			SceneRevision: accepted.SceneRevision,
+			Entities: []*pb.EntityState{{
+				EntityId:           "avatar:bob",
+				QuantizedTransform: &pb.QuantizedTransform{X: 6125, Y: 2275},
+			}},
+		}},
+	})
+	peer.await(func(e *pb.RoomEnvelope) bool { return e.GetStateDelta() != nil })
+
+	reconnected := h.dial("bob")
+	rejoin := reconnected.join()
+	var snapshot CanvasSnapshot
+	if err := json.Unmarshal(rejoin.SnapshotJson, &snapshot); err != nil {
+		t.Fatalf("unmarshal reconnect snapshot: %v", err)
+	}
+	if len(snapshot.Avatars) != 1 {
+		t.Fatalf("snapshot avatars = %#v, want bob's last canonical position", snapshot.Avatars)
+	}
+	if got := snapshot.Avatars[0]; got.EntityID != "avatar:bob" || got.Position.X != 61.25 || got.Position.Y != 22.75 {
+		t.Fatalf("reconnect avatar = %#v", got)
+	}
+}
+
 func TestParticipantOverlapIsScopedToOneRoomDuringTravel(t *testing.T) {
 	h := newHarness(t, func(cfg *Config) {
 		cfg.RoomTemplates = StaticRoomTemplates{

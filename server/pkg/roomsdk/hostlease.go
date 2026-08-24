@@ -27,7 +27,7 @@ func (r *Room) grantHost(clientID string, reason string) {
 			Kind:                 pb.HostControlKind_HOST_CONTROL_GRANTED,
 			HostClientId:         clientID,
 			HostEpoch:            r.hostEpoch,
-			SnapshotJson:         r.snapshotRaw,
+			SnapshotJson:         r.snapshotForClient(),
 			Reason:               reason,
 			LeaseExpiresAtUnixMs: uint64(r.hostLeaseUntil.UnixMilli()),
 		}},

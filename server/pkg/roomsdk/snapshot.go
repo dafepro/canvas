@@ -53,16 +53,28 @@ type BehaviorTimer struct {
 
 // CanvasSnapshot mirrors the client CanvasSnapshot type.
 type CanvasSnapshot struct {
-	SchemaVersion      uint32         `json:"schemaVersion"`
-	CanvasID           string         `json:"canvasId"`
-	CanvasVersion      uint32         `json:"canvasVersion"`
-	SceneRevision      uint64         `json:"sceneRevision"`
-	HostEpoch          uint64         `json:"hostEpoch"`
-	CheckpointRevision uint64         `json:"checkpointRevision"`
-	Tick               uint64         `json:"tick"`
-	CapturedAt         string         `json:"capturedAt"`
-	Normalized         bool           `json:"normalized"`
-	Items              []SnapshotItem `json:"items"`
+	SchemaVersion      uint32           `json:"schemaVersion"`
+	CanvasID           string           `json:"canvasId"`
+	CanvasVersion      uint32           `json:"canvasVersion"`
+	SceneRevision      uint64           `json:"sceneRevision"`
+	HostEpoch          uint64           `json:"hostEpoch"`
+	CheckpointRevision uint64           `json:"checkpointRevision"`
+	Tick               uint64           `json:"tick"`
+	CapturedAt         string           `json:"capturedAt"`
+	Normalized         bool             `json:"normalized"`
+	Items              []SnapshotItem   `json:"items"`
+	Avatars            []SnapshotAvatar `json:"avatars"`
+}
+
+type SnapshotAvatar struct {
+	EntityID string `json:"entityId"`
+	UserID   string `json:"userId"`
+	Position Vec2   `json:"position"`
+}
+
+type Vec2 struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
 }
 
 // SystemItemTemplate is an item owned by the room rather than a participant.
@@ -84,6 +96,7 @@ func emptySnapshot(canvasID string, canvasVersion uint32, now time.Time) CanvasS
 		Normalized:    true,
 		CapturedAt:    now.UTC().Format(time.RFC3339Nano),
 		Items:         []SnapshotItem{},
+		Avatars:       []SnapshotAvatar{},
 	}
 }
 

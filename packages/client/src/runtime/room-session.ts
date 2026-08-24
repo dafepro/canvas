@@ -560,6 +560,7 @@ export class RoomSession {
   private wireClient(): void {
     this.client.on("joined", (result) => {
       this.rememberItemMetadata(result.snapshot);
+      this.rememberSnapshotAvatarPositions(result.snapshot);
       void this.acceptJoin(result.canvas, result.snapshot, result.roomWasSleeping);
     });
 
@@ -603,6 +604,7 @@ export class RoomSession {
       this.buffer.reset();
       this.reconciler.reset();
       this.lastReconciledTick = undefined;
+      if (snapshot) this.rememberSnapshotAvatarPositions(snapshot);
       this.driver.send({
         type: "setHost",
         isHost: true,
@@ -957,8 +959,15 @@ export class RoomSession {
   }
 
   private avatarSpawnPosition(entityId: string): Vec2 {
+    if (this.options.spawnPointId) return this.spawnPosition(entityId);
     const canonical = this.lastCanonicalAvatarPositions.get(entityId);
     return canonical ? { ...canonical } : this.spawnPosition(entityId);
+  }
+
+  private rememberSnapshotAvatarPositions(snapshot: CanvasSnapshot): void {
+    for (const avatar of snapshot.avatars) {
+      this.lastCanonicalAvatarPositions.set(avatar.entityId, { ...avatar.position });
+    }
   }
 
   private rememberItemMetadata(snapshot: CanvasSnapshot): void {
