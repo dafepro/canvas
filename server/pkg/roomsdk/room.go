@@ -63,6 +63,12 @@ type Room struct {
 	messages   chan inbound
 	done       chan struct{}
 	emptyAt    time.Time
+
+	// Persistence is intentionally outside the room loop. Disk flushes must not
+	// delay realtime relay; a one-slot queue coalesces superseded checkpoints.
+	persistQueue chan SnapshotRecord
+	persistStop  chan struct{}
+	persistDone  chan struct{}
 }
 
 func newRoom(server *Server, roomID string, record CanvasRecord, snapshot SnapshotRecord) (*Room, error) {
@@ -87,6 +93,9 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 		departures:    make(chan departure, 8),
 		messages:      make(chan inbound, 512),
 		done:          make(chan struct{}),
+		persistQueue:  make(chan SnapshotRecord, 1),
+		persistStop:   make(chan struct{}),
+		persistDone:   make(chan struct{}),
 		sleeping:      true,
 	}
 
@@ -206,6 +215,7 @@ func (r *Room) indexItems() {
 // run owns every field of the Room until the room sleeps.
 func (r *Room) run() {
 	defer close(r.done)
+	go r.persistenceLoop()
 	ticker := time.NewTicker(r.cfg.HeartbeatInterval)
 	defer ticker.Stop()
 
@@ -543,7 +553,7 @@ func (r *Room) handleCheckpoint(from *Client, hostEpoch uint64, checkpoint *pb.C
 		return
 	}
 	r.cfg.Metrics.CheckpointStored(r.roomID, len(checkpoint.SnapshotJson))
-	r.persist()
+	r.persistAsync()
 }
 
 func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
@@ -640,8 +650,8 @@ func (r *Room) withinBounds(t Transform) bool {
 	return t.X > -maxX && t.X < maxX && t.Y > -maxY && t.Y < maxY
 }
 
-func (r *Room) persist() {
-	record := SnapshotRecord{
+func (r *Room) snapshotRecord() SnapshotRecord {
+	return SnapshotRecord{
 		RoomID:             r.roomID,
 		CanvasID:           r.canvasID,
 		CanvasVersion:      r.snapshot.CanvasVersion,
@@ -651,8 +661,42 @@ func (r *Room) persist() {
 		Tick:               r.snapshot.Tick,
 		Normalized:         r.snapshot.Normalized,
 		CapturedAt:         r.cfg.Now().UTC(),
-		SnapshotRaw:        r.snapshotRaw,
+		SnapshotRaw:        append(json.RawMessage(nil), r.snapshotRaw...),
 	}
+}
+
+func (r *Room) persistAsync() {
+	record := r.snapshotRecord()
+	select {
+	case r.persistQueue <- record:
+		return
+	default:
+	}
+	// Only the room goroutine produces records. Replace a queued older record
+	// rather than building a disk-I/O backlog when storage is temporarily slow.
+	select {
+	case <-r.persistQueue:
+	default:
+	}
+	select {
+	case r.persistQueue <- record:
+	default:
+	}
+}
+
+func (r *Room) persistenceLoop() {
+	defer close(r.persistDone)
+	for {
+		select {
+		case record := <-r.persistQueue:
+			r.saveSnapshot(record)
+		case <-r.persistStop:
+			return
+		}
+	}
+}
+
+func (r *Room) saveSnapshot(record SnapshotRecord) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := r.cfg.Store.SaveSnapshot(ctx, record); err != nil {
@@ -667,7 +711,9 @@ func (r *Room) sleep() {
 	// graceful host may already have supplied a normalized final checkpoint;
 	// after abrupt loss the newest periodic checkpoint remains explicitly
 	// unnormalized instead of making a false claim.
-	r.persist()
+	close(r.persistStop)
+	<-r.persistDone
+	r.saveSnapshot(r.snapshotRecord())
 	r.sleeping = true
 	r.cfg.Metrics.RoomSlept(r.roomID)
 	r.cfg.Logger.Info("room sleeping", "canvas", r.roomID,

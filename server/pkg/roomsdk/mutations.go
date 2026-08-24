@@ -104,7 +104,7 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 			Command:          command,
 		}},
 	})
-	r.persist()
+	r.persistAsync()
 }
 
 // Revert transient placements when their editing client leaves without a

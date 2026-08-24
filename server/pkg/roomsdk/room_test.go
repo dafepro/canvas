@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,6 +36,27 @@ type harness struct {
 	server *Server
 	store  *MemoryStore
 	http   *httptest.Server
+}
+
+type blockingSnapshotStore struct {
+	Store
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (s *blockingSnapshotStore) SaveSnapshot(
+	ctx context.Context,
+	snapshot SnapshotRecord,
+) error {
+	s.once.Do(func() {
+		close(s.started)
+		select {
+		case <-s.release:
+		case <-ctx.Done():
+		}
+	})
+	return s.Store.SaveSnapshot(ctx, snapshot)
 }
 
 func newHarness(t *testing.T, mutate func(*Config)) *harness {
@@ -978,6 +1000,73 @@ func TestRoomPreservesAHostNormalizedFinalCheckpointOnSleep(t *testing.T) {
 	}
 	if !snapshot.Normalized || snapshot.Items[0].Transform.X != 24 {
 		t.Fatalf("stored final snapshot = %+v", snapshot)
+	}
+}
+
+func TestPeriodicCheckpointPersistenceDoesNotBlockRealtimeRelay(t *testing.T) {
+	var blocked *blockingSnapshotStore
+	h := newHarness(t, func(cfg *Config) {
+		blocked = &blockingSnapshotStore{
+			Store:   cfg.Store,
+			started: make(chan struct{}),
+			release: make(chan struct{}),
+		}
+		cfg.Store = blocked
+	})
+	defer close(blocked.release)
+
+	host := h.dial("alice")
+	accepted := host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+	peer := h.dial("bob")
+	peer.join()
+
+	raw, err := json.Marshal(CanvasSnapshot{
+		SchemaVersion:      1,
+		CanvasID:           "test-canvas",
+		CanvasVersion:      1,
+		SceneRevision:      accepted.SceneRevision,
+		HostEpoch:          host.hostEpoch,
+		CheckpointRevision: 1,
+		Tick:               60,
+		CapturedAt:         time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	if err != nil {
+		t.Fatalf("marshal checkpoint: %v", err)
+	}
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Payload: &pb.RoomEnvelope_Checkpoint{Checkpoint: &pb.Checkpoint{
+			CheckpointRevision: 1,
+			Tick:               60,
+			SnapshotJson:       raw,
+		}},
+	})
+
+	select {
+	case <-blocked.started:
+	case <-time.After(time.Second):
+		t.Fatal("checkpoint persistence did not start")
+	}
+
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Tick:      61,
+		Payload: &pb.RoomEnvelope_StateDelta{StateDelta: &pb.StateDelta{
+			SceneRevision: accepted.SceneRevision,
+			Entities: []*pb.EntityState{{
+				EntityId:           "avatar:alice",
+				QuantizedTransform: &pb.QuantizedTransform{X: 1200, Y: 900},
+			}},
+		}},
+	})
+	relayed := peer.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetStateDelta() != nil
+	})
+	if relayed.Tick != 61 {
+		t.Fatalf("relayed tick = %d, want 61", relayed.Tick)
 	}
 }
 
