@@ -1,5 +1,6 @@
 node_modules/
 dist/
 examples/*/.data/
+examples/*/.data-retired-*/
 *.tsbuildinfo
 .DS_Store
