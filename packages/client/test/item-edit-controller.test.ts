@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ItemDefinition } from "@canvas-physics/core";
 import {
+  ItemEditPresentation,
   ItemEditController,
   findOwnedItemAt,
 } from "../src/input/item-edit-controller.js";
@@ -87,7 +88,7 @@ describe("item edit interaction", () => {
     ).toBeUndefined();
   });
 
-  it("requires a completed selection tap before a later drag can move the item", () => {
+  it("opens editing only after a completed tap and moves on a later drag", () => {
     const surface = new PointerSurface();
     const previews: number[] = [];
     const commits: number[] = [];
@@ -105,12 +106,18 @@ describe("item edit interaction", () => {
         }),
     });
 
-    // The first gesture only selects, even if it turns into a drag.
+    // A drag beginning on an unselected item is neither a tap nor a move.
     surface.emit("pointerdown", 20, 10);
     surface.emit("pointermove", 30, 14);
     surface.emit("pointerup", 30, 14);
     expect(previews).toEqual([]);
     expect(commits).toEqual([]);
+    expect(states).toEqual([]);
+
+    // Editing opens only once an actual tap has completed.
+    surface.emit("pointerdown", 20, 10);
+    expect(states).toEqual([]);
+    surface.emit("pointerup", 20, 10);
     expect(states.at(-1)).toEqual({ selectedEntityId: "item-1", ghostX: undefined });
 
     // A later gesture on the selected item may manipulate it.
@@ -122,6 +129,14 @@ describe("item edit interaction", () => {
     surface.emit("pointerup", 30, 14);
     expect(commits).toEqual([15]);
     expect(states.at(-1)).toEqual({ selectedEntityId: "item-1", ghostX: undefined });
+
+    controller.clear();
+    const stateCountAfterClear = states.length;
+    surface.emit("pointerdown", 20, 10);
+    surface.emit("pointermove", 30, 14);
+    surface.emit("pointerup", 30, 14);
+    expect(states).toHaveLength(stateCountAfterClear);
+    expect(commits).toEqual([15]);
     controller.destroy();
   });
 
@@ -145,13 +160,35 @@ describe("item edit interaction", () => {
 
     enabled = true;
     surface.emit("pointerdown", 10, 5);
-    expect(selected.at(-1)).toBe("item-1");
+    expect(selected).toEqual([]);
     surface.emit("pointerup", 10, 5);
+    expect(selected.at(-1)).toBe("item-1");
     expect(commits).toBe(0);
 
     pickItem = false;
     surface.emit("pointerdown", 80, 40);
     expect(selected.at(-1)).toBeUndefined();
     controller.destroy();
+  });
+
+  it("renders local edit previews at pointer cadence until the commit is observed", () => {
+    const presentation = new ItemEditPresentation(1_500);
+    const canonical = [item()];
+    const preview = { x: 14, y: 8, rotation: 0.2, scale: 1.1 };
+
+    presentation.preview("item-1", preview);
+    expect(presentation.apply(canonical, 10)[0]).toMatchObject(preview);
+    expect(canonical[0]).toMatchObject({ x: 10, y: 5, rotation: 0 });
+
+    presentation.commit("item-1", preview, 20);
+    expect(presentation.apply(canonical, 100)[0]).toMatchObject(preview);
+    expect(presentation.apply([{ ...item(), ...preview }], 110)[0]).toMatchObject(preview);
+
+    presentation.preview("item-1", { ...preview, x: 18 });
+    presentation.cancelPreview("item-1");
+    expect(presentation.apply(canonical, 120)[0]).toMatchObject({ x: 10, y: 5 });
+
+    presentation.commit("item-1", { ...preview, x: 19 }, 200);
+    expect(presentation.apply(canonical, 1_701)[0]).toMatchObject({ x: 10, y: 5 });
   });
 });

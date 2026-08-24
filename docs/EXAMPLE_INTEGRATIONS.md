@@ -31,8 +31,8 @@ without adding product concepts to Canvas.
 
 The in-canvas Spawn and Manage popovers exercise the public durable mutation
 surface: spawn, direct placement, rotation, uniform visual-and-collider
-scaling, configuration, optional simulation isolation, and deletion. Thin
-green projections mark items owned by the local user. Selection and icon edit
+scaling, configuration, optional simulation isolation, and deletion. Aurora,
+Halo, or Badge projections mark items owned by the local user. Selection and icon edit
 controls are local DOM overlays, so another participant receives the canonical
 item updates but not the editor's private UI state. The server remains the
 authority even though this consumer chooses to list only editable items.
@@ -40,13 +40,15 @@ authority even though this consumer chooses to list only editable items.
 Direct manipulation controls surround the selected item: scale above,
 rotation at each side, and More/delete/finish below. More contains only the
 controls relevant to that item. The controls may render outside the canvas
-bounds, and a selection gesture must finish before a later drag can move the
-item. Three local ownership treatments demonstrate that product affordances
+bounds. Only a completed tap selects; dragging from an unselected item does
+nothing. A later drag moves the selected item with display-rate local
+presentation layered over rate-limited authoritative previews. Three local ownership treatments demonstrate that product affordances
 can vary without entering canonical room state. The example's avatar skin is
 also supplied through the same consumer asset manifest as its item artwork.
 
 Editing never changes the room into a separate mode. A room-owned gold ball
-maintains constant speed while item controls are open. Consumers may explicitly
+maintains constant speed against the canvas boundary while item controls are
+open, and ignores editable objects so it cannot be trapped. Consumers may explicitly
 freeze an owned item while manipulating it; Canvas then preserves its pose and
 pauses collision, physics, behavior, and simulation-clock timers until it is
 returned to live simulation. The independent collision override keeps an item

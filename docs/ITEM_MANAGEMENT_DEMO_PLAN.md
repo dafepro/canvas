@@ -35,6 +35,10 @@ interaction behavior while importing only published Canvas package exports.
    gestures; controls may escape canvas clipping; custom tint, independent
    collision control, constant-speed live motion, and three local ownership
    treatments demonstrate product-level extensibility on generic runtime seams.
+8. [x] **Tap and local-presentation refinement.** Only a completed tap opens
+   item controls. Selected-item drags render locally at display cadence while
+   the existing authoritative preview stream remains coalesced, and the live
+   ball ignores editable objects so it cannot become wedged in user content.
 
 ## Alignment decisions
 

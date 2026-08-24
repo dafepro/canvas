@@ -1,6 +1,6 @@
 {
   "id": "item-playground-live",
-  "version": 1,
+  "version": 2,
   "size": { "width": 36, "height": 24 },
   "orientation": "topDown",
   "backgroundAssetId": "playground.workbench",
@@ -38,7 +38,7 @@
     {
       "entityId": "always-live-ball",
       "definitionId": "live-bouncer",
-      "definitionVersion": 2,
+      "definitionVersion": 3,
       "transform": { "x": 18, "y": 10, "rotation": 0, "scale": 1 },
       "resolvedConfig": { "speed": 8.5, "initialDirection": { "x": 7, "y": 5 } }
     }

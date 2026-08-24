@@ -1,4 +1,4 @@
-import type { ItemDefinition } from "@canvas-physics/core";
+import { CollisionLayer, type ItemDefinition } from "@canvas-physics/core";
 import {
   defaultReactiveOrbConfig,
   type ReactiveOrbConfig,
@@ -140,7 +140,7 @@ export const colorTileDefinition: ItemDefinition<ReactiveOrbConfig> = {
 
 export const liveBouncerDefinition: ItemDefinition<LiveBouncerConfig> = {
   definitionId: "live-bouncer",
-  version: 2,
+  version: 3,
   displayName: "Always-live ball",
   visual: {
     spriteId: "playground.ball",
@@ -160,6 +160,9 @@ export const liveBouncerDefinition: ItemDefinition<LiveBouncerConfig> = {
       id: "solid",
       role: "itemSolid",
       shape: { type: "circle", radius: 1.75 },
+      // Keep the visual proof moving even when users build a dense pile of
+      // editable objects. It still bounces from the canvas boundary.
+      collisionMask: CollisionLayer.WORLD_STATIC,
       restitution: 1,
       friction: 0,
     },

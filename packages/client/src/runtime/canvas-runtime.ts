@@ -14,6 +14,7 @@ import {
   type PointerDragOptions,
 } from "../input/pointer-drag-controller.js";
 import {
+  ItemEditPresentation,
   ItemEditController,
   findOwnedItemAt,
   type ItemEditState,
@@ -116,6 +117,7 @@ export class CanvasRuntime {
   private pageHideListener?: () => void;
   private avatarDisabled = false;
   private editMode = false;
+  private readonly editPresentation = new ItemEditPresentation();
   private latestEntities: RenderEntity[] = [];
   private disableKeyListener?: (event: KeyboardEvent) => void;
   private assetBundle?: LoadedAssetBundle<Texture>;
@@ -330,9 +332,18 @@ export class CanvasRuntime {
             this.session.userId,
           ),
         toWorld: (point) => this.scene!.camera.toWorld(point.x, point.y),
-        onPreview: (entityId, transform) => this.moveItem(entityId, transform, true),
-        onCommit: (entityId, transform) => this.moveItem(entityId, transform),
+        onPreview: (entityId, transform) => {
+          this.editPresentation.preview(entityId, transform);
+          this.moveItem(entityId, transform, true);
+        },
+        onCommit: (entityId, transform) => {
+          this.editPresentation.commit(entityId, transform);
+          this.moveItem(entityId, transform);
+        },
         onChange: (state) => {
+          if (!state.ghost && state.selectedEntityId) {
+            this.editPresentation.cancelPreview(state.selectedEntityId);
+          }
           this.scene?.setEditState(state);
           this.options.onEditSelectionChange?.(state);
         },
@@ -366,7 +377,9 @@ export class CanvasRuntime {
   setEditMode(enabled: boolean): void {
     if (this.editMode === enabled) return;
     this.editMode = enabled;
-    if (!enabled) this.editor?.clear();
+    if (!enabled) {
+      this.clearItemEditSelection();
+    }
     if (this.scene) this.scene.app.canvas.style.cursor = enabled ? "crosshair" : "";
     this.options.onEditModeChange?.(enabled);
   }
@@ -378,6 +391,12 @@ export class CanvasRuntime {
 
   get isEditMode(): boolean {
     return this.editMode;
+  }
+
+  /** Clears private selection/presentation without disabling live editing. */
+  clearItemEditSelection(): void {
+    this.editor?.clear();
+    this.editPresentation.clear();
   }
 
   private mergedIntent(): InputIntent {
@@ -404,7 +423,10 @@ export class CanvasRuntime {
       } else {
         this.frameProfiler.sample(deltaMs);
       }
-      const entities = this.session.entitiesToDraw(nowMs);
+      const entities = this.editPresentation.apply(
+        this.session.entitiesToDraw(nowMs),
+        nowMs,
+      );
       this.latestEntities = entities;
       scene.update(entities, deltaMs);
       if (this.overlayProjections.hasObservers && this.session.canvas) {

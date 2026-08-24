@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { validateCanvasDefinition, type CanvasDefinition } from "@canvas-physics/core";
+import {
+  CollisionLayer,
+  validateCanvasDefinition,
+  type CanvasDefinition,
+} from "@canvas-physics/core";
 import { BehaviorTestHarness } from "@canvas-physics/core/testing";
 import { validateAssetReferences } from "@canvas-physics/client";
 import canvasJson from "../server/canvases/item-playground.json";
@@ -14,6 +18,7 @@ import { playgroundAssets } from "../src/assets.js";
 import {
   playgroundDefinitions,
   playgroundAvatarDefinition,
+  liveBouncerDefinition,
   reactiveOrbDefinition,
 } from "../src/content.js";
 import {
@@ -121,6 +126,9 @@ describe("compact item playground", () => {
   });
 
   it("keeps the room-owned demo ball moving without an editor", () => {
+    expect(liveBouncerDefinition.colliders[0]?.collisionMask).toBe(
+      CollisionLayer.WORLD_STATIC,
+    );
     const harness = new BehaviorTestHarness(
       LiveBouncerBehavior,
       { speed: 8.5, initialDirection: { x: 7, y: 5 } },

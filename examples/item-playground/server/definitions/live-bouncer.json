@@ -1,6 +1,6 @@
 {
   "definitionId": "live-bouncer",
-  "version": 2,
+  "version": 3,
   "displayName": "Always-live ball",
   "visual": {
     "spriteId": "playground.ball",
@@ -20,6 +20,7 @@
       "id": "solid",
       "role": "itemSolid",
       "shape": { "type": "circle", "radius": 1.75 },
+      "collisionMask": 4,
       "restitution": 1,
       "friction": 0
     }

@@ -64,6 +64,12 @@ Collision disablement is narrower: physics motion and behavior continue, but
 the item's authored solid and sensor colliders are inactive. Both states are
 durable, server-authoritative, replicated, and restored during host migration.
 
+Direct manipulation may render an owner's current transform locally at display
+cadence while reliable preview commands remain coalesced. The local pose is
+held after pointer-up until canonical state observes the commit or a bounded
+timeout expires. This presentation layer does not weaken server authorization
+or increase the network preview rate.
+
 Behaviors may publish an optional RGB sprite tint with `setSpriteTint`. Tint is
 a generic render attribute, replicated with canonical entity state and stored
 in checkpoints. Consumers still own the meaning and selection of colors.

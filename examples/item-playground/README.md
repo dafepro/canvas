@@ -13,18 +13,21 @@ pnpm example:items
 
 Open <http://localhost:5175/?autojoin=1&user=maker-one>. For the ownership
 scenario, open another tab with `user=maker-two`. Spawn and Manage are compact
-in-canvas popovers. A green outline identifies items the local user can edit;
+in-canvas popovers. A configurable ownership treatment identifies items the local user can edit;
 selecting one places frameless scale controls above it, rotation controls at
 its sides, and finish/delete/more actions below it. Those controls may extend
-outside the canvas instead of being clipped at an edge. The first pointer
-gesture selects only; a later drag manipulates the selected item. The private
+outside the canvas instead of being clipped at an edge. Only a completed tap
+selects an item; dragging from an unselected item does nothing. A later drag
+manipulates the selected item with a display-rate local presentation while
+authoritative preview messages remain rate-limited. The private
 More menu holds item-specific controls such as three color presets, a custom
 color picker, freeze, and collisions. Each user can drag, rotate, scale,
 recolor, freeze, make collisionless, and delete their own items. The visitor
 avatar is also a consumer-supplied texture rather than an engine placeholder.
 
-The gold system ball maintains constant speed while its collision response
-changes direction, even while controls are open. Editing does not stop the
+The gold system ball maintains constant speed while the canvas boundary changes
+its direction, even while controls are open. It intentionally ignores editable
+items so a dense user-created arrangement cannot trap the visual proof. Editing does not stop the
 room. Freeze is an optional, durable per-item setting that pauses motion,
 collision, behavior, and behavior timers while preserving pose. Collision can
 also be disabled independently, leaving motion and behavior live while other

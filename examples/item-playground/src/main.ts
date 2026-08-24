@@ -472,6 +472,7 @@ deleteButton.addEventListener("click", () => {
   const entity = selectedEntity();
   if (!entity) return;
   requestMutation("Deleting…", () => runtime!.deleteItem(entity.id));
+  runtime?.clearItemEditSelection();
   selectedEntityId = undefined;
   closeMoreMenu();
   editToolbar.hidden = true;
@@ -488,6 +489,7 @@ finishEdit.addEventListener("click", () => {
     actionStatus.textContent = "Finished editing · item remains live";
     actionStatus.dataset.kind = "accepted";
   }
+  runtime?.clearItemEditSelection();
   selectedEntityId = undefined;
   closeMoreMenu();
   editToolbar.hidden = true;
