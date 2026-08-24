@@ -173,7 +173,7 @@ func (c *testClient) sendJoin(definitions ...*pb.DefinitionVersion) {
 		RoomId: c.roomID,
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
 			RoomId:          c.roomID,
-			ProtocolVersion: 6,
+			ProtocolVersion: 7,
 			Definitions:     definitions,
 		}},
 	})
@@ -565,6 +565,47 @@ func TestOwnershipIsEnforced(t *testing.T) {
 	}).GetDurableResult()
 	if isolationReject.Accepted || isolationReject.RejectReason != "not_owner" {
 		t.Errorf("non-owner isolation accepted=%v reason=%q", isolationReject.Accepted, isolationReject.RejectReason)
+	}
+
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId:         "cmd-disable-collisions",
+			Kind:              pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS,
+			EntityId:          entityID,
+			CollisionsEnabled: false,
+		}},
+	})
+	collisions := owner.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-disable-collisions"
+	}).GetDurableResult()
+	if !collisions.Accepted {
+		t.Fatalf("owner collision change rejected: %s", collisions.RejectReason)
+	}
+	var collisionItem SnapshotItem
+	if err := json.Unmarshal(collisions.ItemInstanceJson, &collisionItem); err != nil {
+		t.Fatalf("collision item json: %v", err)
+	}
+	if !collisionItem.CollisionsDisabled {
+		t.Error("disabled collisions were not persisted")
+	}
+
+	other.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId:         "cmd-steal-collisions",
+			Kind:              pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS,
+			EntityId:          entityID,
+			CollisionsEnabled: true,
+		}},
+	})
+	collisionReject := other.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-steal-collisions"
+	}).GetDurableResult()
+	if collisionReject.Accepted || collisionReject.RejectReason != "not_owner" {
+		t.Errorf("non-owner collision change accepted=%v reason=%q", collisionReject.Accepted, collisionReject.RejectReason)
 	}
 
 	owner.send(&pb.RoomEnvelope{
@@ -1596,8 +1637,8 @@ func TestProtocolMismatchIsRefused(t *testing.T) {
 	if got.Code != "protocol_mismatch" {
 		t.Errorf("error code = %q, want protocol_mismatch", got.Code)
 	}
-	if got.ServerProtocolVersion != 6 {
-		t.Errorf("server protocol version = %d, want 6", got.ServerProtocolVersion)
+	if got.ServerProtocolVersion != 7 {
+		t.Errorf("server protocol version = %d, want 7", got.ServerProtocolVersion)
 	}
 }
 

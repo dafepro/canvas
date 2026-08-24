@@ -216,6 +216,9 @@ export class BehaviorRuntime {
       case "setSpriteVariant":
         this.host.setSpriteVariant(target, command.variant, command.persistent ?? false);
         break;
+      case "setSpriteTint":
+        this.host.setSpriteTint(target, command.tint, command.persistent ?? false);
+        break;
       case "startAnimation":
         this.host.startAnimation(target, command.animation, command.loop ?? true);
         break;

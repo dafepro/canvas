@@ -87,7 +87,7 @@ describe("item edit interaction", () => {
     ).toBeUndefined();
   });
 
-  it("shows a local ghost during drag and commits its final transform on release", () => {
+  it("requires a completed selection tap before a later drag can move the item", () => {
     const surface = new PointerSurface();
     const previews: number[] = [];
     const commits: number[] = [];
@@ -105,10 +105,17 @@ describe("item edit interaction", () => {
         }),
     });
 
-    // Screen (20, 10) is world (10, 5), the item's centre.
+    // The first gesture only selects, even if it turns into a drag.
     surface.emit("pointerdown", 20, 10);
     surface.emit("pointermove", 30, 14);
+    surface.emit("pointerup", 30, 14);
+    expect(previews).toEqual([]);
+    expect(commits).toEqual([]);
+    expect(states.at(-1)).toEqual({ selectedEntityId: "item-1", ghostX: undefined });
 
+    // A later gesture on the selected item may manipulate it.
+    surface.emit("pointerdown", 20, 10);
+    surface.emit("pointermove", 30, 14);
     expect(previews).toEqual([15]);
     expect(states.at(-1)).toEqual({ selectedEntityId: "item-1", ghostX: 15 });
 

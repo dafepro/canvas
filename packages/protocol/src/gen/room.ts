@@ -75,6 +75,7 @@ export enum DurableCommandKind {
   DURABLE_SET_CONFIG = 5,
   DURABLE_SCALE_ITEM = 6,
   DURABLE_SET_ITEM_ISOLATION = 7,
+  DURABLE_SET_ITEM_COLLISIONS = 8,
   UNRECOGNIZED = -1,
 }
 
@@ -104,6 +105,9 @@ export function durableCommandKindFromJSON(object: any): DurableCommandKind {
     case 7:
     case "DURABLE_SET_ITEM_ISOLATION":
       return DurableCommandKind.DURABLE_SET_ITEM_ISOLATION;
+    case 8:
+    case "DURABLE_SET_ITEM_COLLISIONS":
+      return DurableCommandKind.DURABLE_SET_ITEM_COLLISIONS;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -129,6 +133,8 @@ export function durableCommandKindToJSON(object: DurableCommandKind): string {
       return "DURABLE_SCALE_ITEM";
     case DurableCommandKind.DURABLE_SET_ITEM_ISOLATION:
       return "DURABLE_SET_ITEM_ISOLATION";
+    case DurableCommandKind.DURABLE_SET_ITEM_COLLISIONS:
+      return "DURABLE_SET_ITEM_COLLISIONS";
     case DurableCommandKind.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -268,6 +274,11 @@ export interface EntityState {
   animationEpoch: number;
   /** True when the owner has removed this item from physics and behavior. */
   itemIsolated: boolean;
+  /** Optional consumer-authored multiplicative sprite tint. */
+  spriteTint: number;
+  hasSpriteTint: boolean;
+  /** True when this live item does not participate in contacts. */
+  itemCollisionsDisabled: boolean;
 }
 
 export interface QuantizedTransform {
@@ -329,6 +340,7 @@ export interface DurableCommand {
   preview: boolean;
   scale: number;
   isolated: boolean;
+  collisionsEnabled: boolean;
 }
 
 export interface DurableCommandResult {
@@ -2079,6 +2091,9 @@ function createBaseEntityState(): EntityState {
     spriteAnimation: "",
     animationEpoch: 0,
     itemIsolated: false,
+    spriteTint: 0,
+    hasSpriteTint: false,
+    itemCollisionsDisabled: false,
   };
 }
 
@@ -2122,6 +2137,15 @@ export const EntityState: MessageFns<EntityState> = {
     }
     if (message.itemIsolated !== false) {
       writer.uint32(144).bool(message.itemIsolated);
+    }
+    if (message.spriteTint !== 0) {
+      writer.uint32(152).uint32(message.spriteTint);
+    }
+    if (message.hasSpriteTint !== false) {
+      writer.uint32(160).bool(message.hasSpriteTint);
+    }
+    if (message.itemCollisionsDisabled !== false) {
+      writer.uint32(168).bool(message.itemCollisionsDisabled);
     }
     return writer;
   },
@@ -2243,6 +2267,30 @@ export const EntityState: MessageFns<EntityState> = {
             message.itemIsolated = reader.bool();
             continue;
           }
+          case 19: {
+            if (tag !== 152) {
+              break;
+            }
+
+            message.spriteTint = reader.uint32();
+            continue;
+          }
+          case 20: {
+            if (tag !== 160) {
+              break;
+            }
+
+            message.hasSpriteTint = reader.bool();
+            continue;
+          }
+          case 21: {
+            if (tag !== 168) {
+              break;
+            }
+
+            message.itemCollisionsDisabled = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2310,6 +2358,21 @@ export const EntityState: MessageFns<EntityState> = {
         : isSet(object.item_isolated)
         ? globalThis.Boolean(object.item_isolated)
         : false,
+      spriteTint: isSet(object.spriteTint)
+        ? globalThis.Number(object.spriteTint)
+        : isSet(object.sprite_tint)
+        ? globalThis.Number(object.sprite_tint)
+        : 0,
+      hasSpriteTint: isSet(object.hasSpriteTint)
+        ? globalThis.Boolean(object.hasSpriteTint)
+        : isSet(object.has_sprite_tint)
+        ? globalThis.Boolean(object.has_sprite_tint)
+        : false,
+      itemCollisionsDisabled: isSet(object.itemCollisionsDisabled)
+        ? globalThis.Boolean(object.itemCollisionsDisabled)
+        : isSet(object.item_collisions_disabled)
+        ? globalThis.Boolean(object.item_collisions_disabled)
+        : false,
     };
   },
 
@@ -2354,6 +2417,15 @@ export const EntityState: MessageFns<EntityState> = {
     if (message.itemIsolated !== false) {
       obj.itemIsolated = message.itemIsolated;
     }
+    if (message.spriteTint !== 0) {
+      obj.spriteTint = Math.round(message.spriteTint);
+    }
+    if (message.hasSpriteTint !== false) {
+      obj.hasSpriteTint = message.hasSpriteTint;
+    }
+    if (message.itemCollisionsDisabled !== false) {
+      obj.itemCollisionsDisabled = message.itemCollisionsDisabled;
+    }
     return obj;
   },
 
@@ -2377,6 +2449,9 @@ export const EntityState: MessageFns<EntityState> = {
     message.spriteAnimation = object.spriteAnimation ?? "";
     message.animationEpoch = object.animationEpoch ?? 0;
     message.itemIsolated = object.itemIsolated ?? false;
+    message.spriteTint = object.spriteTint ?? 0;
+    message.hasSpriteTint = object.hasSpriteTint ?? false;
+    message.itemCollisionsDisabled = object.itemCollisionsDisabled ?? false;
     return message;
   },
 };
@@ -3094,6 +3169,7 @@ function createBaseDurableCommand(): DurableCommand {
     preview: false,
     scale: 0,
     isolated: false,
+    collisionsEnabled: false,
   };
 }
 
@@ -3134,6 +3210,9 @@ export const DurableCommand: MessageFns<DurableCommand> = {
     }
     if (message.isolated !== false) {
       writer.uint32(96).bool(message.isolated);
+    }
+    if (message.collisionsEnabled !== false) {
+      writer.uint32(104).bool(message.collisionsEnabled);
     }
     return writer;
   },
@@ -3247,6 +3326,14 @@ export const DurableCommand: MessageFns<DurableCommand> = {
             message.isolated = reader.bool();
             continue;
           }
+          case 13: {
+            if (tag !== 104) {
+              break;
+            }
+
+            message.collisionsEnabled = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -3293,6 +3380,11 @@ export const DurableCommand: MessageFns<DurableCommand> = {
       preview: isSet(object.preview) ? globalThis.Boolean(object.preview) : false,
       scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
       isolated: isSet(object.isolated) ? globalThis.Boolean(object.isolated) : false,
+      collisionsEnabled: isSet(object.collisionsEnabled)
+        ? globalThis.Boolean(object.collisionsEnabled)
+        : isSet(object.collisions_enabled)
+        ? globalThis.Boolean(object.collisions_enabled)
+        : false,
     };
   },
 
@@ -3334,6 +3426,9 @@ export const DurableCommand: MessageFns<DurableCommand> = {
     if (message.isolated !== false) {
       obj.isolated = message.isolated;
     }
+    if (message.collisionsEnabled !== false) {
+      obj.collisionsEnabled = message.collisionsEnabled;
+    }
     return obj;
   },
 
@@ -3356,6 +3451,7 @@ export const DurableCommand: MessageFns<DurableCommand> = {
     message.preview = object.preview ?? false;
     message.scale = object.scale ?? 0;
     message.isolated = object.isolated ?? false;
+    message.collisionsEnabled = object.collisionsEnabled ?? false;
     return message;
   },
 };

@@ -29,7 +29,7 @@ export function buildEntityDisplay(
   const visual = definition?.visual;
   const size = visual?.size ?? { width: 2, height: 2 };
   const variant = entity.variant ? visual?.variants?.[entity.variant] : undefined;
-  const tint = variant?.color;
+  const tint = entity.tint ?? variant?.color;
   const animation = entity.animation ? visual?.animations?.[entity.animation] : undefined;
   const animationTextures = animation?.frames
     .map((id) => assets?.texture(id))

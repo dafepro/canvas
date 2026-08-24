@@ -1303,6 +1303,7 @@ export class RoomSession {
       configJson: toJsonBytes(config),
       preview: false,
       isolated: false,
+      collisionsEnabled: true,
     });
   }
 
@@ -1351,6 +1352,7 @@ export class RoomSession {
       configJson: new Uint8Array(),
       preview,
       isolated: false,
+      collisionsEnabled: false,
     });
   }
 
@@ -1368,6 +1370,7 @@ export class RoomSession {
       configJson: new Uint8Array(),
       preview: false,
       isolated: false,
+      collisionsEnabled: false,
     });
   }
 
@@ -1385,6 +1388,7 @@ export class RoomSession {
       configJson: new Uint8Array(),
       preview: false,
       isolated: false,
+      collisionsEnabled: false,
     });
   }
 
@@ -1402,6 +1406,7 @@ export class RoomSession {
       configJson: toJsonBytes(config),
       preview: false,
       isolated: false,
+      collisionsEnabled: false,
     });
   }
 
@@ -1419,6 +1424,25 @@ export class RoomSession {
       configJson: new Uint8Array(),
       preview: false,
       isolated,
+      collisionsEnabled: false,
+    });
+  }
+
+  setItemCollisionsEnabled(entityId: string, enabled: boolean): void {
+    this.client.sendDurableCommand({
+      commandId: this.nextCommandId(),
+      kind: DurableCommandKind.DURABLE_SET_ITEM_COLLISIONS,
+      entityId,
+      definitionId: "",
+      definitionVersion: 0,
+      position: undefined,
+      rotation: 0,
+      scale: 0,
+      z: 0,
+      configJson: new Uint8Array(),
+      preview: false,
+      isolated: false,
+      collisionsEnabled: enabled,
     });
   }
 
@@ -1436,6 +1460,7 @@ export class RoomSession {
       configJson: new Uint8Array(),
       preview: false,
       isolated: false,
+      collisionsEnabled: false,
     });
   }
 
@@ -1471,6 +1496,7 @@ export class RoomSession {
             createdAt: new Date().toISOString(),
             sceneRevision: this.client.sceneRevision,
             isolated: item?.isolated ?? command.isolated,
+            collisionsDisabled: item?.collisionsDisabled,
           },
         });
         break;
@@ -1511,6 +1537,13 @@ export class RoomSession {
           type: "setItemIsolation",
           entityId: command.entityId,
           isolated: item?.isolated ?? command.isolated,
+        });
+        break;
+      case DurableCommandKind.DURABLE_SET_ITEM_COLLISIONS:
+        this.driver.send({
+          type: "setItemCollisions",
+          entityId: command.entityId,
+          enabled: !(item?.collisionsDisabled ?? !command.collisionsEnabled),
         });
         break;
     }
@@ -1589,6 +1622,7 @@ interface SentSample {
   vy: number;
   angularVelocity: number;
   variant?: string;
+  tint?: number;
   animation?: string;
   animationEpoch?: number;
   disabled?: boolean;
@@ -1596,6 +1630,7 @@ interface SentSample {
   teleportEpoch?: number;
   respawning?: boolean;
   isolated?: boolean;
+  collisionsDisabled?: boolean;
 }
 
 const sentSample = (entity: RenderEntity): SentSample => ({
@@ -1608,6 +1643,7 @@ const sentSample = (entity: RenderEntity): SentSample => ({
   vy: entity.vy,
   angularVelocity: entity.angularVelocity,
   variant: entity.variant,
+  tint: entity.tint,
   animation: entity.animation,
   animationEpoch: entity.animationEpoch,
   disabled: entity.disabled,
@@ -1615,6 +1651,7 @@ const sentSample = (entity: RenderEntity): SentSample => ({
   teleportEpoch: entity.teleportEpoch,
   respawning: entity.respawning,
   isolated: entity.isolated,
+  collisionsDisabled: entity.collisionsDisabled,
 });
 
 /** Movement below these values is not visible at the 100 ms render delay. */
@@ -1632,6 +1669,7 @@ const movedSince = (before: SentSample, now: RenderEntity): boolean =>
   Math.abs(before.vy - now.vy) > VELOCITY_EPSILON ||
   Math.abs(before.angularVelocity - now.angularVelocity) > VELOCITY_EPSILON ||
   before.variant !== now.variant ||
+  before.tint !== now.tint ||
   before.animation !== now.animation ||
   before.animationEpoch !== now.animationEpoch ||
   before.disabled !== now.disabled ||
@@ -1640,7 +1678,8 @@ const movedSince = (before: SentSample, now: RenderEntity): boolean =>
   // they happen, or a peer slides the sprite across the canvas instead.
   before.teleportEpoch !== now.teleportEpoch ||
   before.respawning !== now.respawning ||
-  before.isolated !== now.isolated;
+  before.isolated !== now.isolated ||
+  before.collisionsDisabled !== now.collisionsDisabled;
 // The processed input sequence is not a reason to send. It rides on the entity
 // whenever the entity moves, and the 2 Hz keyframe carries it for a still
 // avatar. Sending it alone would put every idle avatar in every delta.
@@ -1682,6 +1721,9 @@ const toEntityState = (
   teleportEpoch: entity.teleportEpoch ?? 0,
   respawning: entity.respawning ?? false,
   itemIsolated: entity.isolated ?? false,
+  spriteTint: entity.tint ?? 0,
+  hasSpriteTint: entity.tint !== undefined,
+  itemCollisionsDisabled: entity.collisionsDisabled ?? false,
   quantizedTransform: quantizeTransform({
     x: entity.x,
     y: entity.y,
@@ -1720,5 +1762,7 @@ const fromEntityState = (state: EntityState): RenderEntity => {
     teleportEpoch: state.teleportEpoch,
     respawning: state.respawning,
     isolated: state.itemIsolated,
+    tint: state.hasSpriteTint ? state.spriteTint : undefined,
+    collisionsDisabled: state.itemCollisionsDisabled,
   };
 };

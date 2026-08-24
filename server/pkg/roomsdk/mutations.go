@@ -193,6 +193,7 @@ func (r *Room) validateDurable(
 		pb.DurableCommandKind_DURABLE_ROTATE_ITEM,
 		pb.DurableCommandKind_DURABLE_SCALE_ITEM,
 		pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION,
+		pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS,
 		pb.DurableCommandKind_DURABLE_SET_CONFIG:
 
 		item, ok := r.items[command.EntityId]
@@ -285,6 +286,9 @@ func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, clie
 
 	case pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION:
 		item.Isolated = command.Isolated
+
+	case pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS:
+		item.CollisionsDisabled = !command.CollisionsEnabled
 
 	case pb.DurableCommandKind_DURABLE_SET_CONFIG:
 		if len(command.ConfigJson) > 0 {

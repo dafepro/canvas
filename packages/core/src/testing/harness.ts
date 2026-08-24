@@ -18,6 +18,7 @@ export interface FakeBody {
   elevation?: { z: number; vz: number; grounded: boolean };
   tags: string[];
   variant?: string;
+  tint?: number;
   animation?: string;
   disabledColliders: Set<string>;
   forces: Vec2[];
@@ -123,6 +124,9 @@ export class BehaviorTestHost implements BehaviorHost {
   }
   setSpriteVariant(id: EntityId, variant: string): void {
     this.body(id).variant = variant;
+  }
+  setSpriteTint(id: EntityId, tint: number | undefined): void {
+    this.body(id).tint = tint;
   }
   startAnimation(id: EntityId, animation: string): void {
     this.body(id).animation = animation;

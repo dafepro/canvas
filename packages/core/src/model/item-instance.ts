@@ -18,6 +18,8 @@ export interface ItemInstance<Config = unknown, State = unknown> {
   transform: Transform;
   /** Owner-controlled pause of physics, collision, behavior, and timers. */
   isolated?: boolean;
+  /** True when the item's authored colliders are globally disabled. */
+  collisionsDisabled?: boolean;
   resolvedConfig: Config;
   behaviorState?: State;
   /** Version of behaviorState before any registered migration is applied. */

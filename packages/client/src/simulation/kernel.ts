@@ -27,6 +27,7 @@ const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity =
   vy: entity.rigidBody?.velocity.y ?? 0,
   angularVelocity: entity.rigidBody?.angularVelocity ?? 0,
   variant: entity.render?.variant,
+  tint: entity.render?.tint,
   animation: entity.render?.animation,
   animationEpoch: entity.render?.animationEpoch,
   userId: entity.avatar?.userId,
@@ -36,6 +37,7 @@ const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity =
   quarantined: entity.quarantined,
   disabled: entity.avatar?.disabled,
   isolated: entity.isolated,
+  collisionsDisabled: entity.collisionsDisabled,
   teleportEpoch: entity.teleportEpoch,
   respawning: entity.respawning,
 });
@@ -173,6 +175,9 @@ export class SimulationKernel {
 
       case "setItemIsolation":
         this.simulation?.setItemIsolation(request.entityId, request.isolated);
+        break;
+      case "setItemCollisions":
+        this.simulation?.setItemCollisionsEnabled(request.entityId, request.enabled);
         break;
 
       case "requestSnapshot": {

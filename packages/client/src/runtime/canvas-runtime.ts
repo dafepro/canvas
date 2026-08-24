@@ -494,6 +494,10 @@ export class CanvasRuntime {
     this.session.setItemIsolation(entityId, isolated);
   }
 
+  setItemCollisionsEnabled(entityId: string, enabled: boolean): void {
+    this.session.setItemCollisionsEnabled(entityId, enabled);
+  }
+
   deleteItem(entityId: string): void {
     this.session.deleteItem(entityId);
   }

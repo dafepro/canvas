@@ -341,6 +341,7 @@ export class RapierWorld implements BehaviorHost {
       },
       ownership: { ownerUserId: instance.ownerUserId },
       isolated: instance.isolated === true,
+      collisionsDisabled: instance.collisionsDisabled === true,
       persistence: definition.persistence,
       tags: new Set([definition.definitionId]),
     };
@@ -390,6 +391,7 @@ export class RapierWorld implements BehaviorHost {
     const record: BodyRecord = { entity, body, colliders: new Map(), regions: new Set() };
     this.bodies.set(entity.id, record);
     for (const collider of definition.colliders) this.attachCollider(record, collider);
+    if (instance.collisionsDisabled) this.setItemCollisionsEnabled(entity.id, false);
     if (instance.isolated) this.setItemIsolation(entity.id, true);
     return entity;
   }
@@ -490,6 +492,16 @@ export class RapierWorld implements BehaviorHost {
     record.entity.isolated = isolated;
     record.body.setEnabled(!isolated);
     if (isolated) this.endContacts(entityId);
+    return true;
+  }
+
+  /** Globally enables or disables an item's authored solid and sensor colliders. */
+  setItemCollisionsEnabled(entityId: EntityId, enabled: boolean): boolean {
+    const record = this.bodies.get(entityId);
+    if (!record || record.entity.kind !== "item") return false;
+    record.entity.collisionsDisabled = !enabled;
+    for (const collider of record.colliders.values()) collider.setEnabled(enabled);
+    if (!enabled) this.endContacts(entityId);
     return true;
   }
 
@@ -1164,7 +1176,7 @@ export class RapierWorld implements BehaviorHost {
 
   private completeRespawn(record: BodyRecord): void {
     for (const id of record.respawnDisabled ?? []) {
-      record.colliders.get(id)?.setEnabled(true);
+      record.colliders.get(id)?.setEnabled(record.entity.collisionsDisabled !== true);
     }
     record.respawnDisabled = undefined;
     record.respawnTicks = undefined;
@@ -1275,7 +1287,10 @@ export class RapierWorld implements BehaviorHost {
   }
 
   setColliderEnabled(id: EntityId, colliderId: string, enabled: boolean): void {
-    this.bodies.get(id)?.colliders.get(colliderId)?.setEnabled(enabled);
+    const record = this.bodies.get(id);
+    record?.colliders
+      .get(colliderId)
+      ?.setEnabled(enabled && record.entity.collisionsDisabled !== true);
   }
 
   setElevationVelocity(id: EntityId, vz: number): void {
@@ -1320,6 +1335,11 @@ export class RapierWorld implements BehaviorHost {
     }
   }
 
+  setSpriteTint(id: EntityId, tint: number | undefined): void {
+    const render = this.registry.get(id)?.render;
+    if (render) render.tint = tint;
+  }
+
   /** Atomically applies uniform visual/physics scale to an authored item. */
   setScale(id: EntityId, scale: number): void {
     const record = this.bodies.get(id);
@@ -1339,6 +1359,9 @@ export class RapierWorld implements BehaviorHost {
     record.entity.colliders = [];
     record.entity.transform.scale = scale;
     for (const collider of definition.colliders) this.attachCollider(record, collider);
+    if (record.entity.collisionsDisabled) {
+      for (const collider of record.colliders.values()) collider.setEnabled(false);
+    }
     record.body.wakeUp();
   }
 

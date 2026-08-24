@@ -23,6 +23,7 @@ interface SpriteRecord {
   display: Container;
   definitionId: string;
   variant?: string;
+  tint?: number;
   animation?: string;
   animationEpoch?: number;
 }
@@ -283,6 +284,7 @@ export class PixiScene {
       existing &&
       existing.definitionId === entity.definitionId &&
       existing.variant === entity.variant &&
+      existing.tint === entity.tint &&
       existing.animation === entity.animation &&
       existing.animationEpoch === entity.animationEpoch
     ) {
@@ -298,6 +300,7 @@ export class PixiScene {
       display,
       definitionId: entity.definitionId,
       variant: entity.variant,
+      tint: entity.tint,
       animation: entity.animation,
       animationEpoch: entity.animationEpoch,
     };

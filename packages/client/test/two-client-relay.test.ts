@@ -159,6 +159,22 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       "the owner to return the item to live simulation",
       () => entity(alice, crateId)?.isolated === false && entity(bob, crateId)?.isolated === false,
     );
+
+    bob.setItemCollisionsEnabled(crateId, false);
+    await waitFor(
+      "the collision override to reach the host and peer",
+      () =>
+        entity(alice, crateId)?.collisionsDisabled === true &&
+        entity(bob, crateId)?.collisionsDisabled === true,
+    );
+
+    bob.setItemCollisionsEnabled(crateId, true);
+    await waitFor(
+      "the owner to restore collisions",
+      () =>
+        entity(alice, crateId)?.collisionsDisabled === false &&
+        entity(bob, crateId)?.collisionsDisabled === false,
+    );
   }, 90_000);
 
   it("applies an owner's durable config change to the live behavior", async () => {

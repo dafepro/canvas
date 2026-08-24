@@ -8,11 +8,11 @@ import (
 
 // Transform mirrors the client Transform type.
 type Transform struct {
-  X        float64  `json:"x"`
-  Y        float64  `json:"y"`
-  Rotation float64  `json:"rotation"`
-  Scale    float64  `json:"scale"`
-  Z        *float64 `json:"z,omitempty"`
+	X        float64  `json:"x"`
+	Y        float64  `json:"y"`
+	Rotation float64  `json:"rotation"`
+	Scale    float64  `json:"scale"`
+	Z        *float64 `json:"z,omitempty"`
 }
 
 func (t Transform) finite() bool {
@@ -30,17 +30,19 @@ func (t Transform) finite() bool {
 
 // SnapshotItem mirrors the client SnapshotItem type (spec 13.1).
 type SnapshotItem struct {
-	EntityID          string          `json:"entityId"`
-	DefinitionID      string          `json:"definitionId"`
-	DefinitionVersion uint32          `json:"definitionVersion"`
-	OwnerUserID       string          `json:"ownerUserId"`
-	Transform         Transform       `json:"transform"`
-	Isolated          bool            `json:"isolated,omitempty"`
-	ResolvedConfig    json.RawMessage `json:"resolvedConfig,omitempty"`
-	BehaviorState     json.RawMessage `json:"behaviorState,omitempty"`
-	BehaviorStateVer  uint32          `json:"behaviorStateVersion,omitempty"`
-	BehaviorTimers    []BehaviorTimer `json:"behaviorTimers,omitempty"`
-	VisualVariant     string          `json:"visualVariant,omitempty"`
+	EntityID           string          `json:"entityId"`
+	DefinitionID       string          `json:"definitionId"`
+	DefinitionVersion  uint32          `json:"definitionVersion"`
+	OwnerUserID        string          `json:"ownerUserId"`
+	Transform          Transform       `json:"transform"`
+	Isolated           bool            `json:"isolated,omitempty"`
+	CollisionsDisabled bool            `json:"collisionsDisabled,omitempty"`
+	ResolvedConfig     json.RawMessage `json:"resolvedConfig,omitempty"`
+	BehaviorState      json.RawMessage `json:"behaviorState,omitempty"`
+	BehaviorStateVer   uint32          `json:"behaviorStateVersion,omitempty"`
+	BehaviorTimers     []BehaviorTimer `json:"behaviorTimers,omitempty"`
+	VisualVariant      string          `json:"visualVariant,omitempty"`
+	VisualTint         *uint32         `json:"visualTint,omitempty"`
 }
 
 type BehaviorTimer struct {

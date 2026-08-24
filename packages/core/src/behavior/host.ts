@@ -41,6 +41,7 @@ export interface BehaviorHost {
     z?: number,
   ): void;
   setSpriteVariant(id: EntityId, variant: string, persistent: boolean): void;
+  setSpriteTint(id: EntityId, tint: number | undefined, persistent: boolean): void;
   startAnimation(id: EntityId, animation: string, loop: boolean): void;
   emitEffect(emission: EffectEmission): void;
 }

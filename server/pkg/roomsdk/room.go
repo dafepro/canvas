@@ -611,6 +611,7 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 		stored.BehaviorStateVer = item.BehaviorStateVer
 		stored.BehaviorTimers = item.BehaviorTimers
 		stored.VisualVariant = item.VisualVariant
+		stored.VisualTint = item.VisualTint
 	}
 
 	// The server keeps all durable snapshot metadata. Only runtime checkpoint

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v7.35.1
-// source: room.proto
+// source: packages/protocol/proto/room.proto
 
 package canvasphysicsv1
 
@@ -63,11 +63,11 @@ func (x HostControlKind) String() string {
 }
 
 func (HostControlKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_room_proto_enumTypes[0].Descriptor()
+	return file_packages_protocol_proto_room_proto_enumTypes[0].Descriptor()
 }
 
 func (HostControlKind) Type() protoreflect.EnumType {
-	return &file_room_proto_enumTypes[0]
+	return &file_packages_protocol_proto_room_proto_enumTypes[0]
 }
 
 func (x HostControlKind) Number() protoreflect.EnumNumber {
@@ -76,20 +76,21 @@ func (x HostControlKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use HostControlKind.Descriptor instead.
 func (HostControlKind) EnumDescriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{0}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{0}
 }
 
 type DurableCommandKind int32
 
 const (
-	DurableCommandKind_DURABLE_UNSPECIFIED        DurableCommandKind = 0
-	DurableCommandKind_DURABLE_SPAWN_ITEM         DurableCommandKind = 1
-	DurableCommandKind_DURABLE_DELETE_ITEM        DurableCommandKind = 2
-	DurableCommandKind_DURABLE_MOVE_ITEM          DurableCommandKind = 3
-	DurableCommandKind_DURABLE_ROTATE_ITEM        DurableCommandKind = 4
-	DurableCommandKind_DURABLE_SET_CONFIG         DurableCommandKind = 5
-	DurableCommandKind_DURABLE_SCALE_ITEM         DurableCommandKind = 6
-	DurableCommandKind_DURABLE_SET_ITEM_ISOLATION DurableCommandKind = 7
+	DurableCommandKind_DURABLE_UNSPECIFIED         DurableCommandKind = 0
+	DurableCommandKind_DURABLE_SPAWN_ITEM          DurableCommandKind = 1
+	DurableCommandKind_DURABLE_DELETE_ITEM         DurableCommandKind = 2
+	DurableCommandKind_DURABLE_MOVE_ITEM           DurableCommandKind = 3
+	DurableCommandKind_DURABLE_ROTATE_ITEM         DurableCommandKind = 4
+	DurableCommandKind_DURABLE_SET_CONFIG          DurableCommandKind = 5
+	DurableCommandKind_DURABLE_SCALE_ITEM          DurableCommandKind = 6
+	DurableCommandKind_DURABLE_SET_ITEM_ISOLATION  DurableCommandKind = 7
+	DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS DurableCommandKind = 8
 )
 
 // Enum value maps for DurableCommandKind.
@@ -103,16 +104,18 @@ var (
 		5: "DURABLE_SET_CONFIG",
 		6: "DURABLE_SCALE_ITEM",
 		7: "DURABLE_SET_ITEM_ISOLATION",
+		8: "DURABLE_SET_ITEM_COLLISIONS",
 	}
 	DurableCommandKind_value = map[string]int32{
-		"DURABLE_UNSPECIFIED":        0,
-		"DURABLE_SPAWN_ITEM":         1,
-		"DURABLE_DELETE_ITEM":        2,
-		"DURABLE_MOVE_ITEM":          3,
-		"DURABLE_ROTATE_ITEM":        4,
-		"DURABLE_SET_CONFIG":         5,
-		"DURABLE_SCALE_ITEM":         6,
-		"DURABLE_SET_ITEM_ISOLATION": 7,
+		"DURABLE_UNSPECIFIED":         0,
+		"DURABLE_SPAWN_ITEM":          1,
+		"DURABLE_DELETE_ITEM":         2,
+		"DURABLE_MOVE_ITEM":           3,
+		"DURABLE_ROTATE_ITEM":         4,
+		"DURABLE_SET_CONFIG":          5,
+		"DURABLE_SCALE_ITEM":          6,
+		"DURABLE_SET_ITEM_ISOLATION":  7,
+		"DURABLE_SET_ITEM_COLLISIONS": 8,
 	}
 )
 
@@ -127,11 +130,11 @@ func (x DurableCommandKind) String() string {
 }
 
 func (DurableCommandKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_room_proto_enumTypes[1].Descriptor()
+	return file_packages_protocol_proto_room_proto_enumTypes[1].Descriptor()
 }
 
 func (DurableCommandKind) Type() protoreflect.EnumType {
-	return &file_room_proto_enumTypes[1]
+	return &file_packages_protocol_proto_room_proto_enumTypes[1]
 }
 
 func (x DurableCommandKind) Number() protoreflect.EnumNumber {
@@ -140,7 +143,7 @@ func (x DurableCommandKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DurableCommandKind.Descriptor instead.
 func (DurableCommandKind) EnumDescriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{1}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{1}
 }
 
 // Spec 12.3. One envelope carries every realtime message. Peers drop an
@@ -175,7 +178,7 @@ type RoomEnvelope struct {
 
 func (x *RoomEnvelope) Reset() {
 	*x = RoomEnvelope{}
-	mi := &file_room_proto_msgTypes[0]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +190,7 @@ func (x *RoomEnvelope) String() string {
 func (*RoomEnvelope) ProtoMessage() {}
 
 func (x *RoomEnvelope) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[0]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +203,7 @@ func (x *RoomEnvelope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomEnvelope.ProtoReflect.Descriptor instead.
 func (*RoomEnvelope) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{0}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *RoomEnvelope) GetRoomId() string {
@@ -454,7 +457,7 @@ type Vec2 struct {
 
 func (x *Vec2) Reset() {
 	*x = Vec2{}
-	mi := &file_room_proto_msgTypes[1]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -466,7 +469,7 @@ func (x *Vec2) String() string {
 func (*Vec2) ProtoMessage() {}
 
 func (x *Vec2) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[1]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -479,7 +482,7 @@ func (x *Vec2) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Vec2.ProtoReflect.Descriptor instead.
 func (*Vec2) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{1}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Vec2) GetX() float32 {
@@ -508,7 +511,7 @@ type Join struct {
 
 func (x *Join) Reset() {
 	*x = Join{}
-	mi := &file_room_proto_msgTypes[2]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -520,7 +523,7 @@ func (x *Join) String() string {
 func (*Join) ProtoMessage() {}
 
 func (x *Join) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[2]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -533,7 +536,7 @@ func (x *Join) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Join.ProtoReflect.Descriptor instead.
 func (*Join) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{2}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Join) GetRoomId() string {
@@ -567,7 +570,7 @@ type DefinitionVersion struct {
 
 func (x *DefinitionVersion) Reset() {
 	*x = DefinitionVersion{}
-	mi := &file_room_proto_msgTypes[3]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -579,7 +582,7 @@ func (x *DefinitionVersion) String() string {
 func (*DefinitionVersion) ProtoMessage() {}
 
 func (x *DefinitionVersion) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[3]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -592,7 +595,7 @@ func (x *DefinitionVersion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefinitionVersion.ProtoReflect.Descriptor instead.
 func (*DefinitionVersion) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{3}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DefinitionVersion) GetDefinitionId() string {
@@ -632,7 +635,7 @@ type JoinAccepted struct {
 
 func (x *JoinAccepted) Reset() {
 	*x = JoinAccepted{}
-	mi := &file_room_proto_msgTypes[4]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -644,7 +647,7 @@ func (x *JoinAccepted) String() string {
 func (*JoinAccepted) ProtoMessage() {}
 
 func (x *JoinAccepted) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[4]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -657,7 +660,7 @@ func (x *JoinAccepted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinAccepted.ProtoReflect.Descriptor instead.
 func (*JoinAccepted) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{4}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *JoinAccepted) GetClientId() string {
@@ -746,7 +749,7 @@ type Presence struct {
 
 func (x *Presence) Reset() {
 	*x = Presence{}
-	mi := &file_room_proto_msgTypes[5]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -758,7 +761,7 @@ func (x *Presence) String() string {
 func (*Presence) ProtoMessage() {}
 
 func (x *Presence) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[5]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,7 +774,7 @@ func (x *Presence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Presence.ProtoReflect.Descriptor instead.
 func (*Presence) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{5}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Presence) GetPeers() []*Peer {
@@ -794,7 +797,7 @@ type Peer struct {
 
 func (x *Peer) Reset() {
 	*x = Peer{}
-	mi := &file_room_proto_msgTypes[6]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -806,7 +809,7 @@ func (x *Peer) String() string {
 func (*Peer) ProtoMessage() {}
 
 func (x *Peer) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[6]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -819,7 +822,7 @@ func (x *Peer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Peer.ProtoReflect.Descriptor instead.
 func (*Peer) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{6}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Peer) GetClientId() string {
@@ -873,7 +876,7 @@ type HostControl struct {
 
 func (x *HostControl) Reset() {
 	*x = HostControl{}
-	mi := &file_room_proto_msgTypes[7]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -885,7 +888,7 @@ func (x *HostControl) String() string {
 func (*HostControl) ProtoMessage() {}
 
 func (x *HostControl) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[7]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -898,7 +901,7 @@ func (x *HostControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostControl.ProtoReflect.Descriptor instead.
 func (*HostControl) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{7}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *HostControl) GetKind() HostControlKind {
@@ -963,7 +966,7 @@ type Heartbeat struct {
 
 func (x *Heartbeat) Reset() {
 	*x = Heartbeat{}
-	mi := &file_room_proto_msgTypes[8]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -975,7 +978,7 @@ func (x *Heartbeat) String() string {
 func (*Heartbeat) ProtoMessage() {}
 
 func (x *Heartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[8]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -988,7 +991,7 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{8}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Heartbeat) GetSentAtUnixMs() uint64 {
@@ -1036,7 +1039,7 @@ type PlayerInput struct {
 
 func (x *PlayerInput) Reset() {
 	*x = PlayerInput{}
-	mi := &file_room_proto_msgTypes[9]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1048,7 +1051,7 @@ func (x *PlayerInput) String() string {
 func (*PlayerInput) ProtoMessage() {}
 
 func (x *PlayerInput) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[9]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1061,7 +1064,7 @@ func (x *PlayerInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerInput.ProtoReflect.Descriptor instead.
 func (*PlayerInput) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{9}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *PlayerInput) GetInputSequence() uint32 {
@@ -1129,14 +1132,19 @@ type EntityState struct {
 	SpriteAnimation string `protobuf:"bytes,16,opt,name=sprite_animation,json=spriteAnimation,proto3" json:"sprite_animation,omitempty"`
 	AnimationEpoch  uint32 `protobuf:"varint,17,opt,name=animation_epoch,json=animationEpoch,proto3" json:"animation_epoch,omitempty"`
 	// True when the owner has removed this item from physics and behavior.
-	ItemIsolated  bool `protobuf:"varint,18,opt,name=item_isolated,json=itemIsolated,proto3" json:"item_isolated,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ItemIsolated bool `protobuf:"varint,18,opt,name=item_isolated,json=itemIsolated,proto3" json:"item_isolated,omitempty"`
+	// Optional consumer-authored multiplicative sprite tint.
+	SpriteTint    uint32 `protobuf:"varint,19,opt,name=sprite_tint,json=spriteTint,proto3" json:"sprite_tint,omitempty"`
+	HasSpriteTint bool   `protobuf:"varint,20,opt,name=has_sprite_tint,json=hasSpriteTint,proto3" json:"has_sprite_tint,omitempty"`
+	// True when this live item does not participate in contacts.
+	ItemCollisionsDisabled bool `protobuf:"varint,21,opt,name=item_collisions_disabled,json=itemCollisionsDisabled,proto3" json:"item_collisions_disabled,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *EntityState) Reset() {
 	*x = EntityState{}
-	mi := &file_room_proto_msgTypes[10]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1148,7 +1156,7 @@ func (x *EntityState) String() string {
 func (*EntityState) ProtoMessage() {}
 
 func (x *EntityState) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[10]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1161,7 +1169,7 @@ func (x *EntityState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EntityState.ProtoReflect.Descriptor instead.
 func (*EntityState) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{10}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *EntityState) GetEntityId() string {
@@ -1255,6 +1263,27 @@ func (x *EntityState) GetItemIsolated() bool {
 	return false
 }
 
+func (x *EntityState) GetSpriteTint() uint32 {
+	if x != nil {
+		return x.SpriteTint
+	}
+	return 0
+}
+
+func (x *EntityState) GetHasSpriteTint() bool {
+	if x != nil {
+		return x.HasSpriteTint
+	}
+	return false
+}
+
+func (x *EntityState) GetItemCollisionsDisabled() bool {
+	if x != nil {
+		return x.ItemCollisionsDisabled
+	}
+	return false
+}
+
 type QuantizedTransform struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Position and elevation use 1/100 canvas unit precision.
@@ -1277,7 +1306,7 @@ type QuantizedTransform struct {
 
 func (x *QuantizedTransform) Reset() {
 	*x = QuantizedTransform{}
-	mi := &file_room_proto_msgTypes[11]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1289,7 +1318,7 @@ func (x *QuantizedTransform) String() string {
 func (*QuantizedTransform) ProtoMessage() {}
 
 func (x *QuantizedTransform) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[11]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1302,7 +1331,7 @@ func (x *QuantizedTransform) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuantizedTransform.ProtoReflect.Descriptor instead.
 func (*QuantizedTransform) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{11}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *QuantizedTransform) GetX() int32 {
@@ -1379,7 +1408,7 @@ type StateDelta struct {
 
 func (x *StateDelta) Reset() {
 	*x = StateDelta{}
-	mi := &file_room_proto_msgTypes[12]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1391,7 +1420,7 @@ func (x *StateDelta) String() string {
 func (*StateDelta) ProtoMessage() {}
 
 func (x *StateDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[12]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1404,7 +1433,7 @@ func (x *StateDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateDelta.ProtoReflect.Descriptor instead.
 func (*StateDelta) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{12}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *StateDelta) GetEntities() []*EntityState {
@@ -1440,7 +1469,7 @@ type FullState struct {
 
 func (x *FullState) Reset() {
 	*x = FullState{}
-	mi := &file_room_proto_msgTypes[13]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1452,7 +1481,7 @@ func (x *FullState) String() string {
 func (*FullState) ProtoMessage() {}
 
 func (x *FullState) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[13]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1465,7 +1494,7 @@ func (x *FullState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FullState.ProtoReflect.Descriptor instead.
 func (*FullState) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{13}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FullState) GetEntities() []*EntityState {
@@ -1508,7 +1537,7 @@ type AvatarPresence struct {
 
 func (x *AvatarPresence) Reset() {
 	*x = AvatarPresence{}
-	mi := &file_room_proto_msgTypes[14]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1520,7 +1549,7 @@ func (x *AvatarPresence) String() string {
 func (*AvatarPresence) ProtoMessage() {}
 
 func (x *AvatarPresence) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[14]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1533,7 +1562,7 @@ func (x *AvatarPresence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AvatarPresence.ProtoReflect.Descriptor instead.
 func (*AvatarPresence) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{14}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AvatarPresence) GetEntityId() string {
@@ -1577,7 +1606,7 @@ type EffectEvent struct {
 
 func (x *EffectEvent) Reset() {
 	*x = EffectEvent{}
-	mi := &file_room_proto_msgTypes[15]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1589,7 +1618,7 @@ func (x *EffectEvent) String() string {
 func (*EffectEvent) ProtoMessage() {}
 
 func (x *EffectEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[15]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1602,7 +1631,7 @@ func (x *EffectEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EffectEvent.ProtoReflect.Descriptor instead.
 func (*EffectEvent) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{15}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *EffectEvent) GetEntityId() string {
@@ -1645,16 +1674,17 @@ type DurableCommand struct {
 	Z                 float32                `protobuf:"fixed32,8,opt,name=z,proto3" json:"z,omitempty"`
 	ConfigJson        []byte                 `protobuf:"bytes,9,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"`
 	// True while an owner drags an item, so the host uses a kinematic reposition.
-	Preview       bool    `protobuf:"varint,10,opt,name=preview,proto3" json:"preview,omitempty"`
-	Scale         float32 `protobuf:"fixed32,11,opt,name=scale,proto3" json:"scale,omitempty"`
-	Isolated      bool    `protobuf:"varint,12,opt,name=isolated,proto3" json:"isolated,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Preview           bool    `protobuf:"varint,10,opt,name=preview,proto3" json:"preview,omitempty"`
+	Scale             float32 `protobuf:"fixed32,11,opt,name=scale,proto3" json:"scale,omitempty"`
+	Isolated          bool    `protobuf:"varint,12,opt,name=isolated,proto3" json:"isolated,omitempty"`
+	CollisionsEnabled bool    `protobuf:"varint,13,opt,name=collisions_enabled,json=collisionsEnabled,proto3" json:"collisions_enabled,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *DurableCommand) Reset() {
 	*x = DurableCommand{}
-	mi := &file_room_proto_msgTypes[16]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1666,7 +1696,7 @@ func (x *DurableCommand) String() string {
 func (*DurableCommand) ProtoMessage() {}
 
 func (x *DurableCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[16]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1679,7 +1709,7 @@ func (x *DurableCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DurableCommand.ProtoReflect.Descriptor instead.
 func (*DurableCommand) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{16}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DurableCommand) GetCommandId() string {
@@ -1766,6 +1796,13 @@ func (x *DurableCommand) GetIsolated() bool {
 	return false
 }
 
+func (x *DurableCommand) GetCollisionsEnabled() bool {
+	if x != nil {
+		return x.CollisionsEnabled
+	}
+	return false
+}
+
 type DurableCommandResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
@@ -1781,7 +1818,7 @@ type DurableCommandResult struct {
 
 func (x *DurableCommandResult) Reset() {
 	*x = DurableCommandResult{}
-	mi := &file_room_proto_msgTypes[17]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1793,7 +1830,7 @@ func (x *DurableCommandResult) String() string {
 func (*DurableCommandResult) ProtoMessage() {}
 
 func (x *DurableCommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[17]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1806,7 +1843,7 @@ func (x *DurableCommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DurableCommandResult.ProtoReflect.Descriptor instead.
 func (*DurableCommandResult) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{17}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *DurableCommandResult) GetCommandId() string {
@@ -1863,7 +1900,7 @@ type Checkpoint struct {
 
 func (x *Checkpoint) Reset() {
 	*x = Checkpoint{}
-	mi := &file_room_proto_msgTypes[18]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1875,7 +1912,7 @@ func (x *Checkpoint) String() string {
 func (*Checkpoint) ProtoMessage() {}
 
 func (x *Checkpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[18]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1888,7 +1925,7 @@ func (x *Checkpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Checkpoint.ProtoReflect.Descriptor instead.
 func (*Checkpoint) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{18}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Checkpoint) GetCheckpointRevision() uint64 {
@@ -1930,7 +1967,7 @@ type ProtocolError struct {
 
 func (x *ProtocolError) Reset() {
 	*x = ProtocolError{}
-	mi := &file_room_proto_msgTypes[19]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1942,7 +1979,7 @@ func (x *ProtocolError) String() string {
 func (*ProtocolError) ProtoMessage() {}
 
 func (x *ProtocolError) ProtoReflect() protoreflect.Message {
-	mi := &file_room_proto_msgTypes[19]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1955,7 +1992,7 @@ func (x *ProtocolError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtocolError.ProtoReflect.Descriptor instead.
 func (*ProtocolError) Descriptor() ([]byte, []int) {
-	return file_room_proto_rawDescGZIP(), []int{19}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ProtocolError) GetCode() string {
@@ -1979,12 +2016,11 @@ func (x *ProtocolError) GetServerProtocolVersion() uint32 {
 	return 0
 }
 
-var File_room_proto protoreflect.FileDescriptor
+var File_packages_protocol_proto_room_proto protoreflect.FileDescriptor
 
-const file_room_proto_rawDesc = "" +
+const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"\n" +
-	"\n" +
-	"room.proto\x12\x10canvasphysics.v1\"\xf9\a\n" +
+	"\"packages/protocol/proto/room.proto\x12\x10canvasphysics.v1\"\xf9\a\n" +
 	"\fRoomEnvelope\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
@@ -2063,7 +2099,7 @@ const file_room_proto_rawDesc = "" +
 	"\tintensity\x18\x03 \x01(\x02R\tintensity\x12-\n" +
 	"\x13client_time_unix_ms\x18\x04 \x01(\x04R\x10clientTimeUnixMs\x12\x12\n" +
 	"\x04held\x18\x05 \x01(\bR\x04held\x12'\n" +
-	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xbe\x04\n" +
+	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xc1\x05\n" +
 	"\vEntityState\x12\x1b\n" +
 	"\tentity_id\x18\x01 \x01(\tR\bentityId\x12U\n" +
 	"\x13quantized_transform\x18\x02 \x01(\v2$.canvasphysics.v1.QuantizedTransformR\x12quantizedTransform\x12A\n" +
@@ -2080,7 +2116,11 @@ const file_room_proto_rawDesc = "" +
 	"respawning\x12)\n" +
 	"\x10sprite_animation\x18\x10 \x01(\tR\x0fspriteAnimation\x12'\n" +
 	"\x0fanimation_epoch\x18\x11 \x01(\rR\x0eanimationEpoch\x12#\n" +
-	"\ritem_isolated\x18\x12 \x01(\bR\fitemIsolated\"\xcb\x01\n" +
+	"\ritem_isolated\x18\x12 \x01(\bR\fitemIsolated\x12\x1f\n" +
+	"\vsprite_tint\x18\x13 \x01(\rR\n" +
+	"spriteTint\x12&\n" +
+	"\x0fhas_sprite_tint\x18\x14 \x01(\bR\rhasSpriteTint\x128\n" +
+	"\x18item_collisions_disabled\x18\x15 \x01(\bR\x16itemCollisionsDisabled\"\xcb\x01\n" +
 	"\x12QuantizedTransform\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x11R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x11R\x01y\x12\x1a\n" +
@@ -2111,7 +2151,7 @@ const file_room_proto_rawDesc = "" +
 	"\x06effect\x18\x02 \x01(\tR\x06effect\x12\x12\n" +
 	"\x04mode\x18\x03 \x01(\tR\x04mode\x12\x1f\n" +
 	"\vparams_json\x18\x04 \x01(\fR\n" +
-	"paramsJson\"\xa5\x03\n" +
+	"paramsJson\"\xd4\x03\n" +
 	"\x0eDurableCommand\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x128\n" +
@@ -2127,7 +2167,8 @@ const file_room_proto_rawDesc = "" +
 	"\apreview\x18\n" +
 	" \x01(\bR\apreview\x12\x14\n" +
 	"\x05scale\x18\v \x01(\x02R\x05scale\x12\x1a\n" +
-	"\bisolated\x18\f \x01(\bR\bisolated\"\x87\x02\n" +
+	"\bisolated\x18\f \x01(\bR\bisolated\x12-\n" +
+	"\x12collisions_enabled\x18\r \x01(\bR\x11collisionsEnabled\"\x87\x02\n" +
 	"\x14DurableCommandResult\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x1a\n" +
@@ -2152,7 +2193,7 @@ const file_room_proto_rawDesc = "" +
 	"\x14HOST_CONTROL_REVOKED\x10\x02\x12\x1e\n" +
 	"\x1aHOST_CONTROL_YIELD_REQUEST\x10\x03\x12\x16\n" +
 	"\x12HOST_CONTROL_YIELD\x10\x04\x12\x1c\n" +
-	"\x18HOST_CONTROL_ELIGIBILITY\x10\x05*\xde\x01\n" +
+	"\x18HOST_CONTROL_ELIGIBILITY\x10\x05*\xff\x01\n" +
 	"\x12DurableCommandKind\x12\x17\n" +
 	"\x13DURABLE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12DURABLE_SPAWN_ITEM\x10\x01\x12\x17\n" +
@@ -2161,23 +2202,24 @@ const file_room_proto_rawDesc = "" +
 	"\x13DURABLE_ROTATE_ITEM\x10\x04\x12\x16\n" +
 	"\x12DURABLE_SET_CONFIG\x10\x05\x12\x16\n" +
 	"\x12DURABLE_SCALE_ITEM\x10\x06\x12\x1e\n" +
-	"\x1aDURABLE_SET_ITEM_ISOLATION\x10\aBFZDgithub.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1b\x06proto3"
+	"\x1aDURABLE_SET_ITEM_ISOLATION\x10\a\x12\x1f\n" +
+	"\x1bDURABLE_SET_ITEM_COLLISIONS\x10\bBFZDgithub.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1b\x06proto3"
 
 var (
-	file_room_proto_rawDescOnce sync.Once
-	file_room_proto_rawDescData []byte
+	file_packages_protocol_proto_room_proto_rawDescOnce sync.Once
+	file_packages_protocol_proto_room_proto_rawDescData []byte
 )
 
-func file_room_proto_rawDescGZIP() []byte {
-	file_room_proto_rawDescOnce.Do(func() {
-		file_room_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_room_proto_rawDesc), len(file_room_proto_rawDesc)))
+func file_packages_protocol_proto_room_proto_rawDescGZIP() []byte {
+	file_packages_protocol_proto_room_proto_rawDescOnce.Do(func() {
+		file_packages_protocol_proto_room_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_packages_protocol_proto_room_proto_rawDesc), len(file_packages_protocol_proto_room_proto_rawDesc)))
 	})
-	return file_room_proto_rawDescData
+	return file_packages_protocol_proto_room_proto_rawDescData
 }
 
-var file_room_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_room_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
-var file_room_proto_goTypes = []any{
+var file_packages_protocol_proto_room_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_packages_protocol_proto_room_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_packages_protocol_proto_room_proto_goTypes = []any{
 	(HostControlKind)(0),         // 0: canvasphysics.v1.HostControlKind
 	(DurableCommandKind)(0),      // 1: canvasphysics.v1.DurableCommandKind
 	(*RoomEnvelope)(nil),         // 2: canvasphysics.v1.RoomEnvelope
@@ -2201,7 +2243,7 @@ var file_room_proto_goTypes = []any{
 	(*Checkpoint)(nil),           // 20: canvasphysics.v1.Checkpoint
 	(*ProtocolError)(nil),        // 21: canvasphysics.v1.ProtocolError
 }
-var file_room_proto_depIdxs = []int32{
+var file_packages_protocol_proto_room_proto_depIdxs = []int32{
 	4,  // 0: canvasphysics.v1.RoomEnvelope.join:type_name -> canvasphysics.v1.Join
 	6,  // 1: canvasphysics.v1.RoomEnvelope.join_accepted:type_name -> canvasphysics.v1.JoinAccepted
 	7,  // 2: canvasphysics.v1.RoomEnvelope.presence:type_name -> canvasphysics.v1.Presence
@@ -2233,12 +2275,12 @@ var file_room_proto_depIdxs = []int32{
 	0,  // [0:24] is the sub-list for field type_name
 }
 
-func init() { file_room_proto_init() }
-func file_room_proto_init() {
-	if File_room_proto != nil {
+func init() { file_packages_protocol_proto_room_proto_init() }
+func file_packages_protocol_proto_room_proto_init() {
+	if File_packages_protocol_proto_room_proto != nil {
 		return
 	}
-	file_room_proto_msgTypes[0].OneofWrappers = []any{
+	file_packages_protocol_proto_room_proto_msgTypes[0].OneofWrappers = []any{
 		(*RoomEnvelope_Join)(nil),
 		(*RoomEnvelope_JoinAccepted)(nil),
 		(*RoomEnvelope_Presence)(nil),
@@ -2257,18 +2299,18 @@ func file_room_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_room_proto_rawDesc), len(file_room_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_packages_protocol_proto_room_proto_rawDesc), len(file_packages_protocol_proto_room_proto_rawDesc)),
 			NumEnums:      2,
 			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_room_proto_goTypes,
-		DependencyIndexes: file_room_proto_depIdxs,
-		EnumInfos:         file_room_proto_enumTypes,
-		MessageInfos:      file_room_proto_msgTypes,
+		GoTypes:           file_packages_protocol_proto_room_proto_goTypes,
+		DependencyIndexes: file_packages_protocol_proto_room_proto_depIdxs,
+		EnumInfos:         file_packages_protocol_proto_room_proto_enumTypes,
+		MessageInfos:      file_packages_protocol_proto_room_proto_msgTypes,
 	}.Build()
-	File_room_proto = out.File
-	file_room_proto_goTypes = nil
-	file_room_proto_depIdxs = nil
+	File_packages_protocol_proto_room_proto = out.File
+	file_packages_protocol_proto_room_proto_goTypes = nil
+	file_packages_protocol_proto_room_proto_depIdxs = nil
 }

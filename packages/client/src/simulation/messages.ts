@@ -52,6 +52,7 @@ export type SimulationRequest =
   | { type: "moveItem"; entityId: string; transform: Transform; preview: boolean }
   | { type: "setItemConfig"; entityId: string; config: unknown }
   | { type: "setItemIsolation"; entityId: string; isolated: boolean }
+  | { type: "setItemCollisions"; entityId: string; enabled: boolean }
   | {
       type: "requestSnapshot";
       final: boolean;
@@ -73,6 +74,7 @@ export interface RenderEntity {
   vy: number;
   angularVelocity: number;
   variant?: string;
+  tint?: number;
   animation?: string;
   animationEpoch?: number;
   userId?: string;
@@ -84,6 +86,7 @@ export interface RenderEntity {
   disabled?: boolean;
   /** Owner-controlled isolation of an item from physics and behavior. */
   isolated?: boolean;
+  collisionsDisabled?: boolean;
   /**
    * Addendum A2. Rises on every discontinuous move. A renderer that sees a new
    * value snaps the sprite instead of interpolating across the canvas.

@@ -145,6 +145,11 @@ message EntityState {
   uint32 animation_epoch = 17;
   // True when the owner has removed this item from physics and behavior.
   bool item_isolated = 18;
+  // Optional consumer-authored multiplicative sprite tint.
+  uint32 sprite_tint = 19;
+  bool has_sprite_tint = 20;
+  // True when this live item does not participate in contacts.
+  bool item_collisions_disabled = 21;
 }
 
 message QuantizedTransform {
@@ -203,6 +208,7 @@ enum DurableCommandKind {
   DURABLE_SET_CONFIG = 5;
   DURABLE_SCALE_ITEM = 6;
   DURABLE_SET_ITEM_ISOLATION = 7;
+  DURABLE_SET_ITEM_COLLISIONS = 8;
 }
 
 message DurableCommand {
@@ -219,6 +225,7 @@ message DurableCommand {
   bool preview = 10;
   float scale = 11;
   bool isolated = 12;
+  bool collisions_enabled = 13;
 }
 
 message DurableCommandResult {

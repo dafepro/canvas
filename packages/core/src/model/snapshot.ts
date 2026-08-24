@@ -28,6 +28,7 @@ export interface SnapshotItem {
   transform: Transform;
   /** Durable owner-controlled simulation isolation. */
   isolated?: boolean;
+  collisionsDisabled?: boolean;
   resolvedConfig: unknown;
   /** Present only when the item definition declares behaviorState durable. */
   behaviorState?: unknown;
@@ -36,6 +37,8 @@ export interface SnapshotItem {
   behaviorTimers?: BehaviorTimerSnapshot[];
   /** Persistent visual variant needed to rebuild the item. */
   visualVariant?: string;
+  /** Persistent behavior-authored multiplicative sprite tint. */
+  visualTint?: number;
 }
 
 export interface BehaviorTimerSnapshot {

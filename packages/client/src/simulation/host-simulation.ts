@@ -66,6 +66,9 @@ export class HostSimulation {
       if (item.visualVariant) {
         this.world.setSpriteVariant(item.entityId, item.visualVariant);
       }
+      if (item.visualTint !== undefined) {
+        this.world.setSpriteTint(item.entityId, item.visualTint);
+      }
       if (!wakeFromSleep && item.behaviorTimers?.length) {
         this.behaviors.timers.restore(
           item.entityId,
@@ -102,6 +105,7 @@ export class HostSimulation {
       transform: { ...item.transform },
       resolvedConfig: item.resolvedConfig,
       isolated: item.isolated,
+      collisionsDisabled: item.collisionsDisabled,
       behaviorState: item.behaviorState,
       behaviorStateVersion: item.behaviorStateVersion,
       createdAt: new Date().toISOString(),
@@ -145,6 +149,10 @@ export class HostSimulation {
     if (!this.world.setItemIsolation(entityId, isolated)) return false;
     this.behaviors.setDisabled(entityId, isolated, this.world.currentTick);
     return true;
+  }
+
+  setItemCollisionsEnabled(entityId: string, enabled: boolean): boolean {
+    return this.world.setItemCollisionsEnabled(entityId, enabled);
   }
 
   addAvatar(spawn: AvatarSpawn): Entity {
@@ -199,6 +207,7 @@ export class HostSimulation {
         ownerUserId: entity.ownership?.ownerUserId ?? "",
         transform: { ...entity.transform },
         isolated: entity.isolated || undefined,
+        collisionsDisabled: entity.collisionsDisabled || undefined,
         resolvedConfig: entity.behavior?.config,
       };
       if (slot && persistence?.behaviorState) {
@@ -213,6 +222,7 @@ export class HostSimulation {
         }
       }
       if (entity.render?.variant) item.visualVariant = entity.render.variant;
+      if (entity.render?.tint !== undefined) item.visualTint = entity.render.tint;
       items.push(item);
     }
     return {
@@ -257,6 +267,8 @@ export class HostSimulation {
         entity.transform.rotation.toFixed(3),
         (entity.transform.scale ?? 1).toFixed(3),
         entity.render?.variant ?? "",
+        entity.render?.tint?.toString(16) ?? "",
+        entity.collisionsDisabled ? "no-collisions" : "collisions",
       ].join(",");
       if (this.lastSentTransforms.get(entity.id) === key) continue;
       this.lastSentTransforms.set(entity.id, key);

@@ -56,6 +56,14 @@ export interface SetSpriteVariant {
   persistent?: boolean;
 }
 
+export interface SetSpriteTint {
+  type: "setSpriteTint";
+  target?: EntityId;
+  /** RGB tint in the inclusive range 0x000000..0xffffff; omit to clear. */
+  tint?: number;
+  persistent?: boolean;
+}
+
 export interface StartAnimation {
   type: "startAnimation";
   target?: EntityId;
@@ -122,6 +130,7 @@ export type BehaviorCommand =
   | SetBodyMode
   | SetColliderEnabled
   | SetSpriteVariant
+  | SetSpriteTint
   | StartAnimation
   | EmitEffect
   | Teleport

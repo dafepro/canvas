@@ -80,9 +80,20 @@ export class ItemEditController {
       if (!this.options.enabled()) return;
       const local = this.toLocal(event);
       const selected = this.options.pick(local);
+      const wasSelected = selected !== undefined && this.selected?.id === selected.id;
       this.selected = selected;
       if (!selected) {
         this.drag = undefined;
+        this.emit();
+        return;
+      }
+
+      // The selection gesture never becomes a move. This prevents a tap with
+      // ordinary finger drift from repositioning an item. A later gesture on
+      // the already-selected item owns the manipulation.
+      if (!wasSelected) {
+        this.drag = undefined;
+        event.preventDefault();
         this.emit();
         return;
       }

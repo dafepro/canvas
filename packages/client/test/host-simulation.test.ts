@@ -100,6 +100,55 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("disables item collisions without stopping its motion", () => {
+    const simulation = build();
+    simulation.addItem(instance("ghost-ball", ballDefinition, 50, 20));
+    simulation.world.setVelocity("ghost-ball", { x: 6, y: 0 }, 0);
+    const collidersBefore = simulation.world.activeColliderCount;
+    const startX = simulation.world.registry.require("ghost-ball").transform.x;
+
+    expect(simulation.setItemCollisionsEnabled("ghost-ball", false)).toBe(true);
+    expect(simulation.world.activeColliderCount).toBeLessThan(collidersBefore);
+    for (let index = 0; index < 10; index++) simulation.step();
+
+    expect(simulation.world.registry.require("ghost-ball").transform.x).toBeGreaterThan(startX);
+    expect(simulation.snapshot().items[0]?.collisionsDisabled).toBe(true);
+    expect(simulation.setItemCollisionsEnabled("ghost-ball", true)).toBe(true);
+    expect(simulation.world.activeColliderCount).toBe(collidersBefore);
+    simulation.free();
+  });
+
+  it("persists a behavior-authored custom sprite tint", () => {
+    const tintBehavior: ItemBehavior<Record<string, never>, Record<string, never>> = {
+      behaviorType: "test.tint",
+      stateVersion: 1,
+      subscribes: ["tick"],
+      initialState: () => ({}),
+      onEvent: (_context, _config, state) => ({
+        state: state as Record<string, never>,
+        commands: [{ type: "setSpriteTint", tint: 0x2a7fff, persistent: true }],
+      }),
+    };
+    const tintedDefinition: ItemDefinition = {
+      ...ballDefinition,
+      definitionId: "test-tinted",
+      behaviorType: tintBehavior.behaviorType,
+      defaultConfig: {},
+    };
+    const simulation = new HostSimulation(
+      rocketCanvas,
+      [tintedDefinition],
+      new BehaviorRegistry().register(tintBehavior),
+      60,
+    );
+    simulation.addItem(instance("tinted-1", tintedDefinition, 50, 20));
+    simulation.step();
+
+    expect(simulation.world.registry.require("tinted-1").render?.tint).toBe(0x2a7fff);
+    expect(simulation.snapshot().items[0]?.visualTint).toBe(0x2a7fff);
+    simulation.free();
+  });
+
   it("drops a crate onto the ground and stops it there", () => {
     const simulation = build();
     simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));

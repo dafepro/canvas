@@ -12,6 +12,7 @@ export interface RenderComponent {
   definitionId: string;
   definitionVersion?: number;
   variant?: string;
+  tint?: number;
   animation?: string;
   /** Rises whenever an animation starts, including replaying the same name. */
   animationEpoch?: number;
@@ -94,6 +95,8 @@ export interface Entity {
   ownership?: OwnershipComponent;
   /** True while this item is excluded from physics, collision, and behavior. */
   isolated?: boolean;
+  /** Global owner control over this item's authored colliders. */
+  collisionsDisabled?: boolean;
   persistence?: PersistenceComponent;
   tags?: Set<string>;
   /** Set by the host when a NaN or out-of-bounds value is found (spec 14.3). */
