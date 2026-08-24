@@ -176,6 +176,10 @@ work below because they determine the public boundary every consumer will use.
   workflows resume from their checkpointed remaining duration.
 - [x] Reconcile avatar presence by adding only new peers and removing departed
   peers; eliminate duplicate avatars and ghost colliders.
+- [x] Keep peer-local avatar prediction stable across keyframes and periodic
+  checkpoints. Host and peer now derive the same deterministic spawn offset,
+  and display correction observes each canonical tick once before easing toward
+  its newest error instead of reapplying delayed state every render frame.
 - [x] Wire behavior-state migrations into snapshot loading and preserve actual
   behavior/definition versions in checkpoints.
 - [x] Add public rotate and set-config APIs, use server-authoritative accepted

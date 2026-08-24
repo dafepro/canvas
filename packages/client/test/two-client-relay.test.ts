@@ -290,6 +290,45 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     );
   }, 90_000);
 
+  it("keeps peer-local avatar presentation smooth across checkpoint boundaries", async () => {
+    let bobIntent: InputIntent = STILL;
+    const alice = session("alice");
+    await alice.start();
+    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+
+    const bob = session("bob", () => bobIntent);
+    await bob.start();
+    await waitFor("bob to join", () => bob.client.clientId !== "");
+    const bobAvatar = avatarEntityId(bob.client.userId);
+    await waitFor("host to add bob's avatar", () => entity(alice, bobAvatar) !== undefined);
+    await waitFor("bob to receive its canonical avatar", () => entity(bob, bobAvatar) !== undefined);
+
+    bobIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true };
+    const samples: Array<{ at: number; x: number }> = [];
+    const deadline = performance.now() + 2_400;
+    while (performance.now() < deadline) {
+      const at = performance.now();
+      const avatar = entity(bob, bobAvatar);
+      if (avatar) samples.push({ at, x: avatar.x });
+      await new Promise((resolve) => setTimeout(resolve, 16));
+    }
+    bobIntent = STILL;
+
+    const steps = samples.slice(1).map((sample, index) => {
+      const previous = samples[index]!;
+      return sample.x - previous.x;
+    });
+    const slowest = steps.indexOf(Math.min(...steps));
+    const fastest = steps.indexOf(Math.max(...steps));
+    const motionDiagnostics = JSON.stringify({
+      slowest: { step: steps[slowest], before: samples[slowest], after: samples[slowest + 1] },
+      fastest: { step: steps[fastest], before: samples[fastest], after: samples[fastest + 1] },
+    });
+    expect(samples.at(-1)!.x - samples[0]!.x).toBeGreaterThan(8);
+    expect(Math.min(...steps), motionDiagnostics).toBeGreaterThan(-0.08);
+    expect(Math.max(...steps), motionDiagnostics).toBeLessThan(0.8);
+  }, 90_000);
+
   it("resumes a timer-driven workflow on the replacement host", async () => {
     const alice = session("alice");
     await alice.start();

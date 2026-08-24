@@ -186,6 +186,7 @@ export class RoomSession {
   readonly driver: SimulationDriver;
   private readonly buffer = new InterpolationBuffer();
   private readonly reconciler = new AvatarReconciler();
+  private lastReconciledTick?: number;
   private canvasDefinition?: CanvasDefinition;
   private timers: ReturnType<typeof setInterval>[] = [];
   private previewTimer?: ReturnType<typeof setTimeout>;
@@ -575,6 +576,7 @@ export class RoomSession {
       }
       this.buffer.reset();
       this.reconciler.reset();
+      this.lastReconciledTick = undefined;
       this.driver.send({
         type: "setHost",
         isHost: true,
@@ -596,6 +598,7 @@ export class RoomSession {
       this.lastMigrationReason = reason || undefined;
       this.buffer.reset();
       this.reconciler.reset();
+      this.lastReconciledTick = undefined;
       if (hostClientId !== this.client.clientId) {
         this.driver.send({ type: "setHost", isHost: false });
         this.hostAvatarIds.clear();
@@ -825,11 +828,13 @@ export class RoomSession {
     for (const observer of this.effectObservers) observer(effect);
   }
 
-  private spawnPosition(): Vec2 {
+  private spawnPosition(entityId: string): Vec2 {
     const spawn = this.canvasDefinition?.spawnPoints[0]?.position;
     if (spawn) {
-      // Spread avatars a little so they do not stack on one point.
-      return { x: spawn.x + (Math.random() - 0.5) * 6, y: spawn.y };
+      // Host and peer prediction must derive exactly the same starting pose.
+      // A random local offset makes the peer correct toward a different host
+      // spawn on every keyframe, which presents as periodic rubber-banding.
+      return { x: spawn.x + stableSpawnOffset(entityId), y: spawn.y };
     }
     return { x: 10, y: 10 };
   }
@@ -912,7 +917,7 @@ export class RoomSession {
 
   private avatarSpawnPosition(entityId: string): Vec2 {
     const canonical = this.lastCanonicalAvatarPositions.get(entityId);
-    return canonical ? { ...canonical } : this.spawnPosition();
+    return canonical ? { ...canonical } : this.spawnPosition(entityId);
   }
 
   private rememberItemMetadata(snapshot: CanvasSnapshot): void {
@@ -1148,11 +1153,18 @@ export class RoomSession {
 
     const sampled = this.buffer.sample(nowMs);
     const remote = sampled.filter((entity) => entity.id !== this.localAvatarId);
-    const canonicalLocal = sampled.find((entity) => entity.id === this.localAvatarId);
-
     if (this.localPrediction) {
-      if (canonicalLocal) {
+      const latestTick = this.buffer.latestTick;
+      const canonicalLocal = this.buffer.latest().find(
+        (entity) => entity.id === this.localAvatarId,
+      );
+      if (
+        canonicalLocal &&
+        latestTick !== undefined &&
+        latestTick !== this.lastReconciledTick
+      ) {
         this.reconciler.observe(canonicalLocal, this.localPrediction);
+        this.lastReconciledTick = latestTick;
       }
       const corrected = this.reconciler.correct(this.localPrediction);
       remote.push({
@@ -1702,6 +1714,16 @@ const pickCounters = (traffic: {
 
 export const avatarEntityId = (participantId: string): string =>
   `avatar:${participantId}`;
+
+/** Stable ±3-unit spread shared by the host and the predicting peer. */
+const stableSpawnOffset = (entityId: string): number => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < entityId.length; index++) {
+    hash ^= entityId.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return ((hash >>> 0) / 0xffffffff - 0.5) * 6;
+};
 
 /**
  * Spec 19.3. A delta leaves out the definition id. A client learns the

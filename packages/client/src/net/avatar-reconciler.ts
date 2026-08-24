@@ -13,7 +13,8 @@ export interface ReconcilerOptions {
  * A small error blends over several frames; a large error snaps.
  */
 export class AvatarReconciler {
-  private offset: Vec2 = { x: 0, y: 0 };
+  private targetOffset: Vec2 = { x: 0, y: 0 };
+  private appliedOffset: Vec2 = { x: 0, y: 0 };
   private lastTeleportEpoch?: number;
   lastErrorDistance = 0;
   snapCount = 0;
@@ -23,51 +24,55 @@ export class AvatarReconciler {
 
   constructor(options: ReconcilerOptions = {}) {
     this.snapDistance = options.snapDistance ?? 3;
-    this.blendPerFrame = options.blendPerFrame ?? 0.2;
+    this.blendPerFrame = options.blendPerFrame ?? 0.1;
   }
 
   /**
    * Records the newest canonical state for the local avatar. Addendum A2. The
    * host may have wrapped or respawned the avatar. That is not a prediction
-   * error, so the offset is dropped and the canonical place is used at once.
+   * error, so the canonical place is used at once.
    */
   observe(canonical: RenderEntity, predicted: { x: number; y: number }): void {
     const epoch = canonical.teleportEpoch ?? 0;
+    const errorX = canonical.x - predicted.x;
+    const errorY = canonical.y - predicted.y;
     if (this.lastTeleportEpoch !== undefined && epoch !== this.lastTeleportEpoch) {
       this.lastTeleportEpoch = epoch;
-      this.offset = { x: 0, y: 0 };
+      this.targetOffset = { x: errorX, y: errorY };
+      this.appliedOffset = { x: errorX, y: errorY };
       this.lastErrorDistance = 0;
       this.snapCount++;
       return;
     }
     this.lastTeleportEpoch = epoch;
-    const errorX = canonical.x - predicted.x;
-    const errorY = canonical.y - predicted.y;
     this.lastErrorDistance = Math.hypot(errorX, errorY);
 
     if (this.lastErrorDistance > this.snapDistance) {
-      this.offset = { x: errorX, y: errorY };
+      this.targetOffset = { x: errorX, y: errorY };
+      this.appliedOffset = { x: errorX, y: errorY };
       this.snapCount++;
       return;
     }
-    this.offset = { x: errorX, y: errorY };
+    this.targetOffset = { x: errorX, y: errorY };
   }
 
   /** The corrected display position for the local avatar. */
   correct(predicted: { x: number; y: number }): Vec2 {
-    const corrected = {
-      x: predicted.x + this.offset.x,
-      y: predicted.y + this.offset.y,
+    this.appliedOffset = {
+      x: this.appliedOffset.x +
+        (this.targetOffset.x - this.appliedOffset.x) * this.blendPerFrame,
+      y: this.appliedOffset.y +
+        (this.targetOffset.y - this.appliedOffset.y) * this.blendPerFrame,
     };
-    this.offset = {
-      x: this.offset.x * (1 - this.blendPerFrame),
-      y: this.offset.y * (1 - this.blendPerFrame),
+    return {
+      x: predicted.x + this.appliedOffset.x,
+      y: predicted.y + this.appliedOffset.y,
     };
-    return corrected;
   }
 
   reset(): void {
-    this.offset = { x: 0, y: 0 };
+    this.targetOffset = { x: 0, y: 0 };
+    this.appliedOffset = { x: 0, y: 0 };
     this.lastErrorDistance = 0;
     this.lastTeleportEpoch = undefined;
   }

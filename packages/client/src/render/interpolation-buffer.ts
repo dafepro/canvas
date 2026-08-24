@@ -40,6 +40,10 @@ export class InterpolationBuffer {
     return this.samples.length;
   }
 
+  get latestTick(): number | undefined {
+    return this.samples[this.samples.length - 1]?.tick;
+  }
+
   /** Complete newest canonical sample, without interpolation or prediction. */
   latest(): RenderEntity[] {
     const newest = this.samples[this.samples.length - 1];
