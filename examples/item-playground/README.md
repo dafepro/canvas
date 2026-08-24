@@ -41,6 +41,11 @@ definition, server item metadata, behavior worker, asset manifest, artwork, and
 product UI. Canvas provides the generic projection, durable mutation, and
 owner-authorized simulation-isolation seams.
 
+During local development Vite proxies `/v1` HTTP and WebSocket traffic to the
+room service on port 8083. LAN clients therefore need only port 5175 and use the
+same origin for artwork and realtime room traffic. Set `VITE_SERVER_URL` to use
+a separately exposed room-service origin instead.
+
 The reactive orb is the editable behavior example: avatar contact triggers its
 one-shot `pulse` animation and effect, while its color is durable configuration.
 The color tile reuses the color-applying portion without a contact sensor. The

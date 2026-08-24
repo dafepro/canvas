@@ -18,7 +18,7 @@ import "./style.css";
 
 const params = new URLSearchParams(location.search);
 const serverUrl =
-  import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:8083`;
+  import.meta.env.VITE_SERVER_URL ?? location.origin;
 const stage = document.querySelector<HTMLElement>("#stage")!;
 const userInput = document.querySelector<HTMLInputElement>("#user")!;
 const joinButton = document.querySelector<HTMLButtonElement>("#join")!;
@@ -364,7 +364,9 @@ const join = async (): Promise<void> => {
         renderOwnedList();
       },
       onAssetProgress: ({ loaded, total }) => {
-        connectionStatus.textContent = `Loading assets… ${loaded}/${total}`;
+        connectionStatus.textContent = loaded === total
+          ? "Assets ready · connecting to room…"
+          : `Loading assets… ${loaded}/${total}`;
       },
       onError: (error) => {
         pendingAfterRevision = undefined;

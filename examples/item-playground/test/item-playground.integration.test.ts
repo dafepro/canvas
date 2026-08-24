@@ -109,6 +109,7 @@ describe("compact item playground", () => {
   it("keeps direct manipulation controls around the selected item", () => {
     const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
     const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
+    const vite = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8");
     expect(html).toContain('class="scale-tools"');
     expect(html).toContain('class="rotate-control rotate-left"');
     expect(html).toContain('class="rotate-control rotate-right"');
@@ -136,6 +137,10 @@ describe("compact item playground", () => {
     expect(main).not.toContain("selectedEntityId = spawned.id");
     expect(main).toContain("subscribeOverlayProjection(renderOverlays");
     expect(main).toContain("text.textContent = render.text");
+    expect(main).toContain("import.meta.env.VITE_SERVER_URL ?? location.origin");
+    expect(main).toContain("Assets ready · connecting to room…");
+    expect(vite).toContain('target: "http://127.0.0.1:8083"');
+    expect(vite).toContain("ws: true");
   });
 
   it("renders bounded multiline graffiti config without a physical collider", () => {

@@ -82,7 +82,9 @@ pnpm example:items        # terminal 2; app on :5175
 ```
 
 Open <http://localhost:5175>. Add `?autojoin=1&user=alex` for a named client;
-open a second tab with a different user to demonstrate owner-only edits.
+open a second tab with a different user to demonstrate owner-only edits. The
+development server proxies realtime traffic to `:8083`, so LAN devices only
+need access to the app's `:5175` address.
 
 ## Emulate a bad network
 
