@@ -30,6 +30,11 @@ credentials, staging their presentation, and authorizing travel.
    older connection in that room, while a staged origin/destination overlap is
    allowed. Products requiring one global account location enforce that policy
    while issuing destination credentials.
+9. A staged destination must not be revealed merely because initialization is
+   complete. It waits for presence and a canonical presentation containing all
+   snapshot items and connected avatars.
+10. An explicit arrival spawn wins during travel. A refresh without one resumes
+    the participant's latest server-known canonical position.
 
 ## Public structure
 
@@ -74,4 +79,6 @@ only for those links.
 `examples/linked-rooms` defines a bright village room and a cave room. Each has
 one system-owned threshold item configured with one side of a validated route.
 Walking into the door replaces the visible runtime; the cave contains the exact
-reverse door, and the Back button demonstrates the programmatic fallback.
+reverse door, and the Back button demonstrates the programmatic fallback. A
+same-room duplicate visibly blocks the displaced tab and offers an explicit
+“Use here” takeover instead of leaving a silently frozen scene.

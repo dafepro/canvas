@@ -56,9 +56,17 @@ downward. Check an item only after the relevant focused tests pass.
   spawns, refresh ambiguity, duplicate same-room sessions, and edge-triggered
   portal geometry. Persist the failure matrix in
   `LINKED_ROOM_TRAVEL_HARDENING.md`.
+- [x] Gate destination reveal on complete canonical presentation, render avatars
+  above door art, expose duplicate-session takeover UI, and preserve validated
+  canonical avatar positions across refresh and host promotion. Explicit door
+  arrival spawns override saved positions.
 - [ ] Define an optional product-owned participant-location lease conformance
   adapter for worlds that require one global room per authenticated account.
   Canvas rooms remain independent and do not impose this policy themselves.
+- [ ] Define multi-process room ownership for shared host leases and live avatar
+  position caches before claiming horizontally scaled room coordination.
+- [ ] Add fault injection at every linked-room transaction boundary and a
+  configurable retention policy for saved participant positions.
 
 ## Consumer-library Priority 0 — current structural blockers
 

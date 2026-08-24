@@ -115,12 +115,15 @@ The heartbeat is the real health signal. A visibility event is a hint, because a
 crashed tab sends no event.
 
 An active host migration resumes the checkpoint tick and checkpointed behavior
-state without emitting `room.wake`. The promoted peer seeds avatars from the
-last canonical keyframe/delta positions it received. Periodic active checkpoints
-carry behavior timers as elapsed and remaining ticks, allowing a replacement
-host to rebuild them against the resumed canonical tick. A true sleeping-room
-wake is marked separately, contains no active timers, and emits `room.wake` so
-transient workflows reset.
+state without emitting `room.wake`. The server continuously caches validated
+avatar positions from canonical keyframes/deltas and includes them in JOIN and
+host-grant snapshots; active and final checkpoints persist those positions.
+Explicit named arrival spawns override a saved position, while an ordinary
+reconnect resumes it. Periodic active checkpoints carry behavior timers as
+elapsed and remaining ticks, allowing a replacement host to rebuild them
+against the resumed canonical tick. A true sleeping-room wake is marked
+separately, contains no active timers, and emits `room.wake` so transient
+workflows reset.
 
 ## Durable versus canonical
 

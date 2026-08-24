@@ -58,7 +58,7 @@ same simulation in the test process.
 | Remote snapshot buffer with interpolation and extrapolation | Done. `interpolation-buffer.ts`, 100 ms delay, capped extrapolation. |
 | Periodic full keyframes | Done at 2 Hz. |
 | Host yield on a visibility or health signal | Done. The client yields when the page is hidden. |
-| Timeout election and full-state restart on a new host | Done and tested. The replacement resumes the checkpoint tick, behavior phase, visual, active behavior timers, and last canonical avatar positions. |
+| Timeout election and full-state restart on a new host | Done and tested. The replacement resumes the checkpoint tick, behavior phase, visual, active behavior timers, and server-cached canonical avatar positions. |
 | Exit criterion: closing the host resumes the room with no reload | Verified in the real-process client test and manually in two browser clients, including stationary avatars and checkpointed item placement. |
 
 ## Phase 4 — Ownership, durable editing, and persistence: mostly complete
@@ -71,6 +71,7 @@ same simulation in the test process.
 | Accept 1 Hz host checkpoints | Done, with validation of bounds, item count, and revision order. |
 | Sleeping-room normalization and zero motion | Done. A graceful last host normalizes behavior state and stops timers before its final checkpoint. After abrupt loss, the server preserves the newest periodic checkpoint as explicitly unnormalized. |
 | First-join wake path | Done and tested. |
+| Avatar position rejoin | Done. Validated live state seeds immediate same-process rejoins, checkpoints persist positions across sleep/restart, and explicit travel arrival spawns take precedence. |
 | Exit criterion: rearrange only your own items, leave, return, see the same placement | Met. The demo's explicit edit mode hit-tests only owned items, draws a local gold drag ghost/selection ring, relays bounded previews, and commits on release. Verified through the real service in the in-app browser by dragging a crate, leaving, and rejoining at the committed placement. |
 
 ## Phase 5 — Advanced interaction primitives: partly complete

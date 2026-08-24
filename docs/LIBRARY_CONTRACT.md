@@ -46,7 +46,8 @@ interpolated entities actually drawn. `projectWorldPoint` handles fixed product
 anchors. Neither exposes Pixi or mutable camera state. See
 `docs/OVERLAY_PROJECTION.md`.
 
-`subscribeLifecycle`, `start`, `whenReady`, `stop`, and `stopGracefully` define
+`subscribeLifecycle`, `start`, `whenReady`, `whenPresented`, `stop`, and
+`stopGracefully` define
 route ownership, backgrounding, reconnect, and terminal teardown. Consumer
 failures use `CanvasConsumerError`, not string parsing. See
 `docs/RUNTIME_LIFECYCLE.md`.

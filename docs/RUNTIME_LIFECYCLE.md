@@ -23,7 +23,10 @@ listeners, and transports from being revived into partially initialized state.
 publishes each transition. Concurrent `start()` calls return the same promise.
 `start()` resolves when the transport has opened and JOIN has been sent;
 `whenReady()` resolves after JOIN and consumer initialization, including a
-`CanvasRuntime` scene mount. Starting a stopped or failed instance rejects.
+`CanvasRuntime` scene mount. `whenPresented()` additionally waits for presence,
+a canonical frame, every durable snapshot item, and every connected avatar to
+be represented. Use that stronger gate before revealing a staged room. Starting
+a stopped or failed instance rejects.
 
 Reconnect is automatic on the same instance. It moves through `reconnecting`
 and `joining`, obtains a new ephemeral connection ID, then returns to `active`
@@ -46,7 +49,7 @@ Every application-facing failure is a `CanvasConsumerError` with:
 - `message`: human-readable diagnostic text, not an application contract;
 - optional `details` and original `cause`.
 
-Fatal errors reject `start()` or `whenReady()`, enter `failed`, and release the
+Fatal errors reject `start()`, `whenReady()`, or `whenPresented()`, enter `failed`, and release the
 worker and transport. Recoverable simulation and durable-command errors are
 reported through `onError` without terminating the session. Required asset
 preload failures reject `CanvasRuntime.start()` before a room connection opens.
@@ -56,4 +59,3 @@ The current stable codes are `invalid_lifecycle_state`, `start_cancelled`,
 `transport_closed`, `server_rejected`, `join_initialization_failed`,
 `simulation_failed`, `durable_command_rejected`, and `asset_preload_failed`.
 Consumers should branch on `code` and `recoverable`, never parse `message`.
-

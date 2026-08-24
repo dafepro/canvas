@@ -203,9 +203,13 @@ export const enterCanvasRoute = async () => {
   });
   await runtime.start();
   await runtime.whenReady();
+  await runtime.whenPresented();
   return runtime;
 };
 ```
+
+`whenPresented()` is the reveal gate for staged UI: it waits until the room's
+durable items and connected avatars have appeared in canonical render state.
 
 The `@canvas-physics/client/runtime` subpath is deliberately loaded with
 `import()`. Product routes that never enter a canvas do not download Pixi,

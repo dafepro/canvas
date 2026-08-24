@@ -55,7 +55,10 @@ generic physics relay would make unrelated canvases mutually exclusive.
 | Same identity opens twice in one room | New connection wins once; old session fails terminally; no reconnect duel | Go room test and real-WebSocket client test |
 | Same identity stages another room | Both room-scoped connections may coexist until origin close | Go cross-room overlap test and linked-room E2E |
 | Peer travels away and returns while host remains | Host lease stays with host; peer avatar and input resume; both retain the system door | Linked-room real-server E2E |
-| Reload after returning | URL selects the committed room; avatar rejoins; door and host state remain visible | Route-state test and linked-room real-server E2E |
+| Reload after returning | URL selects the committed room; avatar resumes its latest server-known position; door, peers, and host state are present before reveal | Route-state test, Go live-position rejoin test, and linked-room real-server E2E |
+| Destination JOIN arrives before its first complete frame | Keep the origin visible until presence, durable items, and connected avatars are in canonical presentation state | Runtime presentation-gate tests and linked-room E2E |
+| Same-room tab supersedes this one | Stop this runtime, block and blur its room UI, explain the duplicate, and offer an explicit takeover | Go/client supersession tests and integration UI contract test |
+| Saved position conflicts with a door arrival | Explicit `arrivalSpawnPointId` wins; plain refresh uses saved canonical position | Linked-room round-trip/reload E2E |
 | Host grant races physics initialization | Newest role and durable snapshot win; checkpoint revision advances instead of restarting | Simulation-kernel race regression |
 | Host leaves during/after travel | Replacement host rebuilds from the latest durable snapshot and system items | Relay migration suite and kernel race regression |
 | Destination auth, JOIN, assets, or mount fails | Staged destination closes; origin stays active | Navigator rollback tests |
@@ -67,11 +70,24 @@ generic physics relay would make unrelated canvases mutually exclusive.
 | Origin graceful close times out or throws | Destination remains current; failure is reported | Navigator post-commit close handling |
 | Portal contact begins at sprite edge | No travel request until avatar centre reaches the visual midpoint | Real Rapier contact test |
 
-## Remaining production extension
+## Remaining hardening, in priority order
 
-An optional conformance contract for a product-owned global participant-location
-lease remains useful for RPGs and other single-location worlds. It should issue
-room-scoped travel credentials, make destination commit idempotent, expire
-abandoned origin leases, and expose a resume location for a new device. It must
-remain outside the core room relay so independent canvases can still be open by
-the same account when a product permits it.
+0. **Global-location conformance adapter.** Define an optional product-owned
+   participant-location lease for RPGs and other single-location worlds. It
+   should issue room-scoped travel credentials, make destination commit
+   idempotent, expire abandoned origin leases, and expose a resume location for
+   a new device. It remains outside the generic room relay.
+1. **Multi-process room ownership.** Document and test a shared coordinator for
+   host leases, live avatar-position cache, and room ownership before claiming
+   horizontally scaled rooms. The reference service currently owns each active
+   room in one process.
+2. **Crash-boundary fault injection.** Automate browser/process failure at each
+   numbered transition boundary, including a destination that joined but never
+   committed, an origin that dies after commit, and reload during URL commit.
+3. **Avatar-position retention policy.** Add a host-configurable TTL or roster
+   hook so long-lived public rooms do not retain every historical participant
+   position forever. The current room lifetime cache favors correct resume.
+4. **Travel observability.** Add transition IDs and timings for staged open,
+   presentation ready, commit, rollback, supersession, and origin close.
+5. **Optional presentation polish.** Prefetch known destination assets and add a
+   consumer-controlled crossfade; neither changes the travel transaction.
