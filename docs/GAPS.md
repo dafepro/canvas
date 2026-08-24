@@ -100,8 +100,8 @@ work below because they determine the public boundary every consumer will use.
     representative application behavior, listener cleanup, and quiet stop.
 - [x] Exercise packed release artifacts from separate fixture applications,
   including both reference integrations and their custom worker bundles.
-- [ ] Complete latency, loss, reordering, reconnect, migration, late-join, and
-  mobile backgrounding coverage.
+- [x] Complete latency, loss, reordering, reconnect, migration, late-join, and
+  lifecycle-driven backgrounding coverage.
   - [x] Deterministic inbound/outbound realtime loss with keyframe repair.
   - [x] Real-process convergence at 50, 100, and 200 ms one-way inbound latency
     while every second realtime packet is reordered.
@@ -109,7 +109,9 @@ work below because they determine the public boundary every consumer will use.
     and mid-workflow late-join cases.
   - [x] Combine reconnect and moving/workflow host migration with injected
     latency and reordering.
-  - [ ] Add a browser-driven background/resume case under injected faults.
+  - [x] Add a background/reconnect/resume case under injected faults. JOIN now
+    carries hidden state so a suspended client cannot briefly win the host lease
+    while reconnecting.
 - [ ] Record physical-device resource profiles and enforce measured budgets.
 - [x] Add reproducible Windows/Linux release CI with generated-code verification.
   Both operating systems build and test the library, Linux additionally runs Go
@@ -191,10 +193,10 @@ work below because they determine the public boundary every consumer will use.
   is enforced by the consumer-library Priority 1 packed-build contract above.
 - [ ] Finish elevation rendering and behavior: scale, shadows, and
   elevation-dependent ground collision participation.
-- [ ] Complete multiplayer coverage for multi-avatar pushing and mobile
-  backgrounding. Faulted reconnect and moving/workflow host migration, plus
-  deterministic packet reordering and 50/100/200 ms latency tiers, are covered
-  above.
+- [ ] Complete physical mobile-browser backgrounding coverage. Faulted
+  background/reconnect/resume, simultaneous multi-avatar pushing, faulted
+  reconnect and moving/workflow host migration, plus deterministic packet
+  reordering and 50/100/200 ms latency tiers, are covered above.
 - [ ] Evaluate optional WebRTC only after quantization and relay measurements;
   keep it behind `RoomTransport`.
 
@@ -206,7 +208,8 @@ work below because they determine the public boundary every consumer will use.
 - [x] Connect `startAnimation` to the renderer/network path, including replaying
   the same named animation through a synchronized animation epoch.
 - [x] Correct peer item counts.
-- [ ] Correct host-migration diagnostics.
+- [x] Correct host-migration diagnostics. Both observers and the client promoted
+  to replacement host count the migration and retain the server's reason.
 - [ ] Add collision, network, environment, and behavior visual laboratories.
 - [x] Make the integration harness use the correct executable name on Windows.
 - [x] Add Windows/Linux CI. Publishable package exports and generated bindings

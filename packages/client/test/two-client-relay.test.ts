@@ -276,6 +276,10 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     const beforeMigration = entity(alice, bobAvatar)!;
     alice.stop();
     await waitFor("bob to become host", () => bob.client.isHost);
+    expect(bob.diagnostics()).toMatchObject({
+      hostMigrations: 1,
+      lastMigrationReason: "host_disconnected",
+    });
     await waitFor(
       "bob's avatar to keep its canonical position through migration",
       () => {

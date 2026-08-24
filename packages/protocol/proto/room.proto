@@ -43,6 +43,8 @@ message Join {
   uint32 protocol_version = 2;
   // Item definition ids and versions the client already has.
   repeated DefinitionVersion definitions = 5;
+  // A hidden client rejoins as ineligible instead of briefly winning a lease.
+  bool page_hidden = 6;
 }
 
 message DefinitionVersion {

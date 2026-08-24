@@ -480,6 +480,38 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("accepts simultaneous pushes from two participant avatars", () => {
+    const simulation = build();
+    simulation.addItem(instance("shared-ball", ballDefinition as ItemDefinition, 50, 65));
+    simulation.addAvatar({
+      entityId: "avatar:alice",
+      clientId: "alice",
+      userId: "alice",
+      position: { x: 42, y: 65 },
+    });
+    simulation.addAvatar({
+      entityId: "avatar:bob",
+      clientId: "bob",
+      userId: "bob",
+      position: { x: 58, y: 65 },
+    });
+    simulation.world.setAvatarInput("avatar:alice", { x: 1, y: 0 }, 1, 1);
+    simulation.world.setAvatarInput("avatar:bob", { x: -1, y: 0 }, 1, 1);
+
+    for (let i = 0; i < 180; i++) simulation.step();
+
+    const state = simulation.behaviors.slot("shared-ball")!.state as {
+      cooldownUntil: [string, number][];
+      kickCount: number;
+    };
+    expect(state.kickCount).toBeGreaterThanOrEqual(2);
+    expect(state.cooldownUntil.map(([entityId]) => entityId)).toEqual([
+      "avatar:alice",
+      "avatar:bob",
+    ]);
+    simulation.free();
+  });
+
   // Spec 20. A body pushed into terrain must not stay there.
   it("frees a body that a teleport left inside the ground", () => {
     const simulation = build();

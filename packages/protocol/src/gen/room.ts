@@ -177,6 +177,8 @@ export interface Join {
   protocolVersion: number;
   /** Item definition ids and versions the client already has. */
   definitions: DefinitionVersion[];
+  /** A hidden client rejoins as ineligible instead of briefly winning a lease. */
+  pageHidden: boolean;
 }
 
 export interface DefinitionVersion {
@@ -880,7 +882,7 @@ export const Vec2: MessageFns<Vec2> = {
 };
 
 function createBaseJoin(): Join {
-  return { roomId: "", protocolVersion: 0, definitions: [] };
+  return { roomId: "", protocolVersion: 0, definitions: [], pageHidden: false };
 }
 
 export const Join: MessageFns<Join> = {
@@ -893,6 +895,9 @@ export const Join: MessageFns<Join> = {
     }
     for (const v of message.definitions) {
       DefinitionVersion.encode(v!, writer.uint32(42).fork()).join();
+    }
+    if (message.pageHidden !== false) {
+      writer.uint32(48).bool(message.pageHidden);
     }
     return writer;
   },
@@ -934,6 +939,14 @@ export const Join: MessageFns<Join> = {
             message.definitions.push(DefinitionVersion.decode(reader, reader.uint32()));
             continue;
           }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.pageHidden = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -961,6 +974,11 @@ export const Join: MessageFns<Join> = {
       definitions: globalThis.Array.isArray(object?.definitions)
         ? object.definitions.map((e: any) => DefinitionVersion.fromJSON(e))
         : [],
+      pageHidden: isSet(object.pageHidden)
+        ? globalThis.Boolean(object.pageHidden)
+        : isSet(object.page_hidden)
+        ? globalThis.Boolean(object.page_hidden)
+        : false,
     };
   },
 
@@ -975,6 +993,9 @@ export const Join: MessageFns<Join> = {
     if (message.definitions?.length) {
       obj.definitions = message.definitions.map((e) => DefinitionVersion.toJSON(e));
     }
+    if (message.pageHidden !== false) {
+      obj.pageHidden = message.pageHidden;
+    }
     return obj;
   },
 
@@ -986,6 +1007,7 @@ export const Join: MessageFns<Join> = {
     message.roomId = object.roomId ?? "";
     message.protocolVersion = object.protocolVersion ?? 0;
     message.definitions = object.definitions?.map((e) => DefinitionVersion.fromPartial(e)) || [];
+    message.pageHidden = object.pageHidden ?? false;
     return message;
   },
 };

@@ -86,6 +86,8 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := newClient(newClientID(), identity, sendQueueDepth)
+	client.pageVisible = !join.PageHidden
+	client.hostEligible = !join.PageHidden
 	client.definitions = make(map[string]uint32, len(join.Definitions))
 	for _, definition := range join.Definitions {
 		client.definitions[definition.DefinitionId] = definition.Version

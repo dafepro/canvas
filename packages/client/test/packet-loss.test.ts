@@ -326,6 +326,75 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     expect(faults.reorderedIn).toBeGreaterThan(0);
   }, 120_000);
 
+  it("reconnects in the background without reclaiming the host lease", async () => {
+    let returningIntent: InputIntent = STILL;
+    const faults = new FaultInjectingWebSocketTransport({
+      credentialProvider: async () => devRealtimeCredential("background-host"),
+      backoffMs: [20],
+      faults: {
+        inboundDelayMs: 100,
+        reorderEvery: 2,
+        reorderDelayMs: 180,
+      },
+    });
+    const backgrounded = session("background-host", () => returningIntent, faults);
+    let backgroundHostEligible: boolean | undefined;
+    backgrounded.subscribePresence(({ participants }) => {
+      backgroundHostEligible = participants.find(
+        ({ participantId }) => participantId === "background-host",
+      )?.hostEligible;
+    });
+    await backgrounded.start();
+    await waitFor(
+      "the background test host lease",
+      () => backgrounded.client.isHost && backgrounded.tick > 60,
+    );
+
+    const foreground = session("background-peer");
+    await foreground.start();
+    await waitFor("the foreground peer to join", () => foreground.client.clientId !== "");
+
+    const oldClientId = backgrounded.client.clientId;
+    backgrounded.setPageVisible(false);
+    expect(backgrounded.lifecycleState).toBe("backgrounded");
+    expect(faults.interrupt()).toBe(true);
+
+    await waitFor(
+      "the foreground peer to replace the hidden host",
+      () => foreground.client.isHost,
+      30_000,
+    );
+    await waitFor(
+      "the hidden client to reconnect without a host lease",
+      () =>
+        backgrounded.client.clientId !== oldClientId &&
+        faults.status === "open" &&
+        backgrounded.lifecycleState === "backgrounded" &&
+        backgroundHostEligible === false &&
+        !backgrounded.client.isHost,
+      30_000,
+    );
+
+    backgrounded.setPageVisible(true);
+    expect(backgrounded.lifecycleState).toBe("active");
+    const returningAvatarId = avatarEntityId("background-host");
+    await waitFor(
+      "the replacement host to restore the returning avatar",
+      () => entity(foreground, returningAvatarId) !== undefined,
+      30_000,
+    );
+    const startX = entity(foreground, returningAvatarId)!.x;
+    returningIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true };
+    await waitFor(
+      "the resumed peer to move under delayed and reordered state",
+      () =>
+        (entity(foreground, returningAvatarId)?.x ?? startX) > startX + 2 &&
+        faults.reorderedIn > 0,
+      30_000,
+    );
+    returningIntent = STILL;
+  }, 120_000);
+
   // Spec 11.1. A reconnect gives the client a new id. A client that held the
   // lease before the break must not keep publishing state.
   it("drops the host role when a reconnect finds another host", async () => {

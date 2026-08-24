@@ -39,7 +39,7 @@ export interface RoomClientEvents {
   joined(result: RoomJoinResult): void;
   presence(peers: Peer[]): void;
   /** This client is now the simulation host. */
-  hostGranted(epoch: number, snapshot: CanvasSnapshot | undefined): void;
+  hostGranted(epoch: number, snapshot: CanvasSnapshot | undefined, reason: string): void;
   /** Another client is the host, or this client lost the lease. */
   hostChanged(epoch: number, hostClientId: string, reason: string): void;
   fullState(state: FullState, epoch: number, tick: number): void;
@@ -139,6 +139,7 @@ export class RoomClient {
           roomId: this.joinDescriptor.roomId,
           protocolVersion: PROTOCOL_VERSION,
           definitions: this.definitions,
+          pageHidden: !this.health.pageVisible,
         },
       }),
     );
@@ -422,6 +423,7 @@ export class RoomClient {
         "hostGranted",
         control.hostEpoch,
         fromJsonBytes<CanvasSnapshot>(control.snapshotJson),
+        control.reason,
       );
       return;
     }

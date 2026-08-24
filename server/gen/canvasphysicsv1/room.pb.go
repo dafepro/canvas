@@ -504,7 +504,9 @@ type Join struct {
 	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
 	ProtocolVersion uint32                 `protobuf:"varint,2,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
 	// Item definition ids and versions the client already has.
-	Definitions   []*DefinitionVersion `protobuf:"bytes,5,rep,name=definitions,proto3" json:"definitions,omitempty"`
+	Definitions []*DefinitionVersion `protobuf:"bytes,5,rep,name=definitions,proto3" json:"definitions,omitempty"`
+	// A hidden client rejoins as ineligible instead of briefly winning a lease.
+	PageHidden    bool `protobuf:"varint,6,opt,name=page_hidden,json=pageHidden,proto3" json:"page_hidden,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -558,6 +560,13 @@ func (x *Join) GetDefinitions() []*DefinitionVersion {
 		return x.Definitions
 	}
 	return nil
+}
+
+func (x *Join) GetPageHidden() bool {
+	if x != nil {
+		return x.PageHidden
+	}
+	return false
 }
 
 type DefinitionVersion struct {
@@ -2049,11 +2058,13 @@ const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"\apayload\"\"\n" +
 	"\x04Vec2\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\x02 \x01(\x02R\x01y\"\x91\x01\n" +
+	"\x01y\x18\x02 \x01(\x02R\x01y\"\xb2\x01\n" +
 	"\x04Join\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12)\n" +
 	"\x10protocol_version\x18\x02 \x01(\rR\x0fprotocolVersion\x12E\n" +
-	"\vdefinitions\x18\x05 \x03(\v2#.canvasphysics.v1.DefinitionVersionR\vdefinitions\"R\n" +
+	"\vdefinitions\x18\x05 \x03(\v2#.canvasphysics.v1.DefinitionVersionR\vdefinitions\x12\x1f\n" +
+	"\vpage_hidden\x18\x06 \x01(\bR\n" +
+	"pageHidden\"R\n" +
 	"\x11DefinitionVersion\x12#\n" +
 	"\rdefinition_id\x18\x01 \x01(\tR\fdefinitionId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\rR\aversion\"\x94\x03\n" +

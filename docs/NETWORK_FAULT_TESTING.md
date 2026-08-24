@@ -65,9 +65,11 @@ and real WebSockets. The current matrix proves:
 - a reconnecting client does not retain a stale host role;
 - an active replacement host preserves a moving avatar and completes a
   checkpointed timer workflow after receiving the old host's state through the
-  same latency and reordering profile.
+  same latency and reordering profile;
+- a backgrounded client reconnects with a fresh identity while remaining
+  ineligible to host, then resumes movement under delayed and reordered state.
 
 Separate real-process tests cover active host replacement, checkpointed item
 and avatar restoration, timer-driven workflow continuation, sleeping-room
-restart, and mid-workflow late joining. A browser-driven background/resume case
-under injected faults remains an explicit backlog item in `GAPS.md`.
+restart, and mid-workflow late joining. Physical mobile-browser profiling still
+remains an explicit backlog item in `GAPS.md`.

@@ -195,7 +195,7 @@ func (c *testClient) sendJoin(definitions ...*pb.DefinitionVersion) {
 		RoomId: c.roomID,
 		Payload: &pb.RoomEnvelope_Join{Join: &pb.Join{
 			RoomId:          c.roomID,
-			ProtocolVersion: 7,
+			ProtocolVersion: 8,
 			Definitions:     definitions,
 		}},
 	})
@@ -1726,8 +1726,8 @@ func TestProtocolMismatchIsRefused(t *testing.T) {
 	if got.Code != "protocol_mismatch" {
 		t.Errorf("error code = %q, want protocol_mismatch", got.Code)
 	}
-	if got.ServerProtocolVersion != 7 {
-		t.Errorf("server protocol version = %d, want 7", got.ServerProtocolVersion)
+	if got.ServerProtocolVersion != 8 {
+		t.Errorf("server protocol version = %d, want 8", got.ServerProtocolVersion)
 	}
 }
 

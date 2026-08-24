@@ -568,7 +568,11 @@ export class RoomSession {
       }
     });
 
-    this.client.on("hostGranted", (_epoch, snapshot) => {
+    this.client.on("hostGranted", (_epoch, snapshot, reason) => {
+      if (reason && reason !== "first_join") {
+        this.hostMigrations++;
+        this.lastMigrationReason = reason;
+      }
       this.buffer.reset();
       this.reconciler.reset();
       this.driver.send({
