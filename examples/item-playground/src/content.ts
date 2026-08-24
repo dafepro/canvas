@@ -16,6 +16,10 @@ import {
   blackHoleFieldConfig,
   type ForceFieldConfig,
 } from "./force-field-behavior.js";
+import {
+  defaultGraffitiConfig,
+  type GraffitiConfig,
+} from "./graffiti-behavior.js";
 
 const durableFixed = {
   body: { mode: "fixed" as const, gravityScale: 0, lockRotation: true },
@@ -305,6 +309,24 @@ export const blackHoleDefinition: ItemDefinition<ForceFieldConfig> = {
   complexity: "simple",
 };
 
+export const graffitiDefinition: ItemDefinition<GraffitiConfig> = {
+  definitionId: "graffiti-text",
+  version: 1,
+  displayName: "Custom graffiti",
+  visual: {
+    spriteId: "playground.graffiti.anchor",
+    size: { width: 11, height: 6.5 },
+    placeholder: { shape: "rect", color: 0x71829b },
+    zIndex: 4,
+  },
+  body: { mode: "fixed", gravityScale: 0, lockRotation: true },
+  colliders: [],
+  behaviorType: "playground.graffiti",
+  defaultConfig: defaultGraffitiConfig,
+  persistence: { transform: true, behaviorState: true, onRoomSleep: "pause" },
+  complexity: "simple",
+};
+
 export const playgroundDefinitions: ItemDefinition[] = [
   partyEmojiDefinition,
   photoCardDefinition,
@@ -315,5 +337,6 @@ export const playgroundDefinitions: ItemDefinition[] = [
   pairedPortalDefinition as ItemDefinition,
   antigravityFieldDefinition as ItemDefinition,
   blackHoleDefinition as ItemDefinition,
+  graffitiDefinition as ItemDefinition,
   playgroundAvatarDefinition,
 ];

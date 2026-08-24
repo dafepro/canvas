@@ -50,10 +50,15 @@ interaction behavior while importing only published Canvas package exports.
     directional or softened inverse-square acceleration to overlapping dynamic
     items. The proof ball now preserves added momentum, damps excess speed, and
     only restores energy below its configured minimum.
+12. [x] **Configurable graffiti overlay.** A collider-free canonical item stores
+    owner-authorized multiline text, one of four visual treatments, letter size,
+    paint, and accent colors. The consumer safely renders the replicated state on
+    Canvas's smooth public overlay projection, so it remains aligned during live
+    manipulation without making a product font system part of the engine.
 
 ## Next slice
 
-12. [ ] **Configurable behavior playback.** Add an editable example item whose
+13. [ ] **Configurable behavior playback.** Add an editable example item whose
     durable config chooses an automatic trigger policy (such as avatar contact,
     timer, or collision) and playback settings (once/loop and speed). Add
     private Play/Restart controls after Canvas exposes an owner-authorized
@@ -70,5 +75,7 @@ interaction behavior while importing only published Canvas package exports.
   entirely local.
 - Pictures are bundled. Durable uploads require product-owned storage and are
   not implied by the Canvas room service.
-- Emoji use a consumer texture so rendering is deterministic across clients;
-  live text would require a separate font/text asset contract.
+- Emoji use a consumer texture so rendering is deterministic across clients.
+  This demo's live text deliberately uses the public DOM overlay projection and
+  system font stacks. Engine-native text beneath sprites would still require a
+  separate deterministic font/text asset contract.

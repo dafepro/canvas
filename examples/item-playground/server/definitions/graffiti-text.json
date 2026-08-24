@@ -1,0 +1,35 @@
+{
+  "definitionId": "graffiti-text",
+  "version": 1,
+  "displayName": "Custom graffiti",
+  "visual": {
+    "spriteId": "playground.graffiti.anchor",
+    "size": { "width": 11, "height": 6.5 },
+    "placeholder": { "shape": "rect", "color": 7439003 },
+    "zIndex": 4
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [],
+  "behaviorType": "playground.graffiti",
+  "defaultConfig": {
+    "text": "MAKE\nSOMETHING",
+    "style": "bubble",
+    "size": "large",
+    "color": "#ffe45c",
+    "accentColor": "#713bdb"
+  },
+  "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "text": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "style": { "type": "string", "enum": ["bubble", "wild", "marker", "neon"] },
+      "size": { "type": "string", "enum": ["small", "medium", "large", "huge"] },
+      "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+      "accentColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+    },
+    "required": ["text", "style", "size", "color", "accentColor"],
+    "additionalProperties": false
+  }
+}

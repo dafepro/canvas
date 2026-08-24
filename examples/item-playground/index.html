@@ -40,6 +40,7 @@
                 <button data-spawn="paired-portal"><b>⬌</b><span>Portal pair</span></button>
                 <button data-spawn="antigravity-field"><b>↑</b><span>Antigravity</span></button>
                 <button data-spawn="black-hole"><b>◉</b><span>Black hole</span></button>
+                <button data-spawn="graffiti-text"><b class="graffiti-swatch">Aa</b><span>Graffiti</span></button>
               </div>
             </section>
 
@@ -55,6 +56,7 @@
             </section>
           </div>
 
+          <div id="graffiti-layer" class="graffiti-layer" aria-hidden="true"></div>
           <div id="ownership-layer" class="ownership-layer" aria-hidden="true"></div>
           <div id="edit-toolbar" class="edit-toolbar" hidden>
             <div class="scale-tools">
@@ -75,6 +77,31 @@
                     <label class="custom-color" title="Custom color">
                       <input id="custom-color-picker" type="color" value="#4f7cff" aria-label="Choose custom color" />
                     </label>
+                  </div>
+                  <div id="graffiti-tools" class="graffiti-tools" hidden>
+                    <label class="graffiti-copy">
+                      <span>Text</span>
+                      <textarea id="graffiti-text" rows="3" maxlength="120" aria-label="Graffiti text"></textarea>
+                    </label>
+                    <fieldset class="graffiti-choice">
+                      <legend>Type</legend>
+                      <button type="button" data-graffiti-style="bubble">Bubble</button>
+                      <button type="button" data-graffiti-style="wild">Wild</button>
+                      <button type="button" data-graffiti-style="marker">Marker</button>
+                      <button type="button" data-graffiti-style="neon">Neon</button>
+                    </fieldset>
+                    <fieldset class="graffiti-choice graffiti-sizes">
+                      <legend>Letter size</legend>
+                      <button type="button" data-graffiti-size="small">S</button>
+                      <button type="button" data-graffiti-size="medium">M</button>
+                      <button type="button" data-graffiti-size="large">L</button>
+                      <button type="button" data-graffiti-size="huge">XL</button>
+                    </fieldset>
+                    <div class="graffiti-colors">
+                      <label>Paint <input id="graffiti-color" type="color" value="#ffe45c" aria-label="Graffiti paint color" /></label>
+                      <label>Accent <input id="graffiti-accent" type="color" value="#713bdb" aria-label="Graffiti accent color" /></label>
+                    </div>
+                    <button id="apply-graffiti" class="graffiti-apply" type="button">Apply lettering</button>
                   </div>
                   <button id="isolate" class="menu-action" aria-label="Freeze object" title="Hold this item in place and pause behavior and timers while keeping its collisions"><b>❄</b><span>Freeze object</span></button>
                   <button id="collisions" class="menu-action" aria-label="Disable collisions" title="Keep the item live but let other entities pass through"><b>◉</b><span>Disable collisions</span></button>

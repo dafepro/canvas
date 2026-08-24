@@ -6,6 +6,13 @@ import type {
 import type { RenderEntity } from "@canvas-physics/client";
 import { playgroundAssets } from "./assets.js";
 import { playgroundDefinitions } from "./content.js";
+import {
+  defaultGraffitiConfig,
+  type GraffitiConfig,
+  type GraffitiSize,
+  type GraffitiState,
+  type GraffitiStyle,
+} from "./graffiti-behavior.js";
 import type { OrbTheme } from "./reactive-orb-behavior.js";
 import "./style.css";
 
@@ -21,9 +28,15 @@ const manageToggle = document.querySelector<HTMLButtonElement>("#manage-toggle")
 const spawnPopover = document.querySelector<HTMLElement>("#spawn-popover")!;
 const managePopover = document.querySelector<HTMLElement>("#manage-popover")!;
 const ownedList = document.querySelector<HTMLElement>("#owned-list")!;
+const graffitiLayer = document.querySelector<HTMLElement>("#graffiti-layer")!;
 const ownershipLayer = document.querySelector<HTMLElement>("#ownership-layer")!;
 const editToolbar = document.querySelector<HTMLElement>("#edit-toolbar")!;
 const colorTools = document.querySelector<HTMLElement>("#color-tools")!;
+const graffitiTools = document.querySelector<HTMLElement>("#graffiti-tools")!;
+const graffitiText = document.querySelector<HTMLTextAreaElement>("#graffiti-text")!;
+const graffitiColor = document.querySelector<HTMLInputElement>("#graffiti-color")!;
+const graffitiAccent = document.querySelector<HTMLInputElement>("#graffiti-accent")!;
+const applyGraffiti = document.querySelector<HTMLButtonElement>("#apply-graffiti")!;
 const moreToggle = document.querySelector<HTMLButtonElement>("#more-toggle")!;
 const moreMenu = document.querySelector<HTMLElement>("#more-menu")!;
 const finishEdit = document.querySelector<HTMLButtonElement>("#finish-edit")!;
@@ -42,6 +55,12 @@ const paletteButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-s
 const highlightButtons = [
   ...document.querySelectorAll<HTMLButtonElement>("[data-highlight]"),
 ];
+const graffitiStyleButtons = [
+  ...document.querySelectorAll<HTMLButtonElement>("[data-graffiti-style]"),
+];
+const graffitiSizeButtons = [
+  ...document.querySelectorAll<HTMLButtonElement>("[data-graffiti-size]"),
+];
 
 userInput.value = params.get("user") ?? `maker-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -54,6 +73,7 @@ let selectedEntityId: string | undefined;
 let pendingAfterRevision: number | undefined;
 let spawnCursor = 0;
 let lastManageSignature = "";
+let graffitiDraft: GraffitiConfig = { ...defaultGraffitiConfig };
 stage.dataset.ownedStyle = "aurora";
 
 const definitionById = new Map(
@@ -68,6 +88,7 @@ const featureSpawnPositions = new Map([
   ["paired-portal", { x: 18, y: 12 }],
   ["antigravity-field", { x: 9, y: 12 }],
   ["black-hole", { x: 27, y: 12 }],
+  ["graffiti-text", { x: 18, y: 6 }],
 ]);
 
 const selectedEntity = (): Readonly<RenderEntity> | undefined =>
@@ -75,6 +96,44 @@ const selectedEntity = (): Readonly<RenderEntity> | undefined =>
 
 const isOwned = (entity: Readonly<RenderEntity>): boolean =>
   entity.kind === "item" && entity.ownerUserId === userInput.value;
+
+const graffitiState = (
+  entity: Readonly<RenderEntity> | undefined,
+): GraffitiState["render"] | undefined =>
+  (entity?.behaviorState as GraffitiState | undefined)?.render;
+
+const renderGraffitiChoices = (): void => {
+  graffitiStyleButtons.forEach((button) =>
+    button.classList.toggle("active", button.dataset.graffitiStyle === graffitiDraft.style),
+  );
+  graffitiSizeButtons.forEach((button) =>
+    button.classList.toggle("active", button.dataset.graffitiSize === graffitiDraft.size),
+  );
+};
+
+const syncGraffitiControls = (): void => {
+  const entity = selectedEntity();
+  const isGraffiti = entity?.definitionId === "graffiti-text";
+  graffitiTools.hidden = !isGraffiti;
+  moreMenu.classList.toggle("graffiti-mode", isGraffiti);
+  collisionsButton.hidden = isGraffiti;
+  if (!isGraffiti) return;
+  const render = graffitiState(entity) ?? {
+    ...defaultGraffitiConfig,
+    fontSize: 1.35,
+  };
+  graffitiDraft = {
+    text: render.text,
+    style: render.style,
+    size: render.size,
+    color: render.color,
+    accentColor: render.accentColor,
+  };
+  graffitiText.value = graffitiDraft.text;
+  graffitiColor.value = graffitiDraft.color;
+  graffitiAccent.value = graffitiDraft.accentColor;
+  renderGraffitiChoices();
+};
 
 const closePopovers = (except?: HTMLElement): void => {
   for (const [button, panel] of [
@@ -164,7 +223,27 @@ const ensureOutline = (entityId: string): HTMLElement => {
   return outline;
 };
 
+const ensureGraffiti = (entityId: string): HTMLElement => {
+  let text = graffitiLayer.querySelector<HTMLElement>(
+    `[data-graffiti-id="${CSS.escape(entityId)}"]`,
+  );
+  if (!text) {
+    text = document.createElement("div");
+    text.className = "graffiti-text";
+    text.dataset.graffitiId = entityId;
+    graffitiLayer.append(text);
+  }
+  return text;
+};
+
 const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => {
+  const graffitiIds = new Set(
+    entities.filter(({ definitionId }) => definitionId === "graffiti-text").map(({ id }) => id),
+  );
+  graffitiLayer.querySelectorAll<HTMLElement>("[data-graffiti-id]").forEach((text) => {
+    if (!graffitiIds.has(text.dataset.graffitiId!)) text.remove();
+  });
+
   const ownedIds = new Set(entities.filter(isOwned).map(({ id }) => id));
   ownershipLayer.querySelectorAll<HTMLElement>("[data-outline-id]").forEach((outline) => {
     if (!ownedIds.has(outline.dataset.outlineId!)) outline.remove();
@@ -172,7 +251,23 @@ const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => 
 
   for (const projection of snapshot.entities) {
     const entity = entities.find(({ id }) => id === projection.entityId);
-    if (!entity || !isOwned(entity)) continue;
+    if (!entity) continue;
+    if (entity.definitionId === "graffiti-text") {
+      const render = graffitiState(entity);
+      if (render) {
+        const text = ensureGraffiti(entity.id);
+        text.textContent = render.text;
+        text.dataset.style = render.style;
+        text.style.left = `${projection.screen.x}px`;
+        text.style.top = `${projection.screen.y}px`;
+        text.style.fontSize = `${render.fontSize * snapshot.viewport.scale}px`;
+        text.style.color = render.color;
+        text.style.setProperty("--graffiti-accent", render.accentColor);
+        text.style.transform = `translate(-50%, -50%) rotate(${projection.rotation}rad) scale(${entity.scale ?? 1})`;
+        text.hidden = !projection.visible;
+      }
+    }
+    if (!isOwned(entity)) continue;
     const definition = definitionById.get(entity.definitionId);
     if (!definition) continue;
     const outline = ensureOutline(entity.id);
@@ -203,6 +298,9 @@ const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => 
   editToolbar.style.width = `${(definition?.visual.size.width ?? 3) * visualScale}px`;
   editToolbar.style.height = `${(definition?.visual.size.height ?? 3) * visualScale}px`;
   colorTools.hidden = !editableColors.has(entity.definitionId);
+  graffitiTools.hidden = entity.definitionId !== "graffiti-text";
+  moreMenu.classList.toggle("graffiti-mode", entity.definitionId === "graffiti-text");
+  collisionsButton.hidden = entity.definitionId === "graffiti-text";
   isolateButton.classList.toggle("active", entity.isolated === true);
   isolateButton.querySelector("b")!.textContent = entity.isolated ? "▶" : "❄";
   isolateButton.querySelector("span")!.textContent = entity.isolated
@@ -261,6 +359,7 @@ const join = async (): Promise<void> => {
       onEditSelectionChange: ({ selectedEntityId: id }) => {
         selectedEntityId = id;
         closeMoreMenu();
+        syncGraffitiControls();
         lastManageSignature = "";
         renderOwnedList();
       },
@@ -327,6 +426,7 @@ const leave = (): void => {
   entities = [];
   selectedEntityId = undefined;
   closeMoreMenu();
+  graffitiLayer.replaceChildren();
   ownershipLayer.replaceChildren();
   editToolbar.hidden = true;
   lastManageSignature = "";
@@ -454,6 +554,43 @@ customColorPicker.addEventListener("change", () => {
       theme: "custom",
       customColor: customColorPicker.value,
     }),
+  );
+});
+graffitiStyleButtons.forEach((button) =>
+  button.addEventListener("click", () => {
+    graffitiDraft.style = button.dataset.graffitiStyle as GraffitiStyle;
+    renderGraffitiChoices();
+  }),
+);
+graffitiSizeButtons.forEach((button) =>
+  button.addEventListener("click", () => {
+    graffitiDraft.size = button.dataset.graffitiSize as GraffitiSize;
+    renderGraffitiChoices();
+  }),
+);
+graffitiColor.addEventListener("input", () => {
+  graffitiDraft.color = graffitiColor.value;
+});
+graffitiAccent.addEventListener("input", () => {
+  graffitiDraft.accentColor = graffitiAccent.value;
+});
+applyGraffiti.addEventListener("click", () => {
+  const entity = selectedEntity();
+  if (!entity || entity.definitionId !== "graffiti-text") return;
+  const text = graffitiText.value.replaceAll("\r\n", "\n").slice(0, 120);
+  if (text.length === 0) {
+    actionStatus.textContent = "Graffiti needs at least one character";
+    actionStatus.dataset.kind = "rejected";
+    return;
+  }
+  graffitiDraft = {
+    ...graffitiDraft,
+    text,
+    color: graffitiColor.value,
+    accentColor: graffitiAccent.value,
+  };
+  requestMutation("Painting graffiti…", () =>
+    runtime!.setItemConfig(entity.id, graffitiDraft),
   );
 });
 deleteButton.addEventListener("click", () => {

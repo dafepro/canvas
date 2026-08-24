@@ -6,7 +6,7 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
-button, input { font: inherit; }
+button, input, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .4; }
 
@@ -97,6 +97,7 @@ button:hover:not(:disabled) { border-color: #536c8e; background: #f4f8fd; }
 .spawn-grid b { color: #7655c5; font-size: 22px; line-height: 1; }
 .spawn-grid span { font-size: 9px; font-weight: 750; }
 .rainbow { background: linear-gradient(90deg, #58daba, #ff7d72, #9d7bea); background-clip: text; color: transparent !important; }
+.graffiti-swatch { font-family: Impact, Haettenschweiler, sans-serif; font-style: italic; text-shadow: 2px 2px #ffe45c; transform: rotate(-6deg); }
 .owned-list { max-height: 210px; overflow: auto; display: grid; gap: 5px; }
 .owned-row { width: 100%; min-height: 40px; display: flex; justify-content: space-between; align-items: center; text-align: left; }
 .owned-row span { font-size: 10px; font-weight: 750; }
@@ -108,6 +109,48 @@ button:hover:not(:disabled) { border-color: #536c8e; background: #f4f8fd; }
 .highlight-picker button { min-height: 27px; padding: 4px 7px; border-radius: 999px; font-size: 8px; }
 .highlight-picker button.active { border-color: #5579ce; background: #e8efff; color: #3159ad; }
 
+.graffiti-layer { position: absolute; z-index: 6; inset: 0; overflow: hidden; border-radius: 16px; pointer-events: none; }
+.graffiti-text {
+  --graffiti-accent: #713bdb;
+  position: absolute;
+  max-width: none;
+  white-space: pre;
+  text-align: center;
+  transform-origin: center;
+  line-height: .82;
+  paint-order: stroke fill;
+  user-select: none;
+}
+.graffiti-text[data-style="bubble"] {
+  font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  font-weight: 950;
+  letter-spacing: -.06em;
+  -webkit-text-stroke: .12em var(--graffiti-accent);
+  text-shadow: 0 .12em 0 var(--graffiti-accent), 0 .18em .16em rgb(23 28 44 / 32%);
+}
+.graffiti-text[data-style="wild"] {
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+  -webkit-text-stroke: .075em var(--graffiti-accent);
+  text-shadow: .12em .1em 0 var(--graffiti-accent), .2em .18em .12em rgb(23 28 44 / 30%);
+}
+.graffiti-text[data-style="marker"] {
+  font-family: "Segoe Print", "Comic Sans MS", cursive;
+  font-weight: 900;
+  letter-spacing: -.035em;
+  -webkit-text-stroke: .045em var(--graffiti-accent);
+  text-shadow: .07em .08em 0 var(--graffiti-accent);
+}
+.graffiti-text[data-style="neon"] {
+  font-family: "Courier New", monospace;
+  font-weight: 900;
+  letter-spacing: .035em;
+  -webkit-text-stroke: .025em #fff;
+  text-shadow: 0 0 .07em #fff, 0 0 .18em var(--graffiti-accent), 0 0 .42em var(--graffiti-accent);
+}
 .ownership-layer { position: absolute; z-index: 8; inset: 0; overflow: visible; pointer-events: none; }
 .owned-outline { position: absolute; border-radius: 8px; }
 .owned-outline::before { content: ""; position: absolute; inset: -4px; border-radius: 10px; pointer-events: none; }
@@ -139,7 +182,7 @@ button:hover:not(:disabled) { border-color: #536c8e; background: #f4f8fd; }
   translate: -50% -50%;
   pointer-events: none;
 }
-.edit-toolbar[hidden], .color-tools[hidden], .more-menu[hidden], .popover[hidden] { display: none; }
+.edit-toolbar[hidden], .color-tools[hidden], .graffiti-tools[hidden], .menu-action[hidden], .more-menu[hidden], .popover[hidden] { display: none; }
 .edit-toolbar button { pointer-events: auto; }
 .scale-tools {
   position: absolute;
@@ -216,6 +259,7 @@ button:hover:not(:disabled) { border-color: #536c8e; background: #f4f8fd; }
   box-shadow: 0 12px 28px rgb(24 42 64 / 26%);
   pointer-events: auto;
 }
+.more-menu.graffiti-mode { width: 266px; }
 .color-tools { display: grid; grid-template-columns: 1fr repeat(4, 29px); align-items: center; gap: 4px; padding-bottom: 7px; border-bottom: 1px solid #d6deea; }
 .color-tools > span { color: #68778c; font-size: 9px; font-weight: 750; }
 .color-tools button { width: 28px; min-height: 28px; display: grid; place-items: center; padding: 0; border-radius: 7px; }
@@ -229,6 +273,19 @@ button:hover:not(:disabled) { border-color: #536c8e; background: #f4f8fd; }
 .custom-color input::-webkit-color-swatch-wrapper { padding: 0; }
 .custom-color input::-webkit-color-swatch { border: 0; border-radius: 50%; }
 .custom-color input::-moz-color-swatch { border: 0; border-radius: 50%; }
+.graffiti-tools { display: grid; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #d6deea; }
+.graffiti-copy { display: grid; gap: 4px; color: #68778c; font-size: 9px; font-weight: 800; }
+.graffiti-copy textarea { min-height: 64px; resize: vertical; padding: 7px; border: 1px solid #a4b3c7; border-radius: 8px; color: #172338; line-height: 1.2; }
+.graffiti-choice { min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0; padding: 0; border: 0; }
+.graffiti-choice legend { margin-bottom: 4px; padding: 0; color: #68778c; font-size: 9px; font-weight: 800; }
+.graffiti-choice button { min-width: 0; min-height: 28px; padding: 4px 3px; border-radius: 7px; font-size: 8px; font-weight: 800; }
+.graffiti-choice button.active { border-color: #604ac1; background: #ece7ff; color: #4f37a6; box-shadow: inset 0 0 0 1px #604ac1; }
+.graffiti-sizes button { font-size: 9px; }
+.graffiti-colors { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.graffiti-colors label { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 7px; border: 1px solid #d3dce8; border-radius: 8px; color: #68778c; font-size: 9px; font-weight: 800; }
+.graffiti-colors input { width: 28px; height: 24px; min-height: 0; padding: 1px; border-radius: 6px; cursor: pointer; }
+.graffiti-apply { min-height: 32px; border-color: #5940b3; background: #6550be; color: #fff; font-size: 9px; font-weight: 850; }
+.graffiti-apply:hover:not(:disabled) { border-color: #402c93; background: #513ba9; }
 .menu-action { width: 100%; min-height: 34px; display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 8px; font-size: 9px; font-weight: 750; }
 .menu-action b { width: 20px; font-size: 17px; }
 .menu-action.active { border-color: #5e46ba; background: #ece7ff; color: #4f37a6; }

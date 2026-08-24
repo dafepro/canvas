@@ -4,7 +4,7 @@ import type { AssetManifest } from "@canvas-physics/client";
 export const playgroundAssets: AssetManifest = {
   schemaVersion: 1,
   id: "item-playground",
-  revision: "2026-08-23.6",
+  revision: "2026-08-23.7",
   sources: [
     { id: "workbench-art", src: "/workbench.svg", required: true },
     { id: "emoji-art", src: "/assets/party-emoji.svg", required: true },
@@ -25,6 +25,7 @@ export const playgroundAssets: AssetManifest = {
     { id: "portal-pair-pulse-art", src: "/assets/portal-pair-pulse.svg", required: true },
     { id: "antigravity-field-art", src: "/assets/antigravity-field.svg", required: true },
     { id: "black-hole-art", src: "/assets/black-hole.svg", required: true },
+    { id: "graffiti-anchor-art", src: "/assets/graffiti-anchor.svg", required: true },
   ],
   textures: [
     { id: "playground.workbench", sourceId: "workbench-art" },
@@ -46,5 +47,6 @@ export const playgroundAssets: AssetManifest = {
     { id: "playground.portal.pairPulse", sourceId: "portal-pair-pulse-art" },
     { id: "playground.field.antigravity", sourceId: "antigravity-field-art" },
     { id: "playground.field.blackHole", sourceId: "black-hole-art" },
+    { id: "playground.graffiti.anchor", sourceId: "graffiti-anchor-art" },
   ],
 };

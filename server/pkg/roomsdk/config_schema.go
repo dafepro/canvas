@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"unicode/utf8"
 )
 
 var errConfigSchemaMismatch = errors.New("config does not match the item definition schema")
@@ -17,6 +19,11 @@ type configSchema struct {
 	Required             []string                `json:"required,omitempty"`
 	Items                *configSchema           `json:"items,omitempty"`
 	AdditionalProperties bool                    `json:"additionalProperties,omitempty"`
+	Enum                 []string                `json:"enum,omitempty"`
+	Const                *string                 `json:"const,omitempty"`
+	Pattern              string                  `json:"pattern,omitempty"`
+	MinLength            *int                    `json:"minLength,omitempty"`
+	MaxLength            *int                    `json:"maxLength,omitempty"`
 }
 
 func validateConfigJSON(schemaRaw, configRaw json.RawMessage) error {
@@ -81,8 +88,37 @@ func validateConfigValue(schema configSchema, value any) error {
 		}
 		return nil
 	case "string":
-		if _, ok := value.(string); !ok {
+		text, ok := value.(string)
+		if !ok {
 			return errConfigSchemaMismatch
+		}
+		length := utf8.RuneCountInString(text)
+		if schema.MinLength != nil && length < *schema.MinLength {
+			return errConfigSchemaMismatch
+		}
+		if schema.MaxLength != nil && length > *schema.MaxLength {
+			return errConfigSchemaMismatch
+		}
+		if schema.Const != nil && text != *schema.Const {
+			return errConfigSchemaMismatch
+		}
+		if len(schema.Enum) > 0 {
+			matched := false
+			for _, candidate := range schema.Enum {
+				if text == candidate {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return errConfigSchemaMismatch
+			}
+		}
+		if schema.Pattern != "" {
+			matched, err := regexp.MatchString(schema.Pattern, text)
+			if err != nil || !matched {
+				return errConfigSchemaMismatch
+			}
 		}
 		return nil
 	case "boolean":

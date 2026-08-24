@@ -23,12 +23,14 @@ import colorTileJson from "../server/definitions/color-tile.json";
 import pairedPortalJson from "../server/definitions/paired-portal.json";
 import antigravityFieldJson from "../server/definitions/antigravity-field.json";
 import blackHoleJson from "../server/definitions/black-hole.json";
+import graffitiJson from "../server/definitions/graffiti-text.json";
 import { playgroundAssets } from "../src/assets.js";
 import {
   playgroundDefinitions,
   playgroundAvatarDefinition,
   antigravityFieldDefinition,
   blackHoleDefinition,
+  graffitiDefinition,
   liveBouncerDefinition,
   pairedPortalDefinition,
   reactiveOrbDefinition,
@@ -47,6 +49,10 @@ import {
   antigravityFieldConfig,
   blackHoleFieldConfig,
 } from "../src/force-field-behavior.js";
+import {
+  GraffitiBehavior,
+  defaultGraffitiConfig,
+} from "../src/graffiti-behavior.js";
 
 const canvas = canvasJson as unknown as CanvasDefinition;
 
@@ -82,6 +88,7 @@ describe("compact item playground", () => {
       pairedPortalJson,
       antigravityFieldJson,
       blackHoleJson,
+      graffitiJson,
     ];
     for (const definition of playgroundDefinitions.filter(
       ({ definitionId }) => definitionId !== "avatar",
@@ -112,12 +119,49 @@ describe("compact item playground", () => {
     expect(html).toContain('data-spawn="paired-portal"');
     expect(html).toContain('data-spawn="antigravity-field"');
     expect(html).toContain('data-spawn="black-hole"');
+    expect(html).toContain('data-spawn="graffiti-text"');
+    expect(html).toContain('id="graffiti-text"');
+    expect(html).toContain('data-graffiti-style="bubble"');
+    expect(html).toContain('data-graffiti-style="wild"');
+    expect(html).toContain('data-graffiti-style="marker"');
+    expect(html).toContain('data-graffiti-style="neon"');
+    expect(html).toContain('data-graffiti-size="huge"');
+    expect(html).toContain('id="graffiti-color"');
+    expect(html).toContain('id="graffiti-accent"');
     expect(html).toContain('data-highlight="aurora"');
     expect(html).toContain('aria-label="Delete item"');
     expect(main).toContain("Finished editing · frozen state preserved");
     expect(main).not.toContain("runtime!.setItemIsolation(entity.id, false)");
     expect(main).toContain("runtime?.selectItemForEdit(entity.id)");
     expect(main).not.toContain("selectedEntityId = spawned.id");
+    expect(main).toContain("subscribeOverlayProjection(renderOverlays");
+    expect(main).toContain("text.textContent = render.text");
+  });
+
+  it("renders bounded multiline graffiti config without a physical collider", () => {
+    expect(graffitiDefinition.colliders).toEqual([]);
+    const harness = new BehaviorTestHarness(
+      GraffitiBehavior,
+      {
+        ...defaultGraffitiConfig,
+        text: "CANVAS\nCREW",
+        style: "neon" as const,
+        size: "huge" as const,
+        color: "#12ABef",
+        accentColor: "#ff4081",
+      },
+      { canvas: { width: 36, height: 24, orientation: "topDown" } },
+    );
+
+    expect(harness.state.render).toEqual({
+      text: "CANVAS\nCREW",
+      style: "neon",
+      size: "huge",
+      color: "#12abef",
+      accentColor: "#ff4081",
+      fontSize: 1.75,
+    });
+    expect(harness.commands()).toEqual([]);
   });
 
   it("applies an arbitrary consumer color as a replicated sprite tint", () => {
