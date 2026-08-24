@@ -130,6 +130,12 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 	room.indexItems()
 	for _, avatar := range room.snapshot.Avatars {
 		room.avatarPositions[avatar.EntityID] = avatar
+		if avatar.EntityID == "avatar:"+avatar.UserID && avatar.UserID != "" {
+			// A replacement process must recognize an avatar that the previous
+			// host retained as disconnected. Otherwise its first canonical frame
+			// is rejected before that participant has rejoined this process.
+			room.participants[avatar.UserID] = struct{}{}
+		}
 	}
 	return room, nil
 }
@@ -521,7 +527,7 @@ func (r *Room) validateEntityStates(states []*pb.EntityState) error {
 
 		item := r.items[state.EntityId]
 		if item == nil && !r.knownParticipantAvatar(state.EntityId) {
-			return errUnknownEntity
+			return fmt.Errorf("%w %q", errUnknownEntity, state.EntityId)
 		}
 		if item != nil && state.DefinitionId != "" && state.DefinitionId != item.DefinitionID {
 			return errDefinitionMismatch
@@ -638,7 +644,7 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 		}
 		seen[item.EntityID] = struct{}{}
 		if r.items[item.EntityID] == nil {
-			return errUnknownEntity
+			return fmt.Errorf("%w %q", errUnknownEntity, item.EntityID)
 		}
 		if !item.Transform.finite() {
 			return errNonFiniteTransform
@@ -667,7 +673,7 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 		}
 		seenAvatars[avatar.EntityID] = struct{}{}
 		if avatar.EntityID != "avatar:"+avatar.UserID || !r.knownParticipantAvatar(avatar.EntityID) {
-			return errUnknownEntity
+			return fmt.Errorf("%w %q", errUnknownEntity, avatar.EntityID)
 		}
 		transform := Transform{X: avatar.Position.X, Y: avatar.Position.Y, Scale: 1}
 		if !transform.finite() {

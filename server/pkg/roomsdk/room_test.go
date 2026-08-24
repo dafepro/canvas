@@ -369,6 +369,53 @@ func TestReconnectReceivesTheLatestRelayedAvatarPosition(t *testing.T) {
 	}
 }
 
+func TestPersistedAvatarRemainsValidAfterRoomProcessRestart(t *testing.T) {
+	h := newHarness(t, nil)
+	snapshot := emptySnapshot("test-canvas", 1, time.Now())
+	snapshot.CheckpointRevision = 1
+	snapshot.Avatars = []SnapshotAvatar{{
+		EntityID: "avatar:returning-player",
+		UserID:   "returning-player",
+		Position: Vec2{X: 42, Y: 21},
+	}}
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("marshal snapshot: %v", err)
+	}
+	if err := h.store.SaveSnapshot(context.Background(), SnapshotRecord{
+		RoomID:             "test-canvas",
+		CanvasID:           "test-canvas",
+		CanvasVersion:      1,
+		CheckpointRevision: 1,
+		SnapshotRaw:        raw,
+	}); err != nil {
+		t.Fatalf("save snapshot: %v", err)
+	}
+
+	host := h.dial("alice")
+	accepted := host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+	observer := h.dial("bob")
+	observer.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetPresence() != nil })
+
+	host.send(&pb.RoomEnvelope{
+		RoomId:    "test-canvas",
+		HostEpoch: host.hostEpoch,
+		Payload: &pb.RoomEnvelope_StateDelta{StateDelta: &pb.StateDelta{
+			SceneRevision: accepted.SceneRevision,
+			Entities: []*pb.EntityState{{
+				EntityId:           "avatar:returning-player",
+				QuantizedTransform: &pb.QuantizedTransform{X: 4200, Y: 2100},
+			}},
+		}},
+	})
+	got := observer.await(func(e *pb.RoomEnvelope) bool { return e.GetStateDelta() != nil })
+	if got.GetStateDelta().Entities[0].EntityId != "avatar:returning-player" {
+		t.Fatalf("relayed entity = %q", got.GetStateDelta().Entities[0].EntityId)
+	}
+}
+
 func TestParticipantOverlapIsScopedToOneRoomDuringTravel(t *testing.T) {
 	h := newHarness(t, func(cfg *Config) {
 		cfg.RoomTemplates = StaticRoomTemplates{
