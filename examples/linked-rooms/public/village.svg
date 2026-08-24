@@ -4,5 +4,5 @@
   <path d="M0 560 Q250 470 465 570 T930 545 T1200 565 V750 H0Z" fill="#5e9d59" opacity=".75"/>
   <path d="M0 210 Q180 125 360 215 T730 195 T1200 205 V0 H0Z" fill="#fff" opacity=".22"/>
   <text x="55" y="86" fill="#215439" font-family="system-ui,sans-serif" font-size="45" font-weight="800">SUNMEADOW VILLAGE</text>
-  <text x="55" y="132" fill="#3c6c4b" font-family="system-ui,sans-serif" font-size="24">The cave door glows at the eastern edge →</text>
+  <text x="55" y="132" fill="#3c6c4b" font-family="system-ui,sans-serif" font-size="24">← Pixel room to the west · moonlit cave to the east →</text>
 </svg>

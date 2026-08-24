@@ -3,7 +3,7 @@ import type { AssetManifest } from "@canvas-physics/client";
 export const linkedRoomAssets: AssetManifest = {
   schemaVersion: 1,
   id: "linked-rooms",
-  revision: "2026-08-24.2",
+  revision: "2026-08-24.3",
   sources: [
     { id: "village-art", src: "/village.svg", required: true },
     { id: "cave-art", src: "/cave.svg", required: true },
