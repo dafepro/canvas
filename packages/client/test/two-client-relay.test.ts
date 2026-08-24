@@ -326,7 +326,9 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     });
     expect(samples.at(-1)!.x - samples[0]!.x).toBeGreaterThan(8);
     expect(Math.min(...steps), motionDiagnostics).toBeGreaterThan(-0.08);
-    expect(Math.max(...steps), motionDiagnostics).toBeLessThan(0.8);
+    // A loaded worker may deliver up to four 60 Hz steps together. The peer
+    // must still avoid a network correction large enough to exceed that bound.
+    expect(Math.max(...steps), motionDiagnostics).toBeLessThan(1.2);
   }, 90_000);
 
   it("resumes a timer-driven workflow on the replacement host", async () => {

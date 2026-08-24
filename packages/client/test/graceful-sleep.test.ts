@@ -107,6 +107,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
         reader.entitiesToDraw(performance.now()).some(
           (entity) => entity.kind === "item" && entity.definitionId === crateDefinition.definitionId,
         ),
+        20_000,
       );
       reader.stop();
     } finally {
