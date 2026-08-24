@@ -1,0 +1,22 @@
+{
+  "name": "@canvas-physics/example-linked-rooms",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5176",
+    "build": "vite build",
+    "test": "vitest run test",
+    "server": "go -C ../../server run ./cmd/canvasd -addr :8084 -canvases ../examples/linked-rooms/server/canvases -definitions ../examples/linked-rooms/server/definitions -data-dir ../examples/linked-rooms/.data"
+  },
+  "dependencies": {
+    "@canvas-physics/client": "workspace:*",
+    "@canvas-physics/core": "workspace:*",
+    "@canvas-physics/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}

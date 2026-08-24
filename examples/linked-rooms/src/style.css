@@ -1,0 +1,27 @@
+:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #17231a; background: #edf4ed; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, #fff 0, #edf4ed 55%, #dce8dd 100%); }
+main { width: min(980px, 100%); margin: 0 auto; padding: 28px 18px 40px; }
+header { display: flex; justify-content: space-between; align-items: end; gap: 22px; margin-bottom: 18px; }
+.eyebrow { margin: 0; color: #3f7250; font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+h1 { margin: 4px 0 2px; font-size: clamp(30px, 5vw, 48px); letter-spacing: -.045em; }
+.lede { margin: 0; color: #53665a; }
+.join-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: end; }
+input, button { border: 1px solid #b8c9bc; border-radius: 12px; padding: 11px 14px; font: inherit; background: #fff; }
+button { font-weight: 750; cursor: pointer; box-shadow: 0 3px 10px #15361c12; }
+button:disabled { cursor: default; opacity: .45; }
+#join, #back { background: #285f3b; color: #fff; border-color: #285f3b; }
+.room-card { overflow: hidden; border: 1px solid #b9cabc; border-radius: 24px; background: #fff; box-shadow: 0 22px 60px #27482f20; }
+.room-heading, .status-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; }
+.room-heading span { display: block; color: #708177; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+.room-heading strong { font-size: 20px; }
+#stage { position: relative; width: 100%; aspect-ratio: 16 / 10; overflow: hidden; background: #17231a; }
+.room-stage { position: absolute; inset: 0; opacity: 1; transition: opacity .22s ease; }
+.room-stage.staged { opacity: 0; pointer-events: none; }
+.room-stage canvas { display: block; width: 100%; height: 100%; }
+.status-row { color: #54655a; font-size: 14px; border-top: 1px solid #e1e9e2; }
+#route { font-weight: 750; color: #285f3b; }
+aside { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px; color: #53665a; font-size: 13px; }
+aside strong { color: #17231a; }
+aside span { padding: 7px 10px; border-radius: 999px; background: #fff; border: 1px solid #cfdbd1; }
+@media (max-width: 720px) { header { align-items: stretch; flex-direction: column; } .join-controls { justify-content: start; } .room-heading { align-items: stretch; flex-direction: column; } .status-row { align-items: start; flex-direction: column; } }

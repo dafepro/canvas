@@ -22,6 +22,27 @@ Examples are not compatibility fixtures. This repository is prerelease, so a
 public contract change updates the examples in the same release and removes the
 superseded path.
 
+## Linked rooms reference integration
+
+`examples/linked-rooms` demonstrates reversible travel between independently
+hosted Canvas rooms. A built-in sensor behavior emits a reliable, targeted
+travel request when an avatar crosses a door threshold. The application then
+resolves the data-only route, authorizes it, obtains destination credentials,
+and stages a second `CanvasRuntime` before replacing the visible room.
+
+Both village-to-cave and cave-to-village links are declared as exact reverses.
+`RoomLinkGraph` rejects the application topology at startup if either side is
+missing or mismatched. The destination contains a physical return door, while
+the application Back button uses `LinkedRoomNavigator.back()` as an escape
+hatch if collision geometry, placement, or product UI ever makes that door
+unreachable. A failed destination open leaves the origin runtime active.
+
+The example intentionally keeps room access outside Canvas. A host-authored
+collision effect is a navigation request, not authorization; a production
+consumer supplies its own authorization callback and room-scoped credential
+provider. See `docs/LINKED_ROOM_TRAVEL.md` for the full lifecycle and trust
+boundary.
+
 ## Item playground reference integration
 
 `examples/item-playground` is a deliberately compact 36 × 24 workbench. Its

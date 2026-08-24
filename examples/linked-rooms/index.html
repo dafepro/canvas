@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Canvas Physics · Linked rooms</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">Canvas Physics reference integration</p>
+          <h1>Two rooms, one traveler</h1>
+          <p class="lede">Walk into the glowing door. The next Canvas is staged before this one closes.</p>
+        </div>
+        <div class="join-controls">
+          <input id="user" aria-label="Player name" autocomplete="off" />
+          <button id="join">Join village</button>
+          <button id="leave" disabled>Leave</button>
+        </div>
+      </header>
+
+      <section class="room-card">
+        <div class="room-heading">
+          <div>
+            <span>Current room</span>
+            <strong id="room-name">Not connected</strong>
+          </div>
+          <button id="back" disabled>← Back through the linked door</button>
+        </div>
+        <div id="stage" aria-label="Linked Canvas room"></div>
+        <div class="status-row">
+          <span id="status">Choose a name and join.</span>
+          <span id="route">Village ⇄ Moonlit cave</span>
+        </div>
+      </section>
+
+      <aside>
+        <strong>What this proves</strong>
+        <span>Host-authored collision</span>
+        <span>Reliable targeted travel request</span>
+        <span>Ready-before-close room swap</span>
+        <span>Validated reverse route + Back fallback</span>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

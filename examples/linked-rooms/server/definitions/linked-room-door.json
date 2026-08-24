@@ -1,0 +1,24 @@
+{
+  "definitionId": "linked-room-door",
+  "version": 1,
+  "displayName": "Linked room door",
+  "visual": { "spriteId": "linked.door", "size": { "width": 5, "height": 10 }, "anchor": { "x": 0.5, "y": 0.5 }, "zIndex": 3 },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [
+    { "id": "threshold", "role": "itemSensor", "sensor": true, "shape": { "type": "rect", "width": 3.5, "height": 8 }, "tags": ["room-exit"] }
+  ],
+  "behaviorType": "canvas.roomTravel",
+  "defaultConfig": { "sensorId": "threshold", "linkId": "", "cooldownSeconds": 1 },
+  "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "resetToIdle" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "required": ["sensorId", "linkId", "cooldownSeconds"],
+    "additionalProperties": false,
+    "properties": {
+      "sensorId": { "type": "string", "enum": ["threshold"] },
+      "linkId": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "cooldownSeconds": { "type": "number", "minimum": 0.1, "maximum": 10 }
+    }
+  }
+}

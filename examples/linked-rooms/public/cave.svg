@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750">
+  <defs><radialGradient id="g"><stop stop-color="#39436f"/><stop offset=".65" stop-color="#171d39"/><stop offset="1" stop-color="#090d1d"/></radialGradient><pattern id="s" width="120" height="100" patternUnits="userSpaceOnUse"><circle cx="24" cy="30" r="3" fill="#9ff7ef"/><circle cx="86" cy="72" r="5" fill="#967dff" opacity=".7"/></pattern></defs>
+  <rect width="1200" height="750" fill="url(#g)"/><rect width="1200" height="750" fill="url(#s)" opacity=".6"/>
+  <path d="M0 690 L120 550 225 645 355 510 485 660 625 535 775 650 910 505 1045 620 1200 500 V750 H0Z" fill="#0b1024"/>
+  <text x="55" y="86" fill="#d7dcff" font-family="system-ui,sans-serif" font-size="45" font-weight="800">MOONLIT CAVE</text>
+  <text x="55" y="132" fill="#aeb9f1" font-family="system-ui,sans-serif" font-size="24">The return door waits at the western edge ←</text>
+</svg>

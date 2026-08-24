@@ -1,0 +1,13 @@
+{
+  "id": "linked-cave", "version": 1,
+  "size": { "width": 48, "height": 30 }, "orientation": "topDown",
+  "backgroundAssetId": "linked.cave",
+  "edges": { "top": "solid", "right": "solid", "bottom": "solid", "left": "solid" },
+  "terrainDefaults": { "avatars": true, "items": true },
+  "avatarController": { "radius": 1.4, "maxSpeed": 13, "acceleration": 70 },
+  "staticGeometry": [], "regions": [],
+  "environment": { "base": { "gravityXY": { "x": 0, "y": 0 }, "linearDrag": 0.08, "angularDrag": 0.1, "softSpeedLimit": 14, "surfaceFrictionMultiplier": 1 } },
+  "spawnPoints": [{ "id": "from-village", "position": { "x": 12, "y": 15 } }, { "id": "cave-depths", "position": { "x": 36, "y": 15 } }],
+  "systemItems": [{ "entityId": "cave-village-door", "definitionId": "linked-room-door", "definitionVersion": 1, "transform": { "x": 5, "y": 15, "rotation": 3.141592653589793, "scale": 1 }, "resolvedConfig": { "sensorId": "threshold", "linkId": "cave-to-village", "cooldownSeconds": 1 } }],
+  "limits": { "maxAvatars": 12, "maxItems": 4, "maxComplexPhysicsItems": 0 }
+}

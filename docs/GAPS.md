@@ -37,6 +37,20 @@ downward. Check an item only after the relevant focused tests pass.
   angular-speed limits as consumer configuration. Mirrored glancing-kick tests
   verify the screen-coordinate rotation sign, while `?kickAnimation=0` hides
   deformation art without disabling physical rotation.
+- [x] Ship a linked-rooms reference integration demonstrating a reliable
+  collision-triggered room replacement, destination staging, exact reverse
+  routes, failed-open rollback, and a programmatic Back escape hatch.
+
+## Consumer-library Priority 0 — linked room travel
+
+- [x] Define the trust and lifecycle boundary for host-authored travel requests,
+  consumer authorization, destination credentials, staging, and origin rollback.
+- [x] Add a built-in avatar-only room-threshold behavior and immutable
+  bidirectional room-link validation.
+- [x] Add a renderer-independent linked-room navigator with local-avatar
+  targeting, transition coalescing, reverse-link history, and `back()`.
+- [x] Prove the public contract through a packed, independently runnable
+  linked-rooms reference integration.
 
 ## Consumer-library Priority 0 — current structural blockers
 

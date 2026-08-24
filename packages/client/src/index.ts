@@ -20,6 +20,7 @@ export * from "./input/item-edit-controller.js";
 export * from "./input/keyboard-controller.js";
 export * from "./runtime/room-session.js";
 export * from "./runtime/canvas-runtime.js";
+export * from "./runtime/linked-room-navigator.js";
 export * from "./runtime/lifecycle.js";
 export * from "./definitions/rocket-canvas.js";
 export * from "./assets/index.js";

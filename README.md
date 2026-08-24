@@ -20,6 +20,7 @@ item ownership, and stores canonical checkpoints.
 | `apps/demo` | Browser demo of the rocket canvas from spec section 18. |
 | `examples/soccer-lounge` | Independently runnable consumer integration with custom soccer behavior, field data/art, and scoreboard UI. |
 | `examples/item-playground` | Compact item-management integration covering spawn, drag, rotate, scale, configuration, deletion, effects, ownership, portals, and sensor-only force fields. |
+| `examples/linked-rooms` | Reversible collision-triggered travel that stages and swaps between independently hosted Canvas rooms. |
 | `docker/`, `docker-compose.yml` | The local stack: service, network emulator, demo. |
 
 ## Consume the JavaScript packages
@@ -85,6 +86,17 @@ Open <http://localhost:5175>. Add `?autojoin=1&user=alex` for a named client;
 open a second tab with a different user to demonstrate owner-only edits. The
 development server proxies realtime traffic to `:8083`, so LAN devices only
 need access to the app's `:5175` address.
+
+For reversible travel between two independent rooms:
+
+```bash
+pnpm example:rooms:server # terminal 1; service on :8084
+pnpm example:rooms        # terminal 2; app on :5176
+```
+
+Open <http://localhost:5176/?autojoin=1&user=traveler>. Walk into the glowing
+door or use Back after traveling. See `docs/LINKED_ROOM_TRAVEL.md` for the
+authorization, staging, rollback, and reverse-route contract.
 
 ## Emulate a bad network
 

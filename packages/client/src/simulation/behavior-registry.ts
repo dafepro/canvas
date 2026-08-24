@@ -2,6 +2,7 @@ import {
   BehaviorRegistry,
   KickableBehavior,
   PortalBehavior,
+  RoomTravelBehavior,
   RocketBehavior,
   type ItemBehavior,
 } from "@canvas-physics/core";
@@ -17,7 +18,8 @@ export const createSimulationBehaviorRegistry = (
   const registry = new BehaviorRegistry()
     .register(RocketBehavior)
     .register(KickableBehavior)
-    .register(PortalBehavior);
+    .register(PortalBehavior)
+    .register(RoomTravelBehavior);
   for (const behavior of applicationBehaviors) registry.register(behavior);
   return registry;
 };
