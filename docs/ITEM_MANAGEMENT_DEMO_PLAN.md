@@ -45,10 +45,15 @@ interaction behavior while importing only published Canvas package exports.
     rotatable, and scalable item owns two portal sensors. Avatars and solid
     items preserve momentum as they transit either direction, exit clear of the
     opposite sensor, and produce transient animation/effect feedback.
+11. [x] **Sensor-only force fields.** Movable antigravity and black-hole items
+    have no solid collision response. Their consumer behavior applies continuous
+    directional or softened inverse-square acceleration to overlapping dynamic
+    items. The proof ball now preserves added momentum, damps excess speed, and
+    only restores energy below its configured minimum.
 
 ## Next slice
 
-11. [ ] **Configurable behavior playback.** Add an editable example item whose
+12. [ ] **Configurable behavior playback.** Add an editable example item whose
     durable config chooses an automatic trigger policy (such as avatar contact,
     timer, or collision) and playback settings (once/loop and speed). Add
     private Play/Restart controls after Canvas exposes an owner-authorized

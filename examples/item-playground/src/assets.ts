@@ -4,7 +4,7 @@ import type { AssetManifest } from "@canvas-physics/client";
 export const playgroundAssets: AssetManifest = {
   schemaVersion: 1,
   id: "item-playground",
-  revision: "2026-08-23.5",
+  revision: "2026-08-23.6",
   sources: [
     { id: "workbench-art", src: "/workbench.svg", required: true },
     { id: "emoji-art", src: "/assets/party-emoji.svg", required: true },
@@ -23,6 +23,8 @@ export const playgroundAssets: AssetManifest = {
     { id: "tile-custom-art", src: "/assets/tile-custom.svg", required: true },
     { id: "portal-pair-art", src: "/assets/portal-pair.svg", required: true },
     { id: "portal-pair-pulse-art", src: "/assets/portal-pair-pulse.svg", required: true },
+    { id: "antigravity-field-art", src: "/assets/antigravity-field.svg", required: true },
+    { id: "black-hole-art", src: "/assets/black-hole.svg", required: true },
   ],
   textures: [
     { id: "playground.workbench", sourceId: "workbench-art" },
@@ -42,5 +44,7 @@ export const playgroundAssets: AssetManifest = {
     { id: "playground.tile.custom", sourceId: "tile-custom-art" },
     { id: "playground.portal.pair", sourceId: "portal-pair-art" },
     { id: "playground.portal.pairPulse", sourceId: "portal-pair-pulse-art" },
+    { id: "playground.field.antigravity", sourceId: "antigravity-field-art" },
+    { id: "playground.field.blackHole", sourceId: "black-hole-art" },
   ],
 };

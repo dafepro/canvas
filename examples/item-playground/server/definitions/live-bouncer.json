@@ -11,7 +11,7 @@
   "body": {
     "mode": "dynamic",
     "gravityScale": 0,
-    "linearDamping": 0,
+    "linearDamping": 0.22,
     "angularDamping": 0.05,
     "canSleep": false
   },

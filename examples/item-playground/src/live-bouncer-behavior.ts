@@ -7,6 +7,7 @@ import type {
 } from "@canvas-physics/core";
 
 export interface LiveBouncerConfig {
+  /** Minimum maintained speed; fields and collisions may accelerate above it. */
   speed: number;
   initialDirection: Vec2;
 }
@@ -18,7 +19,7 @@ export const defaultLiveBouncerConfig: LiveBouncerConfig = {
   initialDirection: { x: 7, y: 5 },
 };
 
-/** A tiny consumer behavior used to prove simulation continues during editing. */
+/** Keeps the proof ball alive without erasing momentum added by fields. */
 export const LiveBouncerBehavior: ItemBehavior<
   LiveBouncerConfig,
   LiveBouncerState
@@ -35,18 +36,21 @@ export const LiveBouncerBehavior: ItemBehavior<
   ): BehaviorResult<LiveBouncerState> {
     const velocity = ctx.velocity() ?? { x: 0, y: 0 };
     const currentSpeed = Math.hypot(velocity.x, velocity.y);
-    if (Math.abs(currentSpeed - config.speed) < 0.01) {
+    if (currentSpeed >= config.speed) {
       return { state: state as LiveBouncerState, commands: [] };
     }
     const source = currentSpeed > 0.001 ? velocity : config.initialDirection;
     const magnitude = Math.max(0.001, Math.hypot(source.x, source.y));
+    const missingSpeed = config.speed - currentSpeed;
     return {
       state: state as LiveBouncerState,
       commands: [{
-        type: "setVelocity",
-        velocity: {
-          x: (source.x / magnitude) * config.speed,
-          y: (source.y / magnitude) * config.speed,
+        // An additive impulse composes with field forces authored by another
+        // item during the same behavior step; an absolute velocity would erase them.
+        type: "applyImpulse",
+        impulse: {
+          x: (source.x / magnitude) * missingSpeed,
+          y: (source.y / magnitude) * missingSpeed,
         },
       }],
     };

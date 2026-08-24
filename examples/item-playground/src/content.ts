@@ -11,6 +11,11 @@ import {
   defaultPairedPortalConfig,
   type PairedPortalConfig,
 } from "./paired-portal-behavior.js";
+import {
+  antigravityFieldConfig,
+  blackHoleFieldConfig,
+  type ForceFieldConfig,
+} from "./force-field-behavior.js";
 
 const durableFixed = {
   body: { mode: "fixed" as const, gravityScale: 0, lockRotation: true },
@@ -155,7 +160,7 @@ export const liveBouncerDefinition: ItemDefinition<LiveBouncerConfig> = {
   body: {
     mode: "dynamic",
     gravityScale: 0,
-    linearDamping: 0,
+    linearDamping: 0.22,
     angularDamping: 0.05,
     canSleep: false,
   },
@@ -252,6 +257,54 @@ export const pairedPortalDefinition: ItemDefinition<PairedPortalConfig> = {
   complexity: "simple",
 };
 
+export const antigravityFieldDefinition: ItemDefinition<ForceFieldConfig> = {
+  definitionId: "antigravity-field",
+  version: 1,
+  displayName: "Antigravity field",
+  visual: {
+    spriteId: "playground.field.antigravity",
+    size: { width: 8, height: 10 },
+    placeholder: { shape: "rect", color: 0x76ead6 },
+    zIndex: 2,
+  },
+  body: { mode: "fixed", gravityScale: 0, lockRotation: true },
+  colliders: [
+    {
+      id: "field",
+      role: "itemSensor",
+      shape: { type: "rect", width: 8, height: 10 },
+    },
+  ],
+  behaviorType: "playground.forceField",
+  defaultConfig: antigravityFieldConfig,
+  persistence: { transform: true, behaviorState: true, onRoomSleep: "pause" },
+  complexity: "simple",
+};
+
+export const blackHoleDefinition: ItemDefinition<ForceFieldConfig> = {
+  definitionId: "black-hole",
+  version: 1,
+  displayName: "Black hole",
+  visual: {
+    spriteId: "playground.field.blackHole",
+    size: { width: 12, height: 12 },
+    placeholder: { shape: "circle", color: 0x171327 },
+    zIndex: 2,
+  },
+  body: { mode: "fixed", gravityScale: 0, lockRotation: true },
+  colliders: [
+    {
+      id: "field",
+      role: "itemSensor",
+      shape: { type: "circle", radius: 7 },
+    },
+  ],
+  behaviorType: "playground.forceField",
+  defaultConfig: blackHoleFieldConfig,
+  persistence: { transform: true, behaviorState: true, onRoomSleep: "pause" },
+  complexity: "simple",
+};
+
 export const playgroundDefinitions: ItemDefinition[] = [
   partyEmojiDefinition,
   photoCardDefinition,
@@ -260,5 +313,7 @@ export const playgroundDefinitions: ItemDefinition[] = [
   liveBouncerDefinition as ItemDefinition,
   systemStampDefinition,
   pairedPortalDefinition as ItemDefinition,
+  antigravityFieldDefinition as ItemDefinition,
+  blackHoleDefinition as ItemDefinition,
   playgroundAvatarDefinition,
 ];

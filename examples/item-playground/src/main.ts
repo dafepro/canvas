@@ -64,6 +64,11 @@ const spawnPositions = [
   { x: 7, y: 6 }, { x: 14, y: 6 }, { x: 22, y: 6 }, { x: 29, y: 6 },
   { x: 7, y: 14 }, { x: 14, y: 14 }, { x: 22, y: 14 }, { x: 29, y: 14 },
 ];
+const featureSpawnPositions = new Map([
+  ["paired-portal", { x: 18, y: 12 }],
+  ["antigravity-field", { x: 9, y: 12 }],
+  ["black-hole", { x: 27, y: 12 }],
+]);
 
 const selectedEntity = (): Readonly<RenderEntity> | undefined =>
   entities.find(({ id }) => id === selectedEntityId);
@@ -370,9 +375,8 @@ highlightButtons.forEach((button) =>
 paletteButtons.forEach((button) =>
   button.addEventListener("click", () => {
     const definitionId = button.dataset.spawn!;
-    const position = definitionId === "paired-portal"
-      ? { x: 18, y: 12 }
-      : spawnPositions[spawnCursor++ % spawnPositions.length]!;
+    const position = featureSpawnPositions.get(definitionId) ??
+      spawnPositions[spawnCursor++ % spawnPositions.length]!;
     runtime?.clearItemEditSelection();
     closePopovers();
     requestMutation(

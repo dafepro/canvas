@@ -19,7 +19,7 @@ item ownership, and stores canonical checkpoints.
 | `server/cmd/canvasd` | Reference binary that wires the SDK to an HTTP listener. |
 | `apps/demo` | Browser demo of the rocket canvas from spec section 18. |
 | `examples/soccer-lounge` | Independently runnable consumer integration with custom soccer behavior, field data/art, and scoreboard UI. |
-| `examples/item-playground` | Compact item-management integration covering spawn, drag, rotate, scale, configuration, deletion, effects, ownership, and a consumer-authored portal pair. |
+| `examples/item-playground` | Compact item-management integration covering spawn, drag, rotate, scale, configuration, deletion, effects, ownership, portals, and sensor-only force fields. |
 | `docker/`, `docker-compose.yml` | The local stack: service, network emulator, demo. |
 
 ## Consume the JavaScript packages

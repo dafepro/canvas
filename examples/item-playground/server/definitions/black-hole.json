@@ -1,0 +1,51 @@
+{
+  "definitionId": "black-hole",
+  "version": 1,
+  "displayName": "Black hole",
+  "visual": {
+    "spriteId": "playground.field.blackHole",
+    "size": { "width": 12, "height": 12 },
+    "placeholder": { "shape": "circle", "color": 1512231 },
+    "zIndex": 2
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [
+    {
+      "id": "field",
+      "role": "itemSensor",
+      "shape": { "type": "circle", "radius": 7 }
+    }
+  ],
+  "behaviorType": "playground.forceField",
+  "defaultConfig": {
+    "sensorId": "field",
+    "mode": "radial",
+    "strength": 450,
+    "direction": { "x": 0, "y": 0 },
+    "softening": 1.5,
+    "maxAcceleration": 70
+  },
+  "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "sensorId": { "type": "string", "const": "field" },
+      "mode": { "type": "string", "enum": ["directional", "radial"] },
+      "strength": { "type": "number", "minimum": 0, "maximum": 1000 },
+      "direction": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number", "minimum": -1, "maximum": 1 },
+          "y": { "type": "number", "minimum": -1, "maximum": 1 }
+        },
+        "required": ["x", "y"],
+        "additionalProperties": false
+      },
+      "softening": { "type": "number", "minimum": 0.1, "maximum": 20 },
+      "maxAcceleration": { "type": "number", "minimum": 0, "maximum": 200 }
+    },
+    "required": ["sensorId", "mode", "strength", "direction", "softening", "maxAcceleration"],
+    "additionalProperties": false
+  }
+}

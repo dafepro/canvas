@@ -112,6 +112,10 @@ work below because they determine the public boundary every consumer will use.
 ## Consumer-library Priority 3 — optional follow-ups
 
 - [ ] Add visual extension labs and additional overlay/diagnostic conveniences.
+- [ ] Add generic transient render projections with clip/mask geometry. This
+  would let one canonical physics body appear partially at two mapped locations
+  during a seamless portal crossing, and would also support mirrors, windows,
+  and other consumer-authored projection effects without exposing Pixi internals.
 - [ ] Complete elevation and richer animation support.
 - [ ] Evaluate WebRTC only if measured WebSocket performance warrants it.
 
