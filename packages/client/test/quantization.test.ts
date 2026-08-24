@@ -41,6 +41,10 @@ describe("realtime transform quantization", () => {
       disabled: false,
       teleportEpoch: 0,
       respawning: false,
+      itemIsolated: false,
+      spriteTint: 0,
+      hasSpriteTint: false,
+      itemCollisionsDisabled: false,
       quantizedTransform: quantizeTransform({
         x: 52.34,
         y: 31.25,

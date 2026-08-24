@@ -1,0 +1,82 @@
+name: Library CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canvas-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generated-code:
+    name: Generated protocol bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: "35.1"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm install --frozen-lockfile
+      - name: Regenerate and compare bindings
+        run: bash scripts/verify-generated.sh
+
+  verify:
+    name: Cross-platform verification (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: pnpm install --frozen-lockfile
+      - name: Build reusable packages
+        run: pnpm -r --filter "./packages/*" build
+      - name: Packed external-consumer and release contracts
+        run: >-
+          pnpm vitest run
+          test/package-artifacts.test.ts
+          test/release-contract.test.ts
+          test/library-boundaries.test.ts
+      - name: TypeScript behavior, runtime, integration, and example tests
+        run: >-
+          pnpm vitest run
+          --exclude test/package-artifacts.test.ts
+          --exclude test/release-contract.test.ts
+          --exclude test/library-boundaries.test.ts
+      - name: Go rooms SDK and service tests
+        run: go -C server test ./...
+      - name: Go race detection
+        if: runner.os == 'Linux'
+        run: go -C server test ./... -race

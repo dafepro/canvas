@@ -103,7 +103,10 @@ work below because they determine the public boundary every consumer will use.
 - [ ] Complete latency, loss, reordering, reconnect, migration, late-join, and
   mobile backgrounding coverage.
 - [ ] Record physical-device resource profiles and enforce measured budgets.
-- [ ] Add reproducible Windows/Linux release CI with generated-code verification.
+- [x] Add reproducible Windows/Linux release CI with generated-code verification.
+  Both operating systems build and test the library, Linux additionally runs Go
+  race detection, packed external consumers exercise public artifacts, and a
+  separate pinned generation job rejects stale TypeScript or Go protobuf bindings.
 - [ ] Expose an owner-authorized transient item-action path from the public
   runtime through the relay to the host behavior. This is needed for generic
   Play, Restart, and named trigger controls that should not masquerade as
@@ -197,5 +200,5 @@ work below because they determine the public boundary every consumer will use.
 - [ ] Correct host-migration diagnostics.
 - [ ] Add collision, network, environment, and behavior visual laboratories.
 - [x] Make the integration harness use the correct executable name on Windows.
-- [ ] Add Windows/Linux CI. Publishable package exports are now tracked as the
-  first consumer-library Priority 0 item above.
+- [x] Add Windows/Linux CI. Publishable package exports and generated bindings
+  are enforced by the cross-platform release gate above.

@@ -28,6 +28,9 @@ not supported.
 Any `room.proto` change regenerates both bindings in the same commit. Release
 verification runs the package-artifact, library-boundary, release-contract,
 TypeScript protocol/client, and Go rooms SDK tests before publishing or tagging.
+The required Windows/Linux checks and local reproduction commands are defined in
+`CI_RELEASE_GATE.md`. CI produces release candidates but never publishes or tags
+implicitly.
 
 Protocol v4 separates product `room_id` from the server-selected canvas
 template. Its room routes are `/v1/rooms/{id}` and

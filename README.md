@@ -264,4 +264,6 @@ This writes the TypeScript bindings and the Go bindings from the same file.
 
 - `docs/PHASES.md` — the state of each phase from spec section 23.
 - `docs/ARCHITECTURE.md` — how the pieces fit together and why.
+- `docs/CI_RELEASE_GATE.md` — required Windows/Linux checks and what a passing
+  release candidate guarantees independent consumers.
 - `docs/spec.txt` — the plain text of the specification, for searching.
