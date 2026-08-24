@@ -61,7 +61,11 @@ const waitForHealth = async (url: string, deadlineMs: number): Promise<void> => 
  * so it must call `stop`.
  */
 export const startCanvasd = async (
-  options: { dataDir?: string } = {},
+  options: {
+    dataDir?: string;
+    canvasesDir?: string;
+    definitionsDir?: string;
+  } = {},
 ): Promise<Canvasd> => {
   const binaryName = process.platform === "win32" ? "canvasd.exe" : "canvasd";
   const binary = path.join(mkdtempSync(path.join(tmpdir(), "canvasd-")), binaryName);
@@ -77,7 +81,10 @@ export const startCanvasd = async (
       "-addr",
       `127.0.0.1:${port}`,
       "-canvases",
-      path.join(serverDir, "canvases"),
+      options.canvasesDir ?? path.join(serverDir, "canvases"),
+      ...(options.definitionsDir
+        ? ["-definitions", options.definitionsDir]
+        : []),
       "-data-dir",
       options.dataDir ?? createCanvasdDataDir(),
       "-log-level",

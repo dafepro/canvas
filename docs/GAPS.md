@@ -51,6 +51,14 @@ downward. Check an item only after the relevant focused tests pass.
   targeting, transition coalescing, reverse-link history, and `back()`.
 - [x] Prove the public contract through a packed, independently runnable
   linked-rooms reference integration.
+- [x] Harden staged travel against initialization/host-grant races, activation
+  and subscription rollback, throwing consumer callbacks, ignored arrival
+  spawns, refresh ambiguity, duplicate same-room sessions, and edge-triggered
+  portal geometry. Persist the failure matrix in
+  `LINKED_ROOM_TRAVEL_HARDENING.md`.
+- [ ] Define an optional product-owned participant-location lease conformance
+  adapter for worlds that require one global room per authenticated account.
+  Canvas rooms remain independent and do not impose this policy themselves.
 
 ## Consumer-library Priority 0 — current structural blockers
 

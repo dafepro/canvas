@@ -41,7 +41,10 @@ export const roomDoorDefinition: ItemDefinition<RoomTravelConfig> = {
       id: "threshold",
       role: "itemSensor",
       sensor: true,
-      shape: { type: "rect", width: 3.5, height: 8 },
+      shape: { type: "rect", width: 0.4, height: 5 },
+      // The sensor sits behind the visual midpoint. An approaching avatar's
+      // leading edge reaches it when the avatar centre reaches the door centre.
+      offset: { x: 1.6, y: 0 },
       tags: ["room-exit"],
     },
   ],

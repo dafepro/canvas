@@ -329,6 +329,45 @@ func TestReconnectSupersedesTheParticipantsOldConnection(t *testing.T) {
 	}
 }
 
+func TestParticipantOverlapIsScopedToOneRoomDuringTravel(t *testing.T) {
+	h := newHarness(t, func(cfg *Config) {
+		cfg.RoomTemplates = StaticRoomTemplates{
+			"village": {CanvasID: "test-canvas", CanvasVersion: 1},
+			"cave":    {CanvasID: "test-canvas", CanvasVersion: 1},
+		}
+	})
+
+	oldVillage := h.dialRoom("village", "alice")
+	oldVillage.join()
+	oldVillage.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	cave := h.dialRoom("cave", "alice")
+	cave.join()
+	cave.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	returningVillage := h.dialRoom("village", "alice")
+	returningVillage.join()
+	superseded := oldVillage.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetError() != nil
+	}).GetError()
+	if superseded.Code != "session_superseded" {
+		t.Fatalf("old village connection error = %q, want session_superseded", superseded.Code)
+	}
+
+	observer := h.dialRoom("cave", "bob")
+	observer.join()
+	presence := observer.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetPresence() != nil
+	}).GetPresence()
+	users := make(map[string]bool, len(presence.Peers))
+	for _, peer := range presence.Peers {
+		users[peer.UserId] = true
+	}
+	if !users["alice"] || !users["bob"] {
+		t.Fatalf("cave presence after village takeover = %#v, want alice and bob", users)
+	}
+}
+
 func TestHostMayRetainAKnownAvatarAfterDisconnect(t *testing.T) {
 	h := newHarness(t, nil)
 	host := h.dial("alice")

@@ -88,20 +88,23 @@ const build = (
   options: {
     onError?: (error: CanvasConsumerError) => void;
     onJoined?: () => void | Promise<void>;
+    spawnPointId?: string;
   } = {},
 ) => {
   const terminate = vi.fn();
-  const driver = new SimulationDriver(() => ({ send: vi.fn(), terminate }));
+  const send = vi.fn();
+  const driver = new SimulationDriver(() => ({ send, terminate }));
   const session = new RoomSession({
     roomId: "team-lounge",
     serverUrl: "http://rooms.test",
     definitions: rocketCanvasDefinitions,
     transport,
     driver,
+    spawnPointId: options.spawnPointId,
     onError: options.onError,
     onJoined: options.onJoined,
   });
-  return { session, terminate };
+  return { session, send, terminate };
 };
 
 describe("RoomSession lifecycle", () => {
@@ -239,5 +242,29 @@ describe("RoomSession lifecycle", () => {
     expect(terminate).toHaveBeenCalledOnce();
     expect(onError).toHaveBeenCalledOnce();
     session.stop();
+  });
+
+  it("uses a requested arrival spawn and rejects an unknown one", async () => {
+    const transport = new LifecycleTransport();
+    const { session, send } = build(transport, { spawnPointId: "pad" });
+    await session.start();
+    transport.deliver(accepted());
+    await session.whenReady();
+
+    const init = send.mock.calls
+      .map(([message]) => message)
+      .find((message) => message.type === "init");
+    expect(init?.localAvatar?.position.y).toBe(62);
+    expect(init?.localAvatar?.position.x).toBeGreaterThan(69.5);
+    expect(init?.localAvatar?.position.x).toBeLessThan(70.5);
+    session.stop();
+
+    const invalidTransport = new LifecycleTransport();
+    const invalid = build(invalidTransport, { spawnPointId: "missing" }).session;
+    await invalid.start();
+    const ready = invalid.whenReady();
+    invalidTransport.deliver(accepted());
+    await expect(ready).rejects.toMatchObject({ code: "join_initialization_failed" });
+    expect(invalid.lifecycleState).toBe("failed");
   });
 });

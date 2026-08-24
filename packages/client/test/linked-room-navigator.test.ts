@@ -13,18 +13,24 @@ import {
 class FakeRoom implements LinkedRoomHandle {
   readonly avatarEntityId = "avatar:alice";
   activated = false;
+  activationCount = 0;
   closed = false;
+  failActivation = false;
+  failSubscription = false;
   private readonly observers = new Set<(effect: Readonly<EffectEmission>) => void>();
 
   constructor(readonly roomId: string) {}
 
   subscribeEffects(observer: (effect: Readonly<EffectEmission>) => void): () => void {
+    if (this.failSubscription) throw new Error("subscription failed");
     this.observers.add(observer);
     return () => this.observers.delete(observer);
   }
 
   activate(): void {
+    if (this.failActivation) throw new Error("activation failed");
     this.activated = true;
+    this.activationCount++;
   }
 
   close(): void {
@@ -117,5 +123,67 @@ describe("LinkedRoomNavigator", () => {
     expect(navigator.currentRoomId).toBe("village");
     expect(origin.closed).toBe(false);
     expect(onError).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it("closes a room whose initial activation fails", async () => {
+    const room = new FakeRoom("village");
+    room.failActivation = true;
+    const navigator = new LinkedRoomNavigator({
+      graph,
+      openRoom: async () => room,
+    });
+
+    await expect(navigator.start("village")).rejects.toThrow("activation failed");
+    expect(room.closed).toBe(true);
+    expect(navigator.currentRoomId).toBeUndefined();
+  });
+
+  it("rolls presentation back to the origin if destination installation fails", async () => {
+    const origin = new FakeRoom("village");
+    const destination = new FakeRoom("cave");
+    destination.failSubscription = true;
+    const onError = vi.fn();
+    const navigator = new LinkedRoomNavigator({
+      graph,
+      openRoom: async ({ roomId }) => roomId === "village" ? origin : destination,
+      onError,
+    });
+    await navigator.start("village");
+
+    origin.cross("village-to-cave");
+    await navigator.whenIdle();
+
+    expect(navigator.currentRoomId).toBe("village");
+    expect(origin).toMatchObject({ closed: false, activationCount: 2 });
+    expect(destination.closed).toBe(true);
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "subscription failed" }));
+  });
+
+  it("isolates consumer callbacks from the committed room transition", async () => {
+    const rooms: FakeRoom[] = [];
+    const onError = vi.fn();
+    const navigator = new LinkedRoomNavigator({
+      graph,
+      openRoom: async ({ roomId }) => {
+        const room = new FakeRoom(roomId);
+        rooms.push(room);
+        return room;
+      },
+      onChanged: () => {
+        throw new Error("consumer callback failed");
+      },
+      onError,
+    });
+
+    await navigator.start("village");
+    rooms[0]!.cross("village-to-cave");
+    await navigator.whenIdle();
+
+    expect(navigator.currentRoomId).toBe("cave");
+    expect(rooms[0]!.closed).toBe(true);
+    expect(rooms[1]!.closed).toBe(false);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "consumer callback failed" }),
+    );
   });
 });

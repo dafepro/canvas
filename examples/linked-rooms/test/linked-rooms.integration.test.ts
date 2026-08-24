@@ -8,6 +8,7 @@ import {
   roomDoorDefinition,
   villageCanvas,
 } from "../src/content.js";
+import { linkedRoomFromSearch, urlForLinkedRoom } from "../src/route-state.js";
 
 const root = resolve(import.meta.dirname, "..");
 const json = <T>(path: string): T =>
@@ -32,5 +33,25 @@ describe("linked rooms reference integration", () => {
       }
       expect(graph.linksFrom(canvas.id)).toHaveLength(1);
     }
+  });
+
+  it("persists the active room in a reload-safe URL and rejects unknown rooms", () => {
+    expect(linkedRoomFromSearch("?room=linked-cave&user=alice")).toBe("linked-cave");
+    expect(linkedRoomFromSearch("?room=not-a-real-room")).toBe("linked-village");
+    expect(
+      urlForLinkedRoom(
+        "http://localhost:5176/?autojoin=1&user=alice&room=linked-village",
+        "linked-cave",
+      ),
+    ).toBe("http://localhost:5176/?autojoin=1&user=alice&room=linked-cave");
+  });
+
+  it("activates the door when the avatar centre reaches the sprite midpoint", () => {
+    const threshold = roomDoorDefinition.colliders.find(({ id }) => id === "threshold")!;
+    expect(threshold.shape).toMatchObject({ type: "rect", width: 0.4 });
+    const sensorNearEdge = threshold.offset!.x -
+      (threshold.shape.type === "rect" ? threshold.shape.width / 2 : 0);
+    const avatarRadius = villageCanvas.avatarController!.radius!;
+    expect(sensorNearEdge - avatarRadius).toBeCloseTo(0, 5);
   });
 });

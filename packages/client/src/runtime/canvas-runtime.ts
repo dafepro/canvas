@@ -69,6 +69,8 @@ export interface CanvasRuntimeOptions {
   scene?: SceneOptions;
   /** Pointer/touch movement style. Defaults to a relative thumbstick. */
   pointer?: Omit<PointerDragOptions, "avatarPosition">;
+  /** Named room spawn used for this session, such as a linked-room arrival. */
+  spawnPointId?: string;
   /** Consumer-owned art. Required sources preload before the room connection opens. */
   assets?: AssetManifest;
   /** Advanced override for tests or a consumer-specific texture loader. */
@@ -134,6 +136,7 @@ export class CanvasRuntime {
       driver: options.driver,
       rates: options.rates,
       intent: () => this.mergedIntent(),
+      spawnPointId: options.spawnPointId,
       projectParticipantAvatar: options.projectParticipantAvatar,
       onJoined: (canvas) => this.mountScene(canvas),
       onError: options.onError,

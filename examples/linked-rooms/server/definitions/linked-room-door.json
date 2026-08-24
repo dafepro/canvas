@@ -5,7 +5,7 @@
   "visual": { "spriteId": "linked.door", "size": { "width": 5, "height": 10 }, "anchor": { "x": 0.5, "y": 0.5 }, "zIndex": 3 },
   "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
   "colliders": [
-    { "id": "threshold", "role": "itemSensor", "sensor": true, "shape": { "type": "rect", "width": 3.5, "height": 8 }, "tags": ["room-exit"] }
+    { "id": "threshold", "role": "itemSensor", "sensor": true, "shape": { "type": "rect", "width": 0.4, "height": 5 }, "offset": { "x": 1.6, "y": 0 }, "tags": ["room-exit"] }
   ],
   "behaviorType": "canvas.roomTravel",
   "defaultConfig": { "sensorId": "threshold", "linkId": "", "cooldownSeconds": 1 },

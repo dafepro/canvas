@@ -7,6 +7,11 @@ import type {
 } from "@canvas-physics/client/runtime";
 import { linkedRoomAssets } from "./assets.js";
 import { linkedRoomDefinitions, linkedRoomLinks } from "./content.js";
+import {
+  linkedRoomFromSearch,
+  urlForLinkedRoom,
+  type LinkedRoomId,
+} from "./route-state.js";
 import "./style.css";
 
 const userInput = document.querySelector<HTMLInputElement>("#user")!;
@@ -18,6 +23,7 @@ const roomName = document.querySelector<HTMLElement>("#room-name")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 
 const params = new URLSearchParams(location.search);
+const initialRoom = linkedRoomFromSearch(location.search);
 userInput.value = params.get("user") ?? `traveler-${Math.floor(Math.random() * 900 + 100)}`;
 const serverUrl = import.meta.env.VITE_SERVER_URL || location.origin;
 const names: Record<string, string> = {
@@ -60,6 +66,8 @@ const join = async (): Promise<void> => {
         driver: new SimulationDriver(worker),
         scene: { background: request.roomId === "linked-cave" ? 0x111629 : 0xbde7b2 },
         pointer: { mode: "thumbstick", deadZonePx: 4, fullRangePx: 55 },
+        spawnPointId: request.arrivalSpawnPointId ??
+          (request.roomId === "linked-village" ? "village-square" : "cave-depths"),
         onAssetProgress: ({ loaded, total }) => {
           status.textContent = `Preparing ${names[request.roomId] ?? request.roomId} · assets ${loaded}/${total}`;
         },
@@ -70,7 +78,9 @@ const join = async (): Promise<void> => {
         },
         onError: (error) => {
           if (!mount.classList.contains("staged")) {
-            status.textContent = `Room error · ${error.code}: ${error.message}`;
+            status.textContent = error.details?.serverCode === "session_superseded"
+              ? "This participant is now open in a newer tab in this room. Use a unique name per tab."
+              : `Room error · ${error.code}: ${error.message}`;
           }
         },
       });
@@ -106,13 +116,18 @@ const join = async (): Promise<void> => {
       onChanged: (current, previous) => {
         roomName.textContent = names[current] ?? current;
         backButton.disabled = !navigator?.canGoBack;
+        history.replaceState(
+          history.state,
+          "",
+          urlForLinkedRoom(location.href, current as LinkedRoomId),
+        );
         if (previous) status.textContent = `Arrived from ${names[previous] ?? previous}`;
       },
       onError: (error) => {
         status.textContent = `Travel cancelled · ${error.message}. You remain in this room.`;
       },
     });
-    await navigator.start("linked-village");
+    await navigator.start(initialRoom);
     leaveButton.disabled = false;
     backButton.disabled = !navigator.canGoBack;
   } catch (error) {

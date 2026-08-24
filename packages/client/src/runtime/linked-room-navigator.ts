@@ -62,14 +62,21 @@ export class LinkedRoomNavigator {
 
   async start(roomId: string): Promise<void> {
     if (this.current) throw new Error("linked room navigator is already started");
-    const room = await this.options.openRoom({ roomId });
-    if (room.roomId !== roomId) {
-      await room.close();
-      throw new Error(`room factory opened '${room.roomId}', expected '${roomId}'`);
+    let room: LinkedRoomHandle | undefined;
+    try {
+      room = await this.options.openRoom({ roomId });
+      if (room.roomId !== roomId) {
+        throw new Error(`room factory opened '${room.roomId}', expected '${roomId}'`);
+      }
+      await room.activate?.();
+      const unsubscribe = this.listen(room);
+      this.current = room;
+      this.unsubscribe = unsubscribe;
+      this.notifyChanged(roomId);
+    } catch (error) {
+      if (room) await this.closeAfterFailure(room);
+      throw error;
     }
-    await room.activate?.();
-    this.install(room);
-    this.options.onChanged?.(roomId);
   }
 
   travel(linkId: string): Promise<boolean> {
@@ -77,7 +84,7 @@ export class LinkedRoomNavigator {
     if (this.transition) return Promise.resolve(false);
     const operation = this.performTravel(linkId).catch((cause: unknown) => {
       const error = cause instanceof Error ? cause : new Error(String(cause));
-      this.options.onError?.(error);
+      this.reportError(error);
       return false;
     });
     this.transition = operation;
@@ -118,6 +125,8 @@ export class LinkedRoomNavigator {
       arrivalSpawnPointId: link.arrivalSpawnPointId,
     };
     let destination: LinkedRoomHandle | undefined;
+    let destinationActivated = false;
+    let destinationUnsubscribe: (() => void) | undefined;
     try {
       destination = await this.options.openRoom(request);
       if (destination.roomId !== link.toRoomId) {
@@ -126,8 +135,18 @@ export class LinkedRoomNavigator {
         );
       }
       await destination.activate?.();
+      destinationActivated = true;
+      destinationUnsubscribe = this.listen(destination);
     } catch (error) {
-      await destination?.close();
+      destinationUnsubscribe?.();
+      if (destination) await this.closeAfterFailure(destination);
+      if (destinationActivated) {
+        try {
+          await origin.activate?.();
+        } catch (cause) {
+          this.reportError(cause);
+        }
+      }
       throw error;
     }
 
@@ -137,25 +156,49 @@ export class LinkedRoomNavigator {
       returnStep.originRoomId === link.toRoomId;
 
     this.unsubscribe?.();
-    this.install(destination);
+    this.current = destination;
+    this.unsubscribe = destinationUnsubscribe;
     if (isReturn) this.history.pop();
     else this.history.push({ originRoomId: origin.roomId, returnLinkId: link.returnLinkId });
-    this.options.onChanged?.(destination.roomId, origin.roomId);
+    this.notifyChanged(destination.roomId, origin.roomId);
     try {
       await origin.close();
     } catch (cause) {
-      this.options.onError?.(
-        cause instanceof Error ? cause : new Error(`failed to close room: ${String(cause)}`),
-      );
+      this.reportError(cause);
     }
     return true;
   }
 
-  private install(room: LinkedRoomHandle): void {
-    this.current = room;
-    this.unsubscribe = room.subscribeEffects((effect) => {
+  private listen(room: LinkedRoomHandle): () => void {
+    return room.subscribeEffects((effect) => {
+      if (this.current !== room) return;
       const request = roomTravelRequestFromEffect(effect, room.avatarEntityId);
       if (request) void this.travel(request.linkId);
     });
+  }
+
+  private notifyChanged(roomId: string, previousRoomId?: string): void {
+    try {
+      this.options.onChanged?.(roomId, previousRoomId);
+    } catch (cause) {
+      this.reportError(cause);
+    }
+  }
+
+  private reportError(cause: unknown): void {
+    const error = cause instanceof Error ? cause : new Error(String(cause));
+    try {
+      this.options.onError?.(error);
+    } catch {
+      // Consumer reporting must never corrupt the committed room transition.
+    }
+  }
+
+  private async closeAfterFailure(room: LinkedRoomHandle): Promise<void> {
+    try {
+      await room.close();
+    } catch (cause) {
+      this.reportError(cause);
+    }
   }
 }

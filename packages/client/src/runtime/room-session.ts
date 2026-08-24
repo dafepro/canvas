@@ -82,6 +82,8 @@ export interface RoomSessionOptions {
   rates?: RoomSessionRates;
   /** Movement intent for the local avatar. Defaults to no movement. */
   intent?: () => InputIntent;
+  /** Named room spawn used for this session, such as a linked-room arrival. */
+  spawnPointId?: string;
   /** Product-owned placement for participant lifecycle transitions. */
   projectParticipantAvatar?: ParticipantAvatarProjector;
   /** Runs once the room accepts the join, before the send loops start. */
@@ -829,7 +831,11 @@ export class RoomSession {
   }
 
   private spawnPosition(entityId: string): Vec2 {
-    const spawn = this.canvasDefinition?.spawnPoints[0]?.position;
+    const requested = this.options.spawnPointId;
+    const spawnPoint = requested
+      ? this.canvasDefinition?.spawnPoints.find((candidate) => candidate.id === requested)
+      : this.canvasDefinition?.spawnPoints[0];
+    const spawn = spawnPoint?.position;
     if (spawn) {
       // Host and peer prediction must derive exactly the same starting pose.
       // A random local offset makes the peer correct toward a different host
@@ -873,6 +879,14 @@ export class RoomSession {
         this.spawnLocalAvatar();
       }
       return;
+    }
+    if (
+      this.options.spawnPointId &&
+      !canvas.spawnPoints.some((candidate) => candidate.id === this.options.spawnPointId)
+    ) {
+      throw new Error(
+        `canvas '${canvas.id}' has no spawn point '${this.options.spawnPointId}'`,
+      );
     }
     this.canvasDefinition = canvas;
     this.localAvatarId = nextAvatarId;

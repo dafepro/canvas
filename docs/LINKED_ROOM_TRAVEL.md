@@ -23,8 +23,13 @@ credentials, staging their presentation, and authorizing travel.
    validated return link. The latter is a product UI escape hatch if the player
    cannot reach the return collider.
 7. A consumer may use `arrivalSpawnPointId` to select or explain destination
-   placement. Canvas treats it as an application-owned hint; the server still
-   selects the destination room template.
+   placement. `CanvasRuntime.spawnPointId` applies that named spawn and rejects
+   a missing point before the destination commits; the server still selects the
+   destination room template.
+8. Same-participant uniqueness is room-scoped. A newer connection supersedes an
+   older connection in that room, while a staged origin/destination overlap is
+   allowed. Products requiring one global account location enforce that policy
+   while issuing destination credentials.
 
 ## Public structure
 
@@ -45,8 +50,15 @@ subscription, then closes the origin. Concurrent contacts are coalesced.
 
 The navigator does not persist travel history. A product that wants browser
 refresh to preserve a navigation stack should persist its own route or current
-room ID. Even without that history, the graph and destination room still expose
-the physical reverse route.
+room ID. The reference integration commits the current room to its URL, so a
+refresh rejoins the committed room. Even without history, the graph and
+destination room still expose the physical reverse route.
+
+Activation and effect-subscription installation are part of the staged commit.
+If either fails, the destination is closed and the origin is reactivated.
+Consumer callbacks cannot interrupt navigation cleanup or corrupt the committed
+current-room pointer. See `LINKED_ROOM_TRAVEL_HARDENING.md` for the pre-mortem
+and cross-layer coverage matrix.
 
 ## Trust boundary
 

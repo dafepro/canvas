@@ -15,3 +15,10 @@ the LAN interface and proxies `/v1` WebSocket traffic to the reference service
 on port 8084. Give simultaneous tabs or devices different `user` values. A
 second connection with the same participant identity intentionally replaces
 the first one instead of creating a duplicate avatar.
+
+The active room is stored in the `room` URL parameter after a successful
+transition. Refresh therefore rejoins the committed room, and unknown room IDs
+fall back to the village. Arrival links use their named spawn points. The rooms
+service intentionally scopes participant uniqueness per room; applications
+that require one global account location enforce that policy when issuing
+destination credentials.
