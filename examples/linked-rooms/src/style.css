@@ -11,7 +11,16 @@ input, button { border: 1px solid #b8c9bc; border-radius: 12px; padding: 11px 14
 button { font-weight: 750; cursor: pointer; box-shadow: 0 3px 10px #15361c12; }
 button:disabled { cursor: default; opacity: .45; }
 #join, #back { background: #285f3b; color: #fff; border-color: #285f3b; }
-.room-card { overflow: hidden; border: 1px solid #b9cabc; border-radius: 24px; background: #fff; box-shadow: 0 22px 60px #27482f20; }
+.room-card { position: relative; overflow: hidden; border: 1px solid #b9cabc; border-radius: 24px; background: #fff; box-shadow: 0 22px 60px #27482f20; }
+.room-card.session-blocked > :not(#session-blocker) { filter: grayscale(.9) blur(3px); opacity: .58; pointer-events: none; user-select: none; }
+#session-blocker[hidden] { display: none; }
+#session-blocker { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 22px; background: #15251eb8; backdrop-filter: blur(3px); }
+.session-blocker-panel { width: min(390px, 100%); padding: 28px; border: 1px solid #b8d3bf; border-radius: 22px; background: #f8fcf8; box-shadow: 0 25px 70px #07180ea6; text-align: center; }
+.session-blocker-icon { display: grid; width: 48px; height: 48px; margin: 0 auto 12px; place-items: center; border-radius: 50%; background: #dceddf; color: #285f3b; font-size: 26px; font-weight: 850; }
+.session-blocker-panel h2 { margin: 0 0 8px; }
+.session-blocker-panel p { margin: 0 0 18px; color: #53665a; line-height: 1.45; }
+.session-blocker-panel small { display: block; margin-top: 10px; color: #708177; }
+#take-control { width: 100%; background: #285f3b; color: #fff; border-color: #285f3b; }
 .room-heading, .status-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; }
 .room-heading span { display: block; color: #708177; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
 .room-heading strong { font-size: 20px; }

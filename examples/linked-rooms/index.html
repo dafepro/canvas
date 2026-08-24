@@ -21,6 +21,15 @@
       </header>
 
       <section class="room-card">
+        <div id="session-blocker" role="dialog" aria-modal="true" aria-labelledby="session-blocker-title" hidden>
+          <div class="session-blocker-panel">
+            <span class="session-blocker-icon" aria-hidden="true">⇄</span>
+            <h2 id="session-blocker-title">Duplicate session</h2>
+            <p>This participant is active in a newer tab in this room. Simulation here has stopped.</p>
+            <button id="take-control">Use here</button>
+            <small>Taking control will stop the other tab.</small>
+          </div>
+        </div>
         <div class="room-heading">
           <div>
             <span>Current room</span>

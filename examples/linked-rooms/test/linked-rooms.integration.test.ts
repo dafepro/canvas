@@ -54,4 +54,16 @@ describe("linked rooms reference integration", () => {
     const avatarRadius = villageCanvas.avatarController!.radius!;
     expect(sensorNearEdge - avatarRadius).toBeCloseTo(0, 5);
   });
+
+  it("makes duplicate-session displacement explicit and recoverable", () => {
+    const html = readFileSync(resolve(root, "index.html"), "utf8");
+    const css = readFileSync(resolve(root, "src/style.css"), "utf8");
+    const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
+
+    expect(html).toContain('id="session-blocker"');
+    expect(html).toContain('id="take-control"');
+    expect(css).toContain(".room-card.session-blocked");
+    expect(main).toContain('serverCode === "session_superseded"');
+    expect(main).toContain("await displaced?.close()");
+  });
 });
