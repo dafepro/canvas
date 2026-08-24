@@ -247,6 +247,14 @@ func (r *Room) handleJoin(client *Client) {
 	// reconnect supersedes its stale socket before capacity is evaluated.
 	for _, existing := range r.clients {
 		if existing.UserID == client.UserID {
+			r.sendTo(existing, &pb.RoomEnvelope{
+				RoomId:    r.roomID,
+				HostEpoch: r.hostEpoch,
+				Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
+					Code:    "session_superseded",
+					Message: "another connection for this participant joined the room",
+				}},
+			})
 			r.removeClient(existing, "superseded")
 		}
 	}

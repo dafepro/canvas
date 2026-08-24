@@ -305,6 +305,12 @@ func TestReconnectSupersedesTheParticipantsOldConnection(t *testing.T) {
 
 	reconnected := h.dial("alice")
 	reconnected.join()
+	superseded := first.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetError() != nil
+	}).GetError()
+	if superseded.Code != "session_superseded" {
+		t.Fatalf("old connection error = %q, want session_superseded", superseded.Code)
+	}
 	presence := observer.await(func(e *pb.RoomEnvelope) bool {
 		return e.GetPresence() != nil
 	}).GetPresence()

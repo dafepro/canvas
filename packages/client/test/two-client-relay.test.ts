@@ -66,6 +66,31 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     server?.stop();
   });
 
+  it("stops a superseded participant instead of starting a reconnect duel", async () => {
+    const displaced = session("alice");
+    await displaced.start();
+    await waitFor("the original alice host lease", () => displaced.client.isHost);
+
+    const winner = session("alice");
+    await winner.start();
+    await waitFor(
+      "the old alice session to stop terminally",
+      () => displaced.lifecycleState === "failed",
+    );
+    await waitFor("the replacement alice host lease", () => winner.client.isHost);
+
+    const winnerClientId = winner.client.clientId;
+    const winnerHostEpoch = winner.client.hostEpoch;
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+    expect(displaced.lifecycleState).toBe("failed");
+    expect(displaced.diagnostics().lastRejection).toContain("session_superseded");
+    expect(winner.lifecycleState).toBe("active");
+    expect(winner.client.clientId).toBe(winnerClientId);
+    expect(winner.client.hostEpoch).toBe(winnerHostEpoch);
+    expect(winner.client.isHost).toBe(true);
+  }, 30_000);
+
   it("grants one host lease and relays the same item state to the peer", async () => {
     const alice = session("alice");
     await alice.start();
