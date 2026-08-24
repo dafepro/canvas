@@ -125,6 +125,13 @@ close. The immutable report is independent of Vitest or Jest. The test peer is
 responsible for running against the real adapter boundary rather than calling
 private transport methods directly.
 
+For built-in WebSocket integrations, `FaultInjectingWebSocketTransport` from
+the same testing entry point adds deterministic loss, one-way latency, jitter,
+and realtime reordering around the real encoded connection. Its counters prove
+that a requested fault occurred, and an injected seeded random source keeps
+loss assertions reproducible. See `NETWORK_FAULT_TESTING.md` for the fault
+model, example setup, and repository coverage matrix.
+
 ## Simulation worker bundle kit
 
 `runSimulationWorkerConformance` also comes from

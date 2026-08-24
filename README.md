@@ -266,4 +266,6 @@ This writes the TypeScript bindings and the Go bindings from the same file.
 - `docs/ARCHITECTURE.md` — how the pieces fit together and why.
 - `docs/CI_RELEASE_GATE.md` — required Windows/Linux checks and what a passing
   release candidate guarantees independent consumers.
+- `docs/NETWORK_FAULT_TESTING.md` — deterministic loss, latency, jitter, and
+  reordering test support plus the verified fault matrix.
 - `docs/spec.txt` — the plain text of the specification, for searching.

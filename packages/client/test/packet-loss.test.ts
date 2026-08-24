@@ -10,8 +10,8 @@ import {
   type InputIntent,
   type RenderEntity,
 } from "../src/index.js";
+import { FaultInjectingWebSocketTransport } from "../src/testing/index.js";
 import { goAvailable, startCanvasd, waitFor, type Canvasd } from "./support/canvasd.js";
-import { LossyTransport } from "./support/lossy-transport.js";
 
 /**
  * Phase 6, spec 20. A client that misses deltas must repair itself from the
@@ -26,7 +26,7 @@ const sessions: RoomSession[] = [];
 const session = (
   userId: string,
   intent: () => InputIntent = () => STILL,
-  transport?: LossyTransport,
+  transport?: FaultInjectingWebSocketTransport,
 ): RoomSession => {
   const created = new RoomSession({
     transport,
@@ -48,8 +48,15 @@ const items = (room: RoomSession): RenderEntity[] =>
   view(room).filter((candidate) => candidate.kind === "item");
 const distance = (a: RenderEntity, b: RenderEntity): number =>
   Math.hypot(a.x - b.x, a.y - b.y);
+const alternatingRandom = (): (() => number) => {
+  let low = false;
+  return () => {
+    low = !low;
+    return low ? 0.25 : 0.75;
+  };
+};
 
-describe.skipIf(!goAvailable())("a room under packet loss", () => {
+describe.skipIf(!goAvailable())("a room under network faults", () => {
   beforeAll(async () => {
     await RapierWorld.load();
     server = await startCanvasd();
@@ -68,10 +75,10 @@ describe.skipIf(!goAvailable())("a room under packet loss", () => {
     await host.start();
     await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
 
-    const lossy = new LossyTransport(
-      async () => devRealtimeCredential("peer"),
-      { inboundLoss: 0.5, inboundDelayMs: 60 },
-    );
+    const lossy = new FaultInjectingWebSocketTransport({
+      credentialProvider: async () => devRealtimeCredential("peer"),
+      faults: { inboundLoss: 0.5, inboundDelayMs: 60, random: alternatingRandom() },
+    });
     const peer = session("peer", () => STILL, lossy);
     await peer.start();
     await waitFor("the peer to join", () => peer.client.clientId !== "");
@@ -106,6 +113,63 @@ describe.skipIf(!goAvailable())("a room under packet loss", () => {
     expect(entity(peer, crateId)!.definitionId).toBe(crateDefinition.definitionId);
   }, 120_000);
 
+  it.each([50, 100, 200])(
+    "repairs reordered realtime state with %d ms of latency",
+    async (latencyMs) => {
+      let hostIntent: InputIntent = STILL;
+      const hostUserId = `latency-host-${latencyMs}`;
+      const host = session(hostUserId, () => hostIntent);
+      await host.start();
+      await waitFor("the latency host lease", () => host.client.isHost && host.tick > 60);
+
+      const faults = new FaultInjectingWebSocketTransport({
+        credentialProvider: async () => devRealtimeCredential(`latency-peer-${latencyMs}`),
+        faults: {
+          inboundDelayMs: latencyMs,
+          reorderEvery: 2,
+          reorderDelayMs: latencyMs + 80,
+        },
+      });
+      const peer = session(`latency-peer-${latencyMs}`, () => STILL, faults);
+      await peer.start();
+      await waitFor("the delayed peer to join", () => peer.client.clientId !== "", 30_000);
+
+      const avatarId = avatarEntityId(hostUserId);
+      await waitFor(
+        "the delayed peer to receive the host avatar",
+        () => entity(peer, avatarId) !== undefined,
+        30_000,
+      );
+      const startX = entity(host, avatarId)!.x;
+      hostIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true };
+      await waitFor(
+        "the host avatar to move",
+        () => (entity(host, avatarId)?.x ?? startX) - startX > 3,
+        30_000,
+      );
+      hostIntent = STILL;
+
+      await waitFor(
+        "the delayed and reordered peer to converge",
+        () => {
+          const onHost = entity(host, avatarId);
+          const onPeer = entity(peer, avatarId);
+          return (
+            onHost !== undefined &&
+            onPeer !== undefined &&
+            Math.abs(onHost.vx) < 0.2 &&
+            distance(onHost, onPeer) < 1
+          );
+        },
+        30_000,
+      );
+
+      expect(faults.delayedIn).toBeGreaterThan(0);
+      expect(faults.reorderedIn).toBeGreaterThan(0);
+    },
+    90_000,
+  );
+
   // Spec 11.1. A reconnect gives the client a new id. A client that held the
   // lease before the break must not keep publishing state.
   it("drops the host role when a reconnect finds another host", async () => {
@@ -137,10 +201,10 @@ describe.skipIf(!goAvailable())("a room under packet loss", () => {
     await host.start();
     await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
 
-    const lossy = new LossyTransport(
-      async () => devRealtimeCredential("peer"),
-      { outboundLoss: 0.5 },
-    );
+    const lossy = new FaultInjectingWebSocketTransport({
+      credentialProvider: async () => devRealtimeCredential("peer"),
+      faults: { outboundLoss: 0.5, random: alternatingRandom() },
+    });
     const peer = session("peer", () => peerIntent, lossy);
     await peer.start();
     await waitFor("the peer to join", () => peer.client.clientId !== "");
