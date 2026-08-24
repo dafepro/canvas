@@ -205,7 +205,7 @@ export const pixelRoomCanvas: CanvasDefinition = {
   id: "linked-pixel-room",
   backgroundAssetId: "linked.pixelRoom",
   spawnPoints: [
-    { id: "room-centre", position: { x: 24, y: 15 } },
+    { id: "room-start", position: { x: 36, y: 15 } },
     { id: "from-village", position: { x: 36, y: 15 } },
   ],
   staticGeometry: [

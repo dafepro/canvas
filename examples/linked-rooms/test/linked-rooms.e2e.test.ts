@@ -186,7 +186,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
   });
 
   it("opens the generated pixel room with its return door and kickable ball", async () => {
-    const room = open("linked-pixel-room", "pixel-host", "room-centre");
+    const room = open("linked-pixel-room", "pixel-host", "room-start");
     await room.start();
     await room.whenPresented();
     await waitFor(

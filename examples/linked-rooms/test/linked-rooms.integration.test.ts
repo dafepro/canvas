@@ -63,6 +63,19 @@ describe("linked rooms reference integration", () => {
     }
   });
 
+  it("does not kick the ball during a direct room join", () => {
+    const spawn = pixelRoomCanvas.spawnPoints[0]!.position;
+    const ball = pixelRoomCanvas.systemItems.find(
+      ({ entityId }) => entityId === "pixel-room-ball",
+    )!.transform;
+    const distance = Math.hypot(spawn.x - ball.x, spawn.y - ball.y);
+    const kickSensor = adventureBallDefinition.colliders.find(({ id }) => id === "kick")!;
+    const kickRadius = kickSensor.shape.type === "circle" ? kickSensor.shape.radius : 0;
+    expect(distance).toBeGreaterThan(
+      pixelRoomCanvas.avatarController!.radius! + kickRadius,
+    );
+  });
+
   it("activates the door when the avatar centre reaches the sprite midpoint", () => {
     const threshold = roomDoorDefinition.colliders.find(({ id }) => id === "threshold")!;
     expect(threshold.shape).toMatchObject({ type: "rect", width: 0.4 });
