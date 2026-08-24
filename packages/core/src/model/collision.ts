@@ -54,7 +54,10 @@ export const roleDefaultMask: Record<ColliderRole, number> = {
     CollisionLayer.WORLD_STATIC |
     CollisionLayer.ITEM_SOLID |
     CollisionLayer.AVATAR_BODY |
-    CollisionLayer.AVATAR_SENSOR,
+    CollisionLayer.AVATAR_SENSOR |
+    CollisionLayer.ITEM_SENSOR |
+    CollisionLayer.REGION_SENSOR |
+    CollisionLayer.PORTAL_SENSOR,
   itemSensor: CollisionLayer.AVATAR_SENSOR | CollisionLayer.ITEM_SOLID,
   regionSensor:
     CollisionLayer.AVATAR_SENSOR | CollisionLayer.ITEM_SOLID,

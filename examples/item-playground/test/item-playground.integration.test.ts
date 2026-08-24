@@ -20,11 +20,13 @@ import orbJson from "../server/definitions/reactive-orb.json";
 import stampJson from "../server/definitions/system-stamp.json";
 import bouncerJson from "../server/definitions/live-bouncer.json";
 import colorTileJson from "../server/definitions/color-tile.json";
+import pairedPortalJson from "../server/definitions/paired-portal.json";
 import { playgroundAssets } from "../src/assets.js";
 import {
   playgroundDefinitions,
   playgroundAvatarDefinition,
   liveBouncerDefinition,
+  pairedPortalDefinition,
   reactiveOrbDefinition,
 } from "../src/content.js";
 import {
@@ -32,6 +34,10 @@ import {
   defaultReactiveOrbConfig,
 } from "../src/reactive-orb-behavior.js";
 import { LiveBouncerBehavior } from "../src/live-bouncer-behavior.js";
+import {
+  PairedPortalBehavior,
+  defaultPairedPortalConfig,
+} from "../src/paired-portal-behavior.js";
 
 const canvas = canvasJson as unknown as CanvasDefinition;
 
@@ -64,6 +70,7 @@ describe("compact item playground", () => {
       stampJson,
       bouncerJson,
       colorTileJson,
+      pairedPortalJson,
     ];
     for (const definition of playgroundDefinitions.filter(
       ({ definitionId }) => definitionId !== "avatar",
@@ -91,6 +98,7 @@ describe("compact item playground", () => {
     expect(html).toContain('id="finish-edit"');
     expect(html).toContain('id="custom-color-picker"');
     expect(html).toContain('id="collisions"');
+    expect(html).toContain('data-spawn="paired-portal"');
     expect(html).toContain('data-highlight="aurora"');
     expect(html).toContain('aria-label="Delete item"');
     expect(main).toContain("Finished editing · frozen state preserved");
@@ -182,6 +190,156 @@ describe("compact item playground", () => {
         mode: "oneShot",
       }),
     ]);
+    simulation.free();
+  });
+
+  it("routes either portal endpoint through the opposite side without ping-pong", () => {
+    const harness = new BehaviorTestHarness(
+      PairedPortalBehavior,
+      defaultPairedPortalConfig,
+      { canvas: { width: 36, height: 24, orientation: "topDown" } },
+    );
+    harness.host.body(harness.entityId).transform = { x: 18, y: 12, rotation: 0 };
+    harness.host.body("avatar:traveler").transform = { x: 13.7, y: 12, rotation: 0 };
+    harness.host.body("avatar:traveler").velocity = { x: 7, y: 0 };
+
+    harness.send({
+      type: "contact.enter",
+      selfColliderId: "left-portal",
+      other: {
+        entityId: "avatar:traveler",
+        colliderId: "sensor",
+        kind: "avatar",
+        tags: [],
+        userId: "traveler",
+      },
+    }).flush();
+
+    expect(harness.host.body("avatar:traveler").transform).toMatchObject({ x: 26, y: 12 });
+    expect(harness.host.body("avatar:traveler").velocity).toEqual({ x: 7, y: 0 });
+    expect(harness.host.body(harness.entityId).animation).toBe("surge");
+    expect(harness.host.effects).toEqual([
+      expect.objectContaining({
+        entityId: "avatar:traveler",
+        effect: "portalFlash",
+        mode: "oneShot",
+      }),
+    ]);
+    expect(harness.state.transitCount).toBe(1);
+
+    harness.send({
+      type: "contact.enter",
+      selfColliderId: "right-portal",
+      other: {
+        entityId: "avatar:traveler",
+        colliderId: "sensor",
+        kind: "avatar",
+        tags: [],
+        userId: "traveler",
+      },
+    }).flush();
+    expect(harness.state.transitCount).toBe(1);
+  });
+
+  it("teleports a real avatar through the composite portal item", () => {
+    const simulation = new HostSimulation(
+      canvas,
+      playgroundDefinitions,
+      new BehaviorRegistry()
+        .register(ReactiveOrbBehavior)
+        .register(LiveBouncerBehavior)
+        .register(PairedPortalBehavior),
+      60,
+    );
+    simulation.addItem({
+      entityId: "portal-pair",
+      canvasId: canvas.id,
+      definitionId: pairedPortalDefinition.definitionId,
+      definitionVersion: pairedPortalDefinition.version,
+      ownerUserId: "maker",
+      transform: { x: 18, y: 12, rotation: 0 },
+      resolvedConfig: defaultPairedPortalConfig,
+      createdAt: new Date().toISOString(),
+      sceneRevision: 1,
+    });
+    simulation.addAvatar({
+      entityId: "avatar:traveler",
+      clientId: "traveler-client",
+      userId: "traveler",
+      position: { x: 7, y: 12 },
+    });
+    simulation.world.setAvatarInput("avatar:traveler", { x: 1, y: 0 }, 1, 1);
+
+    const effects = [];
+    for (let tick = 0; tick < 90; tick++) effects.push(...simulation.step().effects);
+    const avatar = simulation.world.registry.require("avatar:traveler");
+
+    expect(avatar.transform.x).toBeGreaterThan(24);
+    expect(avatar.teleportEpoch).toBe(1);
+    expect(simulation.behaviors.slot("portal-pair")?.state).toMatchObject({ transitCount: 1 });
+    expect(effects).toContainEqual(
+      expect.objectContaining({
+        entityId: "avatar:traveler",
+        effect: "portalFlash",
+        mode: "oneShot",
+      }),
+    );
+    simulation.free();
+  });
+
+  it("teleports a real dynamic item through the composite portal item", () => {
+    const simulation = new HostSimulation(
+      canvas,
+      playgroundDefinitions,
+      new BehaviorRegistry()
+        .register(ReactiveOrbBehavior)
+        .register(LiveBouncerBehavior)
+        .register(PairedPortalBehavior),
+      60,
+    );
+    simulation.addItem({
+      entityId: "portal-pair",
+      canvasId: canvas.id,
+      definitionId: pairedPortalDefinition.definitionId,
+      definitionVersion: pairedPortalDefinition.version,
+      ownerUserId: "maker",
+      transform: { x: 18, y: 12, rotation: 0 },
+      resolvedConfig: defaultPairedPortalConfig,
+      createdAt: new Date().toISOString(),
+      sceneRevision: 1,
+    });
+    simulation.addItem({
+      entityId: "traveling-ball",
+      canvasId: canvas.id,
+      definitionId: liveBouncerDefinition.definitionId,
+      definitionVersion: liveBouncerDefinition.version,
+      ownerUserId: "",
+      transform: { x: 7, y: 12, rotation: 0 },
+      resolvedConfig: { speed: 8.5, initialDirection: { x: 1, y: 0 } },
+      createdAt: new Date().toISOString(),
+      sceneRevision: 1,
+    });
+
+    const effects = [];
+    for (
+      let tick = 0;
+      tick < 70 && (simulation.world.registry.require("traveling-ball").teleportEpoch ?? 0) === 0;
+      tick++
+    ) {
+      effects.push(...simulation.step().effects);
+    }
+    const ball = simulation.world.registry.require("traveling-ball");
+
+    expect(ball.transform.x).toBeGreaterThan(24);
+    expect(ball.teleportEpoch).toBe(1);
+    expect(simulation.behaviors.slot("portal-pair")?.state).toMatchObject({ transitCount: 1 });
+    expect(effects).toContainEqual(
+      expect.objectContaining({
+        entityId: "traveling-ball",
+        effect: "portalFlash",
+        mode: "oneShot",
+      }),
+    );
     simulation.free();
   });
 

@@ -1,4 +1,5 @@
 import {
+  CollisionLayer,
   defaultKickableConfig,
   defaultRocketConfig,
   type CanvasDefinition,
@@ -160,7 +161,12 @@ export const ballDefinition: ItemDefinition<typeof defaultKickableConfig> = {
       restitution: 0.75,
       friction: 0.4,
       // The avatar body passes through; only the world and other items collide.
-      collisionMask: 0b0000_1100,
+      collisionMask:
+        CollisionLayer.WORLD_STATIC |
+        CollisionLayer.ITEM_SOLID |
+        CollisionLayer.ITEM_SENSOR |
+        CollisionLayer.REGION_SENSOR |
+        CollisionLayer.PORTAL_SENSOR,
     },
     { id: "kick", role: "itemSensor", shape: { type: "circle", radius: 1.9 } },
   ],

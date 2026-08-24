@@ -20,7 +20,7 @@
       "id": "solid",
       "role": "itemSolid",
       "shape": { "type": "circle", "radius": 1.75 },
-      "collisionMask": 15,
+      "collisionMask": 127,
       "restitution": 1,
       "friction": 0
     }

@@ -39,7 +39,7 @@
       "shape": { "type": "circle", "radius": 3 },
       "restitution": 0.9,
       "friction": 0.2,
-      "collisionMask": 12
+      "collisionMask": 124
     },
     {
       "id": "kick",

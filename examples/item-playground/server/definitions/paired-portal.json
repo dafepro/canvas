@@ -1,0 +1,70 @@
+{
+  "definitionId": "paired-portal",
+  "version": 1,
+  "displayName": "Linked portal pair",
+  "visual": {
+    "spriteId": "playground.portal.pair",
+    "size": { "width": 13.5, "height": 5 },
+    "placeholder": { "shape": "rect", "color": 7558872 },
+    "zIndex": 7,
+    "animations": {
+      "surge": {
+        "frames": [
+          "playground.portal.pair",
+          "playground.portal.pairPulse",
+          "playground.portal.pair"
+        ],
+        "fps": 9,
+        "loop": false
+      }
+    }
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [
+    {
+      "id": "left-portal",
+      "role": "portalSensor",
+      "shape": { "type": "circle", "radius": 1.8 },
+      "offset": { "x": -4.3, "y": 0 }
+    },
+    {
+      "id": "right-portal",
+      "role": "portalSensor",
+      "shape": { "type": "circle", "radius": 1.8 },
+      "offset": { "x": 4.3, "y": 0 }
+    }
+  ],
+  "behaviorType": "playground.pairedPortal",
+  "defaultConfig": {
+    "endpointOffset": 4.3,
+    "exitClearance": 3.7,
+    "velocityScale": 1,
+    "cooldownSeconds": 0.45,
+    "accepts": ["avatar", "item"]
+  },
+  "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "endpointOffset": { "type": "number", "minimum": 1, "maximum": 10 },
+      "exitClearance": { "type": "number", "minimum": 1, "maximum": 10 },
+      "velocityScale": { "type": "number", "minimum": 0, "maximum": 3 },
+      "cooldownSeconds": { "type": "number", "minimum": 0.1, "maximum": 5 },
+      "accepts": {
+        "type": "array",
+        "items": { "type": "string", "enum": ["avatar", "item"] },
+        "minItems": 1,
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "endpointOffset",
+      "exitClearance",
+      "velocityScale",
+      "cooldownSeconds",
+      "accepts"
+    ],
+    "additionalProperties": false
+  }
+}

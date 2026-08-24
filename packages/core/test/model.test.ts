@@ -111,6 +111,12 @@ describe("collision roles", () => {
     expect(isSensorRole("itemSensor")).toBe(true);
     expect(isSensorRole("itemSolid")).toBe(false);
   });
+
+  it("lets solid items participate in authored sensor interactions", () => {
+    expect(roleDefaultMask.itemSolid & CollisionLayer.ITEM_SENSOR).not.toBe(0);
+    expect(roleDefaultMask.itemSolid & CollisionLayer.REGION_SENSOR).not.toBe(0);
+    expect(roleDefaultMask.itemSolid & CollisionLayer.PORTAL_SENSOR).not.toBe(0);
+  });
 });
 
 describe("validation", () => {

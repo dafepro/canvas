@@ -3,5 +3,10 @@
 import { installSimulationWorker } from "@canvas-physics/client/worker-runtime";
 import { ReactiveOrbBehavior } from "./reactive-orb-behavior.js";
 import { LiveBouncerBehavior } from "./live-bouncer-behavior.js";
+import { PairedPortalBehavior } from "./paired-portal-behavior.js";
 
-installSimulationWorker(self, [ReactiveOrbBehavior, LiveBouncerBehavior]);
+installSimulationWorker(self, [
+  ReactiveOrbBehavior,
+  LiveBouncerBehavior,
+  PairedPortalBehavior,
+]);

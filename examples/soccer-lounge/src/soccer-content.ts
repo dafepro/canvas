@@ -1,4 +1,4 @@
-import type { ItemDefinition } from "@canvas-physics/core";
+import { CollisionLayer, type ItemDefinition } from "@canvas-physics/core";
 import {
   defaultSoccerBallConfig,
   type SoccerBallConfig,
@@ -45,7 +45,12 @@ export const soccerBallDefinition: ItemDefinition<SoccerBallConfig> = {
       shape: { type: "circle", radius: 3 },
       restitution: 0.9,
       friction: 0.2,
-      collisionMask: 0b0000_1100,
+      collisionMask:
+        CollisionLayer.WORLD_STATIC |
+        CollisionLayer.ITEM_SOLID |
+        CollisionLayer.ITEM_SENSOR |
+        CollisionLayer.REGION_SENSOR |
+        CollisionLayer.PORTAL_SENSOR,
     },
     {
       id: "kick",

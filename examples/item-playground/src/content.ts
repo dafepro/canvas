@@ -7,6 +7,10 @@ import {
   defaultLiveBouncerConfig,
   type LiveBouncerConfig,
 } from "./live-bouncer-behavior.js";
+import {
+  defaultPairedPortalConfig,
+  type PairedPortalConfig,
+} from "./paired-portal-behavior.js";
 
 const durableFixed = {
   body: { mode: "fixed" as const, gravityScale: 0, lockRotation: true },
@@ -164,7 +168,10 @@ export const liveBouncerDefinition: ItemDefinition<LiveBouncerConfig> = {
         CollisionLayer.WORLD_STATIC |
         CollisionLayer.ITEM_SOLID |
         CollisionLayer.AVATAR_BODY |
-        CollisionLayer.AVATAR_SENSOR,
+        CollisionLayer.AVATAR_SENSOR |
+        CollisionLayer.ITEM_SENSOR |
+        CollisionLayer.REGION_SENSOR |
+        CollisionLayer.PORTAL_SENSOR,
       restitution: 1,
       friction: 0,
     },
@@ -199,6 +206,52 @@ export const playgroundAvatarDefinition: ItemDefinition<Record<string, never>> =
   complexity: "simple",
 };
 
+export const pairedPortalDefinition: ItemDefinition<PairedPortalConfig> = {
+  definitionId: "paired-portal",
+  version: 1,
+  displayName: "Linked portal pair",
+  visual: {
+    spriteId: "playground.portal.pair",
+    size: { width: 13.5, height: 5 },
+    placeholder: { shape: "rect", color: 0x7356d8 },
+    zIndex: 7,
+    animations: {
+      surge: {
+        frames: [
+          "playground.portal.pair",
+          "playground.portal.pairPulse",
+          "playground.portal.pair",
+        ],
+        fps: 9,
+        loop: false,
+      },
+    },
+  },
+  body: { mode: "fixed", gravityScale: 0, lockRotation: true },
+  colliders: [
+    {
+      id: "left-portal",
+      role: "portalSensor",
+      shape: { type: "circle", radius: 1.8 },
+      offset: { x: -4.3, y: 0 },
+    },
+    {
+      id: "right-portal",
+      role: "portalSensor",
+      shape: { type: "circle", radius: 1.8 },
+      offset: { x: 4.3, y: 0 },
+    },
+  ],
+  behaviorType: "playground.pairedPortal",
+  defaultConfig: defaultPairedPortalConfig,
+  persistence: {
+    transform: true,
+    behaviorState: true,
+    onRoomSleep: "pause",
+  },
+  complexity: "simple",
+};
+
 export const playgroundDefinitions: ItemDefinition[] = [
   partyEmojiDefinition,
   photoCardDefinition,
@@ -206,5 +259,6 @@ export const playgroundDefinitions: ItemDefinition[] = [
   colorTileDefinition as ItemDefinition,
   liveBouncerDefinition as ItemDefinition,
   systemStampDefinition,
+  pairedPortalDefinition as ItemDefinition,
   playgroundAvatarDefinition,
 ];

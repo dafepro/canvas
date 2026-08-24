@@ -370,7 +370,9 @@ highlightButtons.forEach((button) =>
 paletteButtons.forEach((button) =>
   button.addEventListener("click", () => {
     const definitionId = button.dataset.spawn!;
-    const position = spawnPositions[spawnCursor++ % spawnPositions.length]!;
+    const position = definitionId === "paired-portal"
+      ? { x: 18, y: 12 }
+      : spawnPositions[spawnCursor++ % spawnPositions.length]!;
     runtime?.clearItemEditSelection();
     closePopovers();
     requestMutation(

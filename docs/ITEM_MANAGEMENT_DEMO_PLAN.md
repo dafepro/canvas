@@ -41,10 +41,14 @@ interaction behavior while importing only published Canvas package exports.
 9. [x] **Solid durable freeze.** Finish preserves the server-authoritative
    frozen state; frozen items stay selectable, editable, and physically solid.
    The live ball collides with both live and frozen authored items.
+10. [x] **Composite portal pair.** A consumer-authored, independently movable,
+    rotatable, and scalable item owns two portal sensors. Avatars and solid
+    items preserve momentum as they transit either direction, exit clear of the
+    opposite sensor, and produce transient animation/effect feedback.
 
 ## Next slice
 
-10. [ ] **Configurable behavior playback.** Add an editable example item whose
+11. [ ] **Configurable behavior playback.** Add an editable example item whose
     durable config chooses an automatic trigger policy (such as avatar contact,
     timer, or collision) and playback settings (once/loop and speed). Add
     private Play/Restart controls after Canvas exposes an owner-authorized
