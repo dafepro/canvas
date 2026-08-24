@@ -1,0 +1,105 @@
+{
+  "definitionId": "basketball-game-ball",
+  "version": 1,
+  "displayName": "Game ball",
+  "visual": {
+    "spriteId": "basketball.ball",
+    "size": { "width": 3.2, "height": 3.2 },
+    "placeholder": { "shape": "circle", "color": 16347926 },
+    "zIndex": 8,
+    "variants": { "scored": { "color": 16765286 } }
+  },
+  "body": {
+    "mode": "dynamic",
+    "mass": 0.55,
+    "gravityScale": 0,
+    "linearDamping": 0.22,
+    "angularDamping": 0.28,
+    "canSleep": true
+  },
+  "colliders": [
+    {
+      "id": "solid",
+      "role": "itemSolid",
+      "shape": { "type": "circle", "radius": 1.5 },
+      "restitution": 0.86,
+      "friction": 0.25,
+      "collisionMask": 63
+    },
+    {
+      "id": "kick",
+      "role": "itemSensor",
+      "shape": { "type": "circle", "radius": 2.3 }
+    }
+  ],
+  "behaviorType": "basketballGameBall",
+  "defaultConfig": {
+    "sensorId": "kick",
+    "kickStrength": 2.15,
+    "pinchStrength": 1.2,
+    "minimumKickImpulse": 5,
+    "maxImpulse": 28,
+    "spinTransfer": 0.65,
+    "maxAngularSpeed": 14,
+    "cooldownSeconds": 0.18,
+    "basketResetSeconds": 1.25,
+    "gameResetSeconds": 3,
+    "pointsPerBasket": 2,
+    "winningScore": 6,
+    "centre": { "x": 35, "y": 21 },
+    "tealScoreTag": "tealScores",
+    "coralScoreTag": "coralScores"
+  },
+  "persistence": {
+    "transform": true,
+    "behaviorState": true,
+    "onRoomSleep": "pause"
+  },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "sensorId",
+      "kickStrength",
+      "pinchStrength",
+      "minimumKickImpulse",
+      "maxImpulse",
+      "spinTransfer",
+      "maxAngularSpeed",
+      "cooldownSeconds",
+      "basketResetSeconds",
+      "gameResetSeconds",
+      "pointsPerBasket",
+      "winningScore",
+      "centre",
+      "tealScoreTag",
+      "coralScoreTag"
+    ],
+    "properties": {
+      "sensorId": { "type": "string", "enum": ["kick"] },
+      "kickStrength": { "type": "number", "minimum": 0, "maximum": 10 },
+      "pinchStrength": { "type": "number", "minimum": 0, "maximum": 10 },
+      "minimumKickImpulse": { "type": "number", "minimum": 0, "maximum": 50 },
+      "maxImpulse": { "type": "number", "minimum": 1, "maximum": 100 },
+      "spinTransfer": { "type": "number", "minimum": 0, "maximum": 10 },
+      "maxAngularSpeed": { "type": "number", "minimum": 0, "maximum": 50 },
+      "cooldownSeconds": { "type": "number", "minimum": 0.05, "maximum": 2 },
+      "basketResetSeconds": { "type": "number", "minimum": 0, "maximum": 10 },
+      "gameResetSeconds": { "type": "number", "minimum": 0, "maximum": 30 },
+      "pointsPerBasket": { "type": "number", "minimum": 1, "maximum": 3 },
+      "winningScore": { "type": "number", "minimum": 1, "maximum": 100 },
+      "centre": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["x", "y"],
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" }
+        }
+      },
+      "tealScoreTag": { "type": "string" },
+      "coralScoreTag": { "type": "string" }
+    }
+  }
+}

@@ -42,6 +42,10 @@ downward. Check an item only after the relevant focused tests pass.
   routes, failed-open rollback, departure-hidden avatars, a programmatic Back
   escape hatch, and a branching pixel-art room with an independently kickable
   physics item.
+- [x] Ship a basketball reference integration proving that a consumer can put
+  hoop geometry, score sensors, team tags, sport tuning, win thresholds, and
+  possession/game resets in canvas and item configuration while keeping only
+  generic event interpretation in its custom behavior.
 
 ## Consumer-library Priority 0 — linked room travel
 

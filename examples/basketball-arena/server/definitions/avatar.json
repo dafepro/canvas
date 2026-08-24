@@ -1,0 +1,25 @@
+{
+  "definitionId": "avatar",
+  "version": 1,
+  "displayName": "Basketball player",
+  "visual": {
+    "spriteId": "basketball.avatar",
+    "size": { "width": 5.2, "height": 7.8 },
+    "anchor": { "x": 0.5, "y": 0.56 },
+    "placeholder": { "shape": "circle", "color": 1489072 },
+    "zIndex": 10
+  },
+  "colliders": [],
+  "defaultConfig": {},
+  "persistence": {
+    "transform": false,
+    "behaviorState": false,
+    "onRoomSleep": "pause"
+  },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

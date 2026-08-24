@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>Canvas Physics · Basketball arena</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="title-block">
+          <p class="eyebrow">Canvas Physics reference integration</p>
+          <h1>Neon hardwood</h1>
+          <p>Configuration-first multiplayer basketball</p>
+        </div>
+
+        <section id="scoreboard" class="scoreboard" aria-label="Basketball scoreboard">
+          <div class="score-side teal">
+            <span>Teal</span>
+            <strong id="teal-score">0</strong>
+          </div>
+          <div class="score-side coral">
+            <span>Coral</span>
+            <strong id="coral-score">0</strong>
+          </div>
+        </section>
+
+        <div class="connection-status">
+          <span id="status">Not connected</span>
+          <span><strong id="participant-count">0</strong> on court</span>
+        </div>
+      </header>
+
+      <section class="arena-card">
+        <div id="stage" aria-label="Top-down basketball court"></div>
+        <div id="game-message" class="game-message">First to 6 · baskets score 2</div>
+      </section>
+
+      <aside>
+        <div class="join-controls">
+          <label for="user">Player</label>
+          <input id="user" autocomplete="off" />
+          <button id="join">Join game</button>
+          <button id="leave" disabled>Leave</button>
+        </div>
+        <p>
+          Move with WASD or the on-court joystick. Run through the ball to shoot it.
+          Teal scores in the right basket; Coral scores in the left.
+        </p>
+        <p>
+          Hoop sensors award <span id="points-per-basket">2</span> points. The live ball
+          finishes its motion, resets at center after
+          <span id="basket-reset-seconds">1.25</span> seconds, and the whole scoreboard
+          resets <span id="game-reset-seconds">3</span> seconds after a team reaches
+          <span id="winning-score">6</span>.
+        </p>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

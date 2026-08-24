@@ -14,7 +14,9 @@
     "example:items": "pnpm --filter @canvas-physics/example-item-playground dev",
     "example:items:server": "pnpm --filter @canvas-physics/example-item-playground server",
     "example:rooms": "pnpm --filter @canvas-physics/example-linked-rooms dev",
-    "example:rooms:server": "pnpm --filter @canvas-physics/example-linked-rooms server"
+    "example:rooms:server": "pnpm --filter @canvas-physics/example-linked-rooms server",
+    "example:basketball": "pnpm --filter @canvas-physics/example-basketball-arena dev",
+    "example:basketball:server": "pnpm --filter @canvas-physics/example-basketball-arena server"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

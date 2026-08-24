@@ -1,0 +1,144 @@
+{
+  "id": "basketball-arena",
+  "version": 1,
+  "size": { "width": 70, "height": 42 },
+  "orientation": "topDown",
+  "backgroundAssetId": "basketball.court",
+  "edges": { "top": "solid", "right": "solid", "bottom": "solid", "left": "solid" },
+  "terrainDefaults": { "avatars": true, "items": true },
+  "avatarController": { "radius": 1.35, "maxSpeed": 19, "acceleration": 115 },
+  "staticGeometry": [
+    {
+      "id": "left-backboard",
+      "shape": { "type": "rect", "width": 0.55, "height": 8 },
+      "position": { "x": 6.35, "y": 21 },
+      "tags": ["basketFrame", "leftBasket"],
+      "restitution": 0.74,
+      "friction": 0.35
+    },
+    {
+      "id": "right-backboard",
+      "shape": { "type": "rect", "width": 0.55, "height": 8 },
+      "position": { "x": 63.65, "y": 21 },
+      "tags": ["basketFrame", "rightBasket"],
+      "restitution": 0.74,
+      "friction": 0.35
+    },
+    {
+      "id": "left-rim-18.9",
+      "shape": { "type": "circle", "radius": 0.28 },
+      "position": { "x": 7.8, "y": 18.9 },
+      "tags": ["rim", "leftBasket"],
+      "restitution": 0.9
+    },
+    {
+      "id": "right-rim-18.9",
+      "shape": { "type": "circle", "radius": 0.28 },
+      "position": { "x": 62.2, "y": 18.9 },
+      "tags": ["rim", "rightBasket"],
+      "restitution": 0.9
+    },
+    {
+      "id": "left-rim-23.1",
+      "shape": { "type": "circle", "radius": 0.28 },
+      "position": { "x": 7.8, "y": 23.1 },
+      "tags": ["rim", "leftBasket"],
+      "restitution": 0.9
+    },
+    {
+      "id": "right-rim-23.1",
+      "shape": { "type": "circle", "radius": 0.28 },
+      "position": { "x": 62.2, "y": 23.1 },
+      "tags": ["rim", "rightBasket"],
+      "restitution": 0.9
+    }
+  ],
+  "regions": [
+    {
+      "id": "left-basket-score",
+      "shape": { "type": "circle", "x": 7.8, "y": 21, "radius": 1.45 },
+      "tags": ["basket", "coralScores"],
+      "emitEvents": true
+    },
+    {
+      "id": "right-basket-score",
+      "shape": { "type": "circle", "x": 62.2, "y": 21, "radius": 1.45 },
+      "tags": ["basket", "tealScores"],
+      "emitEvents": true
+    }
+  ],
+  "environment": {
+    "base": {
+      "gravityXY": { "x": 0, "y": 0 },
+      "linearDrag": 0.12,
+      "angularDrag": 0.2,
+      "softSpeedLimit": 30,
+      "surfaceFrictionMultiplier": 1
+    },
+    "regions": [
+      {
+        "id": "left-net-damping",
+        "shape": { "type": "circle", "x": 7.1, "y": 21, "radius": 2.2 },
+        "blend": "radial",
+        "priority": 10,
+        "linearDrag": [2.4, 0.5],
+        "angularDrag": [3, 0.4],
+        "softSpeedLimit": [7, 16]
+      },
+      {
+        "id": "right-net-damping",
+        "shape": { "type": "circle", "x": 62.9, "y": 21, "radius": 2.2 },
+        "blend": "radial",
+        "priority": 10,
+        "linearDrag": [2.4, 0.5],
+        "angularDrag": [3, 0.4],
+        "softSpeedLimit": [7, 16]
+      }
+    ]
+  },
+  "spawnPoints": [
+    { "id": "teal", "position": { "x": 25, "y": 21 } },
+    { "id": "coral", "position": { "x": 45, "y": 21 } },
+    { "id": "sideline", "position": { "x": 35, "y": 37 } }
+  ],
+  "systemItems": [
+    {
+      "entityId": "basketball-game-ball",
+      "definitionId": "basketball-game-ball",
+      "definitionVersion": 1,
+      "transform": { "x": 35, "y": 21, "rotation": 0, "scale": 1 },
+      "resolvedConfig": {
+        "sensorId": "kick",
+        "kickStrength": 2.15,
+        "pinchStrength": 1.2,
+        "minimumKickImpulse": 5,
+        "maxImpulse": 28,
+        "spinTransfer": 0.65,
+        "maxAngularSpeed": 14,
+        "cooldownSeconds": 0.18,
+        "basketResetSeconds": 1.25,
+        "gameResetSeconds": 3,
+        "pointsPerBasket": 2,
+        "winningScore": 6,
+        "centre": { "x": 35, "y": 21 },
+        "tealScoreTag": "tealScores",
+        "coralScoreTag": "coralScores"
+      }
+    },
+    {
+      "entityId": "left-basketball-hoop",
+      "definitionId": "basketball-hoop",
+      "definitionVersion": 1,
+      "transform": { "x": 4, "y": 21, "rotation": 0, "scale": 1 },
+      "resolvedConfig": {}
+    },
+    {
+      "entityId": "right-basketball-hoop",
+      "definitionId": "basketball-hoop",
+      "definitionVersion": 1,
+      "transform": { "x": 66, "y": 21, "rotation": 3.141592653589793, "scale": 1 },
+      "resolvedConfig": {}
+    }
+  ],
+  "limits": { "maxAvatars": 16, "maxItems": 3, "maxComplexPhysicsItems": 0 }
+}

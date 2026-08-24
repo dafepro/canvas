@@ -145,3 +145,24 @@ normal lounge UI.
 The canvas definition's `systemItems` materializes exactly one match ball on a
 new room. System items have no participant owner and reject participant move,
 configuration, rotation, and delete commands.
+
+## Basketball arena reference integration
+
+`examples/basketball-arena` is a compact configuration-first full-court game.
+Its authoritative canvas owns mirrored hoop placement, matching backboards and
+rim collision, circular score sensors, localized net damping, player tuning,
+spawn points, and the immutable system ball. The ball's resolved configuration
+owns impulse feel, team-award tags, points per basket, winning score, possession
+and game-reset delays, and the center reset location.
+
+The consumer behavior therefore contains no court coordinates or hard-coded
+match values. It maps configured contacts and region tags into physics commands
+and durable score state. Ordinary physics continues during the score display;
+the ball then teleports to the configured center. Reaching the configured win
+threshold presents the winner before atomically resetting both scores and the
+ball for a new game.
+
+The generated court, ball, mirrored hoop, avatar, and scoreboard shell remain
+consumer-owned assets. Canvas preloads and renders world assets through its
+public manifest, while product DOM projects the replicated behavior state into
+live numbers inside the generated scoreboard frame.
