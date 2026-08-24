@@ -26,11 +26,11 @@ afterEach(() => {
 });
 
 const runPnpm = (arguments_: string[], cwd: string): void => {
-  const pnpmCommand = process.platform === "win32"
-    ? (process.env.ComSpec ?? "cmd.exe")
-    : "pnpm";
-  const pnpmArguments = process.platform === "win32"
-    ? ["/d", "/s", "/c", "pnpm.cmd", ...arguments_]
+  const executable = process.platform === "win32" ? findWindowsPnpm() : "pnpm";
+  const isCommandShim = executable.toLowerCase().endsWith(".cmd");
+  const pnpmCommand = isCommandShim ? (process.env.ComSpec ?? "cmd.exe") : executable;
+  const pnpmArguments = isCommandShim
+    ? ["/d", "/s", "/c", executable, ...arguments_]
     : arguments_;
   try {
     execFileSync(pnpmCommand, pnpmArguments, {
@@ -44,6 +44,23 @@ const runPnpm = (arguments_: string[], cwd: string): void => {
       cause: error,
     });
   }
+};
+
+const findWindowsPnpm = (): string => {
+  for (const name of ["pnpm.exe", "pnpm.cmd"]) {
+    try {
+      const resolved = execFileSync("where.exe", [name], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+        .trim()
+        .split(/\r?\n/u)[0];
+      if (resolved) return resolved;
+    } catch {
+      // Try the next supported Windows installation form.
+    }
+  }
+  throw new Error("Could not locate pnpm.exe or pnpm.cmd on PATH");
 };
 
 interface PackageManifest {
