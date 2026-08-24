@@ -240,6 +240,11 @@ export class RoomSession {
     resolve: () => void;
     reject: (error: CanvasConsumerError) => void;
   }>();
+  private presentationReady = false;
+  private readonly presentationWaiters = new Set<{
+    resolve: () => void;
+    reject: (error: CanvasConsumerError) => void;
+  }>();
   private startPromise?: Promise<void>;
   private terminalError?: CanvasConsumerError;
   private pageVisible = true;
@@ -359,6 +364,23 @@ export class RoomSession {
     }
     return new Promise<void>((resolve, reject) => {
       this.readyWaiters.add({ resolve, reject });
+    });
+  }
+
+  /** Resolves after the first complete authoritative room frame is available. */
+  whenPresented(): Promise<void> {
+    if (this.presentationReady) return Promise.resolve();
+    if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
+        this.lifecycle === "stopped") {
+      return Promise.reject(
+        this.terminalError ?? lifecycleError(
+          "invalid_lifecycle_state",
+          `Room session cannot become presentable after it is ${this.lifecycle}`,
+        ),
+      );
+    }
+    return new Promise<void>((resolve, reject) => {
+      this.presentationWaiters.add({ resolve, reject });
     });
   }
 
@@ -503,6 +525,8 @@ export class RoomSession {
       );
       for (const waiter of this.readyWaiters) waiter.reject(error);
       this.readyWaiters.clear();
+      for (const waiter of this.presentationWaiters) waiter.reject(error);
+      this.presentationWaiters.clear();
     }
   }
 
@@ -622,6 +646,7 @@ export class RoomSession {
       this.publishCanonicalState(tick, entities);
       this.syncCountdowns(entities, tick);
       this.itemCount = entities.filter((entity) => entity.kind === "item").length;
+      this.checkPresentationReady();
     });
 
     this.client.on("stateDelta", (delta, _epoch, tick) => {
@@ -633,6 +658,7 @@ export class RoomSession {
       this.buffer.pushDelta(tick, entities, delta.removedEntityIds);
       this.publishCanonicalState(tick, this.buffer.latest());
       this.syncCountdowns(entities, tick);
+      this.checkPresentationReady();
     });
 
     this.client.on("effect", (event) => {
@@ -678,6 +704,7 @@ export class RoomSession {
       this.latestPeers = peers;
       this.publishPresence(peers);
       this.syncHostAvatars();
+      this.checkPresentationReady();
     });
 
     this.client.on("durableAccepted", (command, _revision, itemJson) => {
@@ -1248,6 +1275,7 @@ export class RoomSession {
       case "ready":
         this.simulationReady = true;
         this.syncHostAvatars();
+        this.checkPresentationReady();
         break;
       case "render": {
         this.currentTick = message.tick;
@@ -1265,6 +1293,7 @@ export class RoomSession {
             (entity) => entity.id === this.localAvatarId,
           );
         }
+        this.checkPresentationReady();
         break;
       }
       case "effects":
@@ -1293,6 +1322,7 @@ export class RoomSession {
           this.finalCheckpointSent?.();
           this.finalCheckpointSent = undefined;
         }
+        this.checkPresentationReady();
         break;
       case "error":
         this.reportError(lifecycleError(
@@ -1335,6 +1365,22 @@ export class RoomSession {
       isolated: false,
       collisionsEnabled: true,
     });
+  }
+
+  private checkPresentationReady(): void {
+    if (this.presentationReady || !this.simulationReady || !this.latestPeers) return;
+    const authoritative = this.client.isHost ? this.hostEntities : this.buffer.latest();
+    if (!this.client.isHost && this.buffer.latestTick === undefined) return;
+    const ids = new Set(authoritative.map((entity) => entity.id));
+    for (const itemId of this.itemMetadataById.keys()) {
+      if (!ids.has(itemId)) return;
+    }
+    for (const peer of this.latestPeers) {
+      if (!ids.has(avatarEntityId(peer.userId))) return;
+    }
+    this.presentationReady = true;
+    for (const waiter of this.presentationWaiters) waiter.resolve();
+    this.presentationWaiters.clear();
   }
 
   moveItem(entityId: string, transform: Transform, preview = false): void {

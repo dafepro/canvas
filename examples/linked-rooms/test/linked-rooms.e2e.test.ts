@@ -77,6 +77,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
   it("keeps a peer present and movable across a round trip and reload", async () => {
     const host = open("linked-village", "host", "village-square");
     await host.start();
+    await host.whenPresented();
     await waitFor(
       "the village host and its door",
       () => host.client.isHost && hasDoor(host, "village-cave-door"),
@@ -84,6 +85,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
 
     const originalPeer = open("linked-village", "peer", "village-square");
     await originalPeer.start();
+    await originalPeer.whenPresented();
     await waitFor(
       "the original peer to see the village door",
       () => !originalPeer.client.isHost && hasDoor(originalPeer, "village-cave-door"),
@@ -93,6 +95,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
     // different rooms until the origin is ready to close.
     const cave = open("linked-cave", "peer", "from-village");
     await cave.start();
+    await cave.whenPresented();
     await waitFor(
       "the staged cave and return door",
       () => cave.client.isHost && hasDoor(cave, "cave-village-door"),
@@ -107,6 +110,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
       () => returningIntent,
     );
     await returned.start();
+    await returned.whenPresented();
     await waitFor(
       "the returned peer and durable village door",
       () => !returned.client.isHost && hasDoor(returned, "village-cave-door"),
@@ -130,6 +134,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
     await returned.stopGracefully();
     const reloaded = open("linked-village", "peer", "from-cave");
     await reloaded.start();
+    await reloaded.whenPresented();
     await waitFor(
       "the reloaded peer, avatar, and village door",
       () =>

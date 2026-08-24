@@ -195,6 +195,11 @@ export class CanvasRuntime {
     return this.session.whenReady();
   }
 
+  /** Waits for a complete authoritative frame before revealing a staged room. */
+  whenPresented(): Promise<void> {
+    return this.session.whenPresented();
+  }
+
   start(): Promise<void> {
     if (this.session.lifecycleState === "failed" ||
         this.session.lifecycleState === "stopping" ||

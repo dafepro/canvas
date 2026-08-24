@@ -178,6 +178,26 @@ describe("asset rendering", () => {
     expect(display.zIndex).toBe(10);
   });
 
+  it("keeps the fallback avatar above ordinary item sprites", () => {
+    const display = buildEntityDisplay(
+      {
+        id: "avatar:alice",
+        kind: "avatar",
+        definitionId: "avatar",
+        x: 0,
+        y: 0,
+        rotation: 0,
+        vx: 0,
+        vy: 0,
+        angularVelocity: 0,
+      },
+      undefined,
+      10,
+    );
+
+    expect(display.zIndex).toBe(10);
+  });
+
   it("plays named atlas animations at the declared rate", () => {
     const display = buildEntityDisplay(
       {

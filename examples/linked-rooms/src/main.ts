@@ -87,6 +87,7 @@ const join = async (): Promise<void> => {
       try {
         await runtime.start();
         await runtime.whenReady();
+        await runtime.whenPresented();
       } catch (error) {
         runtime.stop();
         mount.remove();
