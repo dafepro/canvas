@@ -54,7 +54,7 @@ export const photoCardDefinition: ItemDefinition<Record<string, never>> = {
 
 export const reactiveOrbDefinition: ItemDefinition<ReactiveOrbConfig> = {
   definitionId: "reactive-orb",
-  version: 1,
+  version: 2,
   displayName: "Reactive orb",
   visual: {
     spriteId: "playground.orb.mint",
@@ -65,6 +65,7 @@ export const reactiveOrbDefinition: ItemDefinition<ReactiveOrbConfig> = {
       mint: { spriteId: "playground.orb.mint" },
       coral: { spriteId: "playground.orb.coral" },
       violet: { spriteId: "playground.orb.violet" },
+      custom: { spriteId: "playground.orb.custom" },
     },
     animations: {
       pulse: {
@@ -115,7 +116,7 @@ export const systemStampDefinition: ItemDefinition<Record<string, never>> = {
 
 export const colorTileDefinition: ItemDefinition<ReactiveOrbConfig> = {
   definitionId: "color-tile",
-  version: 1,
+  version: 2,
   displayName: "Color tile",
   visual: {
     spriteId: "playground.tile.mint",
@@ -126,6 +127,7 @@ export const colorTileDefinition: ItemDefinition<ReactiveOrbConfig> = {
       mint: { spriteId: "playground.tile.mint" },
       coral: { spriteId: "playground.tile.coral" },
       violet: { spriteId: "playground.tile.violet" },
+      custom: { spriteId: "playground.tile.custom" },
     },
   },
   ...durableFixed,
@@ -138,7 +140,7 @@ export const colorTileDefinition: ItemDefinition<ReactiveOrbConfig> = {
 
 export const liveBouncerDefinition: ItemDefinition<LiveBouncerConfig> = {
   definitionId: "live-bouncer",
-  version: 1,
+  version: 2,
   displayName: "Always-live ball",
   visual: {
     spriteId: "playground.ball",

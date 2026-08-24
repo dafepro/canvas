@@ -31,6 +31,10 @@ interaction behavior while importing only published Canvas package exports.
    and an always-moving system ball replace the separate inspector/mode UI.
    Optional owner-authorized isolation durably pauses an edited item's physics,
    collision, behavior, and timers without pausing the canvas.
+7. [x] **Ergonomic direct manipulation.** Selection and movement are separate
+   gestures; controls may escape canvas clipping; custom tint, independent
+   collision control, constant-speed live motion, and three local ownership
+   treatments demonstrate product-level extensibility on generic runtime seams.
 
 ## Alignment decisions
 

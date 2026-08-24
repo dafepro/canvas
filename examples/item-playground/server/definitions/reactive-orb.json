@@ -1,6 +1,6 @@
 {
   "definitionId": "reactive-orb",
-  "version": 1,
+  "version": 2,
   "displayName": "Reactive orb",
   "visual": {
     "spriteId": "playground.orb.mint",
@@ -10,7 +10,8 @@
     "variants": {
       "mint": { "spriteId": "playground.orb.mint" },
       "coral": { "spriteId": "playground.orb.coral" },
-      "violet": { "spriteId": "playground.orb.violet" }
+      "violet": { "spriteId": "playground.orb.violet" },
+      "custom": { "spriteId": "playground.orb.custom" }
     },
     "animations": {
       "pulse": {
@@ -31,15 +32,16 @@
     { "id": "touch", "role": "itemSensor", "shape": { "type": "circle", "radius": 2.7 } }
   ],
   "behaviorType": "reactiveOrb",
-  "defaultConfig": { "theme": "mint" },
+  "defaultConfig": { "theme": "mint", "customColor": "#4f7cff" },
   "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "pause" },
   "complexity": "simple",
   "configSchema": {
     "type": "object",
     "properties": {
-      "theme": { "type": "string", "enum": ["mint", "coral", "violet"] }
+      "theme": { "type": "string", "enum": ["mint", "coral", "violet", "custom"] },
+      "customColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
     },
-    "required": ["theme"],
+    "required": ["theme", "customColor"],
     "additionalProperties": false
   }
 }

@@ -15,18 +15,22 @@ Open <http://localhost:5175/?autojoin=1&user=maker-one>. For the ownership
 scenario, open another tab with `user=maker-two`. Spawn and Manage are compact
 in-canvas popovers. A green outline identifies items the local user can edit;
 selecting one places frameless scale controls above it, rotation controls at
-its sides, and finish/delete/more actions below it. The private More menu holds
-item-specific controls such as color and simulation isolation. Each user can
-drag, rotate, scale, recolor, isolate from simulation, and delete their own
-items. The visitor avatar is also a consumer-supplied texture rather than an
-engine placeholder.
+its sides, and finish/delete/more actions below it. Those controls may extend
+outside the canvas instead of being clipped at an edge. The first pointer
+gesture selects only; a later drag manipulates the selected item. The private
+More menu holds item-specific controls such as three color presets, a custom
+color picker, freeze, and collisions. Each user can drag, rotate, scale,
+recolor, freeze, make collisionless, and delete their own items. The visitor
+avatar is also a consumer-supplied texture rather than an engine placeholder.
 
-The gold system ball keeps bouncing while those controls are open to make the
-always-live model visible. Editing does not stop the room. Isolation is an
-optional, durable per-item setting that pauses collision, physics, behavior,
-and behavior timers while preserving the item's pose; pressing play returns it
-to the simulation. Another tab sees the item state, but never sees the first
-user's selection outline or edit toolbar.
+The gold system ball maintains constant speed while its collision response
+changes direction, even while controls are open. Editing does not stop the
+room. Freeze is an optional, durable per-item setting that pauses motion,
+collision, behavior, and behavior timers while preserving pose. Collision can
+also be disabled independently, leaving motion and behavior live while other
+entities pass through. Another tab sees the canonical item state, but never
+sees the first user's selection outline or edit toolbar. The Manage popover
+offers Aurora, Halo, and Badge ownership treatments for comparison.
 
 The example imports only public Canvas package exports. It owns its canvas
 definition, server item metadata, behavior worker, asset manifest, artwork, and

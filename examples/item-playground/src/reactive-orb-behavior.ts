@@ -5,18 +5,28 @@ import type {
   ItemBehavior,
 } from "@canvas-physics/core";
 
-export type OrbTheme = "mint" | "coral" | "violet";
+export type OrbTheme = "mint" | "coral" | "violet" | "custom";
 
 export interface ReactiveOrbConfig {
   theme: OrbTheme;
+  customColor: string;
 }
 
 export interface ReactiveOrbState {
   appliedTheme?: OrbTheme;
+  appliedTint?: number;
   activations: number;
 }
 
-export const defaultReactiveOrbConfig: ReactiveOrbConfig = { theme: "mint" };
+export const defaultReactiveOrbConfig: ReactiveOrbConfig = {
+  theme: "mint",
+  customColor: "#4f7cff",
+};
+
+export const colorStringToTint = (color: string): number => {
+  const normalized = /^#[0-9a-f]{6}$/i.test(color) ? color.slice(1) : "4f7cff";
+  return Number.parseInt(normalized, 16);
+};
 
 export const ReactiveOrbBehavior: ItemBehavior<ReactiveOrbConfig, ReactiveOrbState> = {
   behaviorType: "reactiveOrb",
@@ -30,13 +40,15 @@ export const ReactiveOrbBehavior: ItemBehavior<ReactiveOrbConfig, ReactiveOrbSta
     event: BehaviorEvent,
   ): BehaviorResult<ReactiveOrbState> {
     if (event.type === "tick" || event.type === "room.wake") {
-      if (state.appliedTheme === config.theme) {
+      const tint = config.theme === "custom" ? colorStringToTint(config.customColor) : undefined;
+      if (state.appliedTheme === config.theme && state.appliedTint === tint) {
         return { state: state as ReactiveOrbState, commands: [] };
       }
       return {
-        state: { ...state, appliedTheme: config.theme },
+        state: { ...state, appliedTheme: config.theme, appliedTint: tint },
         commands: [
           { type: "setSpriteVariant", variant: config.theme, persistent: true },
+          { type: "setSpriteTint", tint, persistent: true },
         ],
       };
     }

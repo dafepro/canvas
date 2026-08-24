@@ -39,15 +39,20 @@ authority even though this consumer chooses to list only editable items.
 
 Direct manipulation controls surround the selected item: scale above,
 rotation at each side, and More/delete/finish below. More contains only the
-controls relevant to that item. The example's avatar skin is also supplied
-through the same consumer asset manifest as its item artwork.
+controls relevant to that item. The controls may render outside the canvas
+bounds, and a selection gesture must finish before a later drag can move the
+item. Three local ownership treatments demonstrate that product affordances
+can vary without entering canonical room state. The example's avatar skin is
+also supplied through the same consumer asset manifest as its item artwork.
 
 Editing never changes the room into a separate mode. A room-owned gold ball
-bounces continuously while item controls are open. Consumers may explicitly
-isolate an owned item while manipulating it; Canvas then preserves its pose and
-pauses its collision, physics, behavior, and simulation-clock timers until it
-is returned to live simulation. A configurable color tile makes item-specific
-controls concrete without adding color concepts to the engine.
+maintains constant speed while item controls are open. Consumers may explicitly
+freeze an owned item while manipulating it; Canvas then preserves its pose and
+pauses collision, physics, behavior, and simulation-clock timers until it is
+returned to live simulation. The independent collision override keeps an item
+live while disabling its authored solids and sensors. A configurable color tile
+combines three definition variants with a custom replicated sprite tint,
+without adding product palette concepts to the engine.
 
 The bundled picture is intentionally not an upload flow. Canvas handles asset
 identity and loading, not durable media storage. A product can put uploaded

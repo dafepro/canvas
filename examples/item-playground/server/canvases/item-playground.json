@@ -38,9 +38,9 @@
     {
       "entityId": "always-live-ball",
       "definitionId": "live-bouncer",
-      "definitionVersion": 1,
+      "definitionVersion": 2,
       "transform": { "x": 18, "y": 10, "rotation": 0, "scale": 1 },
-      "resolvedConfig": { "minimumSpeed": 3, "velocity": { "x": 7, "y": 5 } }
+      "resolvedConfig": { "speed": 8.5, "initialDirection": { "x": 7, "y": 5 } }
     }
   ],
   "limits": {

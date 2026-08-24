@@ -43,6 +43,12 @@
             <section id="manage-popover" class="popover" hidden>
               <div class="popover-title"><strong>Your items</strong><small>Choose one to edit</small></div>
               <div id="owned-list" class="owned-list"><p class="empty">Nothing spawned yet.</p></div>
+              <div class="highlight-picker">
+                <span>Owned look</span>
+                <button data-highlight="aurora" class="active">Aurora</button>
+                <button data-highlight="halo">Halo</button>
+                <button data-highlight="badge">Badge</button>
+              </div>
             </section>
           </div>
 
@@ -63,8 +69,12 @@
                     <button data-color="mint" aria-label="Make mint" title="Mint"><i class="mint"></i></button>
                     <button data-color="coral" aria-label="Make coral" title="Coral"><i class="coral"></i></button>
                     <button data-color="violet" aria-label="Make violet" title="Violet"><i class="violet"></i></button>
+                    <label class="custom-color" title="Custom color">
+                      <input id="custom-color-picker" type="color" value="#4f7cff" aria-label="Choose custom color" />
+                    </label>
                   </div>
-                  <button id="isolate" class="menu-action" aria-label="Pause physics while editing" title="Pause physics, collision, and behavior"><b>◌</b><span>Pause simulation</span></button>
+                  <button id="isolate" class="menu-action" aria-label="Freeze object" title="Freeze motion, collision, behavior, and timers"><b>❄</b><span>Freeze object</span></button>
+                  <button id="collisions" class="menu-action" aria-label="Disable collisions" title="Keep the item live but let other entities pass through"><b>◉</b><span>Disable collisions</span></button>
                 </div>
               </div>
               <button id="delete" class="danger" aria-label="Delete item" title="Delete">×</button>

@@ -4,7 +4,7 @@ import type { AssetManifest } from "@canvas-physics/client";
 export const playgroundAssets: AssetManifest = {
   schemaVersion: 1,
   id: "item-playground",
-  revision: "2026-08-23.3",
+  revision: "2026-08-23.4",
   sources: [
     { id: "workbench-art", src: "/workbench.svg", required: true },
     { id: "emoji-art", src: "/assets/party-emoji.svg", required: true },
@@ -19,6 +19,8 @@ export const playgroundAssets: AssetManifest = {
     { id: "tile-coral-art", src: "/assets/tile-coral.svg", required: true },
     { id: "tile-violet-art", src: "/assets/tile-violet.svg", required: true },
     { id: "avatar-maker-art", src: "/assets/avatar-maker.svg", required: true },
+    { id: "orb-custom-art", src: "/assets/orb-custom.svg", required: true },
+    { id: "tile-custom-art", src: "/assets/tile-custom.svg", required: true },
   ],
   textures: [
     { id: "playground.workbench", sourceId: "workbench-art" },
@@ -34,5 +36,7 @@ export const playgroundAssets: AssetManifest = {
     { id: "playground.tile.coral", sourceId: "tile-coral-art" },
     { id: "playground.tile.violet", sourceId: "tile-violet-art" },
     { id: "playground.avatar.maker", sourceId: "avatar-maker-art" },
+    { id: "playground.orb.custom", sourceId: "orb-custom-art" },
+    { id: "playground.tile.custom", sourceId: "tile-custom-art" },
   ],
 };

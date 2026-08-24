@@ -34,8 +34,14 @@ const rotateRight = document.querySelector<HTMLButtonElement>("#rotate-right")!;
 const scaleDown = document.querySelector<HTMLButtonElement>("#scale-down")!;
 const scaleUp = document.querySelector<HTMLButtonElement>("#scale-up")!;
 const isolateButton = document.querySelector<HTMLButtonElement>("#isolate")!;
+const collisionsButton = document.querySelector<HTMLButtonElement>("#collisions")!;
+const customColorPicker = document.querySelector<HTMLInputElement>("#custom-color-picker")!;
+const customColorControl = document.querySelector<HTMLElement>(".custom-color")!;
 const deleteButton = document.querySelector<HTMLButtonElement>("#delete")!;
 const paletteButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-spawn]")];
+const highlightButtons = [
+  ...document.querySelectorAll<HTMLButtonElement>("[data-highlight]"),
+];
 
 userInput.value = params.get("user") ?? `maker-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -50,6 +56,7 @@ let spawnCursor = 0;
 let idsBeforeSpawn = new Set<string>();
 let pendingSpawnDefinition: string | undefined;
 let lastManageSignature = "";
+stage.dataset.ownedStyle = "aurora";
 
 const definitionById = new Map(
   playgroundDefinitions.map((definition) => [definition.definitionId, definition]),
@@ -100,7 +107,9 @@ const requestMutation = (message: string, action: () => void): void => {
 const renderOwnedList = (): void => {
   const owned = entities.filter(isOwned);
   const signature = owned
-    .map(({ id, definitionId, isolated }) => `${id}:${definitionId}:${isolated}`)
+    .map(({ id, definitionId, isolated, collisionsDisabled }) =>
+      `${id}:${definitionId}:${isolated}:${collisionsDisabled}`,
+    )
     .join("|");
   if (signature === lastManageSignature) return;
   lastManageSignature = signature;
@@ -187,6 +196,7 @@ const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => 
     outline.style.transform = `translate(-50%, -50%) rotate(${projection.rotation}rad)`;
     outline.classList.toggle("selected", entity.id === selectedEntityId);
     outline.classList.toggle("isolated", entity.isolated === true);
+    outline.classList.toggle("collisions-off", entity.collisionsDisabled === true);
     outline.hidden = !projection.visible;
   }
 
@@ -206,20 +216,33 @@ const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => 
   editToolbar.style.height = `${(definition?.visual.size.height ?? 3) * visualScale}px`;
   colorTools.hidden = !editableColors.has(entity.definitionId);
   isolateButton.classList.toggle("active", entity.isolated === true);
-  isolateButton.querySelector("b")!.textContent = entity.isolated ? "▶" : "◌";
+  isolateButton.querySelector("b")!.textContent = entity.isolated ? "▶" : "❄";
   isolateButton.querySelector("span")!.textContent = entity.isolated
-    ? "Resume simulation"
-    : "Pause simulation";
+    ? "Unfreeze object"
+    : "Freeze object";
   isolateButton.setAttribute(
     "aria-label",
-    entity.isolated ? "Resume physics" : "Pause physics while editing",
+    entity.isolated ? "Unfreeze object" : "Freeze object",
   );
   isolateButton.title = entity.isolated
-    ? "Resume physics, collision, and behavior"
-    : "Pause physics, collision, and behavior";
+    ? "Resume motion, collision, behavior, and timers"
+    : "Freeze motion, collision, behavior, and timers";
+  collisionsButton.classList.toggle("active", entity.collisionsDisabled === true);
+  collisionsButton.querySelector("b")!.textContent = entity.collisionsDisabled ? "○" : "◉";
+  collisionsButton.querySelector("span")!.textContent = entity.collisionsDisabled
+    ? "Enable collisions"
+    : "Disable collisions";
+  collisionsButton.setAttribute(
+    "aria-label",
+    entity.collisionsDisabled ? "Enable collisions" : "Disable collisions",
+  );
   document.querySelectorAll<HTMLButtonElement>("[data-color]").forEach((button) => {
     button.classList.toggle("active", button.dataset.color === entity.variant);
   });
+  customColorControl.classList.toggle("active", entity.variant === "custom");
+  if (entity.variant === "custom" && entity.tint !== undefined) {
+    customColorPicker.value = `#${entity.tint.toString(16).padStart(6, "0")}`;
+  }
 };
 
 const join = async (): Promise<void> => {
@@ -351,6 +374,15 @@ moreToggle.addEventListener("click", (event) => {
   moreToggle.setAttribute("aria-expanded", String(open));
 });
 moreMenu.addEventListener("click", (event) => event.stopPropagation());
+highlightButtons.forEach((button) =>
+  button.addEventListener("click", () => {
+    const style = button.dataset.highlight!;
+    stage.dataset.ownedStyle = style;
+    highlightButtons.forEach((candidate) =>
+      candidate.classList.toggle("active", candidate === button),
+    );
+  }),
+);
 
 paletteButtons.forEach((button) =>
   button.addEventListener("click", () => {
@@ -400,9 +432,17 @@ isolateButton.addEventListener("click", () => {
   const isolated = entity.isolated !== true;
   requestMutation(
     isolated
-      ? "Pausing this item's simulation…"
-      : "Returning item to live simulation…",
+      ? "Freezing this object…"
+      : "Unfreezing this object…",
     () => runtime!.setItemIsolation(entity.id, isolated),
+  );
+});
+collisionsButton.addEventListener("click", () => {
+  const entity = selectedEntity();
+  if (!entity) return;
+  const enabled = entity.collisionsDisabled === true;
+  requestMutation(enabled ? "Enabling collisions…" : "Disabling collisions…", () =>
+    runtime!.setItemCollisionsEnabled(entity.id, enabled),
   );
 });
 document.querySelectorAll<HTMLButtonElement>("[data-color]").forEach((button) =>
@@ -411,10 +451,23 @@ document.querySelectorAll<HTMLButtonElement>("[data-color]").forEach((button) =>
     if (!entity) return;
     const theme = button.dataset.color as OrbTheme;
     requestMutation(`Applying ${theme}…`, () =>
-      runtime!.setItemConfig(entity.id, { theme }),
+      runtime!.setItemConfig(entity.id, {
+        theme,
+        customColor: customColorPicker.value,
+      }),
     );
   }),
 );
+customColorPicker.addEventListener("change", () => {
+  const entity = selectedEntity();
+  if (!entity) return;
+  requestMutation(`Applying ${customColorPicker.value}…`, () =>
+    runtime!.setItemConfig(entity.id, {
+      theme: "custom",
+      customColor: customColorPicker.value,
+    }),
+  );
+});
 deleteButton.addEventListener("click", () => {
   const entity = selectedEntity();
   if (!entity) return;

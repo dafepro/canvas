@@ -1,6 +1,6 @@
 {
   "definitionId": "live-bouncer",
-  "version": 1,
+  "version": 2,
   "displayName": "Always-live ball",
   "visual": {
     "spriteId": "playground.ball",
@@ -25,14 +25,14 @@
     }
   ],
   "behaviorType": "liveBouncer",
-  "defaultConfig": { "minimumSpeed": 3, "velocity": { "x": 7, "y": 5 } },
+  "defaultConfig": { "speed": 8.5, "initialDirection": { "x": 7, "y": 5 } },
   "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "pause" },
   "complexity": "simple",
   "configSchema": {
     "type": "object",
     "properties": {
-      "minimumSpeed": { "type": "number", "minimum": 0, "maximum": 20 },
-      "velocity": {
+      "speed": { "type": "number", "exclusiveMinimum": 0, "maximum": 20 },
+      "initialDirection": {
         "type": "object",
         "properties": {
           "x": { "type": "number", "minimum": -20, "maximum": 20 },
@@ -42,7 +42,7 @@
         "additionalProperties": false
       }
     },
-    "required": ["minimumSpeed", "velocity"],
+    "required": ["speed", "initialDirection"],
     "additionalProperties": false
   }
 }

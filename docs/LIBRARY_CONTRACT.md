@@ -55,6 +55,19 @@ failures use `CanvasConsumerError`, not string parsing. See
 supersession, inactive/disconnected projection, and the product-owned avatar
 placement hook.
 
+## Durable item controls
+
+Owner-authorized mutations include transform, uniform scale, configuration,
+deletion, whole-item freeze, and global collision enablement. Freeze preserves
+pose while pausing the body, contacts, behavior, and simulation-clock timers.
+Collision disablement is narrower: physics motion and behavior continue, but
+the item's authored solid and sensor colliders are inactive. Both states are
+durable, server-authoritative, replicated, and restored during host migration.
+
+Behaviors may publish an optional RGB sprite tint with `setSpriteTint`. Tint is
+a generic render attribute, replicated with canonical entity state and stored
+in checkpoints. Consumers still own the meaning and selection of colors.
+
 ## Avatar presentation
 
 Consumers may register an item definition with the reserved ID `avatar` to

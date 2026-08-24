@@ -73,7 +73,22 @@ describe("compact item playground", () => {
     expect(html).toContain('class="rotate-control rotate-right"');
     expect(html).toContain('id="more-toggle"');
     expect(html).toContain('id="finish-edit"');
+    expect(html).toContain('id="custom-color-picker"');
+    expect(html).toContain('id="collisions"');
+    expect(html).toContain('data-highlight="aurora"');
     expect(html).toContain('aria-label="Delete item"');
+  });
+
+  it("applies an arbitrary consumer color as a replicated sprite tint", () => {
+    const harness = new BehaviorTestHarness(
+      ReactiveOrbBehavior,
+      { theme: "custom", customColor: "#2a7fff" },
+      { canvas: { width: 36, height: 24, orientation: "topDown" } },
+    );
+
+    harness.advance();
+    expect(harness.host.body(harness.entityId).variant).toBe("custom");
+    expect(harness.host.body(harness.entityId).tint).toBe(0x2a7fff);
   });
 
   it("applies configured color and plays an effect on avatar contact", () => {
@@ -108,14 +123,17 @@ describe("compact item playground", () => {
   it("keeps the room-owned demo ball moving without an editor", () => {
     const harness = new BehaviorTestHarness(
       LiveBouncerBehavior,
-      { minimumSpeed: 3, velocity: { x: 7, y: 5 } },
+      { speed: 8.5, initialDirection: { x: 7, y: 5 } },
       { canvas: { width: 36, height: 24, orientation: "topDown" } },
     );
 
     harness.advance();
-    expect(harness.host.body(harness.entityId).velocity).toEqual({ x: 7, y: 5 });
+    expect(Math.hypot(
+      harness.host.body(harness.entityId).velocity.x,
+      harness.host.body(harness.entityId).velocity.y,
+    )).toBeCloseTo(8.5);
     harness.host.body(harness.entityId).velocity = { x: 1, y: 0 };
     harness.advance();
-    expect(harness.host.body(harness.entityId).velocity).toEqual({ x: 7, y: 5 });
+    expect(harness.host.body(harness.entityId).velocity).toEqual({ x: 8.5, y: 0 });
   });
 });
