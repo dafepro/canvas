@@ -8,7 +8,7 @@ export interface ItemEditState {
 
 export interface ItemEditControllerOptions {
   enabled(): boolean;
-  pick(point: Vec2): RenderEntity | undefined;
+  pick(point: Vec2, preferredEntityId?: string): RenderEntity | undefined;
   toWorld(point: Vec2): Vec2;
   onPreview(entityId: string, transform: Transform): void;
   onCommit(entityId: string, transform: Transform): void;
@@ -87,6 +87,7 @@ export const findOwnedItemAt = (
   definitions: ItemDefinition[],
   point: Vec2,
   userId: string,
+  preferredEntityId?: string,
 ): RenderEntity | undefined => {
   const byId = new Map(definitions.map((definition) => [definition.definitionId, definition]));
   const candidates = entities
@@ -97,9 +98,14 @@ export const findOwnedItemAt = (
         entity.respawning !== true,
     )
     .sort(
-      (left, right) =>
-        (byId.get(right.definitionId)?.visual.zIndex ?? 0) -
-        (byId.get(left.definitionId)?.visual.zIndex ?? 0),
+      (left, right) => {
+        if (left.id === preferredEntityId) return -1;
+        if (right.id === preferredEntityId) return 1;
+        return (
+          (byId.get(right.definitionId)?.visual.zIndex ?? 0) -
+          (byId.get(left.definitionId)?.visual.zIndex ?? 0)
+        );
+      },
     );
 
   for (const entity of candidates) {
@@ -151,7 +157,7 @@ export class ItemEditController {
     const onDown = (event: PointerEvent) => {
       if (!this.options.enabled()) return;
       const local = this.toLocal(event);
-      const selected = this.options.pick(local);
+      const selected = this.options.pick(local, this.selected?.id);
       const wasSelected = selected !== undefined && this.selected?.id === selected.id;
       if (!selected) {
         this.selected = undefined;

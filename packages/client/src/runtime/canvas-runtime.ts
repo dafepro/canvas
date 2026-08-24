@@ -324,12 +324,13 @@ export class CanvasRuntime {
       this.scene.app.canvas as unknown as HTMLElement,
       {
         enabled: () => this.editMode,
-        pick: (point) =>
+        pick: (point, preferredEntityId) =>
           findOwnedItemAt(
             this.latestEntities,
             this.options.definitions,
             this.scene!.camera.toWorld(point.x, point.y),
             this.session.userId,
+            preferredEntityId,
           ),
         toWorld: (point) => this.scene!.camera.toWorld(point.x, point.y),
         onPreview: (entityId, transform) => {

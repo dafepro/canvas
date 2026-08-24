@@ -91,6 +91,41 @@ describe("item edit interaction", () => {
     ).toBeUndefined();
   });
 
+  it("gives the selected item priority within an overlapping hit area", () => {
+    const selected = { ...item(), id: "selected", x: 10, y: 5 };
+    const covering = { ...item(), id: "covering", x: 10.5, y: 5 };
+    const definitions = [
+      definition,
+      {
+        ...definition,
+        definitionId: "cover",
+        visual: { ...definition.visual, zIndex: 20 },
+      } as ItemDefinition,
+    ];
+    covering.definitionId = "cover";
+
+    expect(findOwnedItemAt(
+      [selected, covering],
+      definitions,
+      { x: 10.5, y: 5 },
+      "alice",
+    )?.id).toBe("covering");
+    expect(findOwnedItemAt(
+      [selected, covering],
+      definitions,
+      { x: 10.5, y: 5 },
+      "alice",
+      "selected",
+    )?.id).toBe("selected");
+    expect(findOwnedItemAt(
+      [selected, covering],
+      definitions,
+      { x: 12.25, y: 5 },
+      "alice",
+      "selected",
+    )?.id).toBe("covering");
+  });
+
   it("opens editing only after a completed tap and moves on a later drag", () => {
     const surface = new PointerSurface();
     const previews: number[] = [];
@@ -213,6 +248,33 @@ describe("item edit interaction", () => {
     surface.emit("pointerdown", 20, 10);
     surface.emit("pointermove", 30, 14);
     expect(previews).toEqual([15]);
+    controller.destroy();
+  });
+
+  it("passes the active selection as the preferred hit target for a later drag", () => {
+    const surface = new PointerSurface();
+    const lower = { ...item(), id: "lower" };
+    const upper = { ...item(), id: "upper" };
+    const preferred: Array<string | undefined> = [];
+    const previews: string[] = [];
+    const controller = new ItemEditController(surface as unknown as HTMLElement, {
+      enabled: () => true,
+      pick: (_point, preferredEntityId) => {
+        preferred.push(preferredEntityId);
+        return preferredEntityId === lower.id ? lower : upper;
+      },
+      toWorld: (point) => point,
+      onPreview: (id) => previews.push(id),
+      onCommit: () => {},
+      onChange: () => {},
+    });
+
+    controller.select(lower);
+    surface.emit("pointerdown", 10, 5);
+    surface.emit("pointermove", 16, 5);
+
+    expect(preferred.at(-1)).toBe("lower");
+    expect(previews).toEqual(["lower"]);
     controller.destroy();
   });
 });
