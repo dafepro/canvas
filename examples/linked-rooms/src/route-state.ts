@@ -1,4 +1,4 @@
-export const linkedRoomIds = ["linked-village", "linked-cave"] as const;
+export const linkedRoomIds = ["linked-village", "linked-cave", "linked-pixel-room"] as const;
 export type LinkedRoomId = (typeof linkedRoomIds)[number];
 
 export const linkedRoomFromSearch = (search: string): LinkedRoomId => {

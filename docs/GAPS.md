@@ -39,7 +39,9 @@ downward. Check an item only after the relevant focused tests pass.
   deformation art without disabling physical rotation.
 - [x] Ship a linked-rooms reference integration demonstrating a reliable
   collision-triggered room replacement, destination staging, exact reverse
-  routes, failed-open rollback, and a programmatic Back escape hatch.
+  routes, failed-open rollback, departure-hidden avatars, a programmatic Back
+  escape hatch, and a branching pixel-art room with an independently kickable
+  physics item.
 
 ## Consumer-library Priority 0 — linked room travel
 

@@ -1,12 +1,16 @@
 import type {
   CanvasDefinition,
+  KickableConfig,
   ItemDefinition,
   RoomLinkDefinition,
   RoomTravelConfig,
 } from "@canvas-physics/core";
+import { CollisionLayer } from "@canvas-physics/core";
 
 export const villageToCave = "village-to-cave";
 export const caveToVillage = "cave-to-village";
+export const villageToPixelRoom = "village-to-pixel-room";
+export const pixelRoomToVillage = "pixel-room-to-village";
 
 export const linkedRoomLinks: RoomLinkDefinition[] = [
   {
@@ -22,6 +26,20 @@ export const linkedRoomLinks: RoomLinkDefinition[] = [
     toRoomId: "linked-village",
     returnLinkId: villageToCave,
     arrivalSpawnPointId: "from-cave",
+  },
+  {
+    id: villageToPixelRoom,
+    fromRoomId: "linked-village",
+    toRoomId: "linked-pixel-room",
+    returnLinkId: pixelRoomToVillage,
+    arrivalSpawnPointId: "from-village",
+  },
+  {
+    id: pixelRoomToVillage,
+    fromRoomId: "linked-pixel-room",
+    toRoomId: "linked-village",
+    returnLinkId: villageToPixelRoom,
+    arrivalSpawnPointId: "from-pixel-room",
   },
 ];
 
@@ -54,6 +72,62 @@ export const roomDoorDefinition: ItemDefinition<RoomTravelConfig> = {
   complexity: "simple",
 };
 
+export const openDoorDefinition: ItemDefinition<RoomTravelConfig> = {
+  ...roomDoorDefinition,
+  definitionId: "linked-open-door",
+  displayName: "Open linked room door",
+  visual: {
+    spriteId: "linked.openDoor",
+    size: { width: 6, height: 9 },
+    anchor: { x: 0.5, y: 0.5 },
+    zIndex: 3,
+  },
+};
+
+export const adventureBallDefinition: ItemDefinition<KickableConfig> = {
+  definitionId: "linked-adventure-ball",
+  version: 1,
+  displayName: "Adventure ball",
+  visual: {
+    spriteId: "linked.adventureBall",
+    size: { width: 3.4, height: 3.4 },
+    placeholder: { shape: "circle", color: 0xe7473c },
+    zIndex: 5,
+  },
+  body: {
+    mode: "dynamic",
+    mass: 0.5,
+    gravityScale: 0,
+    linearDamping: 0.35,
+    angularDamping: 0.2,
+  },
+  colliders: [
+    {
+      id: "solid",
+      role: "itemSolid",
+      shape: { type: "circle", radius: 1.55 },
+      restitution: 0.82,
+      friction: 0.35,
+      collisionMask:
+        CollisionLayer.WORLD_STATIC |
+        CollisionLayer.ITEM_SOLID |
+        CollisionLayer.ITEM_SENSOR |
+        CollisionLayer.REGION_SENSOR,
+    },
+    { id: "kick", role: "itemSensor", shape: { type: "circle", radius: 2.15 } },
+  ],
+  behaviorType: "kickable",
+  defaultConfig: {
+    sensorId: "kick",
+    kickStrength: 3.2,
+    minImpulse: 9,
+    maxImpulse: 42,
+    cooldownSeconds: 0.18,
+  },
+  persistence: { transform: true, behaviorState: false, onRoomSleep: "resetToIdle" },
+  complexity: "simple",
+};
+
 const base = {
   version: 1,
   size: { width: 48, height: 30 },
@@ -78,10 +152,12 @@ const base = {
 export const villageCanvas: CanvasDefinition = {
   ...base,
   id: "linked-village",
+  version: 2,
   backgroundAssetId: "linked.village",
   spawnPoints: [
     { id: "village-square", position: { x: 12, y: 15 } },
     { id: "from-cave", position: { x: 36, y: 15 } },
+    { id: "from-pixel-room", position: { x: 12, y: 15 } },
   ],
   systemItems: [
     {
@@ -90,6 +166,17 @@ export const villageCanvas: CanvasDefinition = {
       definitionVersion: 1,
       transform: { x: 43, y: 15, rotation: 0, scale: 1 },
       resolvedConfig: { sensorId: "threshold", linkId: villageToCave, cooldownSeconds: 1 },
+    },
+    {
+      entityId: "village-pixel-room-door",
+      definitionId: openDoorDefinition.definitionId,
+      definitionVersion: 1,
+      transform: { x: 5, y: 15, rotation: Math.PI, scale: 1 },
+      resolvedConfig: {
+        sensorId: "threshold",
+        linkId: villageToPixelRoom,
+        cooldownSeconds: 1,
+      },
     },
   ],
 };
@@ -113,4 +200,58 @@ export const caveCanvas: CanvasDefinition = {
   ],
 };
 
-export const linkedRoomDefinitions: ItemDefinition[] = [roomDoorDefinition];
+export const pixelRoomCanvas: CanvasDefinition = {
+  ...base,
+  id: "linked-pixel-room",
+  backgroundAssetId: "linked.pixelRoom",
+  spawnPoints: [
+    { id: "room-centre", position: { x: 24, y: 15 } },
+    { id: "from-village", position: { x: 36, y: 15 } },
+  ],
+  staticGeometry: [
+    {
+      id: "top-furniture",
+      role: "worldSolid",
+      shape: { type: "rect", width: 40, height: 4 },
+      position: { x: 24, y: 4 },
+    },
+    {
+      id: "left-bench",
+      role: "worldSolid",
+      shape: { type: "rect", width: 6, height: 11 },
+      position: { x: 5, y: 16 },
+    },
+    {
+      id: "bottom-furniture",
+      role: "worldSolid",
+      shape: { type: "rect", width: 31, height: 3 },
+      position: { x: 29, y: 27.5 },
+    },
+  ],
+  systemItems: [
+    {
+      entityId: "pixel-room-village-door",
+      definitionId: openDoorDefinition.definitionId,
+      definitionVersion: 1,
+      transform: { x: 43, y: 15, rotation: 0, scale: 1 },
+      resolvedConfig: {
+        sensorId: "threshold",
+        linkId: pixelRoomToVillage,
+        cooldownSeconds: 1,
+      },
+    },
+    {
+      entityId: "pixel-room-ball",
+      definitionId: adventureBallDefinition.definitionId,
+      definitionVersion: 1,
+      transform: { x: 24, y: 15, rotation: 0, scale: 1 },
+      resolvedConfig: adventureBallDefinition.defaultConfig,
+    },
+  ],
+};
+
+export const linkedRoomDefinitions: ItemDefinition[] = [
+  roomDoorDefinition,
+  openDoorDefinition,
+  adventureBallDefinition,
+];

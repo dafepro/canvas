@@ -1,5 +1,5 @@
 {
-  "id": "linked-village", "version": 1,
+  "id": "linked-village", "version": 2,
   "size": { "width": 48, "height": 30 }, "orientation": "topDown",
   "backgroundAssetId": "linked.village",
   "edges": { "top": "solid", "right": "solid", "bottom": "solid", "left": "solid" },
@@ -7,7 +7,10 @@
   "avatarController": { "radius": 1.4, "maxSpeed": 13, "acceleration": 70 },
   "staticGeometry": [], "regions": [],
   "environment": { "base": { "gravityXY": { "x": 0, "y": 0 }, "linearDrag": 0.08, "angularDrag": 0.1, "softSpeedLimit": 14, "surfaceFrictionMultiplier": 1 } },
-  "spawnPoints": [{ "id": "village-square", "position": { "x": 12, "y": 15 } }, { "id": "from-cave", "position": { "x": 36, "y": 15 } }],
-  "systemItems": [{ "entityId": "village-cave-door", "definitionId": "linked-room-door", "definitionVersion": 1, "transform": { "x": 43, "y": 15, "rotation": 0, "scale": 1 }, "resolvedConfig": { "sensorId": "threshold", "linkId": "village-to-cave", "cooldownSeconds": 1 } }],
+  "spawnPoints": [{ "id": "village-square", "position": { "x": 12, "y": 15 } }, { "id": "from-cave", "position": { "x": 36, "y": 15 } }, { "id": "from-pixel-room", "position": { "x": 12, "y": 15 } }],
+  "systemItems": [
+    { "entityId": "village-cave-door", "definitionId": "linked-room-door", "definitionVersion": 1, "transform": { "x": 43, "y": 15, "rotation": 0, "scale": 1 }, "resolvedConfig": { "sensorId": "threshold", "linkId": "village-to-cave", "cooldownSeconds": 1 } },
+    { "entityId": "village-pixel-room-door", "definitionId": "linked-open-door", "definitionVersion": 1, "transform": { "x": 5, "y": 15, "rotation": 3.141592653589793, "scale": 1 }, "resolvedConfig": { "sensorId": "threshold", "linkId": "village-to-pixel-room", "cooldownSeconds": 1 } }
+  ],
   "limits": { "maxAvatars": 12, "maxItems": 4, "maxComplexPhysicsItems": 0 }
 }

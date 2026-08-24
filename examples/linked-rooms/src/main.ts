@@ -31,6 +31,7 @@ const serverUrl = import.meta.env.VITE_SERVER_URL || location.origin;
 const names: Record<string, string> = {
   "linked-village": "Sunmeadow Village",
   "linked-cave": "Moonlit Cave",
+  "linked-pixel-room": "Pixel Trainer Room",
 };
 
 let navigator: LinkedRoomNavigator | undefined;
@@ -71,8 +72,13 @@ const join = async (): Promise<void> => {
         definitions: linkedRoomDefinitions,
         assets: linkedRoomAssets,
         driver: new SimulationDriver(worker),
-        scene: { background: request.roomId === "linked-cave" ? 0x111629 : 0xbde7b2 },
+        scene: {
+          background: request.roomId === "linked-cave"
+            ? 0x111629
+            : request.roomId === "linked-pixel-room" ? 0xd9a63c : 0xbde7b2,
+        },
         pointer: { mode: "thumbstick", deadZonePx: 4, fullRangePx: 55 },
+        hideDisabledAvatars: true,
         spawnPointId: request.arrivalSpawnPointId,
         onAssetProgress: ({ loaded, total }) => {
           status.textContent = `Preparing ${names[request.roomId] ?? request.roomId} · assets ${loaded}/${total}`;
@@ -112,6 +118,10 @@ const join = async (): Promise<void> => {
             other.classList.add("staged");
           }
           mount.classList.remove("staged");
+        },
+        setDeparturePending: (pending) => {
+          runtime.setLocalAvatarPresentationHidden(pending);
+          runtime.setAvatarDisabled(pending);
         },
         close: async () => {
           await runtime.stopGracefully();

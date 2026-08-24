@@ -1,0 +1,27 @@
+{
+  "definitionId": "linked-adventure-ball",
+  "version": 1,
+  "displayName": "Adventure ball",
+  "visual": { "spriteId": "linked.adventureBall", "size": { "width": 3.4, "height": 3.4 }, "placeholder": { "shape": "circle", "color": 15157052 }, "zIndex": 5 },
+  "body": { "mode": "dynamic", "mass": 0.5, "gravityScale": 0, "linearDamping": 0.35, "angularDamping": 0.2 },
+  "colliders": [
+    { "id": "solid", "role": "itemSolid", "shape": { "type": "circle", "radius": 1.55 }, "restitution": 0.82, "friction": 0.35, "collisionMask": 60 },
+    { "id": "kick", "role": "itemSensor", "shape": { "type": "circle", "radius": 2.15 } }
+  ],
+  "behaviorType": "kickable",
+  "defaultConfig": { "sensorId": "kick", "kickStrength": 3.2, "minImpulse": 9, "maxImpulse": 42, "cooldownSeconds": 0.18 },
+  "persistence": { "transform": true, "behaviorState": false, "onRoomSleep": "resetToIdle" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "required": ["sensorId", "kickStrength", "minImpulse", "maxImpulse", "cooldownSeconds"],
+    "additionalProperties": false,
+    "properties": {
+      "sensorId": { "type": "string", "enum": ["kick"] },
+      "kickStrength": { "type": "number", "minimum": 0, "maximum": 10 },
+      "minImpulse": { "type": "number", "minimum": 0, "maximum": 50 },
+      "maxImpulse": { "type": "number", "minimum": 1, "maximum": 100 },
+      "cooldownSeconds": { "type": "number", "minimum": 0.05, "maximum": 2 }
+    }
+  }
+}

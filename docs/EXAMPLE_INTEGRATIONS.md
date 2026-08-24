@@ -24,18 +24,23 @@ superseded path.
 
 ## Linked rooms reference integration
 
-`examples/linked-rooms` demonstrates reversible travel between independently
+`examples/linked-rooms` demonstrates reversible travel among independently
 hosted Canvas rooms. A built-in sensor behavior emits a reliable, targeted
 travel request when an avatar crosses a door threshold. The application then
 resolves the data-only route, authorizes it, obtains destination credentials,
 and stages a second `CanvasRuntime` before replacing the visible room.
 
-Both village-to-cave and cave-to-village links are declared as exact reverses.
+The village connects to both a cave and an original pixel-art adventure room;
+all four directional links are declared as exact reverse pairs.
 `RoomLinkGraph` rejects the application topology at startup if either side is
 missing or mismatched. The destination contains a physical return door, while
 the application Back button uses `LinkedRoomNavigator.back()` as an escape
 hatch if collision geometry, placement, or product UI ever makes that door
-unreachable. A failed destination open leaves the origin runtime active.
+unreachable. Departure presentation hides and disables the traveler while the
+destination stages, then restores it if opening fails. The pixel room pairs its
+consumer-owned background with matching collision geometry and includes a
+synchronized ball whose configurable kick impulse exceeds simple avatar
+momentum transfer. A failed destination open leaves the origin runtime active.
 
 The example intentionally keeps room access outside Canvas. A host-authored
 collision effect is a navigation request, not authorization; a production

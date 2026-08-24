@@ -35,6 +35,11 @@ credentials, staging their presentation, and authorizing travel.
    snapshot items and connected avatars.
 10. An explicit arrival spawn wins during travel. A refresh without one resumes
     the participant's latest server-known canonical position.
+11. A consumer may mark departure pending after authorization and before room
+    staging. The reference integration immediately hides the local avatar,
+    disables its input, and hides replicated disabled avatars so nobody watches
+    the traveler continue beyond the threshold during the load. Failed staging
+    restores both presentation and input before returning control.
 
 ## Public structure
 
@@ -76,9 +81,12 @@ only for those links.
 
 ## Reference integration
 
-`examples/linked-rooms` defines a bright village room and a cave room. Each has
-one system-owned threshold item configured with one side of a validated route.
-Walking into the door replaces the visible runtime; the cave contains the exact
-reverse door, and the Back button demonstrates the programmatic fallback. A
-same-room duplicate visibly blocks the displaced tab and offers an explicit
-“Use here” takeover instead of leaving a silently frozen scene.
+`examples/linked-rooms` defines a bright village, a moonlit cave, and an
+original pixel-art adventure room. The village branches through two differently
+skinned system-owned doors, while each destination contains its exact reverse
+door. Walking into either door replaces the visible runtime, and the Back button
+demonstrates the programmatic fallback. The pixel room also proves that normal
+synchronized dynamic items continue to work across linked-room boundaries with
+a strongly kickable ball. A same-room duplicate visibly blocks the displaced
+tab and offers an explicit “Use here” takeover instead of leaving a silently
+frozen scene.

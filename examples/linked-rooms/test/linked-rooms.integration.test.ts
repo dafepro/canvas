@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import { RoomLinkGraph } from "@canvas-physics/core";
 import {
   caveCanvas,
+  adventureBallDefinition,
   linkedRoomLinks,
+  openDoorDefinition,
+  pixelRoomCanvas,
   roomDoorDefinition,
   villageCanvas,
 } from "../src/content.js";
@@ -18,25 +21,33 @@ describe("linked rooms reference integration", () => {
   it("keeps browser and server room content identical", () => {
     expect(json("server/canvases/linked-village.json")).toEqual(villageCanvas);
     expect(json("server/canvases/linked-cave.json")).toEqual(caveCanvas);
+    expect(json("server/canvases/linked-pixel-room.json")).toEqual(pixelRoomCanvas);
     const serverDefinition = json<Record<string, unknown>>(
       "server/definitions/linked-room-door.json",
     );
     expect(serverDefinition).toMatchObject(roomDoorDefinition);
+    expect(json("server/definitions/linked-open-door.json"))
+      .toMatchObject(openDoorDefinition);
+    expect(json("server/definitions/linked-adventure-ball.json"))
+      .toMatchObject(adventureBallDefinition);
   });
 
   it("places each exact reverse link in its declared origin room", () => {
     const graph = new RoomLinkGraph(linkedRoomLinks);
-    for (const canvas of [villageCanvas, caveCanvas]) {
+    for (const canvas of [villageCanvas, caveCanvas, pixelRoomCanvas]) {
       for (const item of canvas.systemItems) {
-        const config = item.resolvedConfig as { linkId: string };
+        const config = item.resolvedConfig as { linkId?: string };
+        if (!config.linkId) continue;
         expect(graph.resolve(canvas.id, config.linkId).returnLinkId).toBeTruthy();
       }
-      expect(graph.linksFrom(canvas.id)).toHaveLength(1);
+      expect(graph.linksFrom(canvas.id)).toHaveLength(canvas.id === "linked-village" ? 2 : 1);
     }
   });
 
   it("persists the active room in a reload-safe URL and rejects unknown rooms", () => {
     expect(linkedRoomFromSearch("?room=linked-cave&user=alice")).toBe("linked-cave");
+    expect(linkedRoomFromSearch("?room=linked-pixel-room&user=alice"))
+      .toBe("linked-pixel-room");
     expect(linkedRoomFromSearch("?room=not-a-real-room")).toBe("linked-village");
     expect(
       urlForLinkedRoom(
@@ -44,6 +55,12 @@ describe("linked rooms reference integration", () => {
         "linked-cave",
       ),
     ).toBe("http://localhost:5176/?autojoin=1&user=alice&room=linked-cave");
+  });
+
+  it("ships generated pixel-room, open-door, and ball assets", () => {
+    for (const asset of ["pixel-room.png", "open-door.png", "adventure-ball.png"]) {
+      expect(readFileSync(resolve(root, `public/${asset}`)).byteLength).toBeGreaterThan(100_000);
+    }
   });
 
   it("activates the door when the avatar centre reaches the sprite midpoint", () => {
@@ -65,5 +82,12 @@ describe("linked rooms reference integration", () => {
     expect(css).toContain(".room-card.session-blocked");
     expect(main).toContain('serverCode === "session_superseded"');
     expect(main).toContain("await displaced?.close()");
+  });
+
+  it("hides and disables a traveler while the destination is staged", () => {
+    const main = readFileSync(resolve(root, "src/main.ts"), "utf8");
+    expect(main).toContain("hideDisabledAvatars: true");
+    expect(main).toContain("runtime.setLocalAvatarPresentationHidden(pending)");
+    expect(main).toContain("runtime.setAvatarDisabled(pending)");
   });
 });

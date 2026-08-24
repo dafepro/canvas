@@ -1,0 +1,24 @@
+{
+  "definitionId": "linked-open-door",
+  "version": 1,
+  "displayName": "Open linked room door",
+  "visual": { "spriteId": "linked.openDoor", "size": { "width": 6, "height": 9 }, "anchor": { "x": 0.5, "y": 0.5 }, "zIndex": 3 },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [
+    { "id": "threshold", "role": "itemSensor", "sensor": true, "shape": { "type": "rect", "width": 0.4, "height": 5 }, "offset": { "x": 1.6, "y": 0 }, "tags": ["room-exit"] }
+  ],
+  "behaviorType": "canvas.roomTravel",
+  "defaultConfig": { "sensorId": "threshold", "linkId": "", "cooldownSeconds": 1 },
+  "persistence": { "transform": true, "behaviorState": true, "onRoomSleep": "resetToIdle" },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "required": ["sensorId", "linkId", "cooldownSeconds"],
+    "additionalProperties": false,
+    "properties": {
+      "sensorId": { "type": "string", "enum": ["threshold"] },
+      "linkId": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "cooldownSeconds": { "type": "number", "minimum": 0.1, "maximum": 10 }
+    }
+  }
+}

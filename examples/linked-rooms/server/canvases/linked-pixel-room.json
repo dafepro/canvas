@@ -1,0 +1,21 @@
+{
+  "id": "linked-pixel-room", "version": 1,
+  "size": { "width": 48, "height": 30 }, "orientation": "topDown",
+  "backgroundAssetId": "linked.pixelRoom",
+  "edges": { "top": "solid", "right": "solid", "bottom": "solid", "left": "solid" },
+  "terrainDefaults": { "avatars": true, "items": true },
+  "avatarController": { "radius": 1.4, "maxSpeed": 13, "acceleration": 70 },
+  "staticGeometry": [
+    { "id": "top-furniture", "role": "worldSolid", "shape": { "type": "rect", "width": 40, "height": 4 }, "position": { "x": 24, "y": 4 } },
+    { "id": "left-bench", "role": "worldSolid", "shape": { "type": "rect", "width": 6, "height": 11 }, "position": { "x": 5, "y": 16 } },
+    { "id": "bottom-furniture", "role": "worldSolid", "shape": { "type": "rect", "width": 31, "height": 3 }, "position": { "x": 29, "y": 27.5 } }
+  ],
+  "regions": [],
+  "environment": { "base": { "gravityXY": { "x": 0, "y": 0 }, "linearDrag": 0.08, "angularDrag": 0.1, "softSpeedLimit": 14, "surfaceFrictionMultiplier": 1 } },
+  "spawnPoints": [{ "id": "room-centre", "position": { "x": 24, "y": 15 } }, { "id": "from-village", "position": { "x": 36, "y": 15 } }],
+  "systemItems": [
+    { "entityId": "pixel-room-village-door", "definitionId": "linked-open-door", "definitionVersion": 1, "transform": { "x": 43, "y": 15, "rotation": 0, "scale": 1 }, "resolvedConfig": { "sensorId": "threshold", "linkId": "pixel-room-to-village", "cooldownSeconds": 1 } },
+    { "entityId": "pixel-room-ball", "definitionId": "linked-adventure-ball", "definitionVersion": 1, "transform": { "x": 24, "y": 15, "rotation": 0, "scale": 1 }, "resolvedConfig": { "sensorId": "kick", "kickStrength": 3.2, "minImpulse": 9, "maxImpulse": 42, "cooldownSeconds": 0.18 } }
+  ],
+  "limits": { "maxAvatars": 12, "maxItems": 4, "maxComplexPhysicsItems": 0 }
+}
