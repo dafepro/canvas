@@ -291,7 +291,11 @@ export class RapierWorld implements BehaviorHost {
     desc
       .setSensor(sensor)
       .setCollisionGroups(collisionGroups(membership, filter))
-      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
+      // Rapier's default only detects pairs containing a dynamic body. Canvas
+      // contact contracts also pair fixed items with kinematic avatars, so
+      // both sides must opt into non-dynamic collision detection.
+      .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
     if (definition.offset) {
       desc.setTranslation(definition.offset.x * scale, definition.offset.y * scale);
     }

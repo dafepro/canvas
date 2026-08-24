@@ -1,12 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   CollisionLayer,
+  BehaviorRegistry,
   validateCanvasDefinition,
   type CanvasDefinition,
+  type ItemInstance,
 } from "@canvas-physics/core";
 import { BehaviorTestHarness } from "@canvas-physics/core/testing";
-import { validateAssetReferences } from "@canvas-physics/client";
+import {
+  HostSimulation,
+  RapierWorld,
+  validateAssetReferences,
+} from "@canvas-physics/client";
 import canvasJson from "../server/canvases/item-playground.json";
 import emojiJson from "../server/definitions/emoji-party.json";
 import photoJson from "../server/definitions/photo-card.json";
@@ -28,6 +34,10 @@ import {
 import { LiveBouncerBehavior } from "../src/live-bouncer-behavior.js";
 
 const canvas = canvasJson as unknown as CanvasDefinition;
+
+beforeAll(async () => {
+  await RapierWorld.load();
+}, 30_000);
 
 describe("compact item playground", () => {
   it("keeps the independently served scene intentionally small", () => {
@@ -128,6 +138,51 @@ describe("compact item playground", () => {
       expect.objectContaining({ effect: "portalFlash", mode: "oneShot" }),
     ]);
     expect(harness.state.activations).toBe(1);
+  });
+
+  it("reacts when a real avatar enters the orb touch sensor", () => {
+    const simulation = new HostSimulation(
+      canvas,
+      playgroundDefinitions,
+      new BehaviorRegistry()
+        .register(ReactiveOrbBehavior)
+        .register(LiveBouncerBehavior),
+      60,
+    );
+    const orb: ItemInstance = {
+      entityId: "orb-contact",
+      canvasId: canvas.id,
+      definitionId: reactiveOrbDefinition.definitionId,
+      definitionVersion: reactiveOrbDefinition.version,
+      ownerUserId: "maker",
+      transform: { x: 18, y: 12, rotation: 0 },
+      resolvedConfig: defaultReactiveOrbConfig,
+      createdAt: new Date().toISOString(),
+      sceneRevision: 1,
+    };
+    simulation.addItem(orb);
+    simulation.addAvatar({
+      entityId: "avatar:visitor",
+      clientId: "visitor-client",
+      userId: "visitor",
+      position: { x: 18, y: 20 },
+    });
+
+    simulation.world.setAvatarInput("avatar:visitor", { x: 0, y: -1 }, 1, 1);
+    const effects = [];
+    for (let tick = 0; tick < 90; tick++) effects.push(...simulation.step().effects);
+    const entity = simulation.world.registry.require(orb.entityId);
+
+    expect(simulation.behaviors.slot(orb.entityId)?.state).toMatchObject({ activations: 1 });
+    expect(entity.render).toMatchObject({ animation: "pulse", animationEpoch: 1 });
+    expect(effects).toEqual([
+      expect.objectContaining({
+        entityId: orb.entityId,
+        effect: "portalFlash",
+        mode: "oneShot",
+      }),
+    ]);
+    simulation.free();
   });
 
   it("keeps the room-owned demo ball moving without an editor", () => {
