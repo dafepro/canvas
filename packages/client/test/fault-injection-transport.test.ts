@@ -42,6 +42,15 @@ describe("deterministic network fault injection", () => {
     expect(transport.reorderedIn).toBe(1);
   });
 
+  it("reports that an idle transport has no live connection to interrupt", () => {
+    const transport = new ProbeTransport({
+      credentialProvider: async () => "unused",
+    });
+
+    expect(transport.interrupt()).toBe(false);
+    expect(transport.status).toBe("idle");
+  });
+
   it("uses an injected random source for repeatable packet loss", () => {
     const received: number[] = [];
     const samples = [0.1, 0.9, 0.2, 0.8];

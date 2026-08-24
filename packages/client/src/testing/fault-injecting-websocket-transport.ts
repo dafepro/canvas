@@ -56,6 +56,11 @@ export class FaultInjectingWebSocketTransport extends WebSocketRoomTransport {
     super.sendRealtime(message);
   }
 
+  /** Breaks the live socket and lets the ordinary reconnect machinery recover. */
+  interrupt(): boolean {
+    return this.interruptConnection();
+  }
+
   protected override deliver(envelope: RoomEnvelope): void {
     const realtime = isRealtime(envelope);
     if (realtime && this.random() < clampRate(this.faults.inboundLoss)) {

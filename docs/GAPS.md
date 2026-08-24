@@ -107,7 +107,7 @@ work below because they determine the public boundary every consumer will use.
     while every second realtime packet is reordered.
   - [x] Baseline reconnect, moving/timer host migration, sleeping-room restart,
     and mid-workflow late-join cases.
-  - [ ] Combine reconnect and moving/workflow host migration with injected
+  - [x] Combine reconnect and moving/workflow host migration with injected
     latency and reordering.
   - [ ] Add a browser-driven background/resume case under injected faults.
 - [ ] Record physical-device resource profiles and enforce measured budgets.
@@ -191,9 +191,10 @@ work below because they determine the public boundary every consumer will use.
   is enforced by the consumer-library Priority 1 packed-build contract above.
 - [ ] Finish elevation rendering and behavior: scale, shadows, and
   elevation-dependent ground collision participation.
-- [ ] Complete multiplayer coverage for faulted moving/workflow host migration,
-  multi-avatar pushing, and mobile backgrounding. Deterministic packet
-  reordering and 50/100/200 ms latency tiers are covered above.
+- [ ] Complete multiplayer coverage for multi-avatar pushing and mobile
+  backgrounding. Faulted reconnect and moving/workflow host migration, plus
+  deterministic packet reordering and 50/100/200 ms latency tiers, are covered
+  above.
 - [ ] Evaluate optional WebRTC only after quantization and relay measurements;
   keep it behind `RoomTransport`.
 

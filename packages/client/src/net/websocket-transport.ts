@@ -180,6 +180,18 @@ export class WebSocketRoomTransport implements RoomTransport {
    */
   protected observeInbound(_bytes: Uint8Array): void {}
 
+  /**
+   * Breaks the current socket without marking the transport as caller-closed.
+   * Testing subclasses use this to exercise the normal reconnect path against
+   * a live server without exposing the production socket itself.
+   */
+  protected interruptConnection(): boolean {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    socket.close(4000, "connection interrupted");
+    return true;
+  }
+
   private write(message: RoomEnvelope): void {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     const bytes = encodeEnvelope(message);

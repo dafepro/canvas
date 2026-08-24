@@ -6,6 +6,7 @@ import {
   SimulationDriver,
   avatarEntityId,
   crateDefinition,
+  rocketDefinition,
   rocketCanvasDefinitions,
   type InputIntent,
   type RenderEntity,
@@ -169,6 +170,161 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     },
     90_000,
   );
+
+  it("rejoins and converges while inbound state remains delayed and reordered", async () => {
+    let hostIntent: InputIntent = STILL;
+    let credentialCalls = 0;
+    const hostUserId = "fault-reconnect-host";
+    const host = session(hostUserId, () => hostIntent);
+    await host.start();
+    await waitFor("the reconnect test host lease", () => host.client.isHost && host.tick > 60);
+
+    const faults = new FaultInjectingWebSocketTransport({
+      credentialProvider: async () => {
+        credentialCalls++;
+        return devRealtimeCredential("fault-reconnect-peer");
+      },
+      backoffMs: [20],
+      faults: {
+        inboundDelayMs: 100,
+        reorderEvery: 2,
+        reorderDelayMs: 180,
+      },
+    });
+    const peer = session("fault-reconnect-peer", () => STILL, faults);
+    await peer.start();
+    await waitFor("the faulted peer to join", () => peer.client.clientId !== "", 30_000);
+
+    const avatarId = avatarEntityId(hostUserId);
+    hostIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true };
+    await waitFor(
+      "the faulted peer to observe moving state",
+      () => entity(peer, avatarId) !== undefined && faults.reorderedIn > 0,
+      30_000,
+    );
+    const oldClientId = peer.client.clientId;
+    const beforeInterruptX = entity(host, avatarId)!.x;
+
+    expect(faults.interrupt()).toBe(true);
+    await waitFor(
+      "the faulted peer to receive a fresh connection identity",
+      () => peer.client.clientId !== oldClientId && faults.status === "open",
+      30_000,
+    );
+    expect(credentialCalls).toBeGreaterThanOrEqual(2);
+
+    await waitFor(
+      "the host avatar to keep moving through the peer reconnect",
+      () => (entity(host, avatarId)?.x ?? beforeInterruptX) > beforeInterruptX + 0.2,
+      30_000,
+    );
+    hostIntent = STILL;
+    await waitFor(
+      "the reconnected peer to converge under the same faults",
+      () => {
+        const onHost = entity(host, avatarId);
+        const onPeer = entity(peer, avatarId);
+        return (
+          onHost !== undefined &&
+          onPeer !== undefined &&
+          Math.abs(onHost.vx) < 0.2 &&
+          distance(onHost, onPeer) < 1
+        );
+      },
+      30_000,
+    );
+  }, 120_000);
+
+  it("migrates moving state and a running workflow to a faulted replacement host", async () => {
+    let replacementIntent: InputIntent = STILL;
+    const host = session("fault-migration-host");
+    await host.start();
+    await waitFor("the migration test host lease", () => host.client.isHost && host.tick > 60);
+
+    const faults = new FaultInjectingWebSocketTransport({
+      credentialProvider: async () => devRealtimeCredential("fault-migration-peer"),
+      faults: {
+        inboundDelayMs: 100,
+        reorderEvery: 2,
+        reorderDelayMs: 180,
+      },
+    });
+    const replacement = session(
+      "fault-migration-peer",
+      () => replacementIntent,
+      faults,
+    );
+    await replacement.start();
+    await waitFor(
+      "the faulted replacement peer to join",
+      () => replacement.client.clientId !== "",
+      30_000,
+    );
+
+    const replacementAvatarId = avatarEntityId("fault-migration-peer");
+    await waitFor(
+      "the original host to add the replacement avatar",
+      () => entity(host, replacementAvatarId) !== undefined,
+      30_000,
+    );
+    const peerStartX = entity(host, replacementAvatarId)!.x;
+    replacementIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true };
+    await waitFor(
+      "the replacement avatar to move while it is still a peer",
+      () =>
+        (entity(host, replacementAvatarId)?.x ?? peerStartX) > peerStartX + 2 &&
+        faults.reorderedIn > 0,
+      30_000,
+    );
+
+    host.spawnItem(rocketDefinition.definitionId, { x: 50, y: 62 });
+    await waitFor(
+      "the rocket workflow to reach the faulted peer",
+      () =>
+        items(replacement).some(
+          (item) =>
+            item.definitionId === rocketDefinition.definitionId &&
+            (item.behaviorState as { phase?: string } | undefined)?.phase === "arming",
+        ),
+      30_000,
+    );
+    const rocketId = items(replacement).find(
+      (item) => item.definitionId === rocketDefinition.definitionId,
+    )!.id;
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    expect(
+      (entity(replacement, rocketId)?.behaviorState as
+        | { phase?: string; launchCount?: number }
+        | undefined),
+    ).toMatchObject({ phase: "arming", launchCount: 0 });
+
+    const beforeMigrationX = entity(host, replacementAvatarId)!.x;
+    host.stop();
+    await waitFor(
+      "the faulted peer to become replacement host",
+      () => replacement.client.isHost,
+      30_000,
+    );
+    await waitFor(
+      "the moving avatar to continue on the replacement host",
+      () => (entity(replacement, replacementAvatarId)?.x ?? beforeMigrationX) > beforeMigrationX + 2,
+      30_000,
+    );
+    replacementIntent = STILL;
+    await waitFor(
+      "the replacement host to finish the restored workflow",
+      () => {
+        const state = entity(replacement, rocketId)?.behaviorState as
+          | { phase?: string; launchCount?: number }
+          | undefined;
+        return state?.phase === "flying" && state.launchCount === 1;
+      },
+      10_000,
+    );
+
+    expect(faults.delayedIn).toBeGreaterThan(0);
+    expect(faults.reorderedIn).toBeGreaterThan(0);
+  }, 120_000);
 
   // Spec 11.1. A reconnect gives the client a new id. A client that held the
   // lease before the break must not keep publishing state.
