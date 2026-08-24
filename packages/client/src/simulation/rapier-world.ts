@@ -57,6 +57,12 @@ interface BodyRecord {
   respawnTicks?: number;
   /** Addendum A3. Colliders switched off for the wait, to switch back on. */
   respawnDisabled?: string[];
+  /** Transient dynamics retained while a durable freeze holds the body fixed. */
+  frozenDynamics?: {
+    mode: BodyMode;
+    velocity: Vec2;
+    angularVelocity: number;
+  };
 }
 
 /** Spec 20. Half a second at 60 Hz before a still, embedded body is freed. */
@@ -482,16 +488,39 @@ export class RapierWorld implements BehaviorHost {
     }
   }
 
-  /** Removes an owned item from every simulation subsystem while retaining its pose. */
+  /** Holds an owned item in place while retaining its solid physical presence. */
   setItemIsolation(entityId: EntityId, isolated: boolean): boolean {
     const record = this.bodies.get(entityId);
     if (!record || record.entity.kind !== "item") return false;
-    if (record.entity.isolated === isolated && record.body.isEnabled() === !isolated) {
+    if (record.entity.isolated === isolated) return true;
+    if (isolated) {
+      record.frozenDynamics = {
+        mode: record.entity.rigidBody?.mode ?? "fixed",
+        velocity: { ...record.body.linvel() },
+        angularVelocity: record.body.angvel(),
+      };
+      record.body.setLinvel({ x: 0, y: 0 }, true);
+      record.body.setAngvel(0, true);
+      record.body.setBodyType(RAPIER.RigidBodyType.Fixed, true);
+      record.entity.isolated = true;
       return true;
     }
-    record.entity.isolated = isolated;
-    record.body.setEnabled(!isolated);
-    if (isolated) this.endContacts(entityId);
+
+    const frozen = record.frozenDynamics;
+    const mode = frozen?.mode ?? record.entity.rigidBody?.mode ?? "fixed";
+    const bodyType =
+      mode === "fixed"
+        ? RAPIER.RigidBodyType.Fixed
+        : mode === "dynamic"
+          ? RAPIER.RigidBodyType.Dynamic
+          : mode === "kinematicPosition"
+            ? RAPIER.RigidBodyType.KinematicPositionBased
+            : RAPIER.RigidBodyType.KinematicVelocityBased;
+    record.body.setBodyType(bodyType, true);
+    record.body.setLinvel(frozen?.velocity ?? { x: 0, y: 0 }, true);
+    record.body.setAngvel(frozen?.angularVelocity ?? 0, true);
+    record.entity.isolated = false;
+    record.frozenDynamics = undefined;
     return true;
   }
 

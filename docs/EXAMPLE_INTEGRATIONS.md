@@ -47,11 +47,11 @@ can vary without entering canonical room state. The example's avatar skin is
 also supplied through the same consumer asset manifest as its item artwork.
 
 Editing never changes the room into a separate mode. A room-owned gold ball
-maintains constant speed against the canvas boundary while item controls are
-open, and ignores editable objects so it cannot be trapped. Consumers may explicitly
-freeze an owned item while manipulating it; Canvas then preserves its pose and
-pauses collision, physics, behavior, and simulation-clock timers until it is
-returned to live simulation. The independent collision override keeps an item
+maintains constant speed while colliding with the canvas, avatars, and editable
+objects while item controls are open. Consumers may explicitly freeze an owned
+item while manipulating it; Canvas then preserves its pose and pauses motion,
+behavior, and simulation-clock timers while the frozen item remains solid. The
+independent collision override keeps an item
 live while disabling its authored solids and sensors. A configurable color tile
 combines three definition variants with a custom replicated sprite tint,
 without adding product palette concepts to the engine.

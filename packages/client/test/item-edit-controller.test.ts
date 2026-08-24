@@ -77,6 +77,9 @@ describe("item edit interaction", () => {
       .toBeUndefined();
     expect(findOwnedItemAt([rotated], [definition], { x: 10, y: 5 }, "bob"))
       .toBeUndefined();
+    expect(
+      findOwnedItemAt([{ ...rotated, isolated: true }], [definition], { x: 10, y: 5 }, "alice"),
+    ).toMatchObject({ id: "item-1", isolated: true });
   });
 
   it("hit-tests the scaled visual bounds", () => {

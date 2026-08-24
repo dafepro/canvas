@@ -225,8 +225,8 @@ const renderOverlays = (snapshot: Readonly<OverlayProjectionSnapshot>): void => 
     entity.isolated ? "Unfreeze object" : "Freeze object",
   );
   isolateButton.title = entity.isolated
-    ? "Resume motion, collision, behavior, and timers"
-    : "Freeze motion, collision, behavior, and timers";
+    ? "Resume motion, behavior, and timers; collisions remain independently configurable"
+    : "Hold this item in place and pause behavior and timers while keeping its collisions";
   collisionsButton.classList.toggle("active", entity.collisionsDisabled === true);
   collisionsButton.querySelector("b")!.textContent = entity.collisionsDisabled ? "○" : "◉";
   collisionsButton.querySelector("span")!.textContent = entity.collisionsDisabled
@@ -481,14 +481,10 @@ deleteButton.addEventListener("click", () => {
 });
 finishEdit.addEventListener("click", () => {
   const entity = selectedEntity();
-  if (entity?.isolated) {
-    requestMutation("Finished · returning item to live simulation…", () =>
-      runtime!.setItemIsolation(entity.id, false),
-    );
-  } else {
-    actionStatus.textContent = "Finished editing · item remains live";
-    actionStatus.dataset.kind = "accepted";
-  }
+  actionStatus.textContent = entity?.isolated
+    ? "Finished editing · frozen state preserved"
+    : "Finished editing · item remains live";
+  actionStatus.dataset.kind = "accepted";
   runtime?.clearItemEditSelection();
   selectedEntityId = undefined;
   closeMoreMenu();

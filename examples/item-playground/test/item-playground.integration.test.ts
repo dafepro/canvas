@@ -73,6 +73,7 @@ describe("compact item playground", () => {
 
   it("keeps direct manipulation controls around the selected item", () => {
     const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
     expect(html).toContain('class="scale-tools"');
     expect(html).toContain('class="rotate-control rotate-left"');
     expect(html).toContain('class="rotate-control rotate-right"');
@@ -82,6 +83,8 @@ describe("compact item playground", () => {
     expect(html).toContain('id="collisions"');
     expect(html).toContain('data-highlight="aurora"');
     expect(html).toContain('aria-label="Delete item"');
+    expect(main).toContain("Finished editing · frozen state preserved");
+    expect(main).not.toContain("runtime!.setItemIsolation(entity.id, false)");
   });
 
   it("applies an arbitrary consumer color as a replicated sprite tint", () => {
@@ -126,9 +129,9 @@ describe("compact item playground", () => {
   });
 
   it("keeps the room-owned demo ball moving without an editor", () => {
-    expect(liveBouncerDefinition.colliders[0]?.collisionMask).toBe(
-      CollisionLayer.WORLD_STATIC,
-    );
+    const collisionMask = liveBouncerDefinition.colliders[0]?.collisionMask ?? 0;
+    expect(collisionMask & CollisionLayer.WORLD_STATIC).not.toBe(0);
+    expect(collisionMask & CollisionLayer.ITEM_SOLID).not.toBe(0);
     const harness = new BehaviorTestHarness(
       LiveBouncerBehavior,
       { speed: 8.5, initialDirection: { x: 7, y: 5 } },

@@ -25,13 +25,12 @@ color picker, freeze, and collisions. Each user can drag, rotate, scale,
 recolor, freeze, make collisionless, and delete their own items. The visitor
 avatar is also a consumer-supplied texture rather than an engine placeholder.
 
-The gold system ball maintains constant speed while the canvas boundary changes
-its direction, even while controls are open. It intentionally ignores editable
-items so a dense user-created arrangement cannot trap the visual proof. Editing does not stop the
-room. Freeze is an optional, durable per-item setting that pauses motion,
-collision, behavior, and behavior timers while preserving pose. Collision can
-also be disabled independently, leaving motion and behavior live while other
-entities pass through. Another tab sees the canonical item state, but never
+The gold system ball maintains constant speed while collisions with the canvas,
+avatars, and editable items change its direction, even while controls are open.
+Editing does not stop the room. Freeze is an optional, durable per-item setting
+that holds pose and pauses motion, behavior, and behavior timers while leaving
+the item physically solid. Collision can be disabled independently, leaving
+motion and behavior live while other entities pass through. Another tab sees the canonical item state, but never
 sees the first user's selection outline or edit toolbar. The Manage popover
 offers Aurora, Halo, and Badge ownership treatments for comparison.
 

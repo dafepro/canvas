@@ -29,16 +29,18 @@ interaction behavior while importing only published Canvas package exports.
 6. [x] **Always-live in-canvas editing.** Spawn and owner-only Manage popovers,
    local ownership outlines, a private item-adjacent icon toolbar, recoloring,
    and an always-moving system ball replace the separate inspector/mode UI.
-   Optional owner-authorized isolation durably pauses an edited item's physics,
-   collision, behavior, and timers without pausing the canvas.
+   Optional owner-authorized isolation durably holds an edited item's pose and
+   pauses behavior and timers without removing its collisions or pausing the canvas.
 7. [x] **Ergonomic direct manipulation.** Selection and movement are separate
    gestures; controls may escape canvas clipping; custom tint, independent
    collision control, constant-speed live motion, and three local ownership
    treatments demonstrate product-level extensibility on generic runtime seams.
 8. [x] **Tap and local-presentation refinement.** Only a completed tap opens
    item controls. Selected-item drags render locally at display cadence while
-   the existing authoritative preview stream remains coalesced, and the live
-   ball ignores editable objects so it cannot become wedged in user content.
+   the existing authoritative preview stream remains coalesced.
+9. [x] **Solid durable freeze.** Finish preserves the server-authoritative
+   frozen state; frozen items stay selectable, editable, and physically solid.
+   The live ball collides with both live and frozen authored items.
 
 ## Alignment decisions
 

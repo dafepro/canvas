@@ -140,7 +140,7 @@ export const colorTileDefinition: ItemDefinition<ReactiveOrbConfig> = {
 
 export const liveBouncerDefinition: ItemDefinition<LiveBouncerConfig> = {
   definitionId: "live-bouncer",
-  version: 3,
+  version: 4,
   displayName: "Always-live ball",
   visual: {
     spriteId: "playground.ball",
@@ -160,9 +160,11 @@ export const liveBouncerDefinition: ItemDefinition<LiveBouncerConfig> = {
       id: "solid",
       role: "itemSolid",
       shape: { type: "circle", radius: 1.75 },
-      // Keep the visual proof moving even when users build a dense pile of
-      // editable objects. It still bounces from the canvas boundary.
-      collisionMask: CollisionLayer.WORLD_STATIC,
+      collisionMask:
+        CollisionLayer.WORLD_STATIC |
+        CollisionLayer.ITEM_SOLID |
+        CollisionLayer.AVATAR_BODY |
+        CollisionLayer.AVATAR_SENSOR,
       restitution: 1,
       friction: 0,
     },

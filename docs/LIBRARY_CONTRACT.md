@@ -59,10 +59,12 @@ placement hook.
 
 Owner-authorized mutations include transform, uniform scale, configuration,
 deletion, whole-item freeze, and global collision enablement. Freeze preserves
-pose while pausing the body, contacts, behavior, and simulation-clock timers.
-Collision disablement is narrower: physics motion and behavior continue, but
-the item's authored solid and sensor colliders are inactive. Both states are
-durable, server-authoritative, replicated, and restored during host migration.
+pose while holding the body fixed and pausing behavior and simulation-clock
+timers. Its colliders remain active, so frozen items are still obstacles and
+remain selectable/editable. Collision disablement is independent: physics
+motion and behavior continue, but the item's authored solid and sensor
+colliders are inactive. Both states are durable, server-authoritative,
+replicated, and restored during host migration.
 
 Direct manipulation may render an owner's current transform locally at display
 cadence while reliable preview commands remain coalesced. The local pose is
