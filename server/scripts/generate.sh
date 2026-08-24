@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generates the Go bindings from the shared .proto contract of record.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 PROTOC_GEN_GO_VERSION="v1.36.12"
 export PATH="$(go env GOPATH)/bin:${PATH}"
@@ -12,9 +12,9 @@ if ! command -v protoc-gen-go >/dev/null || \
 fi
 
 protoc \
-  --go_out=gen \
+  --go_out=server/gen \
   --go_opt=module=github.com/dafepro/canvas/server/gen \
-  --proto_path=../packages/protocol/proto \
-  ../packages/protocol/proto/room.proto
+  --proto_path=. \
+  packages/protocol/proto/room.proto
 
-echo "generated gen/canvasphysicsv1/room.pb.go"
+echo "generated server/gen/canvasphysicsv1/room.pb.go"

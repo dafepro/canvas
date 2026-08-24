@@ -22,6 +22,7 @@ describe("cross-platform release verification", () => {
   it("fails when checked-in protocol bindings are stale", () => {
     const workflow = read(".github/workflows/ci.yml");
     const verification = read("scripts/verify-generated.sh");
+    const tsGeneration = read("packages/protocol/scripts/generate.sh");
     const goGeneration = read("server/scripts/generate.sh");
     const attributes = read(".gitattributes");
 
@@ -34,6 +35,8 @@ describe("cross-platform release verification", () => {
     expect(goGeneration).toContain("protoc-gen-go@v1.36.12");
     expect(goGeneration).toContain("protoc-gen-go --version");
     expect(goGeneration).not.toContain("protoc-gen-go@latest");
+    expect(tsGeneration).toContain("Windows_NT");
+    expect(tsGeneration).toContain('${PLUGIN}.CMD');
     expect(attributes).toContain("*.sh text eol=lf");
   });
 

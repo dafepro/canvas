@@ -235,7 +235,7 @@ export interface Heartbeat {
 
 export interface PlayerInput {
   inputSequence: number;
-  direction: Vec2 | undefined;
+  direction?: Vec2 | undefined;
   intensity: number;
   clientTimeUnixMs: number;
   /** True while the pointer is held, so a lost packet leaves no stale input. */
@@ -249,7 +249,7 @@ export interface PlayerInput {
 
 export interface EntityState {
   entityId: string;
-  quantizedTransform:
+  quantizedTransform?:
     | QuantizedTransform
     | undefined;
   /** Set for avatars so the owner can reconcile its prediction. */
@@ -332,7 +332,7 @@ export interface DurableCommand {
   entityId: string;
   definitionId: string;
   definitionVersion: number;
-  position: Vec2 | undefined;
+  position?: Vec2 | undefined;
   rotation: number;
   z: number;
   configJson: Uint8Array;
@@ -350,7 +350,7 @@ export interface DurableCommandResult {
   sceneRevision: number;
   /** The accepted item instance as JSON, present on accept. */
   itemInstanceJson: Uint8Array;
-  command: DurableCommand | undefined;
+  command?: DurableCommand | undefined;
 }
 
 export interface Checkpoint {

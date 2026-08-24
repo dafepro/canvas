@@ -4,9 +4,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(cd ../.. && pwd)"
+PLUGIN="${ROOT}/node_modules/.bin/protoc-gen-ts_proto"
+if [[ "${OS:-}" == "Windows_NT" ]]; then
+  PLUGIN="$(cygpath -w "${PLUGIN}.CMD")"
+fi
 
 protoc \
-  --plugin="protoc-gen-ts_proto=${ROOT}/node_modules/.bin/protoc-gen-ts_proto" \
+  --plugin="protoc-gen-ts_proto=${PLUGIN}" \
   --ts_proto_out=src/gen \
   --ts_proto_opt=esModuleInterop=true,forceLong=number,useOptionals=messages,outputServices=false,snakeToCamel=true,importSuffix=.js \
   --proto_path=proto \

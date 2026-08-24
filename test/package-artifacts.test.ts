@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const workspaceRoot = resolve(import.meta.dirname, "..");
@@ -26,22 +26,14 @@ afterEach(() => {
 });
 
 const runPnpm = (arguments_: string[], cwd: string): void => {
-  let pnpmCli = process.env.npm_execpath;
-  if (!pnpmCli && process.platform === "win32") {
-    const commands = execFileSync("where.exe", ["pnpm.cmd"], {
-      encoding: "utf8",
-    }).trim().split(/\r?\n/u);
-    for (const command of commands) {
-      const candidate = join(dirname(command), "node_modules", "pnpm", "bin", "pnpm.cjs");
-      if (existsSync(candidate)) {
-        pnpmCli = candidate;
-        break;
-      }
-    }
-  }
-  if (!pnpmCli) throw new Error("Could not locate the pnpm CLI");
+  const pnpmCommand = process.platform === "win32"
+    ? (process.env.ComSpec ?? "cmd.exe")
+    : "pnpm";
+  const pnpmArguments = process.platform === "win32"
+    ? ["/d", "/s", "/c", "pnpm.cmd", ...arguments_]
+    : arguments_;
   try {
-    execFileSync(process.execPath, [pnpmCli, ...arguments_], {
+    execFileSync(pnpmCommand, pnpmArguments, {
       cwd,
       encoding: "utf8",
       stdio: "pipe",
