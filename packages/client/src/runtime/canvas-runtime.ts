@@ -82,6 +82,8 @@ export interface CanvasRuntimeOptions {
   onDiagnostics?: (diagnostics: RuntimeDiagnostics) => void;
   /** Addendum A1. Runs after the local avatar changes its disabled state. */
   onAvatarDisabledChange?: (disabled: boolean) => void;
+  /** Presentation policy for rooms where disabled avatars must fully leave view. */
+  hideDisabledAvatars?: boolean;
   onEditModeChange?: (enabled: boolean) => void;
   onEditSelectionChange?: (state: ItemEditState) => void;
   /** Product-owned placement for inactive or disconnected participants. */
@@ -118,6 +120,7 @@ export class CanvasRuntime {
   private visibilityListener?: () => void;
   private pageHideListener?: () => void;
   private avatarDisabled = false;
+  private localAvatarPresentationHidden = false;
   private editMode = false;
   private readonly editPresentation = new ItemEditPresentation();
   private latestEntities: RenderEntity[] = [];
@@ -159,6 +162,11 @@ export class CanvasRuntime {
 
   subscribeBehaviorState(...args: Parameters<RoomSession["subscribeBehaviorState"]>) {
     return this.session.subscribeBehaviorState(...args);
+  }
+
+  /** Presentation-only departure affordance; canonical simulation continues. */
+  setLocalAvatarPresentationHidden(hidden: boolean): void {
+    this.localAvatarPresentationHidden = hidden;
   }
 
   subscribeEffects(...args: Parameters<RoomSession["subscribeEffects"]>) {
@@ -447,10 +455,18 @@ export class CanvasRuntime {
       } else {
         this.frameProfiler.sample(deltaMs);
       }
-      const entities = this.editPresentation.apply(
+      let entities = this.editPresentation.apply(
         this.session.entitiesToDraw(nowMs),
         nowMs,
       );
+      if (this.localAvatarPresentationHidden || this.options.hideDisabledAvatars) {
+        entities = entities.filter((entity) => {
+          if (this.localAvatarPresentationHidden && entity.id === this.session.avatarId) {
+            return false;
+          }
+          return !(this.options.hideDisabledAvatars && entity.kind === "avatar" && entity.disabled);
+        });
+      }
       this.latestEntities = entities;
       scene.update(entities, deltaMs);
       if (this.overlayProjections.hasObservers && this.session.canvas) {

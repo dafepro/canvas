@@ -19,6 +19,8 @@ export interface LinkedRoomHandle {
   subscribeEffects(observer: (effect: Readonly<EffectEmission>) => void): () => void;
   /** Promotes a staged, ready room into the visible presentation. */
   activate?(): void | Promise<void>;
+  /** Hides or otherwise marks the local avatar while destination staging runs. */
+  setDeparturePending?(pending: boolean): void | Promise<void>;
   /** Gracefully leaves and disposes this room. */
   close(): void | Promise<void>;
 }
@@ -127,7 +129,10 @@ export class LinkedRoomNavigator {
     let destination: LinkedRoomHandle | undefined;
     let destinationActivated = false;
     let destinationUnsubscribe: (() => void) | undefined;
+    let departurePending = false;
     try {
+      departurePending = true;
+      await origin.setDeparturePending?.(true);
       destination = await this.options.openRoom(request);
       if (destination.roomId !== link.toRoomId) {
         throw new Error(
@@ -143,6 +148,13 @@ export class LinkedRoomNavigator {
       if (destinationActivated) {
         try {
           await origin.activate?.();
+        } catch (cause) {
+          this.reportError(cause);
+        }
+      }
+      if (departurePending) {
+        try {
+          await origin.setDeparturePending?.(false);
         } catch (cause) {
           this.reportError(cause);
         }

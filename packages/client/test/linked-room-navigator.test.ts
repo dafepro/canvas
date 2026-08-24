@@ -15,6 +15,8 @@ class FakeRoom implements LinkedRoomHandle {
   activated = false;
   activationCount = 0;
   closed = false;
+  departurePending = false;
+  departureStates: boolean[] = [];
   failActivation = false;
   failSubscription = false;
   private readonly observers = new Set<(effect: Readonly<EffectEmission>) => void>();
@@ -35,6 +37,11 @@ class FakeRoom implements LinkedRoomHandle {
 
   close(): void {
     this.closed = true;
+  }
+
+  setDeparturePending(pending: boolean): void {
+    this.departurePending = pending;
+    this.departureStates.push(pending);
   }
 
   cross(linkId: string, entityId = this.avatarEntityId): void {
@@ -93,6 +100,7 @@ describe("LinkedRoomNavigator", () => {
       arrivalSpawnPointId: "from-village",
     });
     expect(rooms[0]).toMatchObject({ activated: true, closed: true });
+    expect(rooms[0]!.departureStates).toEqual([true]);
     expect(rooms[1]).toMatchObject({ activated: true, closed: false });
 
     await expect(navigator.back()).resolves.toBe(true);
@@ -122,6 +130,7 @@ describe("LinkedRoomNavigator", () => {
     await navigator.whenIdle();
     expect(navigator.currentRoomId).toBe("village");
     expect(origin.closed).toBe(false);
+    expect(origin.departureStates).toEqual([true, false]);
     expect(onError).toHaveBeenCalledWith(expect.any(Error));
   });
 
