@@ -56,6 +56,9 @@ export class SimulationKernel {
   private definitions: ItemDefinition[] = [];
   private tickRate = 60;
   private isHost = false;
+  private initialized = false;
+  private initializationGeneration = 0;
+  private hostSnapshot?: Extract<SimulationRequest, { type: "setHost" }>;
   private localAvatarId?: string;
   private running = false;
   private renderAccumulatorMs = 0;
@@ -81,12 +84,26 @@ export class SimulationKernel {
   private dispatch(request: SimulationRequest): void {
     switch (request.type) {
       case "init": {
+        const generation = ++this.initializationGeneration;
+        this.initialized = false;
         this.canvas = request.canvas;
         this.definitions = request.definitions;
         this.tickRate = request.tickRate;
         this.isHost = request.isHost;
+        this.hostSnapshot = request.isHost
+          ? {
+              type: "setHost",
+              isHost: true,
+              snapshot: request.snapshot,
+              wakeFromSleep: request.wakeFromSleep,
+            }
+          : undefined;
         void RapierWorld.load().then(() => {
-          this.rebuild(request);
+          if (generation !== this.initializationGeneration) return;
+          this.initialized = true;
+          this.rebuild(this.isHost
+            ? this.hostSnapshot
+            : { type: "setHost", isHost: false });
           if (request.localAvatar) {
             this.localAvatarId = request.localAvatar.entityId;
             this.simulation?.addAvatar(request.localAvatar);
@@ -100,7 +117,8 @@ export class SimulationKernel {
 
       case "setHost": {
         this.isHost = request.isHost;
-        this.rebuild(request);
+        this.hostSnapshot = request.isHost ? request : undefined;
+        if (this.initialized) this.rebuild(request);
         break;
       }
 
@@ -201,6 +219,8 @@ export class SimulationKernel {
 
   /** Stops the loop and frees the physics world. */
   stop(): void {
+    this.initializationGeneration++;
+    this.initialized = false;
     this.running = false;
     if (this.driveTimer) clearTimeout(this.driveTimer);
     this.driveTimer = undefined;
