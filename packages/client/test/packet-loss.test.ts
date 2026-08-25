@@ -230,6 +230,77 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     expect(faults.reorderedIn).toBeGreaterThan(0);
   }, 90_000);
 
+  it("keeps acknowledged peer prediction moving tangentially along an edge", async () => {
+    let peerIntent: InputIntent = STILL;
+    const host = session("edge-ack-host");
+    await host.start();
+    await waitFor("the edge acknowledgement host", () => host.client.isHost && host.tick > 60);
+
+    const faults = new FaultInjectingWebSocketTransport({
+      credentialProvider: async () => devRealtimeCredential("edge-ack-peer"),
+      faults: {
+        inboundDelayMs: 70,
+        inboundJitterMs: 35,
+        reorderEvery: 12,
+        reorderDelayMs: 190,
+      },
+    });
+    const peer = session("edge-ack-peer", () => peerIntent, faults);
+    await peer.start();
+    await waitFor("the edge acknowledgement peer", () => peer.client.clientId !== "", 30_000);
+    const avatarId = avatarEntityId("edge-ack-peer");
+    await waitFor(
+      "the edge acknowledgement avatar",
+      () => entity(host, avatarId) !== undefined && entity(peer, avatarId) !== undefined,
+      30_000,
+    );
+
+    let targetY = 20;
+    peerIntent = {
+      direction: { x: 1, y: -1 },
+      intensity: 1,
+      held: true,
+      target: { x: 200, y: targetY },
+    };
+    await waitFor(
+      "the peer prediction to reach the right edge",
+      () => {
+        const avatar = entity(peer, avatarId);
+        return avatar !== undefined && avatar.x > 97.8 && Math.abs(avatar.y - 20) < 0.2;
+      },
+      30_000,
+    );
+
+    const samples: Array<{ x: number; y: number }> = [];
+    const deadline = performance.now() + 2_400;
+    while (performance.now() < deadline) {
+      targetY += 0.14;
+      peerIntent = {
+        direction: { x: 0, y: 1 },
+        intensity: 1,
+        held: true,
+        target: { x: 200, y: targetY },
+      };
+      const avatar = entity(peer, avatarId);
+      if (avatar) samples.push({ x: avatar.x, y: avatar.y });
+      await new Promise((resolve) => setTimeout(resolve, 16));
+    }
+    peerIntent = STILL;
+
+    const tangentSteps = samples.slice(1).map((sample, index) =>
+      sample.y - samples[index]!.y);
+    const diagnostics = JSON.stringify({
+      minTangentStep: Math.min(...tangentSteps),
+      maxNormalError: Math.max(...samples.map(({ x }) => Math.abs(98.8 - x))),
+      session: peer.diagnostics(),
+    });
+    expect(samples.at(-1)!.y - samples[0]!.y, diagnostics).toBeGreaterThan(12);
+    expect(Math.min(...tangentSteps), diagnostics).toBeGreaterThan(-0.1);
+    expect(Math.max(...samples.map(({ x }) => Math.abs(98.8 - x))), diagnostics)
+      .toBeLessThan(0.4);
+    expect(peer.diagnostics().acknowledgedInputSequence).toBeGreaterThan(0);
+  }, 90_000);
+
   it("rejoins and converges while inbound state remains delayed and reordered", async () => {
     let hostIntent: InputIntent = STILL;
     let credentialCalls = 0;

@@ -165,6 +165,11 @@ export interface SessionDiagnostics {
   interpolationDepth: number;
   extrapolations: number;
   reconcileError: number;
+  inputSequence: number;
+  acknowledgedInputSequence: number;
+  predictionHistoryDepth: number;
+  predictedAvatar?: Readonly<Vec2>;
+  canonicalAvatar?: Readonly<Vec2>;
   sceneRevision: number;
   itemCount: number;
   lastRejection?: string;
@@ -201,6 +206,8 @@ export class RoomSession {
   private inputSequence = 0;
   private hostEntities: RenderEntity[] = [];
   private localPrediction?: RenderEntity;
+  private readonly localPredictionHistory = new Map<number, Readonly<Vec2>>();
+  private acknowledgedInputSequence = 0;
   private currentTick = 0;
   private simulationReady = false;
   private latestPeers?: Peer[];
@@ -605,6 +612,7 @@ export class RoomSession {
       }
       this.buffer.reset();
       this.reconciler.reset();
+      this.resetPredictionHistory();
       this.lastReconciledTick = undefined;
       // A migration checkpoint may trail the latest replicated state by up to
       // one checkpoint interval. Keep positions already observed from the old
@@ -631,6 +639,7 @@ export class RoomSession {
       this.lastMigrationReason = reason || undefined;
       this.buffer.reset();
       this.reconciler.reset();
+      this.resetPredictionHistory();
       this.lastReconciledTick = undefined;
       if (hostClientId !== this.client.clientId) {
         this.driver.send({ type: "setHost", isHost: false });
@@ -1227,7 +1236,26 @@ export class RoomSession {
         latestTick !== undefined &&
         latestTick !== this.lastReconciledTick
       ) {
-        this.reconciler.observe(canonicalLocal, this.localPrediction);
+        const acknowledged = canonicalLocal.lastProcessedInputSequence ?? 0;
+        const predictionAtAcknowledgement = this.localPredictionHistory.get(acknowledged);
+        if (predictionAtAcknowledgement) {
+          this.reconciler.observe(canonicalLocal, predictionAtAcknowledgement);
+          this.acknowledgedInputSequence = Math.max(
+            this.acknowledgedInputSequence,
+            acknowledged,
+          );
+          for (const sequence of this.localPredictionHistory.keys()) {
+            if (sequence <= acknowledged) this.localPredictionHistory.delete(sequence);
+          }
+        } else if (
+          acknowledged === (this.localPrediction.lastProcessedInputSequence ?? 0)
+        ) {
+          this.reconciler.observe(canonicalLocal, this.localPrediction);
+          this.acknowledgedInputSequence = Math.max(
+            this.acknowledgedInputSequence,
+            acknowledged,
+          );
+        }
         this.lastReconciledTick = latestTick;
       }
       const corrected = this.reconciler.correct(this.localPrediction);
@@ -1315,6 +1343,7 @@ export class RoomSession {
           this.localPrediction = message.entities.find(
             (entity) => entity.id === this.localAvatarId,
           );
+          if (this.localPrediction) this.recordLocalPrediction(this.localPrediction);
         }
         this.checkPresentationReady();
         break;
@@ -1678,6 +1707,8 @@ export class RoomSession {
   }
 
   diagnostics(): SessionDiagnostics {
+    const canonicalAvatar = (this.client.isHost ? this.hostEntities : this.buffer.latest())
+      .find((entity) => entity.id === this.localAvatarId);
     return {
       status: this.client.isHost ? "host" : "peer",
       isHost: this.client.isHost,
@@ -1694,6 +1725,15 @@ export class RoomSession {
       interpolationDepth: this.buffer.depth,
       extrapolations: this.buffer.extrapolationCount,
       reconcileError: this.reconciler.lastErrorDistance,
+      inputSequence: this.inputSequence,
+      acknowledgedInputSequence: this.acknowledgedInputSequence,
+      predictionHistoryDepth: this.localPredictionHistory.size,
+      predictedAvatar: this.localPrediction
+        ? Object.freeze({ x: this.localPrediction.x, y: this.localPrediction.y })
+        : undefined,
+      canonicalAvatar: canonicalAvatar
+        ? Object.freeze({ x: canonicalAvatar.x, y: canonicalAvatar.y })
+        : undefined,
       sceneRevision: this.client.sceneRevision,
       itemCount: this.itemCount,
       lastRejection: this.lastRejection,
@@ -1707,6 +1747,21 @@ export class RoomSession {
 
   get isRunning(): boolean {
     return this.running;
+  }
+
+  private recordLocalPrediction(entity: Readonly<RenderEntity>): void {
+    const sequence = entity.lastProcessedInputSequence ?? 0;
+    this.localPredictionHistory.set(sequence, Object.freeze({ x: entity.x, y: entity.y }));
+    while (this.localPredictionHistory.size > 128) {
+      const oldest = this.localPredictionHistory.keys().next().value as number | undefined;
+      if (oldest === undefined) break;
+      this.localPredictionHistory.delete(oldest);
+    }
+  }
+
+  private resetPredictionHistory(): void {
+    this.localPredictionHistory.clear();
+    this.acknowledgedInputSequence = 0;
   }
 }
 
