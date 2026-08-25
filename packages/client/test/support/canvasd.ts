@@ -11,6 +11,8 @@ export interface Canvasd {
   /** Base URL, such as http://127.0.0.1:53412. */
   url: string;
   stop(): void;
+  /** Stops the process and resolves only after it releases files and sockets. */
+  stopAndWait(timeoutMs?: number): Promise<void>;
 }
 
 export const createCanvasdDataDir = (): string =>
@@ -108,6 +110,20 @@ export const startCanvasd = async (
     url,
     stop: () => {
       child.kill("SIGTERM");
+    },
+    stopAndWait: async (timeoutMs = 5_000) => {
+      child.kill("SIGTERM");
+      const until = Date.now() + timeoutMs;
+      while (
+        child.exitCode === null &&
+        child.signalCode === null &&
+        Date.now() < until
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      if (child.exitCode !== null || child.signalCode !== null) return;
+      child.kill("SIGKILL");
+      throw new Error(`canvasd did not stop within ${timeoutMs}ms`);
     },
   };
 };

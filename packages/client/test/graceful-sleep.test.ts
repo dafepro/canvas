@@ -92,7 +92,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
         writer.entitiesToDraw(performance.now()).some((entity) => entity.kind === "item"),
       );
       await writer.stopGracefully(1_000);
-      first.stop();
+      await first.stopAndWait();
 
       restarted = await startCanvasd({ dataDir });
       reader = new RoomSession({
@@ -113,8 +113,10 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
     } finally {
       writer.stop();
       reader?.stop();
-      first.stop();
-      restarted?.stop();
+      await Promise.all([
+        first.stopAndWait(),
+        restarted?.stopAndWait() ?? Promise.resolve(),
+      ]);
     }
   }, 120_000);
 });
