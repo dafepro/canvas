@@ -74,7 +74,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
   it("stops a superseded participant instead of starting a reconnect duel", async () => {
     const displaced = session("alice");
     await displaced.start();
-    await waitFor("the original alice host lease", () => displaced.client.isHost);
+    await waitFor("the original alice host lease", () => displaced.client.hostLease.isHost);
 
     const winner = session("alice");
     await winner.start();
@@ -82,35 +82,35 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       "the old alice session to stop terminally",
       () => displaced.lifecycleState === "failed",
     );
-    await waitFor("the replacement alice host lease", () => winner.client.isHost);
+    await waitFor("the replacement alice host lease", () => winner.client.hostLease.isHost);
 
-    const winnerClientId = winner.client.clientId;
-    const winnerHostEpoch = winner.client.hostEpoch;
+    const winnerClientId = winner.client.connectionIdentity.clientId;
+    const winnerHostEpoch = winner.client.hostLease.epoch;
     await new Promise((resolve) => setTimeout(resolve, 1_200));
 
     expect(displaced.lifecycleState).toBe("failed");
     expect(displaced.diagnostics().lastRejection).toContain("session_superseded");
     expect(winner.lifecycleState).toBe("active");
-    expect(winner.client.clientId).toBe(winnerClientId);
-    expect(winner.client.hostEpoch).toBe(winnerHostEpoch);
-    expect(winner.client.isHost).toBe(true);
+    expect(winner.client.connectionIdentity.clientId).toBe(winnerClientId);
+    expect(winner.client.hostLease.epoch).toBe(winnerHostEpoch);
+    expect(winner.client.hostLease.isHost).toBe(true);
   }, 30_000);
 
   it("grants one host lease and relays the same item state to the peer", async () => {
     const alice = session("alice");
     await alice.start();
-    await waitFor("alice to host and simulate", () => alice.client.isHost && alice.tick > 60);
+    await waitFor("alice to host and simulate", () => alice.client.hostLease.isHost && alice.tick > 60);
 
     const bob = session("bob");
     await bob.start();
-    await waitFor("bob to join", () => bob.client.clientId !== "");
+    await waitFor("bob to join", () => bob.client.connectionIdentity.clientId !== "");
     await waitFor("bob to receive host state", () => view(bob).length > 0);
 
     // Exactly one host, and both clients name the same one.
-    expect(alice.client.isHost).toBe(true);
-    expect(bob.client.isHost).toBe(false);
-    expect(bob.client.hostClientId).toBe(alice.client.clientId);
-    expect(bob.client.hostEpoch).toBe(alice.client.hostEpoch);
+    expect(alice.client.hostLease.isHost).toBe(true);
+    expect(bob.client.hostLease.isHost).toBe(false);
+    expect(bob.client.hostLease.hostClientId).toBe(alice.client.connectionIdentity.clientId);
+    expect(bob.client.hostLease.epoch).toBe(alice.client.hostLease.epoch);
 
     // The peer asks the server for a durable spawn. The host simulates it.
     bob.spawnItem(crateDefinition.definitionId, { x: 40, y: 20 });
@@ -144,7 +144,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     expect(hostCrate.ownerUserId).toBe("bob");
     expect(peerCrate.ownerUserId).toBe("bob");
 
-    const beforePreviewRevision = bob.client.sceneRevision;
+    const beforePreviewRevision = bob.client.durableRevision.sceneRevision;
     const previewTransform = {
       x: hostCrate.x + 4,
       y: hostCrate.y,
@@ -155,12 +155,12 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       "the host to apply the owner's preview move",
       () => Math.abs((entity(alice, crateId)?.x ?? 0) - previewTransform.x) < 0.5,
     );
-    expect(bob.client.sceneRevision).toBe(beforePreviewRevision);
+    expect(bob.client.durableRevision.sceneRevision).toBe(beforePreviewRevision);
 
     bob.moveItem(crateId, previewTransform);
     await waitFor(
       "the final move to advance the scene revision",
-      () => bob.client.sceneRevision > beforePreviewRevision,
+      () => bob.client.durableRevision.sceneRevision > beforePreviewRevision,
     );
 
     bob.rotateItem(crateId, Math.PI / 4);
@@ -175,13 +175,13 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       () => entity(alice, crateId)?.isolated === true && entity(bob, crateId)?.isolated === true,
     );
 
-    const revisionBeforeUnauthorizedEdit = alice.client.sceneRevision;
+    const revisionBeforeUnauthorizedEdit = alice.client.durableRevision.sceneRevision;
     alice.setItemIsolation(crateId, false);
     await waitFor(
       "the server to reject another player's isolation edit",
       () => alice.diagnostics().lastRejection !== undefined,
     );
-    expect(alice.client.sceneRevision).toBe(revisionBeforeUnauthorizedEdit);
+    expect(alice.client.durableRevision.sceneRevision).toBe(revisionBeforeUnauthorizedEdit);
     expect(entity(alice, crateId)?.isolated).toBe(true);
 
     bob.setItemIsolation(crateId, false);
@@ -210,7 +210,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
   it("applies an owner's durable config change to the live behavior", async () => {
     const alice = session("alice");
     await alice.start();
-    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+    await waitFor("alice to host", () => alice.client.hostLease.isHost && alice.tick > 60);
 
     const bob = session("bob");
     await bob.start();
@@ -228,7 +228,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
 
     await waitFor(
       "both durable edits to settle",
-      () => bob.client.sceneRevision >= 3 || bob.diagnostics().lastRejection !== undefined,
+      () => bob.client.durableRevision.sceneRevision >= 3 || bob.diagnostics().lastRejection !== undefined,
     );
     expect(bob.diagnostics().lastRejection).toBeUndefined();
 
@@ -269,7 +269,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     // Bob's fresher replicated canonical position after the instant move.
     const alice = session("alice", () => STILL, { checkpointHz: 0.1 });
     await alice.start();
-    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+    await waitFor("alice to host", () => alice.client.hostLease.isHost && alice.tick > 60);
 
     const bob = session("bob", () => bobIntent);
     let latestCanonicalBob: RenderEntity | undefined;
@@ -279,9 +279,9 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       );
     });
     await bob.start();
-    await waitFor("bob to join", () => bob.client.clientId !== "");
+    await waitFor("bob to join", () => bob.client.connectionIdentity.clientId !== "");
 
-    const bobAvatar = avatarEntityId(bob.client.userId);
+    const bobAvatar = avatarEntityId(bob.client.connectionIdentity.userId);
     await waitFor("the host to add the peer avatar", () => entity(alice, bobAvatar) !== undefined);
     const start = entity(alice, bobAvatar)!;
     const target = { x: start.x + 20, y: start.y };
@@ -330,7 +330,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
 
     const beforeMigration = entity(alice, bobAvatar)!;
     alice.stop();
-    await waitFor("bob to become host", () => bob.client.isHost);
+    await waitFor("bob to become host", () => bob.client.hostLease.isHost);
     expect(bob.diagnostics()).toMatchObject({
       hostMigrations: 1,
       lastMigrationReason: "host_disconnected",
@@ -349,12 +349,12 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     let bobIntent: InputIntent = STILL;
     const alice = session("alice");
     await alice.start();
-    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+    await waitFor("alice to host", () => alice.client.hostLease.isHost && alice.tick > 60);
 
     const bob = session("bob", () => bobIntent);
     await bob.start();
-    await waitFor("bob to join", () => bob.client.clientId !== "");
-    const bobAvatar = avatarEntityId(bob.client.userId);
+    await waitFor("bob to join", () => bob.client.connectionIdentity.clientId !== "");
+    const bobAvatar = avatarEntityId(bob.client.connectionIdentity.userId);
     await waitFor("host to add bob's avatar", () => entity(alice, bobAvatar) !== undefined);
     await waitFor("bob to receive its canonical avatar", () => entity(bob, bobAvatar) !== undefined);
 
@@ -390,12 +390,12 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     let bobIntent: InputIntent = STILL;
     const alice = session("alice");
     await alice.start();
-    await waitFor("direct host lease", () => alice.client.isHost && alice.tick > 60);
+    await waitFor("direct host lease", () => alice.client.hostLease.isHost && alice.tick > 60);
 
     const bob = session("bob", () => bobIntent);
     await bob.start();
-    await waitFor("direct peer join", () => bob.client.clientId !== "");
-    const bobAvatar = avatarEntityId(bob.client.userId);
+    await waitFor("direct peer join", () => bob.client.connectionIdentity.clientId !== "");
+    const bobAvatar = avatarEntityId(bob.client.connectionIdentity.userId);
     await waitFor("direct host avatar", () => entity(alice, bobAvatar) !== undefined);
     await waitFor("direct peer canonical avatar", () => entity(bob, bobAvatar) !== undefined);
     const start = entity(bob, bobAvatar)!;
@@ -433,7 +433,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
   it("resumes a timer-driven workflow on the replacement host", async () => {
     const alice = session("alice");
     await alice.start();
-    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+    await waitFor("alice to host", () => alice.client.hostLease.isHost && alice.tick > 60);
 
     const bob = session("bob");
     await bob.start();
@@ -460,7 +460,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     ).toMatchObject({ phase: "arming", launchCount: 0 });
 
     alice.stop();
-    await waitFor("bob to become host", () => bob.client.isHost);
+    await waitFor("bob to become host", () => bob.client.hostLease.isHost);
     await waitFor(
       "the replacement host to finish the restored countdown",
       () => {
@@ -482,13 +482,13 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     let bobIntent: InputIntent = STILL;
     const alice = session("alice");
     await alice.start();
-    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+    await waitFor("alice to host", () => alice.client.hostLease.isHost && alice.tick > 60);
 
     const bob = session("bob", () => bobIntent);
     await bob.start();
-    await waitFor("bob to join", () => bob.client.clientId !== "");
+    await waitFor("bob to join", () => bob.client.connectionIdentity.clientId !== "");
 
-    const bobAvatar = avatarEntityId(bob.client.userId);
+    const bobAvatar = avatarEntityId(bob.client.connectionIdentity.userId);
     await waitFor("the host to add the peer avatar", () => entity(alice, bobAvatar) !== undefined);
 
     bobIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true, disabled: true };
@@ -518,7 +518,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
   it("keeps avatars and checkpointed item placement when the host reconnects", async () => {
     const alice = session("alice");
     await alice.start();
-    await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
+    await waitFor("alice to host", () => alice.client.hostLease.isHost && alice.tick > 60);
 
     const bob = session("bob");
     await bob.start();
@@ -539,7 +539,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
 
     const oldAliceAvatar = alice.avatarId;
     alice.stop();
-    await waitFor("bob to take the host lease", () => bob.client.isHost);
+    await waitFor("bob to take the host lease", () => bob.client.hostLease.isHost);
     await waitFor(
       "the departed participant avatar to remain disabled",
       () => entity(bob, oldAliceAvatar)?.disabled === true,

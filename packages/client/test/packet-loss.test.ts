@@ -74,7 +74,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
   it("repairs a peer that lost half of the realtime packets", async () => {
     const host = session("host");
     await host.start();
-    await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
+    await waitFor("the host lease", () => host.client.hostLease.isHost && host.tick > 60);
 
     const lossy = new FaultInjectingWebSocketTransport({
       credentialProvider: async () => devRealtimeCredential("peer"),
@@ -82,7 +82,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     });
     const peer = session("peer", () => STILL, lossy);
     await peer.start();
-    await waitFor("the peer to join", () => peer.client.clientId !== "");
+    await waitFor("the peer to join", () => peer.client.connectionIdentity.clientId !== "");
 
     host.spawnItem(crateDefinition.definitionId, { x: 40, y: 15 });
     await waitFor("the host to hold the crate", () => items(host).length === 1, 30_000);
@@ -121,7 +121,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
       const hostUserId = `latency-host-${latencyMs}`;
       const host = session(hostUserId, () => hostIntent);
       await host.start();
-      await waitFor("the latency host lease", () => host.client.isHost && host.tick > 60);
+      await waitFor("the latency host lease", () => host.client.hostLease.isHost && host.tick > 60);
 
       const faults = new FaultInjectingWebSocketTransport({
         credentialProvider: async () => devRealtimeCredential(`latency-peer-${latencyMs}`),
@@ -133,7 +133,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
       });
       const peer = session(`latency-peer-${latencyMs}`, () => STILL, faults);
       await peer.start();
-      await waitFor("the delayed peer to join", () => peer.client.clientId !== "", 30_000);
+      await waitFor("the delayed peer to join", () => peer.client.connectionIdentity.clientId !== "", 30_000);
 
       const avatarId = avatarEntityId(hostUserId);
       await waitFor(
@@ -175,7 +175,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     let peerIntent: InputIntent = STILL;
     const host = session("direct-jitter-host");
     await host.start();
-    await waitFor("the direct jitter host lease", () => host.client.isHost && host.tick > 60);
+    await waitFor("the direct jitter host lease", () => host.client.hostLease.isHost && host.tick > 60);
 
     const faults = new FaultInjectingWebSocketTransport({
       credentialProvider: async () => devRealtimeCredential("direct-jitter-peer"),
@@ -190,7 +190,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     });
     const peer = session("direct-jitter-peer", () => peerIntent, faults);
     await peer.start();
-    await waitFor("the direct jitter peer join", () => peer.client.clientId !== "", 30_000);
+    await waitFor("the direct jitter peer join", () => peer.client.connectionIdentity.clientId !== "", 30_000);
 
     const avatarId = avatarEntityId("direct-jitter-peer");
     await waitFor(
@@ -234,7 +234,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     let peerIntent: InputIntent = STILL;
     const host = session("edge-ack-host");
     await host.start();
-    await waitFor("the edge acknowledgement host", () => host.client.isHost && host.tick > 60);
+    await waitFor("the edge acknowledgement host", () => host.client.hostLease.isHost && host.tick > 60);
 
     const faults = new FaultInjectingWebSocketTransport({
       credentialProvider: async () => devRealtimeCredential("edge-ack-peer"),
@@ -247,7 +247,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     });
     const peer = session("edge-ack-peer", () => peerIntent, faults);
     await peer.start();
-    await waitFor("the edge acknowledgement peer", () => peer.client.clientId !== "", 30_000);
+    await waitFor("the edge acknowledgement peer", () => peer.client.connectionIdentity.clientId !== "", 30_000);
     const avatarId = avatarEntityId("edge-ack-peer");
     await waitFor(
       "the edge acknowledgement avatar",
@@ -307,7 +307,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     const hostUserId = "fault-reconnect-host";
     const host = session(hostUserId, () => hostIntent);
     await host.start();
-    await waitFor("the reconnect test host lease", () => host.client.isHost && host.tick > 60);
+    await waitFor("the reconnect test host lease", () => host.client.hostLease.isHost && host.tick > 60);
 
     const faults = new FaultInjectingWebSocketTransport({
       credentialProvider: async () => {
@@ -323,7 +323,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     });
     const peer = session("fault-reconnect-peer", () => STILL, faults);
     await peer.start();
-    await waitFor("the faulted peer to join", () => peer.client.clientId !== "", 30_000);
+    await waitFor("the faulted peer to join", () => peer.client.connectionIdentity.clientId !== "", 30_000);
 
     const avatarId = avatarEntityId(hostUserId);
     hostIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true };
@@ -332,13 +332,13 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
       () => entity(peer, avatarId) !== undefined && faults.reorderedIn > 0,
       30_000,
     );
-    const oldClientId = peer.client.clientId;
+    const oldClientId = peer.client.connectionIdentity.clientId;
     const beforeInterruptX = entity(host, avatarId)!.x;
 
     expect(faults.interrupt()).toBe(true);
     await waitFor(
       "the faulted peer to receive a fresh connection identity",
-      () => peer.client.clientId !== oldClientId && faults.status === "open",
+      () => peer.client.connectionIdentity.clientId !== oldClientId && faults.status === "open",
       30_000,
     );
     expect(credentialCalls).toBeGreaterThanOrEqual(2);
@@ -369,7 +369,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     let replacementIntent: InputIntent = STILL;
     const host = session("fault-migration-host");
     await host.start();
-    await waitFor("the migration test host lease", () => host.client.isHost && host.tick > 60);
+    await waitFor("the migration test host lease", () => host.client.hostLease.isHost && host.tick > 60);
 
     const faults = new FaultInjectingWebSocketTransport({
       credentialProvider: async () => devRealtimeCredential("fault-migration-peer"),
@@ -387,7 +387,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     await replacement.start();
     await waitFor(
       "the faulted replacement peer to join",
-      () => replacement.client.clientId !== "",
+      () => replacement.client.connectionIdentity.clientId !== "",
       30_000,
     );
 
@@ -432,7 +432,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     host.stop();
     await waitFor(
       "the faulted peer to become replacement host",
-      () => replacement.client.isHost,
+      () => replacement.client.hostLease.isHost,
       30_000,
     );
     await waitFor(
@@ -477,31 +477,31 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     await backgrounded.start();
     await waitFor(
       "the background test host lease",
-      () => backgrounded.client.isHost && backgrounded.tick > 60,
+      () => backgrounded.client.hostLease.isHost && backgrounded.tick > 60,
     );
 
     const foreground = session("background-peer");
     await foreground.start();
-    await waitFor("the foreground peer to join", () => foreground.client.clientId !== "");
+    await waitFor("the foreground peer to join", () => foreground.client.connectionIdentity.clientId !== "");
 
-    const oldClientId = backgrounded.client.clientId;
+    const oldClientId = backgrounded.client.connectionIdentity.clientId;
     backgrounded.setPageVisible(false);
     expect(backgrounded.lifecycleState).toBe("backgrounded");
     expect(faults.interrupt()).toBe(true);
 
     await waitFor(
       "the foreground peer to replace the hidden host",
-      () => foreground.client.isHost,
+      () => foreground.client.hostLease.isHost,
       30_000,
     );
     await waitFor(
       "the hidden client to reconnect without a host lease",
       () =>
-        backgrounded.client.clientId !== oldClientId &&
+        backgrounded.client.connectionIdentity.clientId !== oldClientId &&
         faults.status === "open" &&
         backgrounded.lifecycleState === "backgrounded" &&
         backgroundHostEligible === false &&
-        !backgrounded.client.isHost,
+        !backgrounded.client.hostLease.isHost,
       30_000,
     );
 
@@ -527,19 +527,18 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
 
   // Spec 11.1. A reconnect gives the client a new id. A client that held the
   // lease before the break must not keep publishing state.
-  it("drops the host role when a reconnect finds another host", async () => {
+  it("does not publish host state without a matching immutable lease", async () => {
     const host = session("host");
     await host.start();
-    await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
+    await waitFor("the host lease", () => host.client.hostLease.isHost && host.tick > 60);
 
     const peer = session("peer");
     await peer.start();
-    await waitFor("the peer to join", () => peer.client.clientId !== "");
-    expect(peer.client.isHost).toBe(false);
+    await waitFor("the peer to join", () => peer.client.connectionIdentity.clientId !== "");
+    expect(peer.client.hostLease.isHost).toBe(false);
 
-    // Pretend the peer held the lease before its connection broke.
-    peer.client.isHost = true;
-    expect(peer.client.hostClientId).not.toBe(peer.client.clientId);
+    expect(Object.isFrozen(peer.client.hostLease)).toBe(true);
+    expect(peer.client.hostLease.hostClientId).not.toBe(peer.client.connectionIdentity.clientId);
 
     // The room refuses state from a client without the lease, so the guard has
     // to be on the client. Nothing may leave the peer.
@@ -554,7 +553,7 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     let peerIntent: InputIntent = STILL;
     const host = session("host");
     await host.start();
-    await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
+    await waitFor("the host lease", () => host.client.hostLease.isHost && host.tick > 60);
 
     const lossy = new FaultInjectingWebSocketTransport({
       credentialProvider: async () => devRealtimeCredential("peer"),
@@ -562,9 +561,9 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     });
     const peer = session("peer", () => peerIntent, lossy);
     await peer.start();
-    await waitFor("the peer to join", () => peer.client.clientId !== "");
+    await waitFor("the peer to join", () => peer.client.connectionIdentity.clientId !== "");
 
-    const peerAvatar = avatarEntityId(peer.client.userId);
+    const peerAvatar = avatarEntityId(peer.client.connectionIdentity.userId);
     await waitFor(
       "the host to add the peer avatar",
       () => entity(host, peerAvatar) !== undefined,

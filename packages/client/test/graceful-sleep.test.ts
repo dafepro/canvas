@@ -46,7 +46,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
     await room.start();
     await waitFor(
       "the sole host and its presence",
-      () => room.client.isHost && room.tick > 30 && room.diagnostics().peers === 1,
+      () => room.client.hostLease.isHost && room.tick > 30 && room.diagnostics().peers === 1,
     );
 
     room.spawnItem(crateDefinition.definitionId, { x: 40, y: 20 });
@@ -86,7 +86,7 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
     });
     try {
       await writer.start();
-      await waitFor("restart writer to host", () => writer.client.isHost && writer.tick > 30);
+      await waitFor("restart writer to host", () => writer.client.hostLease.isHost && writer.tick > 30);
       writer.spawnItem(crateDefinition.definitionId, { x: 44, y: 20 });
       await waitFor("restart writer to hold the crate", () =>
         writer.entitiesToDraw(performance.now()).some((entity) => entity.kind === "item"),

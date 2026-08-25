@@ -53,7 +53,7 @@ describe.skipIf(!goAvailable())("basketball arena through canvasd", () => {
       () => {
         const entities = session!.entitiesToDraw(performance.now());
         const ids = new Set(entities.map(({ id }) => id));
-        return session!.client.isHost &&
+        return session!.client.hostLease.isHost &&
           ids.has("basketball-game-ball") &&
           ids.has("left-basketball-hoop") &&
           ids.has("right-basketball-hoop") &&

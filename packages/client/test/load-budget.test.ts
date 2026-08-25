@@ -120,7 +120,7 @@ describe.skipIf(!goAvailable())("room at the stated limits", () => {
   it("holds 20 avatars and 50 items inside the scene and network budgets", async () => {
     const host = session("host", circling(0));
     await host.start();
-    await waitFor("the host lease", () => host.client.isHost && host.tick > 60);
+    await waitFor("the host lease", () => host.client.hostLease.isHost && host.tick > 60);
 
     const meter = new MeasuringTransport(
       async () => devRealtimeCredential("peer-1"),
@@ -133,7 +133,7 @@ describe.skipIf(!goAvailable())("room at the stated limits", () => {
     }
     await waitFor(
       "every peer to join",
-      () => peers.every((peer) => peer.client.clientId !== ""),
+      () => peers.every((peer) => peer.client.connectionIdentity.clientId !== ""),
       60_000,
     );
     await waitFor(
@@ -180,7 +180,7 @@ describe.skipIf(!goAvailable())("room at the stated limits", () => {
 
     // Exactly one host.
     expect(hostDiagnostics.isHost).toBe(true);
-    expect(peers.every((peer) => !peer.client.isHost)).toBe(true);
+    expect(peers.every((peer) => !peer.client.hostLease.isHost)).toBe(true);
 
     // Spec 19.1. The scene budget.
     expect(items(host).length).toBe(ITEMS);

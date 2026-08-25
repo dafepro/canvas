@@ -1,6 +1,7 @@
 import type { CanvasDefinition, CanvasSnapshot, ItemDefinition } from "@canvas-physics/core";
 import type { SimulationRequest, SimulationResponse } from "../../simulation/messages.js";
 import type { AvatarSpawn } from "../../simulation/rapier-world.js";
+import type { HostLease } from "../../net/room-client.js";
 import {
   systemSessionClock,
   type SessionClock,
@@ -15,8 +16,7 @@ export interface HostRoleRates {
 }
 
 export interface HostRoleInitialize {
-  readonly epoch: number;
-  readonly isHost: boolean;
+  readonly lease: HostLease;
   readonly canvas: CanvasDefinition;
   readonly definitions: ItemDefinition[];
   readonly tickRate: number;
@@ -26,28 +26,28 @@ export interface HostRoleInitialize {
 }
 
 export interface HostRoleGrant {
-  readonly epoch: number;
+  readonly lease: HostLease;
   readonly snapshot?: CanvasSnapshot;
   readonly reason: string;
 }
 
 export interface HostRoleChange {
-  readonly epoch: number;
-  readonly localIsHost: boolean;
+  readonly lease: HostLease;
   readonly reason: string;
 }
 
 export type HostRoleEffect =
   | { readonly type: "simulate"; readonly request: SimulationRequest }
-  | { readonly type: "publishFrame"; readonly keyframe: boolean }
+  | { readonly type: "publishFrame"; readonly keyframe: boolean; readonly lease: HostLease }
   | {
       readonly type: "requestCheckpoint";
       readonly generation: number;
       readonly hostEpoch: number;
       readonly sceneRevision: number;
       readonly final: boolean;
+      readonly lease: HostLease;
     }
-  | { readonly type: "yieldHost"; readonly reason: string }
+  | { readonly type: "yieldHost"; readonly reason: string; readonly lease: HostLease }
   | {
       readonly type: "roleRebuilt";
       readonly isHost: boolean;
@@ -76,8 +76,12 @@ export interface HostRoleSessionOptions {
 export class HostRoleSession {
   private readonly clock: SessionClock;
   private readonly rates: Required<HostRoleRates>;
-  private roleValue: "host" | "peer" = "peer";
-  private epochValue = 0;
+  private leaseValue: HostLease = Object.freeze({
+    epoch: 0,
+    hostClientId: "",
+    localClientId: "",
+    isHost: false,
+  });
   private generationValue = 0;
   private readyValue = false;
   private initialized = false;
@@ -106,11 +110,15 @@ export class HostRoleSession {
   }
 
   get isHost(): boolean {
-    return this.roleValue === "host";
+    return this.leaseValue.isHost;
   }
 
   get hostEpoch(): number {
-    return this.epochValue;
+    return this.leaseValue.epoch;
+  }
+
+  get hostLease(): HostLease {
+    return this.leaseValue;
   }
 
   get generation(): number {
@@ -127,7 +135,7 @@ export class HostRoleSession {
 
   get diagnostics(): HostRoleDiagnostics {
     return Object.freeze({
-      hostEpoch: this.epochValue,
+      hostEpoch: this.leaseValue.epoch,
       hostMigrations: this.migrations,
       ...(this.migrationReason ? { lastMigrationReason: this.migrationReason } : {}),
       quarantined: this.quarantinedCount,
@@ -139,11 +147,10 @@ export class HostRoleSession {
   initialize(input: HostRoleInitialize): void {
     if (this.destroyed || this.initialized) return;
     this.initialized = true;
-    this.epochValue = input.epoch;
-    this.roleValue = input.isHost ? "host" : "peer";
+    this.leaseValue = input.lease;
     this.readyValue = false;
     this.avatarIds.clear();
-    if (input.isHost) this.avatarIds.add(input.localAvatar.entityId);
+    if (input.lease.isHost) this.avatarIds.add(input.localAvatar.entityId);
     const generation = ++this.generationValue;
     this.emit({
       type: "simulate",
@@ -153,28 +160,27 @@ export class HostRoleSession {
         canvas: input.canvas,
         definitions: input.definitions,
         tickRate: input.tickRate,
-        isHost: input.isHost,
-        snapshot: input.isHost ? input.snapshot : undefined,
+        isHost: input.lease.isHost,
+        snapshot: input.lease.isHost ? input.snapshot : undefined,
         wakeFromSleep: input.wakeFromSleep,
         localAvatar: input.localAvatar,
       },
     });
-    if (input.isHost) this.startSchedules();
+    if (input.lease.isHost) this.startSchedules();
   }
 
   grant(input: HostRoleGrant): boolean {
-    if (this.destroyed || !this.acceptEpoch(input.epoch)) return false;
+    if (this.destroyed || !this.acceptEpoch(input.lease.epoch)) return false;
     if (!this.visible) {
-      this.epochValue = input.epoch;
-      this.emit({ type: "yieldHost", reason: "page_hidden" });
+      this.leaseValue = Object.freeze({ ...input.lease, isHost: false });
+      this.emit({ type: "yieldHost", reason: "page_hidden", lease: input.lease });
       return false;
     }
     if (input.reason && input.reason !== "first_join") {
       this.migrations++;
       this.migrationReason = input.reason;
     }
-    this.epochValue = input.epoch;
-    this.roleValue = "host";
+    this.leaseValue = input.lease;
     this.readyValue = false;
     this.cancelFinalCheckpoint();
     this.stopSchedules();
@@ -183,7 +189,7 @@ export class HostRoleSession {
     this.emit({
       type: "roleRebuilt",
       isHost: true,
-      epoch: input.epoch,
+      epoch: input.lease.epoch,
       snapshot: input.snapshot,
       request: {
         type: "setHost",
@@ -198,13 +204,11 @@ export class HostRoleSession {
   }
 
   change(input: HostRoleChange): boolean {
-    if (this.destroyed || !this.acceptEpoch(input.epoch)) return false;
+    if (this.destroyed || !this.acceptEpoch(input.lease.epoch)) return false;
     this.migrations++;
     this.migrationReason = input.reason || undefined;
-    this.epochValue = input.epoch;
-    const nextRole = input.localIsHost ? "host" : "peer";
-    const rebuild = nextRole !== this.roleValue || !input.localIsHost;
-    this.roleValue = nextRole;
+    const rebuild = input.lease.isHost !== this.leaseValue.isHost || !input.lease.isHost;
+    this.leaseValue = input.lease;
     this.cancelFinalCheckpoint();
     this.stopSchedules();
     if (!rebuild) {
@@ -216,9 +220,9 @@ export class HostRoleSession {
     const generation = ++this.generationValue;
     this.emit({
       type: "roleRebuilt",
-      isHost: input.localIsHost,
-      epoch: input.epoch,
-      request: { type: "setHost", generation, isHost: input.localIsHost },
+      isHost: input.lease.isHost,
+      epoch: input.lease.epoch,
+      request: { type: "setHost", generation, isHost: input.lease.isHost },
     });
     if (this.isHost) this.startSchedules();
     return true;
@@ -227,7 +231,9 @@ export class HostRoleSession {
   setPageVisible(visible: boolean): void {
     if (this.destroyed || this.visible === visible) return;
     this.visible = visible;
-    if (!visible && this.isHost) this.emit({ type: "yieldHost", reason: "page_hidden" });
+    if (!visible && this.isHost) {
+      this.emit({ type: "yieldHost", reason: "page_hidden", lease: this.leaseValue });
+    }
   }
 
   acceptSimulation(message: SimulationResponse): boolean {
@@ -270,9 +276,10 @@ export class HostRoleSession {
       this.emit({
         type: "requestCheckpoint",
         generation,
-        hostEpoch: this.epochValue,
+        hostEpoch: this.leaseValue.epoch,
         sceneRevision,
         final: true,
+        lease: this.leaseValue,
       });
     });
   }
@@ -287,7 +294,7 @@ export class HostRoleSession {
   }
 
   private acceptEpoch(epoch: number): boolean {
-    if (epoch >= this.epochValue) return true;
+    if (epoch >= this.leaseValue.epoch) return true;
     this.invariantViolationCount++;
     return false;
   }
@@ -296,20 +303,29 @@ export class HostRoleSession {
     if (this.destroyed || !this.initialized || !this.isHost || this.schedules.length > 0) return;
     this.schedules = [
       this.clock.setInterval(
-        () => this.emit({ type: "publishFrame", keyframe: false }),
+        () => this.emit({
+          type: "publishFrame",
+          keyframe: false,
+          lease: this.leaseValue,
+        }),
         1000 / this.rates.deltaHz,
       ),
       this.clock.setInterval(
-        () => this.emit({ type: "publishFrame", keyframe: true }),
+        () => this.emit({
+          type: "publishFrame",
+          keyframe: true,
+          lease: this.leaseValue,
+        }),
         1000 / this.rates.keyframeHz,
       ),
       this.clock.setInterval(
         () => this.emit({
           type: "requestCheckpoint",
           generation: this.generationValue,
-          hostEpoch: this.epochValue,
+          hostEpoch: this.leaseValue.epoch,
           sceneRevision: this.options.sceneRevision?.() ?? 0,
           final: false,
+          lease: this.leaseValue,
         }),
         1000 / this.rates.checkpointHz,
       ),

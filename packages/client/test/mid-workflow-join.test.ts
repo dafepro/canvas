@@ -122,10 +122,9 @@ describe("a client that joins during a countdown", () => {
 
     // The host armed the rocket at tick 100 with a 3 second countdown. The
     // keyframe arrives at tick 160, so 2 seconds remain at 60 Hz.
-    session.client.hostEpoch = 7;
     const state = { phase: "arming", armedAtTick: 100, countdownTicks: 180 };
     // The session must not be the host for the peer path to run.
-    expect(session.client.isHost).toBe(false);
+    expect(session.client.hostLease.isHost).toBe(false);
 
     deliverFullState(transport, state, 160);
 

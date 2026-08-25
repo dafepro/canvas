@@ -83,7 +83,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
     await host.whenPresented();
     await waitFor(
       "the village host and its door",
-      () => host.client.isHost && hasDoor(host, "village-cave-door"),
+      () => host.client.hostLease.isHost && hasDoor(host, "village-cave-door"),
     );
 
     const originalPeer = open("linked-village", "peer", "village-square");
@@ -91,7 +91,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
     await originalPeer.whenPresented();
     await waitFor(
       "the original peer to see the village door",
-      () => !originalPeer.client.isHost && hasDoor(originalPeer, "village-cave-door"),
+      () => !originalPeer.client.hostLease.isHost && hasDoor(originalPeer, "village-cave-door"),
     );
 
     // Destination staging intentionally overlaps this participant across two
@@ -101,7 +101,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
     await cave.whenPresented();
     await waitFor(
       "the staged cave and return door",
-      () => cave.client.isHost && hasDoor(cave, "cave-village-door"),
+      () => cave.client.hostLease.isHost && hasDoor(cave, "cave-village-door"),
     );
     await originalPeer.stopGracefully();
 
@@ -116,11 +116,11 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
     await returned.whenPresented();
     await waitFor(
       "the returned peer and durable village door",
-      () => !returned.client.isHost && hasDoor(returned, "village-cave-door"),
+      () => !returned.client.hostLease.isHost && hasDoor(returned, "village-cave-door"),
     );
     await cave.stopGracefully();
 
-    expect(host.client.isHost).toBe(true);
+    expect(host.client.hostLease.isHost).toBe(true);
     const returnedAvatar = returned.avatarId;
     await waitFor(
       "the returned avatar to exist on the host",
@@ -160,12 +160,12 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
     await waitFor(
       "the reloaded peer, avatar, and village door",
       () =>
-        !reloaded.client.isHost &&
+        !reloaded.client.hostLease.isHost &&
         hasDoor(reloaded, "village-cave-door") &&
         view(host).some((entity) => entity.id === reloaded.avatarId),
     );
 
-    expect(host.client.isHost).toBe(true);
+    expect(host.client.hostLease.isHost).toBe(true);
     expect(hasDoor(host, "village-cave-door")).toBe(true);
     expect(view(host).find((entity) => entity.id === reloaded.avatarId)!.x).toBeCloseTo(movedX, 0);
   }, 60_000);
@@ -210,7 +210,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
     await waitFor(
       "the pixel room, return door, and adventure ball",
       () =>
-        room.client.isHost &&
+        room.client.hostLease.isHost &&
         hasDoor(room, "pixel-room-village-door") &&
         view(room).some((entity) => entity.id === "pixel-room-ball"),
     );

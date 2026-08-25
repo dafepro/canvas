@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasDefinition, CanvasSnapshot } from "@canvas-physics/core";
 import type { SimulationResponse } from "../src/simulation/messages.js";
+import type { HostLease } from "../src/net/room-client.js";
 import {
   HostRoleSession,
   type HostRoleEffect,
@@ -106,6 +107,13 @@ const snapshot = (epoch: number): CanvasSnapshot => ({
   avatars: [],
 });
 
+const lease = (epoch: number, isHost: boolean): HostLease => Object.freeze({
+  epoch,
+  hostClientId: isHost ? "c1" : "other",
+  localClientId: "c1",
+  isHost,
+});
+
 const ready = (generation: number): SimulationResponse => ({
   type: "ready",
   generation,
@@ -118,8 +126,7 @@ describe("HostRoleSession", () => {
     const role = new HostRoleSession({ clock, emit: (effect) => effects.push(effect) });
 
     role.initialize({
-      epoch: 1,
-      isHost: true,
+      lease: lease(1, true),
       canvas,
       definitions: [],
       tickRate: 60,
@@ -136,11 +143,15 @@ describe("HostRoleSession", () => {
     expect(role.generation).toBe(1);
     expect(clock.intervalCount).toBe(3);
 
-    expect(role.change({ epoch: 2, localIsHost: false, reason: "lease_expired" })).toBe(true);
+    expect(role.change({ lease: lease(2, false), reason: "lease_expired" })).toBe(true);
     expect(clock.intervalCount).toBe(0);
-    expect(role.grant({ epoch: 3, snapshot: snapshot(3), reason: "host_disconnected" })).toBe(true);
+    expect(role.grant({
+      lease: lease(3, true),
+      snapshot: snapshot(3),
+      reason: "host_disconnected",
+    })).toBe(true);
     expect(clock.intervalCount).toBe(3);
-    expect(role.change({ epoch: 2, localIsHost: false, reason: "late" })).toBe(false);
+    expect(role.change({ lease: lease(2, false), reason: "late" })).toBe(false);
     expect(role.isHost).toBe(true);
     expect(clock.intervalCount).toBe(3);
     expect(role.diagnostics).toMatchObject({
@@ -161,8 +172,7 @@ describe("HostRoleSession", () => {
     const effects: HostRoleEffect[] = [];
     const role = new HostRoleSession({ clock, emit: (effect) => effects.push(effect) });
     role.initialize({
-      epoch: 1,
-      isHost: false,
+      lease: lease(1, false),
       canvas,
       definitions: [],
       tickRate: 60,
@@ -177,18 +187,25 @@ describe("HostRoleSession", () => {
     });
     role.setPageVisible(false);
 
-    expect(role.grant({ epoch: 2, snapshot: snapshot(2), reason: "host_disconnected" }))
+    expect(role.grant({
+      lease: lease(2, true),
+      snapshot: snapshot(2),
+      reason: "host_disconnected",
+    }))
       .toBe(false);
     expect(role.isHost).toBe(false);
     expect(clock.intervalCount).toBe(0);
-    expect(effects.at(-1)).toEqual({ type: "yieldHost", reason: "page_hidden" });
+    expect(effects.at(-1)).toMatchObject({
+      type: "yieldHost",
+      reason: "page_hidden",
+      lease: { epoch: 2, isHost: true },
+    });
   });
 
   it("accepts worker responses only from the active simulation generation", () => {
     const role = new HostRoleSession({ emit: vi.fn() });
     role.initialize({
-      epoch: 1,
-      isHost: true,
+      lease: lease(1, true),
       canvas,
       definitions: [],
       tickRate: 60,
@@ -202,7 +219,7 @@ describe("HostRoleSession", () => {
       },
     });
     const oldGeneration = role.generation;
-    role.change({ epoch: 2, localIsHost: false, reason: "lease_expired" });
+    role.change({ lease: lease(2, false), reason: "lease_expired" });
 
     expect(role.acceptSimulation(ready(oldGeneration))).toBe(false);
     expect(role.acceptSimulation(ready(role.generation))).toBe(true);
@@ -215,8 +232,7 @@ describe("HostRoleSession", () => {
     const effects: HostRoleEffect[] = [];
     const role = new HostRoleSession({ clock, emit: (effect) => effects.push(effect) });
     role.initialize({
-      epoch: 4,
-      isHost: true,
+      lease: lease(4, true),
       canvas,
       definitions: [],
       tickRate: 60,
@@ -261,7 +277,11 @@ describe("HostRoleSession", () => {
     await finished;
     expect(settled).toBe(true);
 
-    role.grant({ epoch: 5, snapshot: snapshot(5), reason: "host_disconnected" });
+    role.grant({
+      lease: lease(5, true),
+      snapshot: snapshot(5),
+      reason: "host_disconnected",
+    });
     role.acceptSimulation(ready(role.generation));
     const timedOut = role.requestFinalCheckpoint(8, 250);
     clock.advance(250);

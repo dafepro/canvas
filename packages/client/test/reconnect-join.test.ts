@@ -120,16 +120,38 @@ describe("RoomClient reconnect handshake", () => {
     await client.connect();
     expect(transport.sent.filter((message) => message.join).length).toBe(1);
 
-    client.clientId = "c-old";
-    client.hostClientId = "c-old";
-    client.hostEpoch = 7;
-    client.isHost = true;
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 7,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      joinAccepted: {
+        clientId: "c-old",
+        userId: "alice",
+        displayName: "Alice",
+        sceneRevision: 0,
+        hostEpoch: 7,
+        hostClientId: "c-old",
+        canvasDefinitionJson: toJsonBytes(rocketCanvas),
+        snapshotJson: toJsonBytes(emptySnapshot(rocketCanvas.id, rocketCanvas.version)),
+        roomWasSleeping: false,
+        tickRate: 60,
+      },
+    });
+    const staleLease = client.hostLease;
+    expect(Object.isFrozen(client.connectionIdentity)).toBe(true);
+    expect(Object.isFrozen(staleLease)).toBe(true);
     const hostChanges: string[] = [];
-    client.on("hostChanged", (_epoch, _hostClientId, reason) => hostChanges.push(reason));
+    client.on("hostChanged", (_lease, reason) => hostChanges.push(reason));
 
     transport.setStatus("reconnecting", "connection dropped");
-    expect(client.isHost).toBe(false);
+    expect(client.hostLease.isHost).toBe(false);
+    expect(Object.isFrozen(client.hostLease)).toBe(true);
     expect(hostChanges).toEqual(["transport_lost"]);
+    const beforeStaleYield = transport.sent.length;
+    client.yieldHost("stale callback", staleLease);
+    expect(transport.sent).toHaveLength(beforeStaleYield);
 
     transport.setStatus("open");
     expect(transport.sent.filter((message) => message.join).length).toBe(2);

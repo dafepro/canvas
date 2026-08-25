@@ -235,16 +235,16 @@ export class RoomSession {
     });
     this.hostRole = new HostRoleSession({
       rates: options.rates,
-      sceneRevision: () => this.client.sceneRevision,
+      sceneRevision: () => this.client.durableRevision.sceneRevision,
       emit: (effect) => this.applyHostRoleEffect(effect),
     });
     this.durable = new DurableCommandSession({
       definitions: options.definitions,
       previewHz: options.rates?.previewHz,
       context: () => ({
-        clientId: this.client.clientId,
-        userId: this.client.userId,
-        sceneRevision: this.client.sceneRevision,
+        clientId: this.client.connectionIdentity.clientId,
+        userId: this.client.connectionIdentity.userId,
+        sceneRevision: this.client.durableRevision.sceneRevision,
         isHost: this.hostRole.isHost,
         canvas: this.canvasDefinition,
       }),
@@ -254,7 +254,7 @@ export class RoomSession {
       projectAvatar: options.projectParticipantAvatar,
     });
     this.timeline = new ReplicationTimeline({
-      sceneRevision: () => this.client.sceneRevision,
+      sceneRevision: () => this.client.durableRevision.sceneRevision,
       decorate: (entity) => this.durable.decorate(entity),
       onCanonical: (tick, entities) => {
         const canonical = [...entities];
@@ -289,11 +289,11 @@ export class RoomSession {
   }
 
   get userId(): string {
-    return this.client.userId;
+    return this.client.connectionIdentity.userId;
   }
 
   get displayName(): string {
-    return this.client.displayName;
+    return this.client.connectionIdentity.displayName;
   }
 
   subscribePresence(observer: Observer<PresenceSnapshot>): () => void {
@@ -360,15 +360,18 @@ export class RoomSession {
       this.connection.running &&
       this.hostRole.simulationReady &&
       this.hostRole.isHost &&
-      this.client.peers.length === 1 &&
-      this.client.peers[0]?.clientId === this.client.clientId;
+      this.client.presence.peers.length === 1 &&
+      this.client.presence.peers[0]?.clientId === this.client.connectionIdentity.clientId;
     if (!isLastHost) {
       this.stop();
       return;
     }
 
     if (!this.connection.beginStop()) return;
-    await this.hostRole.requestFinalCheckpoint(this.client.sceneRevision, timeoutMs);
+    await this.hostRole.requestFinalCheckpoint(
+      this.client.durableRevision.sceneRevision,
+      timeoutMs,
+    );
     this.finishStop();
   }
 
@@ -423,16 +426,12 @@ export class RoomSession {
       this.connection.transportStatus(status, detail);
     });
 
-    this.client.on("hostGranted", (epoch, snapshot, reason) => {
-      this.hostRole.grant({ epoch, snapshot, reason });
+    this.client.on("hostGranted", (lease, snapshot, reason) => {
+      this.hostRole.grant({ lease, snapshot, reason });
     });
 
-    this.client.on("hostChanged", (epoch, hostClientId, reason) => {
-      this.hostRole.change({
-        epoch,
-        localIsHost: hostClientId === this.client.clientId,
-        reason,
-      });
+    this.client.on("hostChanged", (lease, reason) => {
+      this.hostRole.change({ lease, reason });
     });
 
     this.client.on("fullState", (state, _epoch, tick) => {
@@ -539,7 +538,7 @@ export class RoomSession {
 
   private installAcceptedJoin(join: ConnectionJoin): void {
     this.durable.loadSnapshot(join.snapshot);
-    this.timeline.resetEpoch(this.hostRole.hostEpoch || this.client.hostEpoch);
+    this.timeline.resetEpoch(this.hostRole.hostEpoch || this.client.hostLease.epoch);
     this.roster.loadSnapshotPositions(join.snapshot);
     this.presentation.markItems(join.generation, this.durable.itemEntityIds);
     this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
@@ -561,7 +560,7 @@ export class RoomSession {
     snapshot: CanvasSnapshot,
     wasSleeping: boolean,
   ): void {
-    const nextAvatarId = avatarEntityId(this.client.userId);
+    const nextAvatarId = avatarEntityId(this.client.connectionIdentity.userId);
     if (this.canvasDefinition) {
       if (this.localAvatarId !== nextAvatarId) {
         if (this.localAvatarId) {
@@ -576,17 +575,16 @@ export class RoomSession {
     this.localAvatarId = nextAvatarId;
 
     this.hostRole.initialize({
-      epoch: this.client.hostEpoch,
-      isHost: this.client.isHost,
+      lease: this.client.hostLease,
       canvas,
       definitions: this.options.definitions,
-      tickRate: this.client.tickRate,
+      tickRate: this.client.connectionIdentity.tickRate,
       snapshot,
       wakeFromSleep: wasSleeping,
       localAvatar: {
         entityId: this.localAvatarId,
-        clientId: this.client.clientId,
-        userId: this.client.userId,
+        clientId: this.client.connectionIdentity.clientId,
+        userId: this.client.connectionIdentity.userId,
         position: this.avatarSpawnPosition(this.localAvatarId),
       },
     });
@@ -600,8 +598,8 @@ export class RoomSession {
       type: "addAvatar",
       spawn: {
         entityId: this.localAvatarId,
-        clientId: this.client.clientId,
-        userId: this.client.userId,
+        clientId: this.client.connectionIdentity.clientId,
+        userId: this.client.connectionIdentity.userId,
         position: this.avatarSpawnPosition(this.localAvatarId),
       },
     });
@@ -633,7 +631,7 @@ export class RoomSession {
         this.driver.send(effect.request);
         break;
       case "publishFrame":
-        this.sendDelta(effect.keyframe);
+        this.sendDelta(effect.keyframe, effect.lease);
         break;
       case "requestCheckpoint":
         this.driver.send({
@@ -645,7 +643,7 @@ export class RoomSession {
         });
         break;
       case "yieldHost":
-        this.client.yieldHost(effect.reason);
+        this.client.yieldHost(effect.reason, effect.lease);
         break;
       case "roleRebuilt":
         // Spec 11.2. A role generation cannot retain interpolation,
@@ -689,7 +687,7 @@ export class RoomSession {
     this.inputSequence++;
     const disabled = intent.disabled === true;
     if (this.roster.setActivity(
-      this.client.userId,
+      this.client.connectionIdentity.userId,
       disabled ? "inactive" : "active",
     )) this.syncHostAvatars();
     // The host applies its own input directly; a peer sends it through the relay.
@@ -716,7 +714,10 @@ export class RoomSession {
     }
   }
 
-  private sendDelta(keyframe: boolean): void {
+  private sendDelta(
+    keyframe: boolean,
+    lease = this.hostRole.hostLease,
+  ): void {
     if (!this.hostRole.isHost || this.timeline.hostEntities.length === 0) return;
     const frame = this.timeline.encodeHostFrame(keyframe);
     if (keyframe) {
@@ -731,10 +732,11 @@ export class RoomSession {
               userId: entity.userId ?? "",
               displayName: entity.userId ?? "",
             })),
-          sceneRevision: this.client.sceneRevision,
-          tickRate: this.client.tickRate,
+          sceneRevision: this.client.durableRevision.sceneRevision,
+          tickRate: this.client.connectionIdentity.tickRate,
         },
         this.timeline.tick,
+        lease,
       );
       return;
     }
@@ -743,9 +745,10 @@ export class RoomSession {
       {
         entities: frame.entities,
         removedEntityIds: frame.removedEntityIds,
-        sceneRevision: this.client.sceneRevision,
+        sceneRevision: this.client.durableRevision.sceneRevision,
       },
       this.timeline.tick,
+      lease,
     );
   }
 
@@ -780,7 +783,7 @@ export class RoomSession {
           entityId: entity.id,
           effect: "countdown",
           mode: "start",
-          params: { seconds: remainingTicks / this.client.tickRate },
+          params: { seconds: remainingTicks / this.client.connectionIdentity.tickRate },
         });
       } else if (!arming && shown) {
         this.countdowns.delete(entity.id);
@@ -844,6 +847,7 @@ export class RoomSession {
                 paramsJson: effect.params ? toJsonBytes(effect.params) : new Uint8Array(),
               },
               message.tick,
+              this.hostRole.hostLease,
             );
           }
         }
@@ -853,6 +857,7 @@ export class RoomSession {
           message.snapshot,
           message.snapshot.checkpointRevision,
           message.final,
+          this.hostRole.hostLease,
         );
         this.checkPresentationReady();
         break;
@@ -976,9 +981,9 @@ export class RoomSession {
       status: this.hostRole.isHost ? "host" : "peer",
       isHost: this.hostRole.isHost,
       hostEpoch: hostRole.hostEpoch,
-      hostClientId: this.client.hostClientId,
-      clientId: this.client.clientId,
-      peers: this.client.peers.length,
+      hostClientId: this.client.hostLease.hostClientId,
+      clientId: this.client.connectionIdentity.clientId,
+      peers: this.client.presence.peers.length,
       tick: timeline.tick,
       simulationHz: this.stats.hz,
       driftMs: this.stats.driftMs,
@@ -995,7 +1000,7 @@ export class RoomSession {
       canonicalAvatar: canonicalAvatar
         ? Object.freeze({ x: canonicalAvatar.x, y: canonicalAvatar.y })
         : undefined,
-      sceneRevision: this.client.sceneRevision,
+      sceneRevision: this.client.durableRevision.sceneRevision,
       itemCount: this.durable.itemCount,
       lastRejection: this.lastRejection,
       ...this.trafficRates(),

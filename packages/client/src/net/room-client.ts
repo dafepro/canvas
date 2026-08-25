@@ -23,31 +23,50 @@ import type {
 export interface RoomJoinResult {
   roomId: string;
   canvasId: string;
-  clientId: string;
-  userId: string;
-  displayName: string;
+  identity: ConnectionIdentity;
+  lease: HostLease;
+  revision: DurableRevision;
   canvas: CanvasDefinition;
   snapshot: CanvasSnapshot;
-  sceneRevision: number;
-  hostEpoch: number;
-  hostClientId: string;
   roomWasSleeping: boolean;
-  tickRate: number;
+}
+
+export interface ConnectionIdentity {
+  readonly generation: number;
+  readonly clientId: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly tickRate: number;
+}
+
+export interface HostLease {
+  readonly epoch: number;
+  readonly hostClientId: string;
+  readonly localClientId: string;
+  readonly isHost: boolean;
+}
+
+export interface DurableRevision {
+  readonly sceneRevision: number;
+}
+
+export interface RoomPresence {
+  readonly peers: readonly Readonly<Peer>[];
 }
 
 export interface RoomClientEvents {
   joined(result: RoomJoinResult): void;
   presence(peers: Peer[]): void;
   /** This client is now the simulation host. */
-  hostGranted(epoch: number, snapshot: CanvasSnapshot | undefined, reason: string): void;
+  hostGranted(lease: HostLease, snapshot: CanvasSnapshot | undefined, reason: string): void;
   /** Another client is the host, or this client lost the lease. */
-  hostChanged(epoch: number, hostClientId: string, reason: string): void;
+  hostChanged(lease: HostLease, reason: string): void;
   fullState(state: FullState, epoch: number, tick: number): void;
   stateDelta(delta: StateDelta, epoch: number, tick: number): void;
   effect(event: EffectEvent, tick: number): void;
   playerInput(input: PlayerInput, fromClientId: string): void;
   durablePreview(command: DurableCommand, fromClientId: string): void;
-  durableAccepted(command: DurableCommand, sceneRevision: number, itemJson?: unknown): void;
+  durableAccepted(command: DurableCommand, revision: DurableRevision, itemJson?: unknown): void;
   durableRejected(command: DurableCommand, reason: string): void;
   status(status: TransportStatus, detail?: string): void;
   error(code: string, message: string): void;
@@ -79,15 +98,21 @@ export class RoomClient {
   private heartbeatTimer?: ReturnType<typeof setInterval>;
   private readonly heartbeatHz: number;
 
-  clientId = "";
-  hostEpoch = 0;
-  hostClientId = "";
-  sceneRevision = 0;
-  tickRate = 60;
-  isHost = false;
-  userId = "";
-  displayName = "";
-  peers: Peer[] = [];
+  private identityValue: ConnectionIdentity = Object.freeze({
+    generation: 0,
+    clientId: "",
+    userId: "",
+    displayName: "",
+    tickRate: 60,
+  });
+  private leaseValue: HostLease = Object.freeze({
+    epoch: 0,
+    hostClientId: "",
+    localClientId: "",
+    isHost: false,
+  });
+  private revisionValue: DurableRevision = Object.freeze({ sceneRevision: 0 });
+  private presenceValue: RoomPresence = Object.freeze({ peers: Object.freeze([]) });
   /** Health values sent with each heartbeat, updated by the runtime. */
   health = { simulationHz: 0, workerDriftMs: 0, pageVisible: true };
 
@@ -132,6 +157,22 @@ export class RoomClient {
     this.startHeartbeat();
   }
 
+  get connectionIdentity(): ConnectionIdentity {
+    return this.identityValue;
+  }
+
+  get hostLease(): HostLease {
+    return this.leaseValue;
+  }
+
+  get durableRevision(): DurableRevision {
+    return this.revisionValue;
+  }
+
+  get presence(): RoomPresence {
+    return this.presenceValue;
+  }
+
   private sendJoin(): void {
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
@@ -147,11 +188,14 @@ export class RoomClient {
 
   private handleTransportStatus(status: TransportStatus, detail?: string): void {
     if (status === "reconnecting" || status === "failed") {
-      const heldHostRole = this.isHost;
-      this.isHost = false;
-      this.hostClientId = "";
+      const heldHostRole = this.leaseValue.isHost;
+      this.leaseValue = Object.freeze({
+        ...this.leaseValue,
+        hostClientId: "",
+        isHost: false,
+      });
       if (heldHostRole) {
-        this.emit("hostChanged", this.hostEpoch, "", "transport_lost");
+        this.emit("hostChanged", this.leaseValue, "transport_lost");
       }
     }
     if (status === "open") {
@@ -173,7 +217,7 @@ export class RoomClient {
     this.heartbeatTimer = setInterval(() => {
       this.transport.sendReliable(
         newEnvelope(this.joinDescriptor.roomId, {
-          hostEpoch: this.hostEpoch,
+          hostEpoch: this.leaseValue.epoch,
           heartbeat: {
             sentAtUnixMs: Date.now(),
             simulationHz: this.health.simulationHz,
@@ -190,7 +234,7 @@ export class RoomClient {
   sendInput(input: PlayerInput): void {
     this.transport.sendRealtime(
       newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.hostEpoch,
+        hostEpoch: this.leaseValue.epoch,
         sequence: ++this.sequence,
         playerInput: input,
       }),
@@ -202,15 +246,17 @@ export class RoomClient {
    * `isHost` alone is not enough: it can survive a reconnect that moved the
    * lease.
    */
-  private get holdsLease(): boolean {
-    return this.isHost && this.hostClientId === this.clientId;
+  private holdsLease(lease: HostLease): boolean {
+    return lease === this.leaseValue &&
+      lease.isHost &&
+      lease.hostClientId === this.identityValue.clientId;
   }
 
-  sendStateDelta(delta: StateDelta, tick: number): void {
-    if (!this.holdsLease) return;
+  sendStateDelta(delta: StateDelta, tick: number, lease: HostLease): void {
+    if (!this.holdsLease(lease)) return;
     this.transport.sendRealtime(
       newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.hostEpoch,
+        hostEpoch: this.leaseValue.epoch,
         sequence: ++this.sequence,
         tick,
         stateDelta: delta,
@@ -218,11 +264,11 @@ export class RoomClient {
     );
   }
 
-  sendFullState(state: FullState, tick: number): void {
-    if (!this.holdsLease) return;
+  sendFullState(state: FullState, tick: number, lease: HostLease): void {
+    if (!this.holdsLease(lease)) return;
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.hostEpoch,
+        hostEpoch: this.leaseValue.epoch,
         sequence: ++this.sequence,
         tick,
         fullState: state,
@@ -230,11 +276,11 @@ export class RoomClient {
     );
   }
 
-  sendEffect(event: EffectEvent, tick: number): void {
-    if (!this.holdsLease) return;
+  sendEffect(event: EffectEvent, tick: number, lease: HostLease): void {
+    if (!this.holdsLease(lease)) return;
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.hostEpoch,
+        hostEpoch: this.leaseValue.epoch,
         sequence: ++this.sequence,
         tick,
         effectEvent: event,
@@ -242,11 +288,16 @@ export class RoomClient {
     );
   }
 
-  sendCheckpoint(snapshot: CanvasSnapshot, checkpointRevision: number, final = false): void {
-    if (!this.holdsLease) return;
+  sendCheckpoint(
+    snapshot: CanvasSnapshot,
+    checkpointRevision: number,
+    final: boolean,
+    lease: HostLease,
+  ): void {
+    if (!this.holdsLease(lease)) return;
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.hostEpoch,
+        hostEpoch: this.leaseValue.epoch,
         tick: snapshot.tick,
         checkpoint: {
           checkpointRevision,
@@ -261,22 +312,22 @@ export class RoomClient {
   sendDurableCommand(command: DurableCommand): void {
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.hostEpoch,
+        hostEpoch: this.leaseValue.epoch,
         durableCommand: command,
       }),
     );
   }
 
   /** Spec 11.2. Yield the lease when the page is hidden or the loop is late. */
-  yieldHost(reason: string): void {
-    if (!this.isHost) return;
+  yieldHost(reason: string, lease: HostLease): void {
+    if (!this.holdsLease(lease)) return;
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.hostEpoch,
+        hostEpoch: this.leaseValue.epoch,
         hostControl: {
           kind: HostControlKind.HOST_CONTROL_YIELD,
-          hostClientId: this.clientId,
-          hostEpoch: this.hostEpoch,
+          hostClientId: this.identityValue.clientId,
+          hostEpoch: this.leaseValue.epoch,
           snapshotJson: new Uint8Array(),
           reason,
           eligible: false,
@@ -289,11 +340,11 @@ export class RoomClient {
   setHostEligible(eligible: boolean): void {
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.hostEpoch,
+        hostEpoch: this.leaseValue.epoch,
         hostControl: {
           kind: HostControlKind.HOST_CONTROL_ELIGIBILITY,
-          hostClientId: this.clientId,
-          hostEpoch: this.hostEpoch,
+          hostClientId: this.identityValue.clientId,
+          hostEpoch: this.leaseValue.epoch,
           snapshotJson: new Uint8Array(),
           reason: "",
           eligible,
@@ -313,17 +364,21 @@ export class RoomClient {
 
     if (message.joinAccepted) {
       const accepted = message.joinAccepted;
-      this.clientId = accepted.clientId;
-      this.userId = accepted.userId;
-      this.displayName = accepted.displayName;
-      this.hostEpoch = accepted.hostEpoch;
-      this.hostClientId = accepted.hostClientId;
-      // Spec 11.1. A reconnect produces a new client id, and the room may have
-      // given the lease to somebody else. Without this line a client that held
-      // the lease before the break keeps sending state the room refuses.
-      this.isHost = accepted.hostClientId === accepted.clientId;
-      this.sceneRevision = accepted.sceneRevision;
-      this.tickRate = accepted.tickRate || 60;
+      this.identityValue = Object.freeze({
+        generation: this.identityValue.generation + 1,
+        clientId: accepted.clientId,
+        userId: accepted.userId,
+        displayName: accepted.displayName,
+        tickRate: accepted.tickRate || 60,
+      });
+      this.leaseValue = Object.freeze({
+        epoch: accepted.hostEpoch,
+        hostClientId: accepted.hostClientId,
+        localClientId: accepted.clientId,
+        // A reconnect may have assigned the lease to somebody else.
+        isHost: accepted.hostClientId === accepted.clientId,
+      });
+      this.revisionValue = Object.freeze({ sceneRevision: accepted.sceneRevision });
       const canvas = fromJsonBytes<CanvasDefinition>(accepted.canvasDefinitionJson);
       const snapshot = fromJsonBytes<CanvasSnapshot>(accepted.snapshotJson);
       if (!canvas) {
@@ -333,9 +388,9 @@ export class RoomClient {
       this.emit("joined", {
         roomId: this.joinDescriptor.roomId,
         canvasId: canvas.id,
-        clientId: accepted.clientId,
-        userId: accepted.userId,
-        displayName: accepted.displayName,
+        identity: this.identityValue,
+        lease: this.leaseValue,
+        revision: this.revisionValue,
         canvas,
         snapshot: snapshot ?? {
           schemaVersion: 1,
@@ -350,17 +405,17 @@ export class RoomClient {
           items: [],
           avatars: [],
         },
-        sceneRevision: accepted.sceneRevision,
-        hostEpoch: accepted.hostEpoch,
-        hostClientId: accepted.hostClientId,
         roomWasSleeping: accepted.roomWasSleeping,
-        tickRate: this.tickRate,
       });
       return;
     }
 
     if (message.presence) {
-      this.peers = message.presence.peers;
+      this.presenceValue = Object.freeze({
+        peers: Object.freeze(
+          message.presence.peers.map((peer) => Object.freeze({ ...peer })),
+        ),
+      });
       this.emit("presence", message.presence.peers);
       return;
     }
@@ -372,7 +427,7 @@ export class RoomClient {
 
     // Spec 11.1. Drop canonical state from an old epoch.
     const isState = message.stateDelta || message.fullState || message.effectEvent;
-    if (isState && message.hostEpoch !== this.hostEpoch) return;
+    if (isState && message.hostEpoch !== this.leaseValue.epoch) return;
 
     if (message.fullState) {
       this.emit("fullState", message.fullState, message.hostEpoch, message.tick);
@@ -391,7 +446,7 @@ export class RoomClient {
       return;
     }
     if (message.durableCommand) {
-      if (message.hostEpoch !== this.hostEpoch || !message.durableCommand.preview) return;
+      if (message.hostEpoch !== this.leaseValue.epoch || !message.durableCommand.preview) return;
       this.emit("durablePreview", message.durableCommand, message.senderClientId);
       return;
     }
@@ -400,11 +455,11 @@ export class RoomClient {
       const command = result.command;
       if (!command) return;
       if (result.accepted) {
-        this.sceneRevision = result.sceneRevision;
+        this.revisionValue = Object.freeze({ sceneRevision: result.sceneRevision });
         this.emit(
           "durableAccepted",
           command,
-          result.sceneRevision,
+          this.revisionValue,
           fromJsonBytes(result.itemInstanceJson),
         );
       } else {
@@ -415,26 +470,30 @@ export class RoomClient {
 
   private handleHostControl(message: RoomEnvelope): void {
     const control = message.hostControl!;
-    this.hostEpoch = control.hostEpoch;
-    this.hostClientId = control.hostClientId;
+    this.leaseValue = Object.freeze({
+      epoch: control.hostEpoch,
+      hostClientId: control.hostClientId,
+      localClientId: this.identityValue.clientId,
+      isHost:
+        control.kind === HostControlKind.HOST_CONTROL_GRANTED ||
+        control.hostClientId === this.identityValue.clientId,
+    });
 
     if (control.kind === HostControlKind.HOST_CONTROL_GRANTED) {
-      this.isHost = true;
       this.emit(
         "hostGranted",
-        control.hostEpoch,
+        this.leaseValue,
         fromJsonBytes<CanvasSnapshot>(control.snapshotJson),
         control.reason,
       );
       return;
     }
     if (control.kind === HostControlKind.HOST_CONTROL_REVOKED) {
-      this.isHost = control.hostClientId === this.clientId;
-      this.emit("hostChanged", control.hostEpoch, control.hostClientId, control.reason);
+      this.emit("hostChanged", this.leaseValue, control.reason);
       return;
     }
     if (control.kind === HostControlKind.HOST_CONTROL_YIELD_REQUEST) {
-      this.yieldHost("server_request");
+      this.yieldHost("server_request", this.leaseValue);
     }
   }
 }
