@@ -10,18 +10,14 @@ import {
 import {
   fromJsonBytes,
   toJsonBytes,
-  type EntityState,
   type Peer,
 } from "@canvas-physics/protocol";
-import { AvatarReconciler } from "../net/avatar-reconciler.js";
-import { dequantizeTransform, quantizeTransform } from "../net/quantization.js";
 import { RoomClient } from "../net/room-client.js";
 import type { RoomTransport } from "../net/transport.js";
 import {
   WebSocketRoomTransport,
   type RealtimeCredentialProvider,
 } from "../net/websocket-transport.js";
-import { InterpolationBuffer } from "../render/interpolation-buffer.js";
 import { SimulationDriver } from "../simulation/driver.js";
 import type { RenderEntity, SimulationResponse } from "../simulation/messages.js";
 import {
@@ -34,6 +30,16 @@ import {
   DurableCommandSession,
   type DurableCommandEffect,
 } from "./session/durable-command-session.js";
+import {
+  ReplicationTimeline,
+  type BehaviorStateSnapshot,
+  type CanonicalStateSnapshot,
+} from "./session/replication-timeline.js";
+
+export type {
+  BehaviorStateSnapshot,
+  CanonicalStateSnapshot,
+} from "./session/replication-timeline.js";
 
 /** One sample of movement intent, from a pointer, a key, or a test. */
 export interface InputIntent {
@@ -134,20 +140,6 @@ export interface PresenceSnapshot {
   readonly participants: readonly Readonly<ParticipantPresence>[];
 }
 
-export interface CanonicalStateSnapshot {
-  readonly tick: number;
-  readonly sceneRevision: number;
-  readonly entities: readonly Readonly<RenderEntity>[];
-}
-
-export interface BehaviorStateSnapshot {
-  readonly tick: number;
-  readonly states: readonly {
-    readonly entityId: string;
-    readonly state: unknown;
-  }[];
-}
-
 type Observer<T> = (value: T) => void;
 
 interface PendingJoin {
@@ -203,19 +195,12 @@ export interface SessionDiagnostics {
 export class RoomSession {
   readonly client: RoomClient;
   readonly driver: SimulationDriver;
-  private readonly buffer = new InterpolationBuffer();
-  private readonly reconciler = new AvatarReconciler();
-  private lastReconciledTick?: number;
   private canvasDefinition?: CanvasDefinition;
   private timers: ReturnType<typeof setInterval>[] = [];
   private readonly durable: DurableCommandSession;
+  private readonly timeline: ReplicationTimeline;
   private localAvatarId = "";
   private inputSequence = 0;
-  private hostEntities: RenderEntity[] = [];
-  private localPrediction?: RenderEntity;
-  private readonly localPredictionHistory = new Map<number, Readonly<Vec2>>();
-  private acknowledgedInputSequence = 0;
-  private currentTick = 0;
   private simulationReady = false;
   private simulationGeneration = 0;
   private staleSimulationResponses = 0;
@@ -227,12 +212,7 @@ export class RoomSession {
   private latestPeers?: Peer[];
   private readonly participantsById = new Map<string, ParticipantPresence>();
   private latestPresenceSnapshot?: PresenceSnapshot;
-  private latestCanonicalSource?: { tick: number; entities: RenderEntity[] };
-  private latestCanonicalSnapshot?: CanonicalStateSnapshot;
-  private latestBehaviorSnapshot?: BehaviorStateSnapshot;
   private readonly presenceObservers = new Set<Observer<PresenceSnapshot>>();
-  private readonly canonicalObservers = new Set<Observer<CanonicalStateSnapshot>>();
-  private readonly behaviorObservers = new Set<Observer<BehaviorStateSnapshot>>();
   private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
   private readonly hostAvatarIds = new Set<string>();
   private readonly appliedParticipantStatus = new Map<string, ParticipantStatus>();
@@ -264,9 +244,7 @@ export class RoomSession {
   private startPromise?: Promise<void>;
   private terminalError?: CanvasConsumerError;
   private pageVisible = true;
-  private readonly lastBehaviorJson = new Map<string, string>();
   private readonly countdowns = new Set<string>();
-  private readonly lastSent = new Map<string, SentSample>();
   private hostMigrations = 0;
   private lastMigrationReason?: string;
   private quarantinedCount = 0;
@@ -316,6 +294,16 @@ export class RoomSession {
       }),
       emit: (effect) => this.applyDurableEffect(effect),
     });
+    this.timeline = new ReplicationTimeline({
+      sceneRevision: () => this.client.sceneRevision,
+      decorate: (entity) => this.durable.decorate(entity),
+      onCanonical: (tick, entities) => {
+        const canonical = [...entities];
+        this.updateParticipantActivity(canonical);
+        this.rememberFullAvatarState(canonical);
+        this.syncCountdowns(canonical, tick);
+      },
+    });
     this.wireClient();
     this.driver.onMessage((message) => this.onSimulation(message));
   }
@@ -325,7 +313,7 @@ export class RoomSession {
   }
 
   get tick(): number {
-    return this.currentTick;
+    return this.timeline.tick;
   }
 
   get avatarId(): string {
@@ -347,17 +335,11 @@ export class RoomSession {
   }
 
   subscribeCanonicalState(observer: Observer<CanonicalStateSnapshot>): () => void {
-    this.canonicalObservers.add(observer);
-    if (this.latestCanonicalSource) this.refreshCanonicalSnapshots();
-    if (this.latestCanonicalSnapshot) observer(this.latestCanonicalSnapshot);
-    return () => this.canonicalObservers.delete(observer);
+    return this.timeline.subscribeCanonical(observer);
   }
 
   subscribeBehaviorState(observer: Observer<BehaviorStateSnapshot>): () => void {
-    this.behaviorObservers.add(observer);
-    if (this.latestCanonicalSource) this.refreshCanonicalSnapshots();
-    if (this.latestBehaviorSnapshot) observer(this.latestBehaviorSnapshot);
-    return () => this.behaviorObservers.delete(observer);
+    return this.timeline.subscribeBehavior(observer);
   }
 
   subscribeEffects(observer: Observer<Readonly<EffectEmission>>): () => void {
@@ -529,8 +511,7 @@ export class RoomSession {
     this.driver.terminate();
     this.client.close();
     this.presenceObservers.clear();
-    this.canonicalObservers.clear();
-    this.behaviorObservers.clear();
+    this.timeline.clearObservers();
     this.effectObservers.clear();
   }
 
@@ -624,15 +605,12 @@ export class RoomSession {
       }
     });
 
-    this.client.on("hostGranted", (_epoch, snapshot, reason) => {
+    this.client.on("hostGranted", (epoch, snapshot, reason) => {
       if (reason && reason !== "first_join") {
         this.hostMigrations++;
         this.lastMigrationReason = reason;
       }
-      this.buffer.reset();
-      this.reconciler.reset();
-      this.resetPredictionHistory();
-      this.lastReconciledTick = undefined;
+      this.timeline.resetEpoch(epoch);
       this.simulationReady = false;
       const generation = ++this.simulationGeneration;
       // A migration checkpoint may trail the latest replicated state by up to
@@ -654,14 +632,11 @@ export class RoomSession {
       this.syncHostAvatars();
     });
 
-    this.client.on("hostChanged", (_epoch, hostClientId, reason) => {
+    this.client.on("hostChanged", (epoch, hostClientId, reason) => {
       // Spec 11.2. Clear stale interpolation history when the epoch changes.
       this.hostMigrations++;
       this.lastMigrationReason = reason || undefined;
-      this.buffer.reset();
-      this.reconciler.reset();
-      this.resetPredictionHistory();
-      this.lastReconciledTick = undefined;
+      this.timeline.resetEpoch(epoch);
       if (hostClientId !== this.client.clientId) {
         this.simulationReady = false;
         const generation = ++this.simulationGeneration;
@@ -674,28 +649,13 @@ export class RoomSession {
 
     this.client.on("fullState", (state, _epoch, tick) => {
       if (this.client.isHost) return;
-      const avatars = new Map(state.avatars.map((avatar) => [avatar.entityId, avatar]));
-      const entities = state.entities.map((serialized) => {
-        const entity = this.durable.decorate(fromEntityState(serialized));
-        const avatar = avatars.get(entity.id);
-        return avatar ? { ...entity, userId: avatar.userId } : entity;
-      });
-      this.rememberFullAvatarState(entities);
-      this.buffer.push(tick, entities);
-      this.publishCanonicalState(tick, entities);
-      this.syncCountdowns(entities, tick);
+      this.timeline.acceptFullState(state, tick);
       this.checkPresentationReady();
     });
 
     this.client.on("stateDelta", (delta, _epoch, tick) => {
       if (this.client.isHost) return;
-      const entities = delta.entities.map((serialized) =>
-        this.durable.decorate(fromEntityState(serialized)),
-      );
-      this.rememberAvatarDelta(entities, delta.removedEntityIds);
-      this.buffer.pushDelta(tick, entities, delta.removedEntityIds);
-      this.publishCanonicalState(tick, this.buffer.latest());
-      this.syncCountdowns(entities, tick);
+      this.timeline.acceptDelta(delta, tick);
       this.checkPresentationReady();
     });
 
@@ -705,7 +665,7 @@ export class RoomSession {
         if (event.mode === "stop") this.countdowns.delete(event.entityId);
       }
       this.publishEffect({
-        tick: this.currentTick,
+        tick: this.timeline.tick,
         entityId: event.entityId,
         effect: event.effect,
         mode: (event.mode as "oneShot" | "start" | "stop") || "oneShot",
@@ -836,46 +796,6 @@ export class RoomSession {
     if (changed) this.publishParticipantSnapshot();
   }
 
-  private publishCanonicalState(tick: number, source: RenderEntity[]): void {
-    this.updateParticipantActivity(source);
-    this.latestCanonicalSource = { tick, entities: source };
-    if (this.canonicalObservers.size === 0 && this.behaviorObservers.size === 0) return;
-    this.refreshCanonicalSnapshots();
-    const snapshot = this.latestCanonicalSnapshot!;
-    const behaviorSnapshot = this.latestBehaviorSnapshot!;
-    for (const observer of this.canonicalObservers) observer(snapshot);
-    for (const observer of this.behaviorObservers) observer(behaviorSnapshot);
-  }
-
-  private refreshCanonicalSnapshots(): void {
-    const source = this.latestCanonicalSource;
-    if (!source) return;
-    const entities = Object.freeze(
-      source.entities.map((entity) =>
-        Object.freeze({
-          ...entity,
-          behaviorState: immutableValue(entity.behaviorState),
-        }),
-      ),
-    );
-    const snapshot = Object.freeze({
-      tick: source.tick,
-      sceneRevision: this.client.sceneRevision,
-      entities,
-    });
-    this.latestCanonicalSnapshot = snapshot;
-
-    const states = Object.freeze(
-      entities
-        .filter((entity) => entity.behaviorState !== undefined)
-        .map((entity) =>
-          Object.freeze({ entityId: entity.id, state: entity.behaviorState }),
-        ),
-    );
-    const behaviorSnapshot = Object.freeze({ tick: source.tick, states });
-    this.latestBehaviorSnapshot = behaviorSnapshot;
-  }
-
   private publishEffect(emission: EffectEmission): void {
     const effect = Object.freeze({
       ...emission,
@@ -967,6 +887,7 @@ export class RoomSession {
         );
       }
       this.durable.loadSnapshot(join.snapshot);
+      this.timeline.resetEpoch(this.client.hostEpoch);
       this.rememberSnapshotAvatarPositions(join.snapshot);
       this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
       this.pendingJoin = undefined;
@@ -1070,14 +991,6 @@ export class RoomSession {
     }
   }
 
-  private rememberAvatarDelta(entities: RenderEntity[], removed: string[]): void {
-    for (const entity of entities) {
-      if (entity.kind !== "avatar") continue;
-      this.lastCanonicalAvatarPositions.set(entity.id, { x: entity.x, y: entity.y });
-    }
-    for (const entityId of removed) this.lastCanonicalAvatarPositions.delete(entityId);
-  }
-
   /** Keeps the host simulation's transient avatars identical to presence. */
   private syncHostAvatars(): void {
     if (!this.client.isHost || !this.simulationReady || !this.latestPeers) return;
@@ -1175,16 +1088,13 @@ export class RoomSession {
   }
 
   private sendDelta(keyframe: boolean): void {
-    if (!this.client.isHost || this.hostEntities.length === 0) return;
-    const source = keyframe ? this.hostEntities : this.changedEntities();
-    const entities = source.map((entity) =>
-      toEntityState(entity, this.behaviorBytes(entity, keyframe), keyframe),
-    );
+    if (!this.client.isHost || this.timeline.hostEntities.length === 0) return;
+    const frame = this.timeline.encodeHostFrame(keyframe);
     if (keyframe) {
       this.client.sendFullState(
         {
-          entities,
-          avatars: this.hostEntities
+          entities: frame.entities,
+          avatars: this.timeline.hostEntities
             .filter((entity) => entity.kind === "avatar")
             .map((entity) => ({
               entityId: entity.id,
@@ -1196,66 +1106,19 @@ export class RoomSession {
           sceneRevision: this.client.sceneRevision,
           tickRate: this.client.tickRate,
         },
-        this.currentTick,
+        this.timeline.tick,
       );
-      // A keyframe carries every entity, so the delta filter starts again here.
-      this.lastSent.clear();
-      for (const entity of this.hostEntities) {
-        this.lastSent.set(entity.id, sentSample(entity));
-      }
       return;
     }
-    const removedEntityIds = this.removedEntityIds();
-    if (entities.length === 0 && removedEntityIds.length === 0) return;
+    if (frame.entities.length === 0 && frame.removedEntityIds.length === 0) return;
     this.client.sendStateDelta(
-      { entities, removedEntityIds, sceneRevision: this.client.sceneRevision },
-      this.currentTick,
+      {
+        entities: frame.entities,
+        removedEntityIds: frame.removedEntityIds,
+        sceneRevision: this.client.sceneRevision,
+      },
+      this.timeline.tick,
     );
-  }
-
-  /**
-   * Spec 19.2, rule 6. A delta carries only an entity that changed since the
-   * last delta. A body at rest costs no bytes, and the 2 Hz keyframe repairs a
-   * client that missed a change.
-   */
-  private changedEntities(): RenderEntity[] {
-    const changed: RenderEntity[] = [];
-    for (const entity of this.hostEntities) {
-      const before = this.lastSent.get(entity.id);
-      if (!before || movedSince(before, entity)) {
-        changed.push(entity);
-        this.lastSent.set(entity.id, sentSample(entity));
-      }
-    }
-    return changed;
-  }
-
-  private removedEntityIds(): string[] {
-    const present = new Set(this.hostEntities.map((entity) => entity.id));
-    const removed: string[] = [];
-    for (const id of this.lastSent.keys()) {
-      if (present.has(id)) continue;
-      removed.push(id);
-      this.lastSent.delete(id);
-    }
-    return removed;
-  }
-
-  /**
-   * Spec 20. A keyframe always carries the behavior state, so a client that
-   * joins during a workflow can show it. A delta carries it only after a change,
-   * which keeps the 15 Hz packet small.
-   */
-  private behaviorBytes(entity: RenderEntity, keyframe: boolean): Uint8Array {
-    if (entity.behaviorState === undefined) {
-      this.lastBehaviorJson.delete(entity.id);
-      return new Uint8Array();
-    }
-    const json = JSON.stringify(entity.behaviorState);
-    const previous = this.lastBehaviorJson.get(entity.id);
-    this.lastBehaviorJson.set(entity.id, json);
-    if (!keyframe && previous === json) return new Uint8Array();
-    return toJsonBytes(entity.behaviorState);
   }
 
   private requestCheckpoint(): void {
@@ -1274,51 +1137,7 @@ export class RoomSession {
    * the interpolated remote state plus its reconciled local avatar.
    */
   entitiesToDraw(nowMs: number): RenderEntity[] {
-    if (this.client.isHost) return this.hostEntities;
-
-    const sampled = this.buffer.sample(nowMs);
-    const remote = sampled.filter((entity) => entity.id !== this.localAvatarId);
-    if (this.localPrediction) {
-      const latestTick = this.buffer.latestTick;
-      const canonicalLocal = this.buffer.latest().find(
-        (entity) => entity.id === this.localAvatarId,
-      );
-      if (
-        canonicalLocal &&
-        latestTick !== undefined &&
-        latestTick !== this.lastReconciledTick
-      ) {
-        const acknowledged = canonicalLocal.lastProcessedInputSequence ?? 0;
-        const predictionAtAcknowledgement = this.localPredictionHistory.get(acknowledged);
-        if (predictionAtAcknowledgement) {
-          this.reconciler.observe(canonicalLocal, predictionAtAcknowledgement);
-          this.acknowledgedInputSequence = Math.max(
-            this.acknowledgedInputSequence,
-            acknowledged,
-          );
-          for (const sequence of this.localPredictionHistory.keys()) {
-            if (sequence <= acknowledged) this.localPredictionHistory.delete(sequence);
-          }
-        } else if (
-          acknowledged === (this.localPrediction.lastProcessedInputSequence ?? 0)
-        ) {
-          this.reconciler.observe(canonicalLocal, this.localPrediction);
-          this.acknowledgedInputSequence = Math.max(
-            this.acknowledgedInputSequence,
-            acknowledged,
-          );
-        }
-        this.lastReconciledTick = latestTick;
-      }
-      const corrected = this.reconciler.correct(this.localPrediction);
-      remote.push({
-        ...this.localPrediction,
-        x: corrected.x,
-        y: corrected.y,
-        extrapolated: false,
-      });
-    }
-    return remote;
+    return this.timeline.frame(nowMs, this.localAvatarId, this.client.isHost);
   }
 
   /**
@@ -1385,20 +1204,19 @@ export class RoomSession {
         this.checkPresentationReady();
         break;
       case "render": {
-        this.currentTick = message.tick;
         this.stats = { ...message.stats };
         this.client.health.simulationHz = message.stats.hz;
         this.client.health.workerDriftMs = message.stats.driftMs;
         if (this.client.isHost) {
-          this.hostEntities = message.entities;
-          this.publishCanonicalState(message.tick, message.entities);
+          this.timeline.acceptHostFrame(message.tick, message.entities);
           // Spec 22.1. The host is the only client that can quarantine a body.
           this.quarantinedCount = message.entities.filter((e) => e.quarantined).length;
         } else {
-          this.localPrediction = message.entities.find(
-            (entity) => entity.id === this.localAvatarId,
+          this.timeline.acceptLocalPredictionFrame(
+            message.tick,
+            message.entities,
+            this.localAvatarId,
           );
-          if (this.localPrediction) this.recordLocalPrediction(this.localPrediction);
         }
         this.checkPresentationReady();
         break;
@@ -1450,8 +1268,10 @@ export class RoomSession {
 
   private checkPresentationReady(): void {
     if (this.presentationReady || !this.simulationReady || !this.latestPeers) return;
-    const authoritative = this.client.isHost ? this.hostEntities : this.buffer.latest();
-    if (!this.client.isHost && this.buffer.latestTick === undefined) return;
+    const authoritative = this.client.isHost
+      ? this.timeline.hostEntities
+      : this.timeline.latestEntities;
+    if (!this.client.isHost && this.timeline.latestPeerTick === undefined) return;
     const ids = new Set(authoritative.map((entity) => entity.id));
     for (const itemId of this.durable.itemEntityIds) {
       if (!ids.has(itemId)) return;
@@ -1540,8 +1360,11 @@ export class RoomSession {
   }
 
   diagnostics(): SessionDiagnostics {
-    const canonicalAvatar = (this.client.isHost ? this.hostEntities : this.buffer.latest())
-      .find((entity) => entity.id === this.localAvatarId);
+    const timeline = this.timeline.diagnostics;
+    const canonicalAvatar = this.timeline.canonicalAvatar(
+      this.localAvatarId,
+      this.client.isHost,
+    );
     return {
       status: this.client.isHost ? "host" : "peer",
       isHost: this.client.isHost,
@@ -1549,21 +1372,19 @@ export class RoomSession {
       hostClientId: this.client.hostClientId,
       clientId: this.client.clientId,
       peers: this.client.peers.length,
-      tick: this.currentTick,
+      tick: timeline.tick,
       simulationHz: this.stats.hz,
       driftMs: this.stats.driftMs,
       worstStepMs: this.stats.worstStepMs,
       awakeBodies: this.stats.awakeBodies,
       activeColliders: this.stats.activeColliders,
-      interpolationDepth: this.buffer.depth,
-      extrapolations: this.buffer.extrapolationCount,
-      reconcileError: this.reconciler.lastErrorDistance,
+      interpolationDepth: timeline.interpolationDepth,
+      extrapolations: timeline.extrapolations,
+      reconcileError: timeline.reconcileError,
       inputSequence: this.inputSequence,
-      acknowledgedInputSequence: this.acknowledgedInputSequence,
-      predictionHistoryDepth: this.localPredictionHistory.size,
-      predictedAvatar: this.localPrediction
-        ? Object.freeze({ x: this.localPrediction.x, y: this.localPrediction.y })
-        : undefined,
+      acknowledgedInputSequence: timeline.acknowledgedInputSequence,
+      predictionHistoryDepth: timeline.predictionHistoryDepth,
+      predictedAvatar: timeline.predictedAvatar,
       canonicalAvatar: canonicalAvatar
         ? Object.freeze({ x: canonicalAvatar.x, y: canonicalAvatar.y })
         : undefined,
@@ -1582,95 +1403,7 @@ export class RoomSession {
   get isRunning(): boolean {
     return this.running;
   }
-
-  private recordLocalPrediction(entity: Readonly<RenderEntity>): void {
-    const sequence = entity.lastProcessedInputSequence ?? 0;
-    this.localPredictionHistory.set(sequence, Object.freeze({ x: entity.x, y: entity.y }));
-    while (this.localPredictionHistory.size > 128) {
-      const oldest = this.localPredictionHistory.keys().next().value as number | undefined;
-      if (oldest === undefined) break;
-      this.localPredictionHistory.delete(oldest);
-    }
-  }
-
-  private resetPredictionHistory(): void {
-    this.localPredictionHistory.clear();
-    this.acknowledgedInputSequence = 0;
-  }
 }
-
-/** One sample of what a delta last carried for an entity. */
-interface SentSample {
-  x: number;
-  y: number;
-  rotation: number;
-  scale: number;
-  z: number;
-  vx: number;
-  vy: number;
-  angularVelocity: number;
-  variant?: string;
-  tint?: number;
-  animation?: string;
-  animationEpoch?: number;
-  disabled?: boolean;
-  quarantined?: boolean;
-  teleportEpoch?: number;
-  respawning?: boolean;
-  isolated?: boolean;
-  collisionsDisabled?: boolean;
-}
-
-const sentSample = (entity: RenderEntity): SentSample => ({
-  x: entity.x,
-  y: entity.y,
-  rotation: entity.rotation,
-  scale: entity.scale ?? 1,
-  z: entity.z ?? 0,
-  vx: entity.vx,
-  vy: entity.vy,
-  angularVelocity: entity.angularVelocity,
-  variant: entity.variant,
-  tint: entity.tint,
-  animation: entity.animation,
-  animationEpoch: entity.animationEpoch,
-  disabled: entity.disabled,
-  quarantined: entity.quarantined,
-  teleportEpoch: entity.teleportEpoch,
-  respawning: entity.respawning,
-  isolated: entity.isolated,
-  collisionsDisabled: entity.collisionsDisabled,
-});
-
-/** Movement below these values is not visible at the 100 ms render delay. */
-const POSITION_EPSILON = 0.01;
-const ROTATION_EPSILON = 0.005;
-const VELOCITY_EPSILON = 0.05;
-
-const movedSince = (before: SentSample, now: RenderEntity): boolean =>
-  Math.abs(before.x - now.x) > POSITION_EPSILON ||
-  Math.abs(before.y - now.y) > POSITION_EPSILON ||
-  Math.abs(before.z - (now.z ?? 0)) > POSITION_EPSILON ||
-  Math.abs(before.rotation - now.rotation) > ROTATION_EPSILON ||
-  Math.abs(before.scale - (now.scale ?? 1)) > ROTATION_EPSILON ||
-  Math.abs(before.vx - now.vx) > VELOCITY_EPSILON ||
-  Math.abs(before.vy - now.vy) > VELOCITY_EPSILON ||
-  Math.abs(before.angularVelocity - now.angularVelocity) > VELOCITY_EPSILON ||
-  before.variant !== now.variant ||
-  before.tint !== now.tint ||
-  before.animation !== now.animation ||
-  before.animationEpoch !== now.animationEpoch ||
-  before.disabled !== now.disabled ||
-  before.quarantined !== now.quarantined ||
-  // Addendum A2 and A3. A jump and a respawn must reach every peer on the tick
-  // they happen, or a peer slides the sprite across the canvas instead.
-  before.teleportEpoch !== now.teleportEpoch ||
-  before.respawning !== now.respawning ||
-  before.isolated !== now.isolated ||
-  before.collisionsDisabled !== now.collisionsDisabled;
-// The processed input sequence is not a reason to send. It rides on the entity
-// whenever the entity moves, and the 2 Hz keyframe carries it for a still
-// avatar. Sending it alone would put every idle avatar in every delta.
 
 const pickCounters = (traffic: {
   inboundBytes: number;
@@ -1695,72 +1428,4 @@ const stableSpawnOffset = (entityId: string): number => {
     hash = Math.imul(hash, 0x01000193);
   }
   return ((hash >>> 0) / 0xffffffff - 0.5) * 6;
-};
-
-/**
- * Spec 19.3. A delta leaves out the definition id. A client learns the
- * definition from the keyframe or from the durable spawn result, and the id
- * would otherwise repeat for every entity 15 times a second.
- */
-const toEntityState = (
-  entity: RenderEntity,
-  behaviorStateJson: Uint8Array,
-  keyframe = true,
-): EntityState => ({
-  entityId: entity.id,
-  lastProcessedInputSequence: entity.lastProcessedInputSequence ?? 0,
-  spriteVariant: entity.variant ?? "",
-  spriteAnimation: entity.animation ?? "",
-  animationEpoch: entity.animationEpoch ?? 0,
-  behaviorStateJson,
-  quarantined: entity.quarantined ?? false,
-  definitionId: keyframe ? entity.definitionId : "",
-  disabled: entity.disabled ?? false,
-  teleportEpoch: entity.teleportEpoch ?? 0,
-  respawning: entity.respawning ?? false,
-  itemIsolated: entity.isolated ?? false,
-  spriteTint: entity.tint ?? 0,
-  hasSpriteTint: entity.tint !== undefined,
-  itemCollisionsDisabled: entity.collisionsDisabled ?? false,
-  quantizedTransform: quantizeTransform({
-    x: entity.x,
-    y: entity.y,
-    rotation: entity.rotation,
-    scale: entity.scale ?? 1,
-    vx: entity.vx,
-    vy: entity.vy,
-    angularVelocity: entity.angularVelocity,
-    z: entity.z,
-    vz: 0,
-  }),
-});
-
-const fromEntityState = (state: EntityState): RenderEntity => {
-  const transform = dequantizeTransform(state.quantizedTransform!);
-
-  return {
-    id: state.entityId,
-    kind: state.entityId.startsWith("avatar:") ? "avatar" : "item",
-    definitionId: state.definitionId,
-    x: transform.x,
-    y: transform.y,
-    rotation: transform.rotation,
-    scale: transform.scale || 1,
-    z: transform.z || undefined,
-    vx: transform.vx,
-    vy: transform.vy,
-    angularVelocity: transform.angularVelocity,
-    variant: state.spriteVariant || undefined,
-    animation: state.spriteAnimation || undefined,
-    animationEpoch: state.animationEpoch || undefined,
-    lastProcessedInputSequence: state.lastProcessedInputSequence,
-    behaviorState: fromJsonBytes(state.behaviorStateJson),
-    quarantined: state.quarantined,
-    disabled: state.disabled,
-    teleportEpoch: state.teleportEpoch,
-    respawning: state.respawning,
-    isolated: state.itemIsolated,
-    tint: state.hasSpriteTint ? state.spriteTint : undefined,
-    collisionsDisabled: state.itemCollisionsDisabled,
-  };
 };
