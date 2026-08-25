@@ -1,5 +1,4 @@
 import {
-  resolveItemConfig,
   type CanvasDefinition,
   type CanvasSnapshot,
   type EffectEmission,
@@ -9,10 +8,8 @@ import {
   type Vec2,
 } from "@canvas-physics/core";
 import {
-  DurableCommandKind,
   fromJsonBytes,
   toJsonBytes,
-  type DurableCommand,
   type EntityState,
   type Peer,
 } from "@canvas-physics/protocol";
@@ -33,6 +30,10 @@ import {
   type CanvasLifecycleSnapshot,
   type CanvasLifecycleState,
 } from "./lifecycle.js";
+import {
+  DurableCommandSession,
+  type DurableCommandEffect,
+} from "./session/durable-command-session.js";
 
 /** One sample of movement intent, from a pointer, a key, or a test. */
 export interface InputIntent {
@@ -207,10 +208,7 @@ export class RoomSession {
   private lastReconciledTick?: number;
   private canvasDefinition?: CanvasDefinition;
   private timers: ReturnType<typeof setInterval>[] = [];
-  private previewTimer?: ReturnType<typeof setTimeout>;
-  private pendingPreview?: { entityId: string; transform: Transform };
-  private lastPreviewSentAt = Number.NEGATIVE_INFINITY;
-  private readonly previewIntervalMs: number;
+  private readonly durable: DurableCommandSession;
   private localAvatarId = "";
   private inputSequence = 0;
   private hostEntities: RenderEntity[] = [];
@@ -237,11 +235,6 @@ export class RoomSession {
   private readonly behaviorObservers = new Set<Observer<BehaviorStateSnapshot>>();
   private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
   private readonly hostAvatarIds = new Set<string>();
-  /** Durable metadata is learned from JOIN/results, not repeated in physics frames. */
-  private readonly itemMetadataById = new Map<
-    string,
-    Readonly<{ definitionId: string; ownerUserId: string }>
-  >();
   private readonly appliedParticipantStatus = new Map<string, ParticipantStatus>();
   private readonly lastCanonicalAvatarPositions = new Map<string, Vec2>();
   private finalCheckpointSent?: () => void;
@@ -255,8 +248,6 @@ export class RoomSession {
     activeColliders: 0,
   };
   private lastRejection?: string;
-  private itemCount = 0;
-  private commandCounter = 0;
   private running = false;
   private lifecycle: CanvasLifecycleState = "idle";
   private lifecycleSnapshot: CanvasLifecycleSnapshot = Object.freeze({ state: "idle" });
@@ -295,7 +286,6 @@ export class RoomSession {
   };
 
   constructor(private readonly options: RoomSessionOptions) {
-    this.previewIntervalMs = 1000 / Math.max(1, options.rates?.previewHz ?? 15);
     if (!options.transport && !options.credentialProvider) {
       throw new Error("RoomSession requires a credentialProvider for WebSocket transport");
     }
@@ -313,6 +303,18 @@ export class RoomSession {
         roomId: options.roomId,
         serverUrl: options.serverUrl,
       },
+    });
+    this.durable = new DurableCommandSession({
+      definitions: options.definitions,
+      previewHz: options.rates?.previewHz,
+      context: () => ({
+        clientId: this.client.clientId,
+        userId: this.client.userId,
+        sceneRevision: this.client.sceneRevision,
+        isHost: this.client.isHost,
+        canvas: this.canvasDefinition,
+      }),
+      emit: (effect) => this.applyDurableEffect(effect),
     });
     this.wireClient();
     this.driver.onMessage((message) => this.onSimulation(message));
@@ -510,9 +512,6 @@ export class RoomSession {
   private clearTimers(): void {
     for (const timer of this.timers) clearInterval(timer);
     this.timers = [];
-    if (this.previewTimer) clearTimeout(this.previewTimer);
-    this.previewTimer = undefined;
-    this.pendingPreview = undefined;
   }
 
   private finishStop(): void {
@@ -524,6 +523,7 @@ export class RoomSession {
   private terminateResources(): void {
     if (this.terminated) return;
     this.terminated = true;
+    this.durable.destroy();
     this.finalCheckpointSent?.();
     this.finalCheckpointSent = undefined;
     this.driver.terminate();
@@ -602,6 +602,7 @@ export class RoomSession {
         case "reconnecting":
           this.connectionGeneration++;
           this.pendingJoin = undefined;
+          this.durable.resetConnection();
           this.transition("reconnecting", detail);
           break;
         case "failed":
@@ -651,7 +652,6 @@ export class RoomSession {
       this.spawnLocalAvatar();
       if (this.localAvatarId) this.hostAvatarIds.add(this.localAvatarId);
       this.syncHostAvatars();
-      this.itemCount = snapshot?.items.length ?? 0;
     });
 
     this.client.on("hostChanged", (_epoch, hostClientId, reason) => {
@@ -676,7 +676,7 @@ export class RoomSession {
       if (this.client.isHost) return;
       const avatars = new Map(state.avatars.map((avatar) => [avatar.entityId, avatar]));
       const entities = state.entities.map((serialized) => {
-        const entity = this.withItemMetadata(fromEntityState(serialized));
+        const entity = this.durable.decorate(fromEntityState(serialized));
         const avatar = avatars.get(entity.id);
         return avatar ? { ...entity, userId: avatar.userId } : entity;
       });
@@ -684,14 +684,13 @@ export class RoomSession {
       this.buffer.push(tick, entities);
       this.publishCanonicalState(tick, entities);
       this.syncCountdowns(entities, tick);
-      this.itemCount = entities.filter((entity) => entity.kind === "item").length;
       this.checkPresentationReady();
     });
 
     this.client.on("stateDelta", (delta, _epoch, tick) => {
       if (this.client.isHost) return;
       const entities = delta.entities.map((serialized) =>
-        this.withItemMetadata(fromEntityState(serialized)),
+        this.durable.decorate(fromEntityState(serialized)),
       );
       this.rememberAvatarDelta(entities, delta.removedEntityIds);
       this.buffer.pushDelta(tick, entities, delta.removedEntityIds);
@@ -750,28 +749,15 @@ export class RoomSession {
 
     this.client.on("durableAccepted", (command, _revision, itemJson) => {
       const item = itemJson as SnapshotItem | undefined;
-      if (command.kind === DurableCommandKind.DURABLE_DELETE_ITEM) {
-        this.itemMetadataById.delete(command.entityId);
-      } else if (item) {
-        this.itemMetadataById.set(item.entityId, Object.freeze({
-          definitionId: item.definitionId,
-          ownerUserId: item.ownerUserId,
-        }));
-      }
-      this.applyAcceptedCommand(command, item);
+      this.durable.accept(command, item);
     });
 
     this.client.on("durablePreview", (command) => {
-      if (!this.client.isHost) return;
-      this.applyAcceptedCommand(command);
+      this.durable.acceptPreview(command);
     });
 
     this.client.on("durableRejected", (_command, reason) => {
-      this.reportError(lifecycleError(
-        "durable_command_rejected",
-        reason,
-        { source: "durable-command", recoverable: true },
-      ));
+      this.durable.reject(reason);
     });
 
     this.client.on("error", (code, message) => {
@@ -980,7 +966,7 @@ export class RoomSession {
           `'${initialized.id}' v${initialized.version}`,
         );
       }
-      this.rememberItemMetadata(join.snapshot);
+      this.durable.loadSnapshot(join.snapshot);
       this.rememberSnapshotAvatarPositions(join.snapshot);
       this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
       this.pendingJoin = undefined;
@@ -1023,7 +1009,6 @@ export class RoomSession {
     }
     this.canvasDefinition = canvas;
     this.localAvatarId = nextAvatarId;
-    this.itemCount = snapshot.items.length;
 
     this.driver.send({
       type: "init",
@@ -1075,27 +1060,6 @@ export class RoomSession {
       if (preserveExisting && this.lastCanonicalAvatarPositions.has(avatar.entityId)) continue;
       this.lastCanonicalAvatarPositions.set(avatar.entityId, { ...avatar.position });
     }
-  }
-
-  private rememberItemMetadata(snapshot: CanvasSnapshot): void {
-    this.itemMetadataById.clear();
-    for (const item of snapshot.items) {
-      this.itemMetadataById.set(item.entityId, Object.freeze({
-        definitionId: item.definitionId,
-        ownerUserId: item.ownerUserId,
-      }));
-    }
-  }
-
-  private withItemMetadata(entity: RenderEntity): RenderEntity {
-    if (entity.kind !== "item") return entity;
-    const metadata = this.itemMetadataById.get(entity.id);
-    if (!metadata) return entity;
-    return {
-      ...entity,
-      definitionId: entity.definitionId || metadata.definitionId,
-      ownerUserId: metadata.ownerUserId,
-    };
   }
 
   private rememberFullAvatarState(entities: RenderEntity[]): void {
@@ -1428,7 +1392,6 @@ export class RoomSession {
         if (this.client.isHost) {
           this.hostEntities = message.entities;
           this.publishCanonicalState(message.tick, message.entities);
-          this.itemCount = message.entities.filter((e) => e.kind === "item").length;
           // Spec 22.1. The host is the only client that can quarantine a body.
           this.quarantinedCount = message.entities.filter((e) => e.quarantined).length;
         } else {
@@ -1482,33 +1445,7 @@ export class RoomSession {
 
   /** Spec 14.1. Every durable edit goes through the backend. */
   spawnItem(definitionId: string, at: Vec2, rotation = 0, scale = 1): void {
-    const definition = this.options.definitions.find(
-      (candidate) => candidate.definitionId === definitionId,
-    );
-    if (!definition || !this.canvasDefinition) return;
-    const config = resolveItemConfig(
-      definition as ItemDefinition<Record<string, unknown>>,
-      {
-        width: this.canvasDefinition.size.width,
-        height: this.canvasDefinition.size.height,
-        orientation: this.canvasDefinition.orientation,
-      },
-    );
-    this.client.sendDurableCommand({
-      commandId: this.nextCommandId(),
-      kind: DurableCommandKind.DURABLE_SPAWN_ITEM,
-      entityId: "",
-      definitionId,
-      definitionVersion: definition.version,
-      position: at,
-      rotation,
-      scale,
-      z: 0,
-      configJson: toJsonBytes(config),
-      preview: false,
-      isolated: false,
-      collisionsEnabled: true,
-    });
+    this.durable.spawnItem(definitionId, at, rotation, scale);
   }
 
   private checkPresentationReady(): void {
@@ -1516,7 +1453,7 @@ export class RoomSession {
     const authoritative = this.client.isHost ? this.hostEntities : this.buffer.latest();
     if (!this.client.isHost && this.buffer.latestTick === undefined) return;
     const ids = new Set(authoritative.map((entity) => entity.id));
-    for (const itemId of this.itemMetadataById.keys()) {
+    for (const itemId of this.durable.itemEntityIds) {
       if (!ids.has(itemId)) return;
     }
     for (const peer of this.latestPeers) {
@@ -1528,243 +1465,47 @@ export class RoomSession {
   }
 
   moveItem(entityId: string, transform: Transform, preview = false): void {
-    if (preview) {
-      this.queuePreview(entityId, transform);
-      return;
-    }
-    if (this.previewTimer) clearTimeout(this.previewTimer);
-    this.previewTimer = undefined;
-    this.pendingPreview = undefined;
-    this.sendMoveItem(entityId, transform, false);
-  }
-
-  private queuePreview(entityId: string, transform: Transform): void {
-    const now = Date.now();
-    const remaining = this.previewIntervalMs - (now - this.lastPreviewSentAt);
-    if (remaining <= 0) {
-      this.lastPreviewSentAt = now;
-      this.sendMoveItem(entityId, transform, true);
-      return;
-    }
-    this.pendingPreview = { entityId, transform };
-    if (this.previewTimer) return;
-    this.previewTimer = setTimeout(() => {
-      this.previewTimer = undefined;
-      const pending = this.pendingPreview;
-      this.pendingPreview = undefined;
-      if (!pending) return;
-      this.lastPreviewSentAt = Date.now();
-      this.sendMoveItem(pending.entityId, pending.transform, true);
-    }, remaining);
-  }
-
-  private sendMoveItem(entityId: string, transform: Transform, preview: boolean): void {
-    this.client.sendDurableCommand({
-      commandId: this.nextCommandId(),
-      kind: DurableCommandKind.DURABLE_MOVE_ITEM,
-      entityId,
-      definitionId: "",
-      definitionVersion: 0,
-      position: { x: transform.x, y: transform.y },
-      rotation: transform.rotation,
-      scale: transform.scale ?? 1,
-      z: transform.z ?? 0,
-      configJson: new Uint8Array(),
-      preview,
-      isolated: false,
-      collisionsEnabled: false,
-    });
+    this.durable.moveItem(entityId, transform, preview);
   }
 
   rotateItem(entityId: string, rotation: number): void {
-    this.client.sendDurableCommand({
-      commandId: this.nextCommandId(),
-      kind: DurableCommandKind.DURABLE_ROTATE_ITEM,
-      entityId,
-      definitionId: "",
-      definitionVersion: 0,
-      position: undefined,
-      rotation,
-      scale: 0,
-      z: 0,
-      configJson: new Uint8Array(),
-      preview: false,
-      isolated: false,
-      collisionsEnabled: false,
-    });
+    this.durable.rotateItem(entityId, rotation);
   }
 
   scaleItem(entityId: string, scale: number): void {
-    this.client.sendDurableCommand({
-      commandId: this.nextCommandId(),
-      kind: DurableCommandKind.DURABLE_SCALE_ITEM,
-      entityId,
-      definitionId: "",
-      definitionVersion: 0,
-      position: undefined,
-      rotation: 0,
-      scale,
-      z: 0,
-      configJson: new Uint8Array(),
-      preview: false,
-      isolated: false,
-      collisionsEnabled: false,
-    });
+    this.durable.scaleItem(entityId, scale);
   }
 
   setItemConfig(entityId: string, config: unknown): void {
-    this.client.sendDurableCommand({
-      commandId: this.nextCommandId(),
-      kind: DurableCommandKind.DURABLE_SET_CONFIG,
-      entityId,
-      definitionId: "",
-      definitionVersion: 0,
-      position: undefined,
-      rotation: 0,
-      scale: 0,
-      z: 0,
-      configJson: toJsonBytes(config),
-      preview: false,
-      isolated: false,
-      collisionsEnabled: false,
-    });
+    this.durable.setItemConfig(entityId, config);
   }
 
   setItemIsolation(entityId: string, isolated: boolean): void {
-    this.client.sendDurableCommand({
-      commandId: this.nextCommandId(),
-      kind: DurableCommandKind.DURABLE_SET_ITEM_ISOLATION,
-      entityId,
-      definitionId: "",
-      definitionVersion: 0,
-      position: undefined,
-      rotation: 0,
-      scale: 0,
-      z: 0,
-      configJson: new Uint8Array(),
-      preview: false,
-      isolated,
-      collisionsEnabled: false,
-    });
+    this.durable.setItemIsolation(entityId, isolated);
   }
 
   setItemCollisionsEnabled(entityId: string, enabled: boolean): void {
-    this.client.sendDurableCommand({
-      commandId: this.nextCommandId(),
-      kind: DurableCommandKind.DURABLE_SET_ITEM_COLLISIONS,
-      entityId,
-      definitionId: "",
-      definitionVersion: 0,
-      position: undefined,
-      rotation: 0,
-      scale: 0,
-      z: 0,
-      configJson: new Uint8Array(),
-      preview: false,
-      isolated: false,
-      collisionsEnabled: enabled,
-    });
+    this.durable.setItemCollisionsEnabled(entityId, enabled);
   }
 
   deleteItem(entityId: string): void {
-    this.client.sendDurableCommand({
-      commandId: this.nextCommandId(),
-      kind: DurableCommandKind.DURABLE_DELETE_ITEM,
-      entityId,
-      definitionId: "",
-      definitionVersion: 0,
-      position: { x: 0, y: 0 },
-      rotation: 0,
-      scale: 0,
-      z: 0,
-      configJson: new Uint8Array(),
-      preview: false,
-      isolated: false,
-      collisionsEnabled: false,
-    });
+    this.durable.deleteItem(entityId);
   }
 
-  private nextCommandId(): string {
-    return `${this.client.clientId}-${++this.commandCounter}`;
-  }
-
-  private applyAcceptedCommand(command: DurableCommand, item?: SnapshotItem): void {
-    if (!this.client.isHost) return;
-    switch (command.kind) {
-      case DurableCommandKind.DURABLE_SPAWN_ITEM:
-        this.driver.send({
-          type: "addItem",
-          instance: {
-            entityId: command.entityId,
-            canvasId: this.canvasDefinition?.id ?? "",
-            definitionId: command.definitionId,
-            definitionVersion: command.definitionVersion,
-            // The server owns the record, so its item wins over the command.
-            ownerUserId: item?.ownerUserId ?? this.client.userId,
-            transform: item?.transform ?? {
-              x: command.position?.x ?? 0,
-              y: command.position?.y ?? 0,
-              rotation: command.rotation,
-              scale: command.scale || 1,
-              z: command.z || undefined,
-            },
-            resolvedConfig:
-              item?.resolvedConfig ??
-              JSON.parse(
-                new TextDecoder().decode(command.configJson || new Uint8Array([123, 125])),
-              ),
-            createdAt: new Date().toISOString(),
-            sceneRevision: this.client.sceneRevision,
-            isolated: item?.isolated ?? command.isolated,
-            collisionsDisabled: item?.collisionsDisabled,
-          },
-        });
+  private applyDurableEffect(effect: DurableCommandEffect): void {
+    switch (effect.type) {
+      case "send":
+        this.client.sendDurableCommand(effect.command);
         break;
-      case DurableCommandKind.DURABLE_DELETE_ITEM:
-        this.driver.send({ type: "removeItem", entityId: command.entityId });
+      case "simulate":
+        this.driver.send(effect.request);
         break;
-      case DurableCommandKind.DURABLE_MOVE_ITEM:
-      case DurableCommandKind.DURABLE_ROTATE_ITEM:
-      case DurableCommandKind.DURABLE_SCALE_ITEM: {
-        const transform =
-          item?.transform ??
-          (command.kind === DurableCommandKind.DURABLE_MOVE_ITEM
-            ? {
-                x: command.position?.x ?? 0,
-                y: command.position?.y ?? 0,
-                rotation: command.rotation,
-                scale: command.scale || 1,
-                z: command.z || undefined,
-              }
-            : undefined);
-        if (!transform) break;
-        this.driver.send({
-          type: "moveItem",
-          entityId: command.entityId,
-          transform,
-          preview: command.preview,
-        });
-        break;
-      }
-      case DurableCommandKind.DURABLE_SET_CONFIG: {
-        const config = item?.resolvedConfig ?? fromJsonBytes(command.configJson);
-        if (config === undefined) break;
-        this.driver.send({ type: "setItemConfig", entityId: command.entityId, config });
-        break;
-      }
-      case DurableCommandKind.DURABLE_SET_ITEM_ISOLATION:
-        this.driver.send({
-          type: "setItemIsolation",
-          entityId: command.entityId,
-          isolated: item?.isolated ?? command.isolated,
-        });
-        break;
-      case DurableCommandKind.DURABLE_SET_ITEM_COLLISIONS:
-        this.driver.send({
-          type: "setItemCollisions",
-          entityId: command.entityId,
-          enabled: !(item?.collisionsDisabled ?? !command.collisionsEnabled),
-        });
+      case "rejected":
+        this.reportError(lifecycleError(
+          "durable_command_rejected",
+          effect.reason,
+          { source: "durable-command", recoverable: true },
+        ));
         break;
     }
   }
@@ -1827,7 +1568,7 @@ export class RoomSession {
         ? Object.freeze({ x: canonicalAvatar.x, y: canonicalAvatar.y })
         : undefined,
       sceneRevision: this.client.sceneRevision,
-      itemCount: this.itemCount,
+      itemCount: this.durable.itemCount,
       lastRejection: this.lastRejection,
       ...this.trafficRates(),
       droppedOutbound: this.client.traffic.droppedOutbound,
