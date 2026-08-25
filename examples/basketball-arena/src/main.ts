@@ -5,9 +5,12 @@ import {
   type BasketballState,
 } from "./basketball-behavior.js";
 import { basketballDefinitions } from "./basketball-content.js";
+import { resolveBasketballControlProfile } from "./control-profile.js";
+import { formatScoreboardScore } from "./scoreboard-presentation.js";
 import "./style.css";
 
 const params = new URLSearchParams(location.search);
+const controlProfile = resolveBasketballControlProfile(params);
 const serverUrl =
   import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:8085`;
 
@@ -33,6 +36,7 @@ const pointsPerBasket = document.querySelector<HTMLElement>("#points-per-basket"
 const basketResetSeconds = document.querySelector<HTMLElement>("#basket-reset-seconds")!;
 const gameResetSeconds = document.querySelector<HTMLElement>("#game-reset-seconds")!;
 const winningScore = document.querySelector<HTMLElement>("#winning-score")!;
+const controlMode = document.querySelector<HTMLElement>("#control-mode")!;
 
 const rulesMessage =
   `First to ${defaultBasketballConfig.winningScore} · baskets score ${defaultBasketballConfig.pointsPerBasket}`;
@@ -42,6 +46,7 @@ pointsPerBasket.textContent = String(defaultBasketballConfig.pointsPerBasket);
 basketResetSeconds.textContent = String(defaultBasketballConfig.basketResetSeconds);
 gameResetSeconds.textContent = String(defaultBasketballConfig.gameResetSeconds);
 winningScore.textContent = String(defaultBasketballConfig.winningScore);
+controlMode.textContent = controlProfile.description;
 
 userInput.value =
   params.get("user") ?? `baller-${Math.random().toString(36).slice(2, 6)}`;
@@ -69,8 +74,14 @@ const waitForPresentation = async (next: CanvasRuntime): Promise<void> => {
 };
 
 const renderScore = (state: Readonly<BasketballState>): void => {
-  tealScore.textContent = String(state.tealScore);
-  coralScore.textContent = String(state.coralScore);
+  for (const [element, score] of [
+    [tealScore, state.tealScore],
+    [coralScore, state.coralScore],
+  ] as const) {
+    const display = formatScoreboardScore(score);
+    element.textContent = display.text;
+    element.dataset.characters = String(display.characters);
+  }
   for (const board of scoreboards) {
     board.dataset.phase = state.phase;
     board.dataset.team = state.lastScoringTeam ?? "";
@@ -126,17 +137,7 @@ const join = async (): Promise<void> => {
           lifeMs: { min: 220, max: 620 },
         }],
       },
-      pointer: {
-        mode: "avatarDrag",
-        grabRadiusPx: 38,
-        deadZonePx: 4,
-        fullRangePx: 58,
-        flick: {
-          sampleWindowMs: 100,
-          minimumSpeedPxPerSecond: 300,
-          fullSpeedPxPerSecond: 1_300,
-        },
-      },
+      pointer: controlProfile.pointer,
       onAssetProgress: ({ loaded, total }) => {
         status.textContent = loaded === total
           ? "Arena art ready · connecting…"
@@ -175,6 +176,7 @@ const join = async (): Promise<void> => {
           if (!overlay) continue;
           overlay.style.left = `${entity.screen.x}px`;
           overlay.style.top = `${entity.screen.y}px`;
+          overlay.style.width = `${9 * snapshot.viewport.scale}px`;
           overlay.dataset.ready = String(entity.visible && entity.inViewport);
         }
       }, {

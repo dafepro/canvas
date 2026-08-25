@@ -19,8 +19,8 @@ The authoritative canvas and the system ball's resolved configuration contain
 the reusable game recipe:
 
 - court size, solid edges, player movement, spawn points, and system items;
-- direct avatar dragging, quick-flick thresholds, and canvas-owned slide
-  deceleration plus bounded facing turn speed;
+- direct avatar dragging, quick-flick thresholds, canvas-owned slide
+  deceleration, fixed visual facing, and bounded contact speed for uncapped drag;
 - definition-level mirrored hoop art plus matching backboard and rim collision;
 - circular basket sensors and team-award tags;
 - localized net damping around each hoop;
@@ -36,8 +36,11 @@ coordinates, team tags, score values, win thresholds, or delays.
 Each generated scoreboard shell is an immutable system item above its basket.
 Product-owned DOM projects replicated immutable behavior state into the item at
 60 Hz through Canvas's renderer-safe overlay seam. Canvas does not learn about
-team names or score rules. The speed-scaled avatar fire trail is likewise
-product configuration through `scene.motionTrails`, not basketball engine code.
+team names or score rules. The overlay uses one centered number aperture for
+both teams, scales two- and three-character text, and displays scores above 99
+as `99+`; the authoritative score is never truncated. The speed-scaled avatar
+fire trail is likewise product configuration through `scene.motionTrails`, not
+basketball engine code.
 
 The fullscreen button uses `CanvasRuntime.toggleFullscreen()` with the product
 shell supplied as `fullscreenElement`. Consumers own the button and layout;
@@ -46,4 +49,13 @@ host-resolved input: while held, the avatar center follows the absolute pointer
 position in one tick without a speed cap, with fixed geometry swept across the
 entire move. Release-flick thresholds live in runtime input configuration, while
 `avatarController.flickDeceleration` lives in the authoritative canvas.
-`avatarController.maxTurnSpeed` keeps direct-drag facing changes smooth.
+`avatarController.facing: "fixed"` keeps this upright character art from
+turning. `avatarController.directInteractionMaxSpeed` bounds only the contact
+velocity seen by behaviors; it does not cap how far the held avatar follows the
+pointer in a tick.
+
+Three client-side control trials use the same authoritative room physics:
+
+- default: direct pointer placement with release flick;
+- `?flick=0`: direct pointer placement that stops on release;
+- `?control=thumbstick`: continuous velocity control from an empty-court drag.

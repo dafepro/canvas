@@ -158,6 +158,8 @@ export const basketballCanvas: CanvasDefinition = {
     acceleration: 115,
     flickDeceleration: 14,
     maxTurnSpeed: 7,
+    facing: "fixed",
+    directInteractionMaxSpeed: 12,
   },
   staticGeometry: [
     {

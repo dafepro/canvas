@@ -11,7 +11,9 @@
     "maxSpeed": 19,
     "acceleration": 115,
     "flickDeceleration": 14,
-    "maxTurnSpeed": 7
+    "maxTurnSpeed": 7,
+    "facing": "fixed",
+    "directInteractionMaxSpeed": 12
   },
   "staticGeometry": [
     {

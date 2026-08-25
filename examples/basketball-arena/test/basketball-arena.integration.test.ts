@@ -34,6 +34,8 @@ import {
   basketballMirroredHoopDefinition,
   basketballTealScoreboardDefinition,
 } from "../src/basketball-content.js";
+import { resolveBasketballControlProfile } from "../src/control-profile.js";
+import { formatScoreboardScore } from "../src/scoreboard-presentation.js";
 
 const canvas = canvasJson as unknown as CanvasDefinition;
 const root = resolve(import.meta.dirname, "..");
@@ -117,7 +119,8 @@ describe("basketball arena integration", () => {
       maxSpeed: 19,
       acceleration: 115,
       flickDeceleration: 14,
-      maxTurnSpeed: 7,
+      facing: "fixed",
+      directInteractionMaxSpeed: 12,
     });
     expect(canvas.systemItems).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -128,6 +131,56 @@ describe("basketball arena integration", () => {
       expect.objectContaining({ entityId: "teal-scoreboard" }),
       expect.objectContaining({ entityId: "coral-scoreboard" }),
     ]));
+  });
+
+  it("turns direct avatar movement into a bounded basketball kick", () => {
+    const game = simulation();
+    game.addItem(ballInstance(35, 21));
+    game.addAvatar({
+      entityId: "avatar:drag-kicker",
+      clientId: "drag-kicker",
+      userId: "drag-kicker",
+      position: { x: 28, y: 21 },
+    });
+
+    game.world.setAvatarInput(
+      "avatar:drag-kicker",
+      { x: 1, y: 0 },
+      1,
+      1,
+      true,
+      { x: 31.8, y: 21 },
+    );
+    game.step();
+    expect(game.world.contacts("basketball-game-ball", "kick"))
+      .toEqual(expect.arrayContaining([expect.objectContaining({ entityId: "avatar:drag-kicker" })]));
+    expect(game.world.registry.require("avatar:drag-kicker").transform.x).toBeCloseTo(31.8, 4);
+    expect(game.world.velocity("avatar:drag-kicker")!.x).toBe(12);
+    expect((game.behaviors.slot("basketball-game-ball")!.state as BasketballState).kickCount)
+      .toBeGreaterThan(0);
+    for (let tick = 0; tick < 7; tick++) game.step();
+
+    expect((game.behaviors.slot("basketball-game-ball")!.state as BasketballState).kickCount)
+      .toBeGreaterThan(0);
+    expect(game.world.velocity("basketball-game-ball")!.x).toBeGreaterThan(1);
+    game.free();
+  });
+
+  it("keeps scoreboard text stable for future high scores", () => {
+    expect(formatScoreboardScore(0)).toEqual({ text: "0", characters: 1 });
+    expect(formatScoreboardScore(42)).toEqual({ text: "42", characters: 2 });
+    expect(formatScoreboardScore(99)).toEqual({ text: "99", characters: 2 });
+    expect(formatScoreboardScore(100)).toEqual({ text: "99+", characters: 3 });
+  });
+
+  it("offers direct, no-flick, and continuous-velocity control trials", () => {
+    expect(resolveBasketballControlProfile(new URLSearchParams()).name).toBe("direct-flick");
+    expect(resolveBasketballControlProfile(new URLSearchParams("flick=0"))).toMatchObject({
+      name: "direct-stop",
+      pointer: { mode: "avatarDrag", flick: false },
+    });
+    expect(resolveBasketballControlProfile(new URLSearchParams("control=thumbstick")))
+      .toMatchObject({ name: "thumbstick", pointer: { mode: "thumbstick", flick: false } });
   });
 
   it("scores through configured hoop geometry while physics remains live", () => {
