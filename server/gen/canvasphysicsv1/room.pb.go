@@ -146,6 +146,215 @@ func (DurableCommandKind) EnumDescriptor() ([]byte, []int) {
 	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{1}
 }
 
+// Prerelease replacement for DurableCommand. Preview is deliberately absent:
+// disposable presentation uses ItemEditPreview instead of a durable envelope.
+type ItemMutationKind int32
+
+const (
+	ItemMutationKind_ITEM_MUTATION_UNSPECIFIED ItemMutationKind = 0
+	ItemMutationKind_ITEM_MUTATION_SPAWN       ItemMutationKind = 1
+	ItemMutationKind_ITEM_MUTATION_DELETE      ItemMutationKind = 2
+	ItemMutationKind_ITEM_MUTATION_TRANSFORM   ItemMutationKind = 3
+	ItemMutationKind_ITEM_MUTATION_CONFIG      ItemMutationKind = 4
+	ItemMutationKind_ITEM_MUTATION_ISOLATION   ItemMutationKind = 5
+	ItemMutationKind_ITEM_MUTATION_COLLISIONS  ItemMutationKind = 6
+)
+
+// Enum value maps for ItemMutationKind.
+var (
+	ItemMutationKind_name = map[int32]string{
+		0: "ITEM_MUTATION_UNSPECIFIED",
+		1: "ITEM_MUTATION_SPAWN",
+		2: "ITEM_MUTATION_DELETE",
+		3: "ITEM_MUTATION_TRANSFORM",
+		4: "ITEM_MUTATION_CONFIG",
+		5: "ITEM_MUTATION_ISOLATION",
+		6: "ITEM_MUTATION_COLLISIONS",
+	}
+	ItemMutationKind_value = map[string]int32{
+		"ITEM_MUTATION_UNSPECIFIED": 0,
+		"ITEM_MUTATION_SPAWN":       1,
+		"ITEM_MUTATION_DELETE":      2,
+		"ITEM_MUTATION_TRANSFORM":   3,
+		"ITEM_MUTATION_CONFIG":      4,
+		"ITEM_MUTATION_ISOLATION":   5,
+		"ITEM_MUTATION_COLLISIONS":  6,
+	}
+)
+
+func (x ItemMutationKind) Enum() *ItemMutationKind {
+	p := new(ItemMutationKind)
+	*p = x
+	return p
+}
+
+func (x ItemMutationKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ItemMutationKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_packages_protocol_proto_room_proto_enumTypes[2].Descriptor()
+}
+
+func (ItemMutationKind) Type() protoreflect.EnumType {
+	return &file_packages_protocol_proto_room_proto_enumTypes[2]
+}
+
+func (x ItemMutationKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ItemMutationKind.Descriptor instead.
+func (ItemMutationKind) EnumDescriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{2}
+}
+
+type ItemMutationRejectCode int32
+
+const (
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_UNSPECIFIED         ItemMutationRejectCode = 0
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_MALFORMED           ItemMutationRejectCode = 1
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_NOT_FOUND           ItemMutationRejectCode = 2
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_SYSTEM_OWNED        ItemMutationRejectCode = 3
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_NOT_OWNER           ItemMutationRejectCode = 4
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_EDIT_IN_USE         ItemMutationRejectCode = 5
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_EDIT_EXPIRED        ItemMutationRejectCode = 6
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_STALE_ITEM_REVISION ItemMutationRejectCode = 7
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_OUTSIDE_CANVAS      ItemMutationRejectCode = 8
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE  ItemMutationRejectCode = 9
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_DEFINITION          ItemMutationRejectCode = 10
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_CONFIG              ItemMutationRejectCode = 11
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_CAPACITY            ItemMutationRejectCode = 12
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_RECEIPT_EXPIRED     ItemMutationRejectCode = 13
+	ItemMutationRejectCode_ITEM_MUTATION_REJECT_INTERNAL            ItemMutationRejectCode = 14
+)
+
+// Enum value maps for ItemMutationRejectCode.
+var (
+	ItemMutationRejectCode_name = map[int32]string{
+		0:  "ITEM_MUTATION_REJECT_UNSPECIFIED",
+		1:  "ITEM_MUTATION_REJECT_MALFORMED",
+		2:  "ITEM_MUTATION_REJECT_NOT_FOUND",
+		3:  "ITEM_MUTATION_REJECT_SYSTEM_OWNED",
+		4:  "ITEM_MUTATION_REJECT_NOT_OWNER",
+		5:  "ITEM_MUTATION_REJECT_EDIT_IN_USE",
+		6:  "ITEM_MUTATION_REJECT_EDIT_EXPIRED",
+		7:  "ITEM_MUTATION_REJECT_STALE_ITEM_REVISION",
+		8:  "ITEM_MUTATION_REJECT_OUTSIDE_CANVAS",
+		9:  "ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE",
+		10: "ITEM_MUTATION_REJECT_DEFINITION",
+		11: "ITEM_MUTATION_REJECT_CONFIG",
+		12: "ITEM_MUTATION_REJECT_CAPACITY",
+		13: "ITEM_MUTATION_REJECT_RECEIPT_EXPIRED",
+		14: "ITEM_MUTATION_REJECT_INTERNAL",
+	}
+	ItemMutationRejectCode_value = map[string]int32{
+		"ITEM_MUTATION_REJECT_UNSPECIFIED":         0,
+		"ITEM_MUTATION_REJECT_MALFORMED":           1,
+		"ITEM_MUTATION_REJECT_NOT_FOUND":           2,
+		"ITEM_MUTATION_REJECT_SYSTEM_OWNED":        3,
+		"ITEM_MUTATION_REJECT_NOT_OWNER":           4,
+		"ITEM_MUTATION_REJECT_EDIT_IN_USE":         5,
+		"ITEM_MUTATION_REJECT_EDIT_EXPIRED":        6,
+		"ITEM_MUTATION_REJECT_STALE_ITEM_REVISION": 7,
+		"ITEM_MUTATION_REJECT_OUTSIDE_CANVAS":      8,
+		"ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE":  9,
+		"ITEM_MUTATION_REJECT_DEFINITION":          10,
+		"ITEM_MUTATION_REJECT_CONFIG":              11,
+		"ITEM_MUTATION_REJECT_CAPACITY":            12,
+		"ITEM_MUTATION_REJECT_RECEIPT_EXPIRED":     13,
+		"ITEM_MUTATION_REJECT_INTERNAL":            14,
+	}
+)
+
+func (x ItemMutationRejectCode) Enum() *ItemMutationRejectCode {
+	p := new(ItemMutationRejectCode)
+	*p = x
+	return p
+}
+
+func (x ItemMutationRejectCode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ItemMutationRejectCode) Descriptor() protoreflect.EnumDescriptor {
+	return file_packages_protocol_proto_room_proto_enumTypes[3].Descriptor()
+}
+
+func (ItemMutationRejectCode) Type() protoreflect.EnumType {
+	return &file_packages_protocol_proto_room_proto_enumTypes[3]
+}
+
+func (x ItemMutationRejectCode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ItemMutationRejectCode.Descriptor instead.
+func (ItemMutationRejectCode) EnumDescriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{3}
+}
+
+type ItemEditSessionStatus int32
+
+const (
+	ItemEditSessionStatus_ITEM_EDIT_SESSION_UNSPECIFIED ItemEditSessionStatus = 0
+	ItemEditSessionStatus_ITEM_EDIT_SESSION_ACTIVE      ItemEditSessionStatus = 1
+	ItemEditSessionStatus_ITEM_EDIT_SESSION_RENEWED     ItemEditSessionStatus = 2
+	ItemEditSessionStatus_ITEM_EDIT_SESSION_ENDED       ItemEditSessionStatus = 3
+	ItemEditSessionStatus_ITEM_EDIT_SESSION_REJECTED    ItemEditSessionStatus = 4
+	ItemEditSessionStatus_ITEM_EDIT_SESSION_EXPIRED     ItemEditSessionStatus = 5
+	ItemEditSessionStatus_ITEM_EDIT_SESSION_SUPERSEDED  ItemEditSessionStatus = 6
+)
+
+// Enum value maps for ItemEditSessionStatus.
+var (
+	ItemEditSessionStatus_name = map[int32]string{
+		0: "ITEM_EDIT_SESSION_UNSPECIFIED",
+		1: "ITEM_EDIT_SESSION_ACTIVE",
+		2: "ITEM_EDIT_SESSION_RENEWED",
+		3: "ITEM_EDIT_SESSION_ENDED",
+		4: "ITEM_EDIT_SESSION_REJECTED",
+		5: "ITEM_EDIT_SESSION_EXPIRED",
+		6: "ITEM_EDIT_SESSION_SUPERSEDED",
+	}
+	ItemEditSessionStatus_value = map[string]int32{
+		"ITEM_EDIT_SESSION_UNSPECIFIED": 0,
+		"ITEM_EDIT_SESSION_ACTIVE":      1,
+		"ITEM_EDIT_SESSION_RENEWED":     2,
+		"ITEM_EDIT_SESSION_ENDED":       3,
+		"ITEM_EDIT_SESSION_REJECTED":    4,
+		"ITEM_EDIT_SESSION_EXPIRED":     5,
+		"ITEM_EDIT_SESSION_SUPERSEDED":  6,
+	}
+)
+
+func (x ItemEditSessionStatus) Enum() *ItemEditSessionStatus {
+	p := new(ItemEditSessionStatus)
+	*p = x
+	return p
+}
+
+func (x ItemEditSessionStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ItemEditSessionStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_packages_protocol_proto_room_proto_enumTypes[4].Descriptor()
+}
+
+func (ItemEditSessionStatus) Type() protoreflect.EnumType {
+	return &file_packages_protocol_proto_room_proto_enumTypes[4]
+}
+
+func (x ItemEditSessionStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ItemEditSessionStatus.Descriptor instead.
+func (ItemEditSessionStatus) EnumDescriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{4}
+}
+
 // Spec 12.3. One envelope carries every realtime message. Peers drop an
 // envelope whose host_epoch is older than the epoch they know.
 type RoomEnvelope struct {
@@ -171,6 +380,13 @@ type RoomEnvelope struct {
 	//	*RoomEnvelope_Checkpoint
 	//	*RoomEnvelope_Heartbeat
 	//	*RoomEnvelope_Error
+	//	*RoomEnvelope_ItemMutation
+	//	*RoomEnvelope_ItemMutationResult
+	//	*RoomEnvelope_BeginItemEdit
+	//	*RoomEnvelope_ItemEditSessionResult
+	//	*RoomEnvelope_RenewItemEdit
+	//	*RoomEnvelope_EndItemEdit
+	//	*RoomEnvelope_ItemEditPreview
 	Payload       isRoomEnvelope_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -365,6 +581,69 @@ func (x *RoomEnvelope) GetError() *ProtocolError {
 	return nil
 }
 
+func (x *RoomEnvelope) GetItemMutation() *ItemMutation {
+	if x != nil {
+		if x, ok := x.Payload.(*RoomEnvelope_ItemMutation); ok {
+			return x.ItemMutation
+		}
+	}
+	return nil
+}
+
+func (x *RoomEnvelope) GetItemMutationResult() *ItemMutationResult {
+	if x != nil {
+		if x, ok := x.Payload.(*RoomEnvelope_ItemMutationResult); ok {
+			return x.ItemMutationResult
+		}
+	}
+	return nil
+}
+
+func (x *RoomEnvelope) GetBeginItemEdit() *BeginItemEdit {
+	if x != nil {
+		if x, ok := x.Payload.(*RoomEnvelope_BeginItemEdit); ok {
+			return x.BeginItemEdit
+		}
+	}
+	return nil
+}
+
+func (x *RoomEnvelope) GetItemEditSessionResult() *ItemEditSessionResult {
+	if x != nil {
+		if x, ok := x.Payload.(*RoomEnvelope_ItemEditSessionResult); ok {
+			return x.ItemEditSessionResult
+		}
+	}
+	return nil
+}
+
+func (x *RoomEnvelope) GetRenewItemEdit() *RenewItemEdit {
+	if x != nil {
+		if x, ok := x.Payload.(*RoomEnvelope_RenewItemEdit); ok {
+			return x.RenewItemEdit
+		}
+	}
+	return nil
+}
+
+func (x *RoomEnvelope) GetEndItemEdit() *EndItemEdit {
+	if x != nil {
+		if x, ok := x.Payload.(*RoomEnvelope_EndItemEdit); ok {
+			return x.EndItemEdit
+		}
+	}
+	return nil
+}
+
+func (x *RoomEnvelope) GetItemEditPreview() *ItemEditPreview {
+	if x != nil {
+		if x, ok := x.Payload.(*RoomEnvelope_ItemEditPreview); ok {
+			return x.ItemEditPreview
+		}
+	}
+	return nil
+}
+
 type isRoomEnvelope_Payload interface {
 	isRoomEnvelope_Payload()
 }
@@ -421,6 +700,34 @@ type RoomEnvelope_Error struct {
 	Error *ProtocolError `protobuf:"bytes,22,opt,name=error,proto3,oneof"`
 }
 
+type RoomEnvelope_ItemMutation struct {
+	ItemMutation *ItemMutation `protobuf:"bytes,23,opt,name=item_mutation,json=itemMutation,proto3,oneof"`
+}
+
+type RoomEnvelope_ItemMutationResult struct {
+	ItemMutationResult *ItemMutationResult `protobuf:"bytes,24,opt,name=item_mutation_result,json=itemMutationResult,proto3,oneof"`
+}
+
+type RoomEnvelope_BeginItemEdit struct {
+	BeginItemEdit *BeginItemEdit `protobuf:"bytes,25,opt,name=begin_item_edit,json=beginItemEdit,proto3,oneof"`
+}
+
+type RoomEnvelope_ItemEditSessionResult struct {
+	ItemEditSessionResult *ItemEditSessionResult `protobuf:"bytes,26,opt,name=item_edit_session_result,json=itemEditSessionResult,proto3,oneof"`
+}
+
+type RoomEnvelope_RenewItemEdit struct {
+	RenewItemEdit *RenewItemEdit `protobuf:"bytes,27,opt,name=renew_item_edit,json=renewItemEdit,proto3,oneof"`
+}
+
+type RoomEnvelope_EndItemEdit struct {
+	EndItemEdit *EndItemEdit `protobuf:"bytes,28,opt,name=end_item_edit,json=endItemEdit,proto3,oneof"`
+}
+
+type RoomEnvelope_ItemEditPreview struct {
+	ItemEditPreview *ItemEditPreview `protobuf:"bytes,29,opt,name=item_edit_preview,json=itemEditPreview,proto3,oneof"`
+}
+
 func (*RoomEnvelope_Join) isRoomEnvelope_Payload() {}
 
 func (*RoomEnvelope_JoinAccepted) isRoomEnvelope_Payload() {}
@@ -446,6 +753,20 @@ func (*RoomEnvelope_Checkpoint) isRoomEnvelope_Payload() {}
 func (*RoomEnvelope_Heartbeat) isRoomEnvelope_Payload() {}
 
 func (*RoomEnvelope_Error) isRoomEnvelope_Payload() {}
+
+func (*RoomEnvelope_ItemMutation) isRoomEnvelope_Payload() {}
+
+func (*RoomEnvelope_ItemMutationResult) isRoomEnvelope_Payload() {}
+
+func (*RoomEnvelope_BeginItemEdit) isRoomEnvelope_Payload() {}
+
+func (*RoomEnvelope_ItemEditSessionResult) isRoomEnvelope_Payload() {}
+
+func (*RoomEnvelope_RenewItemEdit) isRoomEnvelope_Payload() {}
+
+func (*RoomEnvelope_EndItemEdit) isRoomEnvelope_Payload() {}
+
+func (*RoomEnvelope_ItemEditPreview) isRoomEnvelope_Payload() {}
 
 type Vec2 struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1906,6 +2227,707 @@ func (x *DurableCommandResult) GetCommand() *DurableCommand {
 	return nil
 }
 
+type ItemMutation struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	ClientSessionId      string                 `protobuf:"bytes,1,opt,name=client_session_id,json=clientSessionId,proto3" json:"client_session_id,omitempty"`
+	MutationId           uint64                 `protobuf:"varint,2,opt,name=mutation_id,json=mutationId,proto3" json:"mutation_id,omitempty"`
+	EditSessionId        string                 `protobuf:"bytes,3,opt,name=edit_session_id,json=editSessionId,proto3" json:"edit_session_id,omitempty"`
+	ExpectedItemRevision uint64                 `protobuf:"varint,4,opt,name=expected_item_revision,json=expectedItemRevision,proto3" json:"expected_item_revision,omitempty"`
+	Kind                 ItemMutationKind       `protobuf:"varint,5,opt,name=kind,proto3,enum=canvasphysics.v1.ItemMutationKind" json:"kind,omitempty"`
+	EntityId             string                 `protobuf:"bytes,6,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	DefinitionId         string                 `protobuf:"bytes,7,opt,name=definition_id,json=definitionId,proto3" json:"definition_id,omitempty"`
+	DefinitionVersion    uint32                 `protobuf:"varint,8,opt,name=definition_version,json=definitionVersion,proto3" json:"definition_version,omitempty"`
+	Position             *Vec2                  `protobuf:"bytes,9,opt,name=position,proto3" json:"position,omitempty"`
+	Rotation             float32                `protobuf:"fixed32,10,opt,name=rotation,proto3" json:"rotation,omitempty"`
+	Z                    float32                `protobuf:"fixed32,11,opt,name=z,proto3" json:"z,omitempty"`
+	Scale                float32                `protobuf:"fixed32,12,opt,name=scale,proto3" json:"scale,omitempty"`
+	ConfigJson           []byte                 `protobuf:"bytes,13,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"`
+	Isolated             bool                   `protobuf:"varint,14,opt,name=isolated,proto3" json:"isolated,omitempty"`
+	CollisionsEnabled    bool                   `protobuf:"varint,15,opt,name=collisions_enabled,json=collisionsEnabled,proto3" json:"collisions_enabled,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ItemMutation) Reset() {
+	*x = ItemMutation{}
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemMutation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemMutation) ProtoMessage() {}
+
+func (x *ItemMutation) ProtoReflect() protoreflect.Message {
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemMutation.ProtoReflect.Descriptor instead.
+func (*ItemMutation) Descriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ItemMutation) GetClientSessionId() string {
+	if x != nil {
+		return x.ClientSessionId
+	}
+	return ""
+}
+
+func (x *ItemMutation) GetMutationId() uint64 {
+	if x != nil {
+		return x.MutationId
+	}
+	return 0
+}
+
+func (x *ItemMutation) GetEditSessionId() string {
+	if x != nil {
+		return x.EditSessionId
+	}
+	return ""
+}
+
+func (x *ItemMutation) GetExpectedItemRevision() uint64 {
+	if x != nil {
+		return x.ExpectedItemRevision
+	}
+	return 0
+}
+
+func (x *ItemMutation) GetKind() ItemMutationKind {
+	if x != nil {
+		return x.Kind
+	}
+	return ItemMutationKind_ITEM_MUTATION_UNSPECIFIED
+}
+
+func (x *ItemMutation) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+func (x *ItemMutation) GetDefinitionId() string {
+	if x != nil {
+		return x.DefinitionId
+	}
+	return ""
+}
+
+func (x *ItemMutation) GetDefinitionVersion() uint32 {
+	if x != nil {
+		return x.DefinitionVersion
+	}
+	return 0
+}
+
+func (x *ItemMutation) GetPosition() *Vec2 {
+	if x != nil {
+		return x.Position
+	}
+	return nil
+}
+
+func (x *ItemMutation) GetRotation() float32 {
+	if x != nil {
+		return x.Rotation
+	}
+	return 0
+}
+
+func (x *ItemMutation) GetZ() float32 {
+	if x != nil {
+		return x.Z
+	}
+	return 0
+}
+
+func (x *ItemMutation) GetScale() float32 {
+	if x != nil {
+		return x.Scale
+	}
+	return 0
+}
+
+func (x *ItemMutation) GetConfigJson() []byte {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return nil
+}
+
+func (x *ItemMutation) GetIsolated() bool {
+	if x != nil {
+		return x.Isolated
+	}
+	return false
+}
+
+func (x *ItemMutation) GetCollisionsEnabled() bool {
+	if x != nil {
+		return x.CollisionsEnabled
+	}
+	return false
+}
+
+type ItemMutationResult struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ClientSessionId  string                 `protobuf:"bytes,1,opt,name=client_session_id,json=clientSessionId,proto3" json:"client_session_id,omitempty"`
+	MutationId       uint64                 `protobuf:"varint,2,opt,name=mutation_id,json=mutationId,proto3" json:"mutation_id,omitempty"`
+	EditSessionId    string                 `protobuf:"bytes,3,opt,name=edit_session_id,json=editSessionId,proto3" json:"edit_session_id,omitempty"`
+	Accepted         bool                   `protobuf:"varint,4,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	RejectCode       ItemMutationRejectCode `protobuf:"varint,5,opt,name=reject_code,json=rejectCode,proto3,enum=canvasphysics.v1.ItemMutationRejectCode" json:"reject_code,omitempty"`
+	Message          string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	SceneRevision    uint64                 `protobuf:"varint,7,opt,name=scene_revision,json=sceneRevision,proto3" json:"scene_revision,omitempty"`
+	ItemRevision     uint64                 `protobuf:"varint,8,opt,name=item_revision,json=itemRevision,proto3" json:"item_revision,omitempty"`
+	ItemInstanceJson []byte                 `protobuf:"bytes,9,opt,name=item_instance_json,json=itemInstanceJson,proto3" json:"item_instance_json,omitempty"`
+	DeletedEntityId  string                 `protobuf:"bytes,10,opt,name=deleted_entity_id,json=deletedEntityId,proto3" json:"deleted_entity_id,omitempty"`
+	Kind             ItemMutationKind       `protobuf:"varint,11,opt,name=kind,proto3,enum=canvasphysics.v1.ItemMutationKind" json:"kind,omitempty"`
+	EntityId         string                 `protobuf:"bytes,12,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ItemMutationResult) Reset() {
+	*x = ItemMutationResult{}
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemMutationResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemMutationResult) ProtoMessage() {}
+
+func (x *ItemMutationResult) ProtoReflect() protoreflect.Message {
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemMutationResult.ProtoReflect.Descriptor instead.
+func (*ItemMutationResult) Descriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ItemMutationResult) GetClientSessionId() string {
+	if x != nil {
+		return x.ClientSessionId
+	}
+	return ""
+}
+
+func (x *ItemMutationResult) GetMutationId() uint64 {
+	if x != nil {
+		return x.MutationId
+	}
+	return 0
+}
+
+func (x *ItemMutationResult) GetEditSessionId() string {
+	if x != nil {
+		return x.EditSessionId
+	}
+	return ""
+}
+
+func (x *ItemMutationResult) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *ItemMutationResult) GetRejectCode() ItemMutationRejectCode {
+	if x != nil {
+		return x.RejectCode
+	}
+	return ItemMutationRejectCode_ITEM_MUTATION_REJECT_UNSPECIFIED
+}
+
+func (x *ItemMutationResult) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ItemMutationResult) GetSceneRevision() uint64 {
+	if x != nil {
+		return x.SceneRevision
+	}
+	return 0
+}
+
+func (x *ItemMutationResult) GetItemRevision() uint64 {
+	if x != nil {
+		return x.ItemRevision
+	}
+	return 0
+}
+
+func (x *ItemMutationResult) GetItemInstanceJson() []byte {
+	if x != nil {
+		return x.ItemInstanceJson
+	}
+	return nil
+}
+
+func (x *ItemMutationResult) GetDeletedEntityId() string {
+	if x != nil {
+		return x.DeletedEntityId
+	}
+	return ""
+}
+
+func (x *ItemMutationResult) GetKind() ItemMutationKind {
+	if x != nil {
+		return x.Kind
+	}
+	return ItemMutationKind_ITEM_MUTATION_UNSPECIFIED
+}
+
+func (x *ItemMutationResult) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+type BeginItemEdit struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	ClientSessionId      string                 `protobuf:"bytes,1,opt,name=client_session_id,json=clientSessionId,proto3" json:"client_session_id,omitempty"`
+	EditSessionId        string                 `protobuf:"bytes,2,opt,name=edit_session_id,json=editSessionId,proto3" json:"edit_session_id,omitempty"`
+	EntityId             string                 `protobuf:"bytes,3,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	ObservedItemRevision uint64                 `protobuf:"varint,4,opt,name=observed_item_revision,json=observedItemRevision,proto3" json:"observed_item_revision,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *BeginItemEdit) Reset() {
+	*x = BeginItemEdit{}
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginItemEdit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginItemEdit) ProtoMessage() {}
+
+func (x *BeginItemEdit) ProtoReflect() protoreflect.Message {
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginItemEdit.ProtoReflect.Descriptor instead.
+func (*BeginItemEdit) Descriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *BeginItemEdit) GetClientSessionId() string {
+	if x != nil {
+		return x.ClientSessionId
+	}
+	return ""
+}
+
+func (x *BeginItemEdit) GetEditSessionId() string {
+	if x != nil {
+		return x.EditSessionId
+	}
+	return ""
+}
+
+func (x *BeginItemEdit) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+func (x *BeginItemEdit) GetObservedItemRevision() uint64 {
+	if x != nil {
+		return x.ObservedItemRevision
+	}
+	return 0
+}
+
+type RenewItemEdit struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ClientSessionId string                 `protobuf:"bytes,1,opt,name=client_session_id,json=clientSessionId,proto3" json:"client_session_id,omitempty"`
+	EditSessionId   string                 `protobuf:"bytes,2,opt,name=edit_session_id,json=editSessionId,proto3" json:"edit_session_id,omitempty"`
+	EntityId        string                 `protobuf:"bytes,3,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RenewItemEdit) Reset() {
+	*x = RenewItemEdit{}
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenewItemEdit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenewItemEdit) ProtoMessage() {}
+
+func (x *RenewItemEdit) ProtoReflect() protoreflect.Message {
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenewItemEdit.ProtoReflect.Descriptor instead.
+func (*RenewItemEdit) Descriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RenewItemEdit) GetClientSessionId() string {
+	if x != nil {
+		return x.ClientSessionId
+	}
+	return ""
+}
+
+func (x *RenewItemEdit) GetEditSessionId() string {
+	if x != nil {
+		return x.EditSessionId
+	}
+	return ""
+}
+
+func (x *RenewItemEdit) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+type EndItemEdit struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ClientSessionId string                 `protobuf:"bytes,1,opt,name=client_session_id,json=clientSessionId,proto3" json:"client_session_id,omitempty"`
+	EditSessionId   string                 `protobuf:"bytes,2,opt,name=edit_session_id,json=editSessionId,proto3" json:"edit_session_id,omitempty"`
+	EntityId        string                 `protobuf:"bytes,3,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	Cancel          bool                   `protobuf:"varint,4,opt,name=cancel,proto3" json:"cancel,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *EndItemEdit) Reset() {
+	*x = EndItemEdit{}
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndItemEdit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndItemEdit) ProtoMessage() {}
+
+func (x *EndItemEdit) ProtoReflect() protoreflect.Message {
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndItemEdit.ProtoReflect.Descriptor instead.
+func (*EndItemEdit) Descriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *EndItemEdit) GetClientSessionId() string {
+	if x != nil {
+		return x.ClientSessionId
+	}
+	return ""
+}
+
+func (x *EndItemEdit) GetEditSessionId() string {
+	if x != nil {
+		return x.EditSessionId
+	}
+	return ""
+}
+
+func (x *EndItemEdit) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+func (x *EndItemEdit) GetCancel() bool {
+	if x != nil {
+		return x.Cancel
+	}
+	return false
+}
+
+type ItemEditSessionResult struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	ClientSessionId      string                 `protobuf:"bytes,1,opt,name=client_session_id,json=clientSessionId,proto3" json:"client_session_id,omitempty"`
+	EditSessionId        string                 `protobuf:"bytes,2,opt,name=edit_session_id,json=editSessionId,proto3" json:"edit_session_id,omitempty"`
+	EntityId             string                 `protobuf:"bytes,3,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	Status               ItemEditSessionStatus  `protobuf:"varint,4,opt,name=status,proto3,enum=canvasphysics.v1.ItemEditSessionStatus" json:"status,omitempty"`
+	RejectCode           ItemMutationRejectCode `protobuf:"varint,5,opt,name=reject_code,json=rejectCode,proto3,enum=canvasphysics.v1.ItemMutationRejectCode" json:"reject_code,omitempty"`
+	Message              string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	ItemRevision         uint64                 `protobuf:"varint,7,opt,name=item_revision,json=itemRevision,proto3" json:"item_revision,omitempty"`
+	LeaseExpiresAtUnixMs uint64                 `protobuf:"varint,8,opt,name=lease_expires_at_unix_ms,json=leaseExpiresAtUnixMs,proto3" json:"lease_expires_at_unix_ms,omitempty"`
+	ItemInstanceJson     []byte                 `protobuf:"bytes,9,opt,name=item_instance_json,json=itemInstanceJson,proto3" json:"item_instance_json,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ItemEditSessionResult) Reset() {
+	*x = ItemEditSessionResult{}
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemEditSessionResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemEditSessionResult) ProtoMessage() {}
+
+func (x *ItemEditSessionResult) ProtoReflect() protoreflect.Message {
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemEditSessionResult.ProtoReflect.Descriptor instead.
+func (*ItemEditSessionResult) Descriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ItemEditSessionResult) GetClientSessionId() string {
+	if x != nil {
+		return x.ClientSessionId
+	}
+	return ""
+}
+
+func (x *ItemEditSessionResult) GetEditSessionId() string {
+	if x != nil {
+		return x.EditSessionId
+	}
+	return ""
+}
+
+func (x *ItemEditSessionResult) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+func (x *ItemEditSessionResult) GetStatus() ItemEditSessionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ItemEditSessionStatus_ITEM_EDIT_SESSION_UNSPECIFIED
+}
+
+func (x *ItemEditSessionResult) GetRejectCode() ItemMutationRejectCode {
+	if x != nil {
+		return x.RejectCode
+	}
+	return ItemMutationRejectCode_ITEM_MUTATION_REJECT_UNSPECIFIED
+}
+
+func (x *ItemEditSessionResult) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ItemEditSessionResult) GetItemRevision() uint64 {
+	if x != nil {
+		return x.ItemRevision
+	}
+	return 0
+}
+
+func (x *ItemEditSessionResult) GetLeaseExpiresAtUnixMs() uint64 {
+	if x != nil {
+		return x.LeaseExpiresAtUnixMs
+	}
+	return 0
+}
+
+func (x *ItemEditSessionResult) GetItemInstanceJson() []byte {
+	if x != nil {
+		return x.ItemInstanceJson
+	}
+	return nil
+}
+
+type ItemEditPreview struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ClientSessionId string                 `protobuf:"bytes,1,opt,name=client_session_id,json=clientSessionId,proto3" json:"client_session_id,omitempty"`
+	EditSessionId   string                 `protobuf:"bytes,2,opt,name=edit_session_id,json=editSessionId,proto3" json:"edit_session_id,omitempty"`
+	EntityId        string                 `protobuf:"bytes,3,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	PreviewSequence uint64                 `protobuf:"varint,4,opt,name=preview_sequence,json=previewSequence,proto3" json:"preview_sequence,omitempty"`
+	Position        *Vec2                  `protobuf:"bytes,5,opt,name=position,proto3" json:"position,omitempty"`
+	Rotation        float32                `protobuf:"fixed32,6,opt,name=rotation,proto3" json:"rotation,omitempty"`
+	Z               float32                `protobuf:"fixed32,7,opt,name=z,proto3" json:"z,omitempty"`
+	Scale           float32                `protobuf:"fixed32,8,opt,name=scale,proto3" json:"scale,omitempty"`
+	// Server-authored final sample that restores the committed transform.
+	Revert        bool `protobuf:"varint,9,opt,name=revert,proto3" json:"revert,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItemEditPreview) Reset() {
+	*x = ItemEditPreview{}
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemEditPreview) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemEditPreview) ProtoMessage() {}
+
+func (x *ItemEditPreview) ProtoReflect() protoreflect.Message {
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemEditPreview.ProtoReflect.Descriptor instead.
+func (*ItemEditPreview) Descriptor() ([]byte, []int) {
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ItemEditPreview) GetClientSessionId() string {
+	if x != nil {
+		return x.ClientSessionId
+	}
+	return ""
+}
+
+func (x *ItemEditPreview) GetEditSessionId() string {
+	if x != nil {
+		return x.EditSessionId
+	}
+	return ""
+}
+
+func (x *ItemEditPreview) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+func (x *ItemEditPreview) GetPreviewSequence() uint64 {
+	if x != nil {
+		return x.PreviewSequence
+	}
+	return 0
+}
+
+func (x *ItemEditPreview) GetPosition() *Vec2 {
+	if x != nil {
+		return x.Position
+	}
+	return nil
+}
+
+func (x *ItemEditPreview) GetRotation() float32 {
+	if x != nil {
+		return x.Rotation
+	}
+	return 0
+}
+
+func (x *ItemEditPreview) GetZ() float32 {
+	if x != nil {
+		return x.Z
+	}
+	return 0
+}
+
+func (x *ItemEditPreview) GetScale() float32 {
+	if x != nil {
+		return x.Scale
+	}
+	return 0
+}
+
+func (x *ItemEditPreview) GetRevert() bool {
+	if x != nil {
+		return x.Revert
+	}
+	return false
+}
+
 type Checkpoint struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	CheckpointRevision uint64                 `protobuf:"varint,1,opt,name=checkpoint_revision,json=checkpointRevision,proto3" json:"checkpoint_revision,omitempty"`
@@ -1918,7 +2940,7 @@ type Checkpoint struct {
 
 func (x *Checkpoint) Reset() {
 	*x = Checkpoint{}
-	mi := &file_packages_protocol_proto_room_proto_msgTypes[18]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1930,7 +2952,7 @@ func (x *Checkpoint) String() string {
 func (*Checkpoint) ProtoMessage() {}
 
 func (x *Checkpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_packages_protocol_proto_room_proto_msgTypes[18]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1943,7 +2965,7 @@ func (x *Checkpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Checkpoint.ProtoReflect.Descriptor instead.
 func (*Checkpoint) Descriptor() ([]byte, []int) {
-	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{18}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *Checkpoint) GetCheckpointRevision() uint64 {
@@ -1985,7 +3007,7 @@ type ProtocolError struct {
 
 func (x *ProtocolError) Reset() {
 	*x = ProtocolError{}
-	mi := &file_packages_protocol_proto_room_proto_msgTypes[19]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1997,7 +3019,7 @@ func (x *ProtocolError) String() string {
 func (*ProtocolError) ProtoMessage() {}
 
 func (x *ProtocolError) ProtoReflect() protoreflect.Message {
-	mi := &file_packages_protocol_proto_room_proto_msgTypes[19]
+	mi := &file_packages_protocol_proto_room_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2010,7 +3032,7 @@ func (x *ProtocolError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProtocolError.ProtoReflect.Descriptor instead.
 func (*ProtocolError) Descriptor() ([]byte, []int) {
-	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{19}
+	return file_packages_protocol_proto_room_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ProtocolError) GetCode() string {
@@ -2038,7 +3060,7 @@ var File_packages_protocol_proto_room_proto protoreflect.FileDescriptor
 
 const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"\n" +
-	"\"packages/protocol/proto/room.proto\x12\x10canvasphysics.v1\"\xf9\a\n" +
+	"\"packages/protocol/proto/room.proto\x12\x10canvasphysics.v1\"\xaa\f\n" +
 	"\fRoomEnvelope\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
@@ -2063,7 +3085,14 @@ const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"checkpoint\x18\x14 \x01(\v2\x1c.canvasphysics.v1.CheckpointH\x00R\n" +
 	"checkpoint\x12;\n" +
 	"\theartbeat\x18\x15 \x01(\v2\x1b.canvasphysics.v1.HeartbeatH\x00R\theartbeat\x127\n" +
-	"\x05error\x18\x16 \x01(\v2\x1f.canvasphysics.v1.ProtocolErrorH\x00R\x05errorB\t\n" +
+	"\x05error\x18\x16 \x01(\v2\x1f.canvasphysics.v1.ProtocolErrorH\x00R\x05error\x12E\n" +
+	"\ritem_mutation\x18\x17 \x01(\v2\x1e.canvasphysics.v1.ItemMutationH\x00R\fitemMutation\x12X\n" +
+	"\x14item_mutation_result\x18\x18 \x01(\v2$.canvasphysics.v1.ItemMutationResultH\x00R\x12itemMutationResult\x12I\n" +
+	"\x0fbegin_item_edit\x18\x19 \x01(\v2\x1f.canvasphysics.v1.BeginItemEditH\x00R\rbeginItemEdit\x12b\n" +
+	"\x18item_edit_session_result\x18\x1a \x01(\v2'.canvasphysics.v1.ItemEditSessionResultH\x00R\x15itemEditSessionResult\x12I\n" +
+	"\x0frenew_item_edit\x18\x1b \x01(\v2\x1f.canvasphysics.v1.RenewItemEditH\x00R\rrenewItemEdit\x12C\n" +
+	"\rend_item_edit\x18\x1c \x01(\v2\x1d.canvasphysics.v1.EndItemEditH\x00R\vendItemEdit\x12O\n" +
+	"\x11item_edit_preview\x18\x1d \x01(\v2!.canvasphysics.v1.ItemEditPreviewH\x00R\x0fitemEditPreviewB\t\n" +
 	"\apayload\"\"\n" +
 	"\x04Vec2\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
@@ -2197,7 +3226,77 @@ const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"\rreject_reason\x18\x03 \x01(\tR\frejectReason\x12%\n" +
 	"\x0escene_revision\x18\x04 \x01(\x04R\rsceneRevision\x12,\n" +
 	"\x12item_instance_json\x18\x05 \x01(\fR\x10itemInstanceJson\x12:\n" +
-	"\acommand\x18\x06 \x01(\v2 .canvasphysics.v1.DurableCommandR\acommand\"\x8c\x01\n" +
+	"\acommand\x18\x06 \x01(\v2 .canvasphysics.v1.DurableCommandR\acommand\"\xc2\x04\n" +
+	"\fItemMutation\x12*\n" +
+	"\x11client_session_id\x18\x01 \x01(\tR\x0fclientSessionId\x12\x1f\n" +
+	"\vmutation_id\x18\x02 \x01(\x04R\n" +
+	"mutationId\x12&\n" +
+	"\x0fedit_session_id\x18\x03 \x01(\tR\reditSessionId\x124\n" +
+	"\x16expected_item_revision\x18\x04 \x01(\x04R\x14expectedItemRevision\x126\n" +
+	"\x04kind\x18\x05 \x01(\x0e2\".canvasphysics.v1.ItemMutationKindR\x04kind\x12\x1b\n" +
+	"\tentity_id\x18\x06 \x01(\tR\bentityId\x12#\n" +
+	"\rdefinition_id\x18\a \x01(\tR\fdefinitionId\x12-\n" +
+	"\x12definition_version\x18\b \x01(\rR\x11definitionVersion\x122\n" +
+	"\bposition\x18\t \x01(\v2\x16.canvasphysics.v1.Vec2R\bposition\x12\x1a\n" +
+	"\brotation\x18\n" +
+	" \x01(\x02R\brotation\x12\f\n" +
+	"\x01z\x18\v \x01(\x02R\x01z\x12\x14\n" +
+	"\x05scale\x18\f \x01(\x02R\x05scale\x12\x1f\n" +
+	"\vconfig_json\x18\r \x01(\fR\n" +
+	"configJson\x12\x1a\n" +
+	"\bisolated\x18\x0e \x01(\bR\bisolated\x12-\n" +
+	"\x12collisions_enabled\x18\x0f \x01(\bR\x11collisionsEnabled\"\x85\x04\n" +
+	"\x12ItemMutationResult\x12*\n" +
+	"\x11client_session_id\x18\x01 \x01(\tR\x0fclientSessionId\x12\x1f\n" +
+	"\vmutation_id\x18\x02 \x01(\x04R\n" +
+	"mutationId\x12&\n" +
+	"\x0fedit_session_id\x18\x03 \x01(\tR\reditSessionId\x12\x1a\n" +
+	"\baccepted\x18\x04 \x01(\bR\baccepted\x12I\n" +
+	"\vreject_code\x18\x05 \x01(\x0e2(.canvasphysics.v1.ItemMutationRejectCodeR\n" +
+	"rejectCode\x12\x18\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\x12%\n" +
+	"\x0escene_revision\x18\a \x01(\x04R\rsceneRevision\x12#\n" +
+	"\ritem_revision\x18\b \x01(\x04R\fitemRevision\x12,\n" +
+	"\x12item_instance_json\x18\t \x01(\fR\x10itemInstanceJson\x12*\n" +
+	"\x11deleted_entity_id\x18\n" +
+	" \x01(\tR\x0fdeletedEntityId\x126\n" +
+	"\x04kind\x18\v \x01(\x0e2\".canvasphysics.v1.ItemMutationKindR\x04kind\x12\x1b\n" +
+	"\tentity_id\x18\f \x01(\tR\bentityId\"\xb6\x01\n" +
+	"\rBeginItemEdit\x12*\n" +
+	"\x11client_session_id\x18\x01 \x01(\tR\x0fclientSessionId\x12&\n" +
+	"\x0fedit_session_id\x18\x02 \x01(\tR\reditSessionId\x12\x1b\n" +
+	"\tentity_id\x18\x03 \x01(\tR\bentityId\x124\n" +
+	"\x16observed_item_revision\x18\x04 \x01(\x04R\x14observedItemRevision\"\x80\x01\n" +
+	"\rRenewItemEdit\x12*\n" +
+	"\x11client_session_id\x18\x01 \x01(\tR\x0fclientSessionId\x12&\n" +
+	"\x0fedit_session_id\x18\x02 \x01(\tR\reditSessionId\x12\x1b\n" +
+	"\tentity_id\x18\x03 \x01(\tR\bentityId\"\x96\x01\n" +
+	"\vEndItemEdit\x12*\n" +
+	"\x11client_session_id\x18\x01 \x01(\tR\x0fclientSessionId\x12&\n" +
+	"\x0fedit_session_id\x18\x02 \x01(\tR\reditSessionId\x12\x1b\n" +
+	"\tentity_id\x18\x03 \x01(\tR\bentityId\x12\x16\n" +
+	"\x06cancel\x18\x04 \x01(\bR\x06cancel\"\xb9\x03\n" +
+	"\x15ItemEditSessionResult\x12*\n" +
+	"\x11client_session_id\x18\x01 \x01(\tR\x0fclientSessionId\x12&\n" +
+	"\x0fedit_session_id\x18\x02 \x01(\tR\reditSessionId\x12\x1b\n" +
+	"\tentity_id\x18\x03 \x01(\tR\bentityId\x12?\n" +
+	"\x06status\x18\x04 \x01(\x0e2'.canvasphysics.v1.ItemEditSessionStatusR\x06status\x12I\n" +
+	"\vreject_code\x18\x05 \x01(\x0e2(.canvasphysics.v1.ItemMutationRejectCodeR\n" +
+	"rejectCode\x12\x18\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\x12#\n" +
+	"\ritem_revision\x18\a \x01(\x04R\fitemRevision\x126\n" +
+	"\x18lease_expires_at_unix_ms\x18\b \x01(\x04R\x14leaseExpiresAtUnixMs\x12,\n" +
+	"\x12item_instance_json\x18\t \x01(\fR\x10itemInstanceJson\"\xb9\x02\n" +
+	"\x0fItemEditPreview\x12*\n" +
+	"\x11client_session_id\x18\x01 \x01(\tR\x0fclientSessionId\x12&\n" +
+	"\x0fedit_session_id\x18\x02 \x01(\tR\reditSessionId\x12\x1b\n" +
+	"\tentity_id\x18\x03 \x01(\tR\bentityId\x12)\n" +
+	"\x10preview_sequence\x18\x04 \x01(\x04R\x0fpreviewSequence\x122\n" +
+	"\bposition\x18\x05 \x01(\v2\x16.canvasphysics.v1.Vec2R\bposition\x12\x1a\n" +
+	"\brotation\x18\x06 \x01(\x02R\brotation\x12\f\n" +
+	"\x01z\x18\a \x01(\x02R\x01z\x12\x14\n" +
+	"\x05scale\x18\b \x01(\x02R\x05scale\x12\x16\n" +
+	"\x06revert\x18\t \x01(\bR\x06revert\"\x8c\x01\n" +
 	"\n" +
 	"Checkpoint\x12/\n" +
 	"\x13checkpoint_revision\x18\x01 \x01(\x04R\x12checkpointRevision\x12\x12\n" +
@@ -2224,7 +3323,40 @@ const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"\x12DURABLE_SET_CONFIG\x10\x05\x12\x16\n" +
 	"\x12DURABLE_SCALE_ITEM\x10\x06\x12\x1e\n" +
 	"\x1aDURABLE_SET_ITEM_ISOLATION\x10\a\x12\x1f\n" +
-	"\x1bDURABLE_SET_ITEM_COLLISIONS\x10\bBFZDgithub.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1b\x06proto3"
+	"\x1bDURABLE_SET_ITEM_COLLISIONS\x10\b*\xd6\x01\n" +
+	"\x10ItemMutationKind\x12\x1d\n" +
+	"\x19ITEM_MUTATION_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13ITEM_MUTATION_SPAWN\x10\x01\x12\x18\n" +
+	"\x14ITEM_MUTATION_DELETE\x10\x02\x12\x1b\n" +
+	"\x17ITEM_MUTATION_TRANSFORM\x10\x03\x12\x18\n" +
+	"\x14ITEM_MUTATION_CONFIG\x10\x04\x12\x1b\n" +
+	"\x17ITEM_MUTATION_ISOLATION\x10\x05\x12\x1c\n" +
+	"\x18ITEM_MUTATION_COLLISIONS\x10\x06*\xd8\x04\n" +
+	"\x16ItemMutationRejectCode\x12$\n" +
+	" ITEM_MUTATION_REJECT_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eITEM_MUTATION_REJECT_MALFORMED\x10\x01\x12\"\n" +
+	"\x1eITEM_MUTATION_REJECT_NOT_FOUND\x10\x02\x12%\n" +
+	"!ITEM_MUTATION_REJECT_SYSTEM_OWNED\x10\x03\x12\"\n" +
+	"\x1eITEM_MUTATION_REJECT_NOT_OWNER\x10\x04\x12$\n" +
+	" ITEM_MUTATION_REJECT_EDIT_IN_USE\x10\x05\x12%\n" +
+	"!ITEM_MUTATION_REJECT_EDIT_EXPIRED\x10\x06\x12,\n" +
+	"(ITEM_MUTATION_REJECT_STALE_ITEM_REVISION\x10\a\x12'\n" +
+	"#ITEM_MUTATION_REJECT_OUTSIDE_CANVAS\x10\b\x12+\n" +
+	"'ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE\x10\t\x12#\n" +
+	"\x1fITEM_MUTATION_REJECT_DEFINITION\x10\n" +
+	"\x12\x1f\n" +
+	"\x1bITEM_MUTATION_REJECT_CONFIG\x10\v\x12!\n" +
+	"\x1dITEM_MUTATION_REJECT_CAPACITY\x10\f\x12(\n" +
+	"$ITEM_MUTATION_REJECT_RECEIPT_EXPIRED\x10\r\x12!\n" +
+	"\x1dITEM_MUTATION_REJECT_INTERNAL\x10\x0e*\xf5\x01\n" +
+	"\x15ItemEditSessionStatus\x12!\n" +
+	"\x1dITEM_EDIT_SESSION_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18ITEM_EDIT_SESSION_ACTIVE\x10\x01\x12\x1d\n" +
+	"\x19ITEM_EDIT_SESSION_RENEWED\x10\x02\x12\x1b\n" +
+	"\x17ITEM_EDIT_SESSION_ENDED\x10\x03\x12\x1e\n" +
+	"\x1aITEM_EDIT_SESSION_REJECTED\x10\x04\x12\x1d\n" +
+	"\x19ITEM_EDIT_SESSION_EXPIRED\x10\x05\x12 \n" +
+	"\x1cITEM_EDIT_SESSION_SUPERSEDED\x10\x06BFZDgithub.com/dafepro/canvas/server/gen/canvasphysicsv1;canvasphysicsv1b\x06proto3"
 
 var (
 	file_packages_protocol_proto_room_proto_rawDescOnce sync.Once
@@ -2238,63 +3370,87 @@ func file_packages_protocol_proto_room_proto_rawDescGZIP() []byte {
 	return file_packages_protocol_proto_room_proto_rawDescData
 }
 
-var file_packages_protocol_proto_room_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_packages_protocol_proto_room_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_packages_protocol_proto_room_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_packages_protocol_proto_room_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_packages_protocol_proto_room_proto_goTypes = []any{
-	(HostControlKind)(0),         // 0: canvasphysics.v1.HostControlKind
-	(DurableCommandKind)(0),      // 1: canvasphysics.v1.DurableCommandKind
-	(*RoomEnvelope)(nil),         // 2: canvasphysics.v1.RoomEnvelope
-	(*Vec2)(nil),                 // 3: canvasphysics.v1.Vec2
-	(*Join)(nil),                 // 4: canvasphysics.v1.Join
-	(*DefinitionVersion)(nil),    // 5: canvasphysics.v1.DefinitionVersion
-	(*JoinAccepted)(nil),         // 6: canvasphysics.v1.JoinAccepted
-	(*Presence)(nil),             // 7: canvasphysics.v1.Presence
-	(*Peer)(nil),                 // 8: canvasphysics.v1.Peer
-	(*HostControl)(nil),          // 9: canvasphysics.v1.HostControl
-	(*Heartbeat)(nil),            // 10: canvasphysics.v1.Heartbeat
-	(*PlayerInput)(nil),          // 11: canvasphysics.v1.PlayerInput
-	(*EntityState)(nil),          // 12: canvasphysics.v1.EntityState
-	(*QuantizedTransform)(nil),   // 13: canvasphysics.v1.QuantizedTransform
-	(*StateDelta)(nil),           // 14: canvasphysics.v1.StateDelta
-	(*FullState)(nil),            // 15: canvasphysics.v1.FullState
-	(*AvatarPresence)(nil),       // 16: canvasphysics.v1.AvatarPresence
-	(*EffectEvent)(nil),          // 17: canvasphysics.v1.EffectEvent
-	(*DurableCommand)(nil),       // 18: canvasphysics.v1.DurableCommand
-	(*DurableCommandResult)(nil), // 19: canvasphysics.v1.DurableCommandResult
-	(*Checkpoint)(nil),           // 20: canvasphysics.v1.Checkpoint
-	(*ProtocolError)(nil),        // 21: canvasphysics.v1.ProtocolError
+	(HostControlKind)(0),          // 0: canvasphysics.v1.HostControlKind
+	(DurableCommandKind)(0),       // 1: canvasphysics.v1.DurableCommandKind
+	(ItemMutationKind)(0),         // 2: canvasphysics.v1.ItemMutationKind
+	(ItemMutationRejectCode)(0),   // 3: canvasphysics.v1.ItemMutationRejectCode
+	(ItemEditSessionStatus)(0),    // 4: canvasphysics.v1.ItemEditSessionStatus
+	(*RoomEnvelope)(nil),          // 5: canvasphysics.v1.RoomEnvelope
+	(*Vec2)(nil),                  // 6: canvasphysics.v1.Vec2
+	(*Join)(nil),                  // 7: canvasphysics.v1.Join
+	(*DefinitionVersion)(nil),     // 8: canvasphysics.v1.DefinitionVersion
+	(*JoinAccepted)(nil),          // 9: canvasphysics.v1.JoinAccepted
+	(*Presence)(nil),              // 10: canvasphysics.v1.Presence
+	(*Peer)(nil),                  // 11: canvasphysics.v1.Peer
+	(*HostControl)(nil),           // 12: canvasphysics.v1.HostControl
+	(*Heartbeat)(nil),             // 13: canvasphysics.v1.Heartbeat
+	(*PlayerInput)(nil),           // 14: canvasphysics.v1.PlayerInput
+	(*EntityState)(nil),           // 15: canvasphysics.v1.EntityState
+	(*QuantizedTransform)(nil),    // 16: canvasphysics.v1.QuantizedTransform
+	(*StateDelta)(nil),            // 17: canvasphysics.v1.StateDelta
+	(*FullState)(nil),             // 18: canvasphysics.v1.FullState
+	(*AvatarPresence)(nil),        // 19: canvasphysics.v1.AvatarPresence
+	(*EffectEvent)(nil),           // 20: canvasphysics.v1.EffectEvent
+	(*DurableCommand)(nil),        // 21: canvasphysics.v1.DurableCommand
+	(*DurableCommandResult)(nil),  // 22: canvasphysics.v1.DurableCommandResult
+	(*ItemMutation)(nil),          // 23: canvasphysics.v1.ItemMutation
+	(*ItemMutationResult)(nil),    // 24: canvasphysics.v1.ItemMutationResult
+	(*BeginItemEdit)(nil),         // 25: canvasphysics.v1.BeginItemEdit
+	(*RenewItemEdit)(nil),         // 26: canvasphysics.v1.RenewItemEdit
+	(*EndItemEdit)(nil),           // 27: canvasphysics.v1.EndItemEdit
+	(*ItemEditSessionResult)(nil), // 28: canvasphysics.v1.ItemEditSessionResult
+	(*ItemEditPreview)(nil),       // 29: canvasphysics.v1.ItemEditPreview
+	(*Checkpoint)(nil),            // 30: canvasphysics.v1.Checkpoint
+	(*ProtocolError)(nil),         // 31: canvasphysics.v1.ProtocolError
 }
 var file_packages_protocol_proto_room_proto_depIdxs = []int32{
-	4,  // 0: canvasphysics.v1.RoomEnvelope.join:type_name -> canvasphysics.v1.Join
-	6,  // 1: canvasphysics.v1.RoomEnvelope.join_accepted:type_name -> canvasphysics.v1.JoinAccepted
-	7,  // 2: canvasphysics.v1.RoomEnvelope.presence:type_name -> canvasphysics.v1.Presence
-	11, // 3: canvasphysics.v1.RoomEnvelope.player_input:type_name -> canvasphysics.v1.PlayerInput
-	14, // 4: canvasphysics.v1.RoomEnvelope.state_delta:type_name -> canvasphysics.v1.StateDelta
-	15, // 5: canvasphysics.v1.RoomEnvelope.full_state:type_name -> canvasphysics.v1.FullState
-	17, // 6: canvasphysics.v1.RoomEnvelope.effect_event:type_name -> canvasphysics.v1.EffectEvent
-	9,  // 7: canvasphysics.v1.RoomEnvelope.host_control:type_name -> canvasphysics.v1.HostControl
-	18, // 8: canvasphysics.v1.RoomEnvelope.durable_command:type_name -> canvasphysics.v1.DurableCommand
-	19, // 9: canvasphysics.v1.RoomEnvelope.durable_result:type_name -> canvasphysics.v1.DurableCommandResult
-	20, // 10: canvasphysics.v1.RoomEnvelope.checkpoint:type_name -> canvasphysics.v1.Checkpoint
-	10, // 11: canvasphysics.v1.RoomEnvelope.heartbeat:type_name -> canvasphysics.v1.Heartbeat
-	21, // 12: canvasphysics.v1.RoomEnvelope.error:type_name -> canvasphysics.v1.ProtocolError
-	5,  // 13: canvasphysics.v1.Join.definitions:type_name -> canvasphysics.v1.DefinitionVersion
-	8,  // 14: canvasphysics.v1.Presence.peers:type_name -> canvasphysics.v1.Peer
-	0,  // 15: canvasphysics.v1.HostControl.kind:type_name -> canvasphysics.v1.HostControlKind
-	3,  // 16: canvasphysics.v1.PlayerInput.direction:type_name -> canvasphysics.v1.Vec2
-	3,  // 17: canvasphysics.v1.PlayerInput.target_position:type_name -> canvasphysics.v1.Vec2
-	13, // 18: canvasphysics.v1.EntityState.quantized_transform:type_name -> canvasphysics.v1.QuantizedTransform
-	12, // 19: canvasphysics.v1.StateDelta.entities:type_name -> canvasphysics.v1.EntityState
-	12, // 20: canvasphysics.v1.FullState.entities:type_name -> canvasphysics.v1.EntityState
-	16, // 21: canvasphysics.v1.FullState.avatars:type_name -> canvasphysics.v1.AvatarPresence
-	1,  // 22: canvasphysics.v1.DurableCommand.kind:type_name -> canvasphysics.v1.DurableCommandKind
-	3,  // 23: canvasphysics.v1.DurableCommand.position:type_name -> canvasphysics.v1.Vec2
-	18, // 24: canvasphysics.v1.DurableCommandResult.command:type_name -> canvasphysics.v1.DurableCommand
-	25, // [25:25] is the sub-list for method output_type
-	25, // [25:25] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	7,  // 0: canvasphysics.v1.RoomEnvelope.join:type_name -> canvasphysics.v1.Join
+	9,  // 1: canvasphysics.v1.RoomEnvelope.join_accepted:type_name -> canvasphysics.v1.JoinAccepted
+	10, // 2: canvasphysics.v1.RoomEnvelope.presence:type_name -> canvasphysics.v1.Presence
+	14, // 3: canvasphysics.v1.RoomEnvelope.player_input:type_name -> canvasphysics.v1.PlayerInput
+	17, // 4: canvasphysics.v1.RoomEnvelope.state_delta:type_name -> canvasphysics.v1.StateDelta
+	18, // 5: canvasphysics.v1.RoomEnvelope.full_state:type_name -> canvasphysics.v1.FullState
+	20, // 6: canvasphysics.v1.RoomEnvelope.effect_event:type_name -> canvasphysics.v1.EffectEvent
+	12, // 7: canvasphysics.v1.RoomEnvelope.host_control:type_name -> canvasphysics.v1.HostControl
+	21, // 8: canvasphysics.v1.RoomEnvelope.durable_command:type_name -> canvasphysics.v1.DurableCommand
+	22, // 9: canvasphysics.v1.RoomEnvelope.durable_result:type_name -> canvasphysics.v1.DurableCommandResult
+	30, // 10: canvasphysics.v1.RoomEnvelope.checkpoint:type_name -> canvasphysics.v1.Checkpoint
+	13, // 11: canvasphysics.v1.RoomEnvelope.heartbeat:type_name -> canvasphysics.v1.Heartbeat
+	31, // 12: canvasphysics.v1.RoomEnvelope.error:type_name -> canvasphysics.v1.ProtocolError
+	23, // 13: canvasphysics.v1.RoomEnvelope.item_mutation:type_name -> canvasphysics.v1.ItemMutation
+	24, // 14: canvasphysics.v1.RoomEnvelope.item_mutation_result:type_name -> canvasphysics.v1.ItemMutationResult
+	25, // 15: canvasphysics.v1.RoomEnvelope.begin_item_edit:type_name -> canvasphysics.v1.BeginItemEdit
+	28, // 16: canvasphysics.v1.RoomEnvelope.item_edit_session_result:type_name -> canvasphysics.v1.ItemEditSessionResult
+	26, // 17: canvasphysics.v1.RoomEnvelope.renew_item_edit:type_name -> canvasphysics.v1.RenewItemEdit
+	27, // 18: canvasphysics.v1.RoomEnvelope.end_item_edit:type_name -> canvasphysics.v1.EndItemEdit
+	29, // 19: canvasphysics.v1.RoomEnvelope.item_edit_preview:type_name -> canvasphysics.v1.ItemEditPreview
+	8,  // 20: canvasphysics.v1.Join.definitions:type_name -> canvasphysics.v1.DefinitionVersion
+	11, // 21: canvasphysics.v1.Presence.peers:type_name -> canvasphysics.v1.Peer
+	0,  // 22: canvasphysics.v1.HostControl.kind:type_name -> canvasphysics.v1.HostControlKind
+	6,  // 23: canvasphysics.v1.PlayerInput.direction:type_name -> canvasphysics.v1.Vec2
+	6,  // 24: canvasphysics.v1.PlayerInput.target_position:type_name -> canvasphysics.v1.Vec2
+	16, // 25: canvasphysics.v1.EntityState.quantized_transform:type_name -> canvasphysics.v1.QuantizedTransform
+	15, // 26: canvasphysics.v1.StateDelta.entities:type_name -> canvasphysics.v1.EntityState
+	15, // 27: canvasphysics.v1.FullState.entities:type_name -> canvasphysics.v1.EntityState
+	19, // 28: canvasphysics.v1.FullState.avatars:type_name -> canvasphysics.v1.AvatarPresence
+	1,  // 29: canvasphysics.v1.DurableCommand.kind:type_name -> canvasphysics.v1.DurableCommandKind
+	6,  // 30: canvasphysics.v1.DurableCommand.position:type_name -> canvasphysics.v1.Vec2
+	21, // 31: canvasphysics.v1.DurableCommandResult.command:type_name -> canvasphysics.v1.DurableCommand
+	2,  // 32: canvasphysics.v1.ItemMutation.kind:type_name -> canvasphysics.v1.ItemMutationKind
+	6,  // 33: canvasphysics.v1.ItemMutation.position:type_name -> canvasphysics.v1.Vec2
+	3,  // 34: canvasphysics.v1.ItemMutationResult.reject_code:type_name -> canvasphysics.v1.ItemMutationRejectCode
+	2,  // 35: canvasphysics.v1.ItemMutationResult.kind:type_name -> canvasphysics.v1.ItemMutationKind
+	4,  // 36: canvasphysics.v1.ItemEditSessionResult.status:type_name -> canvasphysics.v1.ItemEditSessionStatus
+	3,  // 37: canvasphysics.v1.ItemEditSessionResult.reject_code:type_name -> canvasphysics.v1.ItemMutationRejectCode
+	6,  // 38: canvasphysics.v1.ItemEditPreview.position:type_name -> canvasphysics.v1.Vec2
+	39, // [39:39] is the sub-list for method output_type
+	39, // [39:39] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_packages_protocol_proto_room_proto_init() }
@@ -2316,14 +3472,21 @@ func file_packages_protocol_proto_room_proto_init() {
 		(*RoomEnvelope_Checkpoint)(nil),
 		(*RoomEnvelope_Heartbeat)(nil),
 		(*RoomEnvelope_Error)(nil),
+		(*RoomEnvelope_ItemMutation)(nil),
+		(*RoomEnvelope_ItemMutationResult)(nil),
+		(*RoomEnvelope_BeginItemEdit)(nil),
+		(*RoomEnvelope_ItemEditSessionResult)(nil),
+		(*RoomEnvelope_RenewItemEdit)(nil),
+		(*RoomEnvelope_EndItemEdit)(nil),
+		(*RoomEnvelope_ItemEditPreview)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_packages_protocol_proto_room_proto_rawDesc), len(file_packages_protocol_proto_room_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   20,
+			NumEnums:      5,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

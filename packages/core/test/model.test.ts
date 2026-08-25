@@ -198,10 +198,29 @@ describe("validation", () => {
       definitionId: "rocket",
       definitionVersion: 1,
       ownerUserId: "u1",
+      itemRevision: 1,
       transform: { x: 1, y: 1, rotation: 0 },
       resolvedConfig: {},
     }));
     expect(validateSnapshot(snapshot, canvas).ok).toBe(false);
+  });
+
+  it("requires every durable item to carry a positive item revision", () => {
+    const snapshot = emptySnapshot(canvas.id, canvas.version);
+    snapshot.items = [{
+      entityId: "rocket-1",
+      definitionId: "rocket",
+      definitionVersion: 1,
+      ownerUserId: "u1",
+      itemRevision: 0,
+      transform: { x: 50, y: 35, rotation: 0 },
+      resolvedConfig: {},
+    }];
+
+    expect(validateSnapshot(snapshot, canvas)).toMatchObject({
+      ok: false,
+      problems: [expect.objectContaining({ path: "items[0].itemRevision" })],
+    });
   });
 
   it("refuses duplicate or out-of-bounds system items", () => {
@@ -233,6 +252,7 @@ describe("validation", () => {
       definitionId: "rocket",
       definitionVersion: 1,
       ownerUserId: "u1",
+      itemRevision: 1,
       transform: { x: 50, y: 35, rotation: 0 },
       resolvedConfig: {},
       behaviorTimers: [{ key: "countdown", elapsedTicks: 20, remainingTicks: 0 }],

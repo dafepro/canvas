@@ -179,6 +179,7 @@ func (r *Room) bootstrapSystemItems() error {
 			DefinitionID:      template.DefinitionID,
 			DefinitionVersion: template.DefinitionVersion,
 			OwnerUserID:       "",
+			ItemRevision:      1,
 			Transform:         template.Transform,
 			ResolvedConfig:    append(json.RawMessage(nil), template.ResolvedConfig...),
 		})

@@ -15,6 +15,8 @@ export interface ItemInstance<Config = unknown, State = unknown> {
   definitionId: string;
   definitionVersion: number;
   ownerUserId: string;
+  /** Server-authored revision of this durable item. */
+  itemRevision: number;
   transform: Transform;
   /** Owner-controlled pause of physics, collision, behavior, and timers. */
   isolated?: boolean;

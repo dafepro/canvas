@@ -366,7 +366,10 @@ export class RapierWorld implements BehaviorHost {
         zIndex: definition.visual.zIndex ?? 0,
         size: definition.visual.size,
       },
-      ownership: { ownerUserId: instance.ownerUserId },
+      ownership: {
+        ownerUserId: instance.ownerUserId,
+        itemRevision: instance.itemRevision,
+      },
       isolated: instance.isolated === true,
       collisionsDisabled: instance.collisionsDisabled === true,
       persistence: definition.persistence,

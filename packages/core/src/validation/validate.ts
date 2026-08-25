@@ -188,6 +188,12 @@ export const validateSnapshot = (
       problems.push({ path: `items[${i}].entityId`, message: "duplicate entity id" });
     }
     ids.add(item.entityId);
+    if (!Number.isSafeInteger(item.itemRevision) || item.itemRevision < 1) {
+      problems.push({
+        path: `items[${i}].itemRevision`,
+        message: "must be a positive safe integer",
+      });
+    }
     const transform = validateTransform(item.transform, canvas);
     if (!transform.ok) {
       for (const problem of transform.problems) {

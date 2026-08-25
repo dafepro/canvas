@@ -285,6 +285,7 @@ export class DurableCommandSession {
             definitionId: command.definitionId,
             definitionVersion: command.definitionVersion,
             ownerUserId: item?.ownerUserId ?? context.userId,
+            itemRevision: item?.itemRevision ?? 1,
             transform: item?.transform ?? {
               x: command.position?.x ?? 0,
               y: command.position?.y ?? 0,

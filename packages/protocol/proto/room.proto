@@ -28,6 +28,13 @@ message RoomEnvelope {
     Checkpoint checkpoint = 20;
     Heartbeat heartbeat = 21;
     ProtocolError error = 22;
+    ItemMutation item_mutation = 23;
+    ItemMutationResult item_mutation_result = 24;
+    BeginItemEdit begin_item_edit = 25;
+    ItemEditSessionResult item_edit_session_result = 26;
+    RenewItemEdit renew_item_edit = 27;
+    EndItemEdit end_item_edit = 28;
+    ItemEditPreview item_edit_preview = 29;
   }
 }
 
@@ -240,6 +247,124 @@ message DurableCommandResult {
   // The accepted item instance as JSON, present on accept.
   bytes item_instance_json = 5;
   DurableCommand command = 6;
+}
+
+// Prerelease replacement for DurableCommand. Preview is deliberately absent:
+// disposable presentation uses ItemEditPreview instead of a durable envelope.
+enum ItemMutationKind {
+  ITEM_MUTATION_UNSPECIFIED = 0;
+  ITEM_MUTATION_SPAWN = 1;
+  ITEM_MUTATION_DELETE = 2;
+  ITEM_MUTATION_TRANSFORM = 3;
+  ITEM_MUTATION_CONFIG = 4;
+  ITEM_MUTATION_ISOLATION = 5;
+  ITEM_MUTATION_COLLISIONS = 6;
+}
+
+enum ItemMutationRejectCode {
+  ITEM_MUTATION_REJECT_UNSPECIFIED = 0;
+  ITEM_MUTATION_REJECT_MALFORMED = 1;
+  ITEM_MUTATION_REJECT_NOT_FOUND = 2;
+  ITEM_MUTATION_REJECT_SYSTEM_OWNED = 3;
+  ITEM_MUTATION_REJECT_NOT_OWNER = 4;
+  ITEM_MUTATION_REJECT_EDIT_IN_USE = 5;
+  ITEM_MUTATION_REJECT_EDIT_EXPIRED = 6;
+  ITEM_MUTATION_REJECT_STALE_ITEM_REVISION = 7;
+  ITEM_MUTATION_REJECT_OUTSIDE_CANVAS = 8;
+  ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE = 9;
+  ITEM_MUTATION_REJECT_DEFINITION = 10;
+  ITEM_MUTATION_REJECT_CONFIG = 11;
+  ITEM_MUTATION_REJECT_CAPACITY = 12;
+  ITEM_MUTATION_REJECT_RECEIPT_EXPIRED = 13;
+  ITEM_MUTATION_REJECT_INTERNAL = 14;
+}
+
+message ItemMutation {
+  string client_session_id = 1;
+  uint64 mutation_id = 2;
+  string edit_session_id = 3;
+  uint64 expected_item_revision = 4;
+  ItemMutationKind kind = 5;
+  string entity_id = 6;
+  string definition_id = 7;
+  uint32 definition_version = 8;
+  Vec2 position = 9;
+  float rotation = 10;
+  float z = 11;
+  float scale = 12;
+  bytes config_json = 13;
+  bool isolated = 14;
+  bool collisions_enabled = 15;
+}
+
+message ItemMutationResult {
+  string client_session_id = 1;
+  uint64 mutation_id = 2;
+  string edit_session_id = 3;
+  bool accepted = 4;
+  ItemMutationRejectCode reject_code = 5;
+  string message = 6;
+  uint64 scene_revision = 7;
+  uint64 item_revision = 8;
+  bytes item_instance_json = 9;
+  string deleted_entity_id = 10;
+  ItemMutationKind kind = 11;
+  string entity_id = 12;
+}
+
+enum ItemEditSessionStatus {
+  ITEM_EDIT_SESSION_UNSPECIFIED = 0;
+  ITEM_EDIT_SESSION_ACTIVE = 1;
+  ITEM_EDIT_SESSION_RENEWED = 2;
+  ITEM_EDIT_SESSION_ENDED = 3;
+  ITEM_EDIT_SESSION_REJECTED = 4;
+  ITEM_EDIT_SESSION_EXPIRED = 5;
+  ITEM_EDIT_SESSION_SUPERSEDED = 6;
+}
+
+message BeginItemEdit {
+  string client_session_id = 1;
+  string edit_session_id = 2;
+  string entity_id = 3;
+  uint64 observed_item_revision = 4;
+}
+
+message RenewItemEdit {
+  string client_session_id = 1;
+  string edit_session_id = 2;
+  string entity_id = 3;
+}
+
+message EndItemEdit {
+  string client_session_id = 1;
+  string edit_session_id = 2;
+  string entity_id = 3;
+  bool cancel = 4;
+}
+
+message ItemEditSessionResult {
+  string client_session_id = 1;
+  string edit_session_id = 2;
+  string entity_id = 3;
+  ItemEditSessionStatus status = 4;
+  ItemMutationRejectCode reject_code = 5;
+  string message = 6;
+  uint64 item_revision = 7;
+  uint64 lease_expires_at_unix_ms = 8;
+  bytes item_instance_json = 9;
+}
+
+message ItemEditPreview {
+  string client_session_id = 1;
+  string edit_session_id = 2;
+  string entity_id = 3;
+  uint64 preview_sequence = 4;
+  Vec2 position = 5;
+  float rotation = 6;
+  float z = 7;
+  float scale = 8;
+  // Server-authored final sample that restores the committed transform.
+  bool revert = 9;
 }
 
 message Checkpoint {

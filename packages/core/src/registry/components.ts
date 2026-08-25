@@ -79,6 +79,7 @@ export interface BehaviorComponent {
 
 export interface OwnershipComponent {
   ownerUserId: string;
+  itemRevision: number;
   editLockedBy?: string;
 }
 

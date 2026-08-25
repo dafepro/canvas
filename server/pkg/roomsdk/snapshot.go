@@ -34,6 +34,7 @@ type SnapshotItem struct {
 	DefinitionID       string          `json:"definitionId"`
 	DefinitionVersion  uint32          `json:"definitionVersion"`
 	OwnerUserID        string          `json:"ownerUserId"`
+	ItemRevision       uint64          `json:"itemRevision"`
 	Transform          Transform       `json:"transform"`
 	Isolated           bool            `json:"isolated,omitempty"`
 	CollisionsDisabled bool            `json:"collisionsDisabled,omitempty"`

@@ -242,6 +242,9 @@ func (r *Room) validateDurable(
 }
 
 func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, client *Client) {
+	if item != nil {
+		item.ItemRevision++
+	}
 	switch command.Kind {
 	case pb.DurableCommandKind_DURABLE_SPAWN_ITEM:
 		r.nextEntityNo++
@@ -258,6 +261,7 @@ func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, clie
 			DefinitionVersion: command.DefinitionVersion,
 			// The server sets the owner from the authenticated session.
 			OwnerUserID:    client.UserID,
+			ItemRevision:   1,
 			Transform:      transformOf(command),
 			ResolvedConfig: json.RawMessage(command.ConfigJson),
 		}

@@ -34,6 +34,8 @@ export interface SnapshotItem {
   definitionId: string;
   definitionVersion: number;
   ownerUserId: string;
+  /** Monotonic server revision used for same-item optimistic concurrency. */
+  itemRevision: number;
   transform: Transform;
   /** Durable owner-controlled simulation isolation. */
   isolated?: boolean;

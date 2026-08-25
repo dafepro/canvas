@@ -22,6 +22,13 @@ export type PayloadCase =
   | "hostControl"
   | "durableCommand"
   | "durableResult"
+  | "itemMutation"
+  | "itemMutationResult"
+  | "beginItemEdit"
+  | "itemEditSessionResult"
+  | "renewItemEdit"
+  | "endItemEdit"
+  | "itemEditPreview"
   | "checkpoint"
   | "heartbeat"
   | "error";
@@ -37,6 +44,13 @@ const payloadCases: PayloadCase[] = [
   "hostControl",
   "durableCommand",
   "durableResult",
+  "itemMutation",
+  "itemMutationResult",
+  "beginItemEdit",
+  "itemEditSessionResult",
+  "renewItemEdit",
+  "endItemEdit",
+  "itemEditPreview",
   "checkpoint",
   "heartbeat",
   "error",
@@ -56,8 +70,12 @@ export const messageClassOf = (envelope: RoomEnvelope): MessageClass => {
       return "keyframe";
     case "effectEvent":
       return "effect";
+    case "itemEditPreview":
+      return "input";
     case "durableCommand":
     case "durableResult":
+    case "itemMutation":
+    case "itemMutationResult":
       return "durableMutation";
     default:
       return "coordination";

@@ -142,6 +142,247 @@ export function durableCommandKindToJSON(object: DurableCommandKind): string {
 }
 
 /**
+ * Prerelease replacement for DurableCommand. Preview is deliberately absent:
+ * disposable presentation uses ItemEditPreview instead of a durable envelope.
+ */
+export enum ItemMutationKind {
+  ITEM_MUTATION_UNSPECIFIED = 0,
+  ITEM_MUTATION_SPAWN = 1,
+  ITEM_MUTATION_DELETE = 2,
+  ITEM_MUTATION_TRANSFORM = 3,
+  ITEM_MUTATION_CONFIG = 4,
+  ITEM_MUTATION_ISOLATION = 5,
+  ITEM_MUTATION_COLLISIONS = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function itemMutationKindFromJSON(object: any): ItemMutationKind {
+  switch (object) {
+    case 0:
+    case "ITEM_MUTATION_UNSPECIFIED":
+      return ItemMutationKind.ITEM_MUTATION_UNSPECIFIED;
+    case 1:
+    case "ITEM_MUTATION_SPAWN":
+      return ItemMutationKind.ITEM_MUTATION_SPAWN;
+    case 2:
+    case "ITEM_MUTATION_DELETE":
+      return ItemMutationKind.ITEM_MUTATION_DELETE;
+    case 3:
+    case "ITEM_MUTATION_TRANSFORM":
+      return ItemMutationKind.ITEM_MUTATION_TRANSFORM;
+    case 4:
+    case "ITEM_MUTATION_CONFIG":
+      return ItemMutationKind.ITEM_MUTATION_CONFIG;
+    case 5:
+    case "ITEM_MUTATION_ISOLATION":
+      return ItemMutationKind.ITEM_MUTATION_ISOLATION;
+    case 6:
+    case "ITEM_MUTATION_COLLISIONS":
+      return ItemMutationKind.ITEM_MUTATION_COLLISIONS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ItemMutationKind.UNRECOGNIZED;
+  }
+}
+
+export function itemMutationKindToJSON(object: ItemMutationKind): string {
+  switch (object) {
+    case ItemMutationKind.ITEM_MUTATION_UNSPECIFIED:
+      return "ITEM_MUTATION_UNSPECIFIED";
+    case ItemMutationKind.ITEM_MUTATION_SPAWN:
+      return "ITEM_MUTATION_SPAWN";
+    case ItemMutationKind.ITEM_MUTATION_DELETE:
+      return "ITEM_MUTATION_DELETE";
+    case ItemMutationKind.ITEM_MUTATION_TRANSFORM:
+      return "ITEM_MUTATION_TRANSFORM";
+    case ItemMutationKind.ITEM_MUTATION_CONFIG:
+      return "ITEM_MUTATION_CONFIG";
+    case ItemMutationKind.ITEM_MUTATION_ISOLATION:
+      return "ITEM_MUTATION_ISOLATION";
+    case ItemMutationKind.ITEM_MUTATION_COLLISIONS:
+      return "ITEM_MUTATION_COLLISIONS";
+    case ItemMutationKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum ItemMutationRejectCode {
+  ITEM_MUTATION_REJECT_UNSPECIFIED = 0,
+  ITEM_MUTATION_REJECT_MALFORMED = 1,
+  ITEM_MUTATION_REJECT_NOT_FOUND = 2,
+  ITEM_MUTATION_REJECT_SYSTEM_OWNED = 3,
+  ITEM_MUTATION_REJECT_NOT_OWNER = 4,
+  ITEM_MUTATION_REJECT_EDIT_IN_USE = 5,
+  ITEM_MUTATION_REJECT_EDIT_EXPIRED = 6,
+  ITEM_MUTATION_REJECT_STALE_ITEM_REVISION = 7,
+  ITEM_MUTATION_REJECT_OUTSIDE_CANVAS = 8,
+  ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE = 9,
+  ITEM_MUTATION_REJECT_DEFINITION = 10,
+  ITEM_MUTATION_REJECT_CONFIG = 11,
+  ITEM_MUTATION_REJECT_CAPACITY = 12,
+  ITEM_MUTATION_REJECT_RECEIPT_EXPIRED = 13,
+  ITEM_MUTATION_REJECT_INTERNAL = 14,
+  UNRECOGNIZED = -1,
+}
+
+export function itemMutationRejectCodeFromJSON(object: any): ItemMutationRejectCode {
+  switch (object) {
+    case 0:
+    case "ITEM_MUTATION_REJECT_UNSPECIFIED":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED;
+    case 1:
+    case "ITEM_MUTATION_REJECT_MALFORMED":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_MALFORMED;
+    case 2:
+    case "ITEM_MUTATION_REJECT_NOT_FOUND":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_NOT_FOUND;
+    case 3:
+    case "ITEM_MUTATION_REJECT_SYSTEM_OWNED":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_SYSTEM_OWNED;
+    case 4:
+    case "ITEM_MUTATION_REJECT_NOT_OWNER":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_NOT_OWNER;
+    case 5:
+    case "ITEM_MUTATION_REJECT_EDIT_IN_USE":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_EDIT_IN_USE;
+    case 6:
+    case "ITEM_MUTATION_REJECT_EDIT_EXPIRED":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_EDIT_EXPIRED;
+    case 7:
+    case "ITEM_MUTATION_REJECT_STALE_ITEM_REVISION":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_STALE_ITEM_REVISION;
+    case 8:
+    case "ITEM_MUTATION_REJECT_OUTSIDE_CANVAS":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_OUTSIDE_CANVAS;
+    case 9:
+    case "ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE;
+    case 10:
+    case "ITEM_MUTATION_REJECT_DEFINITION":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_DEFINITION;
+    case 11:
+    case "ITEM_MUTATION_REJECT_CONFIG":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_CONFIG;
+    case 12:
+    case "ITEM_MUTATION_REJECT_CAPACITY":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_CAPACITY;
+    case 13:
+    case "ITEM_MUTATION_REJECT_RECEIPT_EXPIRED":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_RECEIPT_EXPIRED;
+    case 14:
+    case "ITEM_MUTATION_REJECT_INTERNAL":
+      return ItemMutationRejectCode.ITEM_MUTATION_REJECT_INTERNAL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ItemMutationRejectCode.UNRECOGNIZED;
+  }
+}
+
+export function itemMutationRejectCodeToJSON(object: ItemMutationRejectCode): string {
+  switch (object) {
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED:
+      return "ITEM_MUTATION_REJECT_UNSPECIFIED";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_MALFORMED:
+      return "ITEM_MUTATION_REJECT_MALFORMED";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_NOT_FOUND:
+      return "ITEM_MUTATION_REJECT_NOT_FOUND";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_SYSTEM_OWNED:
+      return "ITEM_MUTATION_REJECT_SYSTEM_OWNED";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_NOT_OWNER:
+      return "ITEM_MUTATION_REJECT_NOT_OWNER";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_EDIT_IN_USE:
+      return "ITEM_MUTATION_REJECT_EDIT_IN_USE";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_EDIT_EXPIRED:
+      return "ITEM_MUTATION_REJECT_EDIT_EXPIRED";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_STALE_ITEM_REVISION:
+      return "ITEM_MUTATION_REJECT_STALE_ITEM_REVISION";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_OUTSIDE_CANVAS:
+      return "ITEM_MUTATION_REJECT_OUTSIDE_CANVAS";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE:
+      return "ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_DEFINITION:
+      return "ITEM_MUTATION_REJECT_DEFINITION";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_CONFIG:
+      return "ITEM_MUTATION_REJECT_CONFIG";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_CAPACITY:
+      return "ITEM_MUTATION_REJECT_CAPACITY";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_RECEIPT_EXPIRED:
+      return "ITEM_MUTATION_REJECT_RECEIPT_EXPIRED";
+    case ItemMutationRejectCode.ITEM_MUTATION_REJECT_INTERNAL:
+      return "ITEM_MUTATION_REJECT_INTERNAL";
+    case ItemMutationRejectCode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum ItemEditSessionStatus {
+  ITEM_EDIT_SESSION_UNSPECIFIED = 0,
+  ITEM_EDIT_SESSION_ACTIVE = 1,
+  ITEM_EDIT_SESSION_RENEWED = 2,
+  ITEM_EDIT_SESSION_ENDED = 3,
+  ITEM_EDIT_SESSION_REJECTED = 4,
+  ITEM_EDIT_SESSION_EXPIRED = 5,
+  ITEM_EDIT_SESSION_SUPERSEDED = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function itemEditSessionStatusFromJSON(object: any): ItemEditSessionStatus {
+  switch (object) {
+    case 0:
+    case "ITEM_EDIT_SESSION_UNSPECIFIED":
+      return ItemEditSessionStatus.ITEM_EDIT_SESSION_UNSPECIFIED;
+    case 1:
+    case "ITEM_EDIT_SESSION_ACTIVE":
+      return ItemEditSessionStatus.ITEM_EDIT_SESSION_ACTIVE;
+    case 2:
+    case "ITEM_EDIT_SESSION_RENEWED":
+      return ItemEditSessionStatus.ITEM_EDIT_SESSION_RENEWED;
+    case 3:
+    case "ITEM_EDIT_SESSION_ENDED":
+      return ItemEditSessionStatus.ITEM_EDIT_SESSION_ENDED;
+    case 4:
+    case "ITEM_EDIT_SESSION_REJECTED":
+      return ItemEditSessionStatus.ITEM_EDIT_SESSION_REJECTED;
+    case 5:
+    case "ITEM_EDIT_SESSION_EXPIRED":
+      return ItemEditSessionStatus.ITEM_EDIT_SESSION_EXPIRED;
+    case 6:
+    case "ITEM_EDIT_SESSION_SUPERSEDED":
+      return ItemEditSessionStatus.ITEM_EDIT_SESSION_SUPERSEDED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ItemEditSessionStatus.UNRECOGNIZED;
+  }
+}
+
+export function itemEditSessionStatusToJSON(object: ItemEditSessionStatus): string {
+  switch (object) {
+    case ItemEditSessionStatus.ITEM_EDIT_SESSION_UNSPECIFIED:
+      return "ITEM_EDIT_SESSION_UNSPECIFIED";
+    case ItemEditSessionStatus.ITEM_EDIT_SESSION_ACTIVE:
+      return "ITEM_EDIT_SESSION_ACTIVE";
+    case ItemEditSessionStatus.ITEM_EDIT_SESSION_RENEWED:
+      return "ITEM_EDIT_SESSION_RENEWED";
+    case ItemEditSessionStatus.ITEM_EDIT_SESSION_ENDED:
+      return "ITEM_EDIT_SESSION_ENDED";
+    case ItemEditSessionStatus.ITEM_EDIT_SESSION_REJECTED:
+      return "ITEM_EDIT_SESSION_REJECTED";
+    case ItemEditSessionStatus.ITEM_EDIT_SESSION_EXPIRED:
+      return "ITEM_EDIT_SESSION_EXPIRED";
+    case ItemEditSessionStatus.ITEM_EDIT_SESSION_SUPERSEDED:
+      return "ITEM_EDIT_SESSION_SUPERSEDED";
+    case ItemEditSessionStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
  * Spec 12.3. One envelope carries every realtime message. Peers drop an
  * envelope whose host_epoch is older than the epoch they know.
  */
@@ -165,6 +406,13 @@ export interface RoomEnvelope {
   checkpoint?: Checkpoint | undefined;
   heartbeat?: Heartbeat | undefined;
   error?: ProtocolError | undefined;
+  itemMutation?: ItemMutation | undefined;
+  itemMutationResult?: ItemMutationResult | undefined;
+  beginItemEdit?: BeginItemEdit | undefined;
+  itemEditSessionResult?: ItemEditSessionResult | undefined;
+  renewItemEdit?: RenewItemEdit | undefined;
+  endItemEdit?: EndItemEdit | undefined;
+  itemEditPreview?: ItemEditPreview | undefined;
 }
 
 export interface Vec2 {
@@ -357,6 +605,84 @@ export interface DurableCommandResult {
   command?: DurableCommand | undefined;
 }
 
+export interface ItemMutation {
+  clientSessionId: string;
+  mutationId: number;
+  editSessionId: string;
+  expectedItemRevision: number;
+  kind: ItemMutationKind;
+  entityId: string;
+  definitionId: string;
+  definitionVersion: number;
+  position?: Vec2 | undefined;
+  rotation: number;
+  z: number;
+  scale: number;
+  configJson: Uint8Array;
+  isolated: boolean;
+  collisionsEnabled: boolean;
+}
+
+export interface ItemMutationResult {
+  clientSessionId: string;
+  mutationId: number;
+  editSessionId: string;
+  accepted: boolean;
+  rejectCode: ItemMutationRejectCode;
+  message: string;
+  sceneRevision: number;
+  itemRevision: number;
+  itemInstanceJson: Uint8Array;
+  deletedEntityId: string;
+  kind: ItemMutationKind;
+  entityId: string;
+}
+
+export interface BeginItemEdit {
+  clientSessionId: string;
+  editSessionId: string;
+  entityId: string;
+  observedItemRevision: number;
+}
+
+export interface RenewItemEdit {
+  clientSessionId: string;
+  editSessionId: string;
+  entityId: string;
+}
+
+export interface EndItemEdit {
+  clientSessionId: string;
+  editSessionId: string;
+  entityId: string;
+  cancel: boolean;
+}
+
+export interface ItemEditSessionResult {
+  clientSessionId: string;
+  editSessionId: string;
+  entityId: string;
+  status: ItemEditSessionStatus;
+  rejectCode: ItemMutationRejectCode;
+  message: string;
+  itemRevision: number;
+  leaseExpiresAtUnixMs: number;
+  itemInstanceJson: Uint8Array;
+}
+
+export interface ItemEditPreview {
+  clientSessionId: string;
+  editSessionId: string;
+  entityId: string;
+  previewSequence: number;
+  position?: Vec2 | undefined;
+  rotation: number;
+  z: number;
+  scale: number;
+  /** Server-authored final sample that restores the committed transform. */
+  revert: boolean;
+}
+
 export interface Checkpoint {
   checkpointRevision: number;
   tick: number;
@@ -390,6 +716,13 @@ function createBaseRoomEnvelope(): RoomEnvelope {
     checkpoint: undefined,
     heartbeat: undefined,
     error: undefined,
+    itemMutation: undefined,
+    itemMutationResult: undefined,
+    beginItemEdit: undefined,
+    itemEditSessionResult: undefined,
+    renewItemEdit: undefined,
+    endItemEdit: undefined,
+    itemEditPreview: undefined,
   };
 }
 
@@ -448,6 +781,27 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     }
     if (message.error !== undefined) {
       ProtocolError.encode(message.error, writer.uint32(178).fork()).join();
+    }
+    if (message.itemMutation !== undefined) {
+      ItemMutation.encode(message.itemMutation, writer.uint32(186).fork()).join();
+    }
+    if (message.itemMutationResult !== undefined) {
+      ItemMutationResult.encode(message.itemMutationResult, writer.uint32(194).fork()).join();
+    }
+    if (message.beginItemEdit !== undefined) {
+      BeginItemEdit.encode(message.beginItemEdit, writer.uint32(202).fork()).join();
+    }
+    if (message.itemEditSessionResult !== undefined) {
+      ItemEditSessionResult.encode(message.itemEditSessionResult, writer.uint32(210).fork()).join();
+    }
+    if (message.renewItemEdit !== undefined) {
+      RenewItemEdit.encode(message.renewItemEdit, writer.uint32(218).fork()).join();
+    }
+    if (message.endItemEdit !== undefined) {
+      EndItemEdit.encode(message.endItemEdit, writer.uint32(226).fork()).join();
+    }
+    if (message.itemEditPreview !== undefined) {
+      ItemEditPreview.encode(message.itemEditPreview, writer.uint32(234).fork()).join();
     }
     return writer;
   },
@@ -609,6 +963,62 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
             message.error = ProtocolError.decode(reader, reader.uint32());
             continue;
           }
+          case 23: {
+            if (tag !== 186) {
+              break;
+            }
+
+            message.itemMutation = ItemMutation.decode(reader, reader.uint32());
+            continue;
+          }
+          case 24: {
+            if (tag !== 194) {
+              break;
+            }
+
+            message.itemMutationResult = ItemMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+          case 25: {
+            if (tag !== 202) {
+              break;
+            }
+
+            message.beginItemEdit = BeginItemEdit.decode(reader, reader.uint32());
+            continue;
+          }
+          case 26: {
+            if (tag !== 210) {
+              break;
+            }
+
+            message.itemEditSessionResult = ItemEditSessionResult.decode(reader, reader.uint32());
+            continue;
+          }
+          case 27: {
+            if (tag !== 218) {
+              break;
+            }
+
+            message.renewItemEdit = RenewItemEdit.decode(reader, reader.uint32());
+            continue;
+          }
+          case 28: {
+            if (tag !== 226) {
+              break;
+            }
+
+            message.endItemEdit = EndItemEdit.decode(reader, reader.uint32());
+            continue;
+          }
+          case 29: {
+            if (tag !== 234) {
+              break;
+            }
+
+            message.itemEditPreview = ItemEditPreview.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -685,6 +1095,41 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
       checkpoint: isSet(object.checkpoint) ? Checkpoint.fromJSON(object.checkpoint) : undefined,
       heartbeat: isSet(object.heartbeat) ? Heartbeat.fromJSON(object.heartbeat) : undefined,
       error: isSet(object.error) ? ProtocolError.fromJSON(object.error) : undefined,
+      itemMutation: isSet(object.itemMutation)
+        ? ItemMutation.fromJSON(object.itemMutation)
+        : isSet(object.item_mutation)
+        ? ItemMutation.fromJSON(object.item_mutation)
+        : undefined,
+      itemMutationResult: isSet(object.itemMutationResult)
+        ? ItemMutationResult.fromJSON(object.itemMutationResult)
+        : isSet(object.item_mutation_result)
+        ? ItemMutationResult.fromJSON(object.item_mutation_result)
+        : undefined,
+      beginItemEdit: isSet(object.beginItemEdit)
+        ? BeginItemEdit.fromJSON(object.beginItemEdit)
+        : isSet(object.begin_item_edit)
+        ? BeginItemEdit.fromJSON(object.begin_item_edit)
+        : undefined,
+      itemEditSessionResult: isSet(object.itemEditSessionResult)
+        ? ItemEditSessionResult.fromJSON(object.itemEditSessionResult)
+        : isSet(object.item_edit_session_result)
+        ? ItemEditSessionResult.fromJSON(object.item_edit_session_result)
+        : undefined,
+      renewItemEdit: isSet(object.renewItemEdit)
+        ? RenewItemEdit.fromJSON(object.renewItemEdit)
+        : isSet(object.renew_item_edit)
+        ? RenewItemEdit.fromJSON(object.renew_item_edit)
+        : undefined,
+      endItemEdit: isSet(object.endItemEdit)
+        ? EndItemEdit.fromJSON(object.endItemEdit)
+        : isSet(object.end_item_edit)
+        ? EndItemEdit.fromJSON(object.end_item_edit)
+        : undefined,
+      itemEditPreview: isSet(object.itemEditPreview)
+        ? ItemEditPreview.fromJSON(object.itemEditPreview)
+        : isSet(object.item_edit_preview)
+        ? ItemEditPreview.fromJSON(object.item_edit_preview)
+        : undefined,
     };
   },
 
@@ -744,6 +1189,27 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     if (message.error !== undefined) {
       obj.error = ProtocolError.toJSON(message.error);
     }
+    if (message.itemMutation !== undefined) {
+      obj.itemMutation = ItemMutation.toJSON(message.itemMutation);
+    }
+    if (message.itemMutationResult !== undefined) {
+      obj.itemMutationResult = ItemMutationResult.toJSON(message.itemMutationResult);
+    }
+    if (message.beginItemEdit !== undefined) {
+      obj.beginItemEdit = BeginItemEdit.toJSON(message.beginItemEdit);
+    }
+    if (message.itemEditSessionResult !== undefined) {
+      obj.itemEditSessionResult = ItemEditSessionResult.toJSON(message.itemEditSessionResult);
+    }
+    if (message.renewItemEdit !== undefined) {
+      obj.renewItemEdit = RenewItemEdit.toJSON(message.renewItemEdit);
+    }
+    if (message.endItemEdit !== undefined) {
+      obj.endItemEdit = EndItemEdit.toJSON(message.endItemEdit);
+    }
+    if (message.itemEditPreview !== undefined) {
+      obj.itemEditPreview = ItemEditPreview.toJSON(message.itemEditPreview);
+    }
     return obj;
   },
 
@@ -793,6 +1259,28 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
       : undefined;
     message.error = (object.error !== undefined && object.error !== null)
       ? ProtocolError.fromPartial(object.error)
+      : undefined;
+    message.itemMutation = (object.itemMutation !== undefined && object.itemMutation !== null)
+      ? ItemMutation.fromPartial(object.itemMutation)
+      : undefined;
+    message.itemMutationResult = (object.itemMutationResult !== undefined && object.itemMutationResult !== null)
+      ? ItemMutationResult.fromPartial(object.itemMutationResult)
+      : undefined;
+    message.beginItemEdit = (object.beginItemEdit !== undefined && object.beginItemEdit !== null)
+      ? BeginItemEdit.fromPartial(object.beginItemEdit)
+      : undefined;
+    message.itemEditSessionResult =
+      (object.itemEditSessionResult !== undefined && object.itemEditSessionResult !== null)
+        ? ItemEditSessionResult.fromPartial(object.itemEditSessionResult)
+        : undefined;
+    message.renewItemEdit = (object.renewItemEdit !== undefined && object.renewItemEdit !== null)
+      ? RenewItemEdit.fromPartial(object.renewItemEdit)
+      : undefined;
+    message.endItemEdit = (object.endItemEdit !== undefined && object.endItemEdit !== null)
+      ? EndItemEdit.fromPartial(object.endItemEdit)
+      : undefined;
+    message.itemEditPreview = (object.itemEditPreview !== undefined && object.itemEditPreview !== null)
+      ? ItemEditPreview.fromPartial(object.itemEditPreview)
       : undefined;
     return message;
   },
@@ -3673,6 +4161,1482 @@ export const DurableCommandResult: MessageFns<DurableCommandResult> = {
     message.command = (object.command !== undefined && object.command !== null)
       ? DurableCommand.fromPartial(object.command)
       : undefined;
+    return message;
+  },
+};
+
+function createBaseItemMutation(): ItemMutation {
+  return {
+    clientSessionId: "",
+    mutationId: 0,
+    editSessionId: "",
+    expectedItemRevision: 0,
+    kind: 0,
+    entityId: "",
+    definitionId: "",
+    definitionVersion: 0,
+    position: undefined,
+    rotation: 0,
+    z: 0,
+    scale: 0,
+    configJson: new Uint8Array(0),
+    isolated: false,
+    collisionsEnabled: false,
+  };
+}
+
+export const ItemMutation: MessageFns<ItemMutation> = {
+  encode(message: ItemMutation, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.mutationId !== 0) {
+      writer.uint32(16).uint64(message.mutationId);
+    }
+    if (message.editSessionId !== "") {
+      writer.uint32(26).string(message.editSessionId);
+    }
+    if (message.expectedItemRevision !== 0) {
+      writer.uint32(32).uint64(message.expectedItemRevision);
+    }
+    if (message.kind !== 0) {
+      writer.uint32(40).int32(message.kind);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(50).string(message.entityId);
+    }
+    if (message.definitionId !== "") {
+      writer.uint32(58).string(message.definitionId);
+    }
+    if (message.definitionVersion !== 0) {
+      writer.uint32(64).uint32(message.definitionVersion);
+    }
+    if (message.position !== undefined) {
+      Vec2.encode(message.position, writer.uint32(74).fork()).join();
+    }
+    if (message.rotation !== 0) {
+      writer.uint32(85).float(message.rotation);
+    }
+    if (message.z !== 0) {
+      writer.uint32(93).float(message.z);
+    }
+    if (message.scale !== 0) {
+      writer.uint32(101).float(message.scale);
+    }
+    if (message.configJson.length !== 0) {
+      writer.uint32(106).bytes(message.configJson);
+    }
+    if (message.isolated !== false) {
+      writer.uint32(112).bool(message.isolated);
+    }
+    if (message.collisionsEnabled !== false) {
+      writer.uint32(120).bool(message.collisionsEnabled);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ItemMutation {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseItemMutation();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.mutationId = longToNumber(reader.uint64());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.editSessionId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.expectedItemRevision = longToNumber(reader.uint64());
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.kind = reader.int32() as any;
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.definitionId = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.definitionVersion = reader.uint32();
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.position = Vec2.decode(reader, reader.uint32());
+            continue;
+          }
+          case 10: {
+            if (tag !== 85) {
+              break;
+            }
+
+            message.rotation = reader.float();
+            continue;
+          }
+          case 11: {
+            if (tag !== 93) {
+              break;
+            }
+
+            message.z = reader.float();
+            continue;
+          }
+          case 12: {
+            if (tag !== 101) {
+              break;
+            }
+
+            message.scale = reader.float();
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.configJson = reader.bytes();
+            continue;
+          }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
+            message.isolated = reader.bool();
+            continue;
+          }
+          case 15: {
+            if (tag !== 120) {
+              break;
+            }
+
+            message.collisionsEnabled = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ItemMutation {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      mutationId: isSet(object.mutationId)
+        ? globalThis.Number(object.mutationId)
+        : isSet(object.mutation_id)
+        ? globalThis.Number(object.mutation_id)
+        : 0,
+      editSessionId: isSet(object.editSessionId)
+        ? globalThis.String(object.editSessionId)
+        : isSet(object.edit_session_id)
+        ? globalThis.String(object.edit_session_id)
+        : "",
+      expectedItemRevision: isSet(object.expectedItemRevision)
+        ? globalThis.Number(object.expectedItemRevision)
+        : isSet(object.expected_item_revision)
+        ? globalThis.Number(object.expected_item_revision)
+        : 0,
+      kind: isSet(object.kind) ? itemMutationKindFromJSON(object.kind) : 0,
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+      definitionId: isSet(object.definitionId)
+        ? globalThis.String(object.definitionId)
+        : isSet(object.definition_id)
+        ? globalThis.String(object.definition_id)
+        : "",
+      definitionVersion: isSet(object.definitionVersion)
+        ? globalThis.Number(object.definitionVersion)
+        : isSet(object.definition_version)
+        ? globalThis.Number(object.definition_version)
+        : 0,
+      position: isSet(object.position) ? Vec2.fromJSON(object.position) : undefined,
+      rotation: isSet(object.rotation) ? globalThis.Number(object.rotation) : 0,
+      z: isSet(object.z) ? globalThis.Number(object.z) : 0,
+      scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
+      configJson: isSet(object.configJson)
+        ? bytesFromBase64(object.configJson)
+        : isSet(object.config_json)
+        ? bytesFromBase64(object.config_json)
+        : new Uint8Array(0),
+      isolated: isSet(object.isolated) ? globalThis.Boolean(object.isolated) : false,
+      collisionsEnabled: isSet(object.collisionsEnabled)
+        ? globalThis.Boolean(object.collisionsEnabled)
+        : isSet(object.collisions_enabled)
+        ? globalThis.Boolean(object.collisions_enabled)
+        : false,
+    };
+  },
+
+  toJSON(message: ItemMutation): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.mutationId !== 0) {
+      obj.mutationId = Math.round(message.mutationId);
+    }
+    if (message.editSessionId !== "") {
+      obj.editSessionId = message.editSessionId;
+    }
+    if (message.expectedItemRevision !== 0) {
+      obj.expectedItemRevision = Math.round(message.expectedItemRevision);
+    }
+    if (message.kind !== 0) {
+      obj.kind = itemMutationKindToJSON(message.kind);
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    if (message.definitionId !== "") {
+      obj.definitionId = message.definitionId;
+    }
+    if (message.definitionVersion !== 0) {
+      obj.definitionVersion = Math.round(message.definitionVersion);
+    }
+    if (message.position !== undefined) {
+      obj.position = Vec2.toJSON(message.position);
+    }
+    if (message.rotation !== 0) {
+      obj.rotation = message.rotation;
+    }
+    if (message.z !== 0) {
+      obj.z = message.z;
+    }
+    if (message.scale !== 0) {
+      obj.scale = message.scale;
+    }
+    if (message.configJson.length !== 0) {
+      obj.configJson = base64FromBytes(message.configJson);
+    }
+    if (message.isolated !== false) {
+      obj.isolated = message.isolated;
+    }
+    if (message.collisionsEnabled !== false) {
+      obj.collisionsEnabled = message.collisionsEnabled;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ItemMutation>, I>>(base?: I): ItemMutation {
+    return ItemMutation.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ItemMutation>, I>>(object: I): ItemMutation {
+    const message = createBaseItemMutation();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.mutationId = object.mutationId ?? 0;
+    message.editSessionId = object.editSessionId ?? "";
+    message.expectedItemRevision = object.expectedItemRevision ?? 0;
+    message.kind = object.kind ?? 0;
+    message.entityId = object.entityId ?? "";
+    message.definitionId = object.definitionId ?? "";
+    message.definitionVersion = object.definitionVersion ?? 0;
+    message.position = (object.position !== undefined && object.position !== null)
+      ? Vec2.fromPartial(object.position)
+      : undefined;
+    message.rotation = object.rotation ?? 0;
+    message.z = object.z ?? 0;
+    message.scale = object.scale ?? 0;
+    message.configJson = object.configJson ?? new Uint8Array(0);
+    message.isolated = object.isolated ?? false;
+    message.collisionsEnabled = object.collisionsEnabled ?? false;
+    return message;
+  },
+};
+
+function createBaseItemMutationResult(): ItemMutationResult {
+  return {
+    clientSessionId: "",
+    mutationId: 0,
+    editSessionId: "",
+    accepted: false,
+    rejectCode: 0,
+    message: "",
+    sceneRevision: 0,
+    itemRevision: 0,
+    itemInstanceJson: new Uint8Array(0),
+    deletedEntityId: "",
+    kind: 0,
+    entityId: "",
+  };
+}
+
+export const ItemMutationResult: MessageFns<ItemMutationResult> = {
+  encode(message: ItemMutationResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.mutationId !== 0) {
+      writer.uint32(16).uint64(message.mutationId);
+    }
+    if (message.editSessionId !== "") {
+      writer.uint32(26).string(message.editSessionId);
+    }
+    if (message.accepted !== false) {
+      writer.uint32(32).bool(message.accepted);
+    }
+    if (message.rejectCode !== 0) {
+      writer.uint32(40).int32(message.rejectCode);
+    }
+    if (message.message !== "") {
+      writer.uint32(50).string(message.message);
+    }
+    if (message.sceneRevision !== 0) {
+      writer.uint32(56).uint64(message.sceneRevision);
+    }
+    if (message.itemRevision !== 0) {
+      writer.uint32(64).uint64(message.itemRevision);
+    }
+    if (message.itemInstanceJson.length !== 0) {
+      writer.uint32(74).bytes(message.itemInstanceJson);
+    }
+    if (message.deletedEntityId !== "") {
+      writer.uint32(82).string(message.deletedEntityId);
+    }
+    if (message.kind !== 0) {
+      writer.uint32(88).int32(message.kind);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(98).string(message.entityId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ItemMutationResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseItemMutationResult();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.mutationId = longToNumber(reader.uint64());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.editSessionId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.accepted = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.rejectCode = reader.int32() as any;
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.message = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.sceneRevision = longToNumber(reader.uint64());
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.itemRevision = longToNumber(reader.uint64());
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.itemInstanceJson = reader.bytes();
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.deletedEntityId = reader.string();
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.kind = reader.int32() as any;
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ItemMutationResult {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      mutationId: isSet(object.mutationId)
+        ? globalThis.Number(object.mutationId)
+        : isSet(object.mutation_id)
+        ? globalThis.Number(object.mutation_id)
+        : 0,
+      editSessionId: isSet(object.editSessionId)
+        ? globalThis.String(object.editSessionId)
+        : isSet(object.edit_session_id)
+        ? globalThis.String(object.edit_session_id)
+        : "",
+      accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false,
+      rejectCode: isSet(object.rejectCode)
+        ? itemMutationRejectCodeFromJSON(object.rejectCode)
+        : isSet(object.reject_code)
+        ? itemMutationRejectCodeFromJSON(object.reject_code)
+        : 0,
+      message: isSet(object.message) ? globalThis.String(object.message) : "",
+      sceneRevision: isSet(object.sceneRevision)
+        ? globalThis.Number(object.sceneRevision)
+        : isSet(object.scene_revision)
+        ? globalThis.Number(object.scene_revision)
+        : 0,
+      itemRevision: isSet(object.itemRevision)
+        ? globalThis.Number(object.itemRevision)
+        : isSet(object.item_revision)
+        ? globalThis.Number(object.item_revision)
+        : 0,
+      itemInstanceJson: isSet(object.itemInstanceJson)
+        ? bytesFromBase64(object.itemInstanceJson)
+        : isSet(object.item_instance_json)
+        ? bytesFromBase64(object.item_instance_json)
+        : new Uint8Array(0),
+      deletedEntityId: isSet(object.deletedEntityId)
+        ? globalThis.String(object.deletedEntityId)
+        : isSet(object.deleted_entity_id)
+        ? globalThis.String(object.deleted_entity_id)
+        : "",
+      kind: isSet(object.kind) ? itemMutationKindFromJSON(object.kind) : 0,
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+    };
+  },
+
+  toJSON(message: ItemMutationResult): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.mutationId !== 0) {
+      obj.mutationId = Math.round(message.mutationId);
+    }
+    if (message.editSessionId !== "") {
+      obj.editSessionId = message.editSessionId;
+    }
+    if (message.accepted !== false) {
+      obj.accepted = message.accepted;
+    }
+    if (message.rejectCode !== 0) {
+      obj.rejectCode = itemMutationRejectCodeToJSON(message.rejectCode);
+    }
+    if (message.message !== "") {
+      obj.message = message.message;
+    }
+    if (message.sceneRevision !== 0) {
+      obj.sceneRevision = Math.round(message.sceneRevision);
+    }
+    if (message.itemRevision !== 0) {
+      obj.itemRevision = Math.round(message.itemRevision);
+    }
+    if (message.itemInstanceJson.length !== 0) {
+      obj.itemInstanceJson = base64FromBytes(message.itemInstanceJson);
+    }
+    if (message.deletedEntityId !== "") {
+      obj.deletedEntityId = message.deletedEntityId;
+    }
+    if (message.kind !== 0) {
+      obj.kind = itemMutationKindToJSON(message.kind);
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ItemMutationResult>, I>>(base?: I): ItemMutationResult {
+    return ItemMutationResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ItemMutationResult>, I>>(object: I): ItemMutationResult {
+    const message = createBaseItemMutationResult();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.mutationId = object.mutationId ?? 0;
+    message.editSessionId = object.editSessionId ?? "";
+    message.accepted = object.accepted ?? false;
+    message.rejectCode = object.rejectCode ?? 0;
+    message.message = object.message ?? "";
+    message.sceneRevision = object.sceneRevision ?? 0;
+    message.itemRevision = object.itemRevision ?? 0;
+    message.itemInstanceJson = object.itemInstanceJson ?? new Uint8Array(0);
+    message.deletedEntityId = object.deletedEntityId ?? "";
+    message.kind = object.kind ?? 0;
+    message.entityId = object.entityId ?? "";
+    return message;
+  },
+};
+
+function createBaseBeginItemEdit(): BeginItemEdit {
+  return { clientSessionId: "", editSessionId: "", entityId: "", observedItemRevision: 0 };
+}
+
+export const BeginItemEdit: MessageFns<BeginItemEdit> = {
+  encode(message: BeginItemEdit, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.editSessionId !== "") {
+      writer.uint32(18).string(message.editSessionId);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(26).string(message.entityId);
+    }
+    if (message.observedItemRevision !== 0) {
+      writer.uint32(32).uint64(message.observedItemRevision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BeginItemEdit {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseBeginItemEdit();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.editSessionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.observedItemRevision = longToNumber(reader.uint64());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): BeginItemEdit {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      editSessionId: isSet(object.editSessionId)
+        ? globalThis.String(object.editSessionId)
+        : isSet(object.edit_session_id)
+        ? globalThis.String(object.edit_session_id)
+        : "",
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+      observedItemRevision: isSet(object.observedItemRevision)
+        ? globalThis.Number(object.observedItemRevision)
+        : isSet(object.observed_item_revision)
+        ? globalThis.Number(object.observed_item_revision)
+        : 0,
+    };
+  },
+
+  toJSON(message: BeginItemEdit): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.editSessionId !== "") {
+      obj.editSessionId = message.editSessionId;
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    if (message.observedItemRevision !== 0) {
+      obj.observedItemRevision = Math.round(message.observedItemRevision);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<BeginItemEdit>, I>>(base?: I): BeginItemEdit {
+    return BeginItemEdit.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<BeginItemEdit>, I>>(object: I): BeginItemEdit {
+    const message = createBaseBeginItemEdit();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.editSessionId = object.editSessionId ?? "";
+    message.entityId = object.entityId ?? "";
+    message.observedItemRevision = object.observedItemRevision ?? 0;
+    return message;
+  },
+};
+
+function createBaseRenewItemEdit(): RenewItemEdit {
+  return { clientSessionId: "", editSessionId: "", entityId: "" };
+}
+
+export const RenewItemEdit: MessageFns<RenewItemEdit> = {
+  encode(message: RenewItemEdit, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.editSessionId !== "") {
+      writer.uint32(18).string(message.editSessionId);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(26).string(message.entityId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewItemEdit {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRenewItemEdit();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.editSessionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RenewItemEdit {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      editSessionId: isSet(object.editSessionId)
+        ? globalThis.String(object.editSessionId)
+        : isSet(object.edit_session_id)
+        ? globalThis.String(object.edit_session_id)
+        : "",
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+    };
+  },
+
+  toJSON(message: RenewItemEdit): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.editSessionId !== "") {
+      obj.editSessionId = message.editSessionId;
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RenewItemEdit>, I>>(base?: I): RenewItemEdit {
+    return RenewItemEdit.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RenewItemEdit>, I>>(object: I): RenewItemEdit {
+    const message = createBaseRenewItemEdit();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.editSessionId = object.editSessionId ?? "";
+    message.entityId = object.entityId ?? "";
+    return message;
+  },
+};
+
+function createBaseEndItemEdit(): EndItemEdit {
+  return { clientSessionId: "", editSessionId: "", entityId: "", cancel: false };
+}
+
+export const EndItemEdit: MessageFns<EndItemEdit> = {
+  encode(message: EndItemEdit, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.editSessionId !== "") {
+      writer.uint32(18).string(message.editSessionId);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(26).string(message.entityId);
+    }
+    if (message.cancel !== false) {
+      writer.uint32(32).bool(message.cancel);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EndItemEdit {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseEndItemEdit();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.editSessionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.cancel = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): EndItemEdit {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      editSessionId: isSet(object.editSessionId)
+        ? globalThis.String(object.editSessionId)
+        : isSet(object.edit_session_id)
+        ? globalThis.String(object.edit_session_id)
+        : "",
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+      cancel: isSet(object.cancel) ? globalThis.Boolean(object.cancel) : false,
+    };
+  },
+
+  toJSON(message: EndItemEdit): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.editSessionId !== "") {
+      obj.editSessionId = message.editSessionId;
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    if (message.cancel !== false) {
+      obj.cancel = message.cancel;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EndItemEdit>, I>>(base?: I): EndItemEdit {
+    return EndItemEdit.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EndItemEdit>, I>>(object: I): EndItemEdit {
+    const message = createBaseEndItemEdit();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.editSessionId = object.editSessionId ?? "";
+    message.entityId = object.entityId ?? "";
+    message.cancel = object.cancel ?? false;
+    return message;
+  },
+};
+
+function createBaseItemEditSessionResult(): ItemEditSessionResult {
+  return {
+    clientSessionId: "",
+    editSessionId: "",
+    entityId: "",
+    status: 0,
+    rejectCode: 0,
+    message: "",
+    itemRevision: 0,
+    leaseExpiresAtUnixMs: 0,
+    itemInstanceJson: new Uint8Array(0),
+  };
+}
+
+export const ItemEditSessionResult: MessageFns<ItemEditSessionResult> = {
+  encode(message: ItemEditSessionResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.editSessionId !== "") {
+      writer.uint32(18).string(message.editSessionId);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(26).string(message.entityId);
+    }
+    if (message.status !== 0) {
+      writer.uint32(32).int32(message.status);
+    }
+    if (message.rejectCode !== 0) {
+      writer.uint32(40).int32(message.rejectCode);
+    }
+    if (message.message !== "") {
+      writer.uint32(50).string(message.message);
+    }
+    if (message.itemRevision !== 0) {
+      writer.uint32(56).uint64(message.itemRevision);
+    }
+    if (message.leaseExpiresAtUnixMs !== 0) {
+      writer.uint32(64).uint64(message.leaseExpiresAtUnixMs);
+    }
+    if (message.itemInstanceJson.length !== 0) {
+      writer.uint32(74).bytes(message.itemInstanceJson);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ItemEditSessionResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseItemEditSessionResult();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.editSessionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.status = reader.int32() as any;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.rejectCode = reader.int32() as any;
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.message = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.itemRevision = longToNumber(reader.uint64());
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.leaseExpiresAtUnixMs = longToNumber(reader.uint64());
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.itemInstanceJson = reader.bytes();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ItemEditSessionResult {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      editSessionId: isSet(object.editSessionId)
+        ? globalThis.String(object.editSessionId)
+        : isSet(object.edit_session_id)
+        ? globalThis.String(object.edit_session_id)
+        : "",
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+      status: isSet(object.status) ? itemEditSessionStatusFromJSON(object.status) : 0,
+      rejectCode: isSet(object.rejectCode)
+        ? itemMutationRejectCodeFromJSON(object.rejectCode)
+        : isSet(object.reject_code)
+        ? itemMutationRejectCodeFromJSON(object.reject_code)
+        : 0,
+      message: isSet(object.message) ? globalThis.String(object.message) : "",
+      itemRevision: isSet(object.itemRevision)
+        ? globalThis.Number(object.itemRevision)
+        : isSet(object.item_revision)
+        ? globalThis.Number(object.item_revision)
+        : 0,
+      leaseExpiresAtUnixMs: isSet(object.leaseExpiresAtUnixMs)
+        ? globalThis.Number(object.leaseExpiresAtUnixMs)
+        : isSet(object.lease_expires_at_unix_ms)
+        ? globalThis.Number(object.lease_expires_at_unix_ms)
+        : 0,
+      itemInstanceJson: isSet(object.itemInstanceJson)
+        ? bytesFromBase64(object.itemInstanceJson)
+        : isSet(object.item_instance_json)
+        ? bytesFromBase64(object.item_instance_json)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ItemEditSessionResult): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.editSessionId !== "") {
+      obj.editSessionId = message.editSessionId;
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    if (message.status !== 0) {
+      obj.status = itemEditSessionStatusToJSON(message.status);
+    }
+    if (message.rejectCode !== 0) {
+      obj.rejectCode = itemMutationRejectCodeToJSON(message.rejectCode);
+    }
+    if (message.message !== "") {
+      obj.message = message.message;
+    }
+    if (message.itemRevision !== 0) {
+      obj.itemRevision = Math.round(message.itemRevision);
+    }
+    if (message.leaseExpiresAtUnixMs !== 0) {
+      obj.leaseExpiresAtUnixMs = Math.round(message.leaseExpiresAtUnixMs);
+    }
+    if (message.itemInstanceJson.length !== 0) {
+      obj.itemInstanceJson = base64FromBytes(message.itemInstanceJson);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ItemEditSessionResult>, I>>(base?: I): ItemEditSessionResult {
+    return ItemEditSessionResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ItemEditSessionResult>, I>>(object: I): ItemEditSessionResult {
+    const message = createBaseItemEditSessionResult();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.editSessionId = object.editSessionId ?? "";
+    message.entityId = object.entityId ?? "";
+    message.status = object.status ?? 0;
+    message.rejectCode = object.rejectCode ?? 0;
+    message.message = object.message ?? "";
+    message.itemRevision = object.itemRevision ?? 0;
+    message.leaseExpiresAtUnixMs = object.leaseExpiresAtUnixMs ?? 0;
+    message.itemInstanceJson = object.itemInstanceJson ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseItemEditPreview(): ItemEditPreview {
+  return {
+    clientSessionId: "",
+    editSessionId: "",
+    entityId: "",
+    previewSequence: 0,
+    position: undefined,
+    rotation: 0,
+    z: 0,
+    scale: 0,
+    revert: false,
+  };
+}
+
+export const ItemEditPreview: MessageFns<ItemEditPreview> = {
+  encode(message: ItemEditPreview, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.editSessionId !== "") {
+      writer.uint32(18).string(message.editSessionId);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(26).string(message.entityId);
+    }
+    if (message.previewSequence !== 0) {
+      writer.uint32(32).uint64(message.previewSequence);
+    }
+    if (message.position !== undefined) {
+      Vec2.encode(message.position, writer.uint32(42).fork()).join();
+    }
+    if (message.rotation !== 0) {
+      writer.uint32(53).float(message.rotation);
+    }
+    if (message.z !== 0) {
+      writer.uint32(61).float(message.z);
+    }
+    if (message.scale !== 0) {
+      writer.uint32(69).float(message.scale);
+    }
+    if (message.revert !== false) {
+      writer.uint32(72).bool(message.revert);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ItemEditPreview {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseItemEditPreview();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.editSessionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.previewSequence = longToNumber(reader.uint64());
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.position = Vec2.decode(reader, reader.uint32());
+            continue;
+          }
+          case 6: {
+            if (tag !== 53) {
+              break;
+            }
+
+            message.rotation = reader.float();
+            continue;
+          }
+          case 7: {
+            if (tag !== 61) {
+              break;
+            }
+
+            message.z = reader.float();
+            continue;
+          }
+          case 8: {
+            if (tag !== 69) {
+              break;
+            }
+
+            message.scale = reader.float();
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.revert = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ItemEditPreview {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      editSessionId: isSet(object.editSessionId)
+        ? globalThis.String(object.editSessionId)
+        : isSet(object.edit_session_id)
+        ? globalThis.String(object.edit_session_id)
+        : "",
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+      previewSequence: isSet(object.previewSequence)
+        ? globalThis.Number(object.previewSequence)
+        : isSet(object.preview_sequence)
+        ? globalThis.Number(object.preview_sequence)
+        : 0,
+      position: isSet(object.position) ? Vec2.fromJSON(object.position) : undefined,
+      rotation: isSet(object.rotation) ? globalThis.Number(object.rotation) : 0,
+      z: isSet(object.z) ? globalThis.Number(object.z) : 0,
+      scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
+      revert: isSet(object.revert) ? globalThis.Boolean(object.revert) : false,
+    };
+  },
+
+  toJSON(message: ItemEditPreview): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.editSessionId !== "") {
+      obj.editSessionId = message.editSessionId;
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    if (message.previewSequence !== 0) {
+      obj.previewSequence = Math.round(message.previewSequence);
+    }
+    if (message.position !== undefined) {
+      obj.position = Vec2.toJSON(message.position);
+    }
+    if (message.rotation !== 0) {
+      obj.rotation = message.rotation;
+    }
+    if (message.z !== 0) {
+      obj.z = message.z;
+    }
+    if (message.scale !== 0) {
+      obj.scale = message.scale;
+    }
+    if (message.revert !== false) {
+      obj.revert = message.revert;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ItemEditPreview>, I>>(base?: I): ItemEditPreview {
+    return ItemEditPreview.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ItemEditPreview>, I>>(object: I): ItemEditPreview {
+    const message = createBaseItemEditPreview();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.editSessionId = object.editSessionId ?? "";
+    message.entityId = object.entityId ?? "";
+    message.previewSequence = object.previewSequence ?? 0;
+    message.position = (object.position !== undefined && object.position !== null)
+      ? Vec2.fromPartial(object.position)
+      : undefined;
+    message.rotation = object.rotation ?? 0;
+    message.z = object.z ?? 0;
+    message.scale = object.scale ?? 0;
+    message.revert = object.revert ?? false;
     return message;
   },
 };
