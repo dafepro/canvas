@@ -133,6 +133,8 @@ describe("validation", () => {
         acceleration: 150,
         flickDeceleration: 24,
         maxTurnSpeed: 12,
+        facing: "fixed",
+        directInteractionMaxSpeed: 30,
       },
     })).toEqual({ ok: true });
     expect(validateCanvasDefinition({
@@ -142,6 +144,8 @@ describe("validation", () => {
         acceleration: Number.NaN,
         flickDeceleration: -1,
         maxTurnSpeed: 0,
+        facing: "camera" as "fixed",
+        directInteractionMaxSpeed: Number.POSITIVE_INFINITY,
       },
     })).toMatchObject({
       ok: false,
@@ -150,6 +154,8 @@ describe("validation", () => {
         expect.objectContaining({ path: "avatarController.acceleration" }),
         expect.objectContaining({ path: "avatarController.flickDeceleration" }),
         expect.objectContaining({ path: "avatarController.maxTurnSpeed" }),
+        expect.objectContaining({ path: "avatarController.facing" }),
+        expect.objectContaining({ path: "avatarController.directInteractionMaxSpeed" }),
       ]),
     });
   });

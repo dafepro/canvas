@@ -33,6 +33,7 @@ export const validateCanvasDefinition = (
     "acceleration",
     "flickDeceleration",
     "maxTurnSpeed",
+    "directInteractionMaxSpeed",
   ] as const) {
     const value = canvas.avatarController?.[key];
     if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
@@ -41,6 +42,13 @@ export const validateCanvasDefinition = (
         message: "must be a positive finite number",
       });
     }
+  }
+  const facing = canvas.avatarController?.facing;
+  if (facing !== undefined && facing !== "movement" && facing !== "fixed") {
+    problems.push({
+      path: "avatarController.facing",
+      message: 'must be "movement" or "fixed"',
+    });
   }
   const spawnIds = new Set<string>();
   canvas.spawnPoints.forEach((spawn, i) => {

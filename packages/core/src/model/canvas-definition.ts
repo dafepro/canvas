@@ -95,6 +95,13 @@ export interface AvatarControllerDefinition {
   flickDeceleration?: number;
   /** Maximum visual facing change in radians per second. */
   maxTurnSpeed?: number;
+  /** Whether movement turns the avatar art or keeps its authored orientation. */
+  facing?: "movement" | "fixed";
+  /**
+   * Maximum velocity exposed to contact behaviors during uncapped direct drag.
+   * This limits interaction force without limiting pointer-following distance.
+   */
+  directInteractionMaxSpeed?: number;
 }
 
 export const defaultAvatarController: Required<AvatarControllerDefinition> = {
@@ -103,6 +110,8 @@ export const defaultAvatarController: Required<AvatarControllerDefinition> = {
   acceleration: 90,
   flickDeceleration: 24,
   maxTurnSpeed: 10,
+  facing: "movement",
+  directInteractionMaxSpeed: 36,
 };
 
 export const resolveAvatarController = (

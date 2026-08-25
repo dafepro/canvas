@@ -112,6 +112,12 @@ agree on how the resulting slide comes to rest.
 `avatarController.maxTurnSpeed` independently bounds facing changes, including
 uncapped direct dragging, so a pointer correction cannot snap the avatar art
 through a large angle in one simulation tick.
+Consumers whose art has a fixed upright perspective set
+`avatarController.facing` to `"fixed"`; the default `"movement"` retains
+directional facing. During direct dragging,
+`avatarController.directInteractionMaxSpeed` caps only the velocity exposed to
+contact behaviors. Absolute pointer placement remains uncapped, preventing a
+large pointer jump from becoming an unbounded authored kick or hit.
 
 Consumer visuals may opt into `visual.mirrorX` or `visual.mirrorY`. Reflection
 is presentation-only: world dimensions, anchors, transforms, and colliders do

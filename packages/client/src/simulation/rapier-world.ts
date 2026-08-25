@@ -64,6 +64,10 @@ interface BodyRecord {
     velocity: Vec2;
     angularVelocity: number;
   };
+  /** Velocity estimated across direct-input arrivals, consumed on the move tick. */
+  pendingDirectInteractionVelocity?: Vec2;
+  /** Simulation tick when the previous direct target arrived. */
+  lastDirectInputTick?: number;
 }
 
 /** Spec 20. Half a second at 60 Hz before a still, embedded body is freed. */
@@ -422,6 +426,9 @@ export class RapierWorld implements BehaviorHost {
         acceleration: spawn.acceleration ?? controller.acceleration,
         flickDeceleration: spawn.flickDeceleration ?? controller.flickDeceleration,
         maxTurnSpeed: controller.maxTurnSpeed,
+        facing: controller.facing,
+        directInteractionMaxSpeed: controller.directInteractionMaxSpeed,
+        interactionVelocity: { x: 0, y: 0 },
         flicking: false,
         lastProcessedInputSeq: 0,
         desiredDirection: { x: 0, y: 0 },
@@ -578,6 +585,9 @@ export class RapierWorld implements BehaviorHost {
       entity.avatar.desiredIntensity = 0;
       entity.avatar.desiredPosition = undefined;
       entity.avatar.flicking = false;
+      entity.avatar.interactionVelocity = { x: 0, y: 0 };
+      record.pendingDirectInteractionVelocity = undefined;
+      record.lastDirectInputTick = undefined;
       return;
     }
     const nextInput = inputSequence > entity.avatar.lastProcessedInputSeq;
@@ -590,11 +600,25 @@ export class RapierWorld implements BehaviorHost {
             y: Math.max(0, Math.min(this.canvas.size.height, target.y)),
           }
         : undefined;
+      if (nextInput && entity.avatar.desiredPosition) {
+        const current = record.body.translation();
+        const elapsedTicks = Math.max(1, this.tick - (record.lastDirectInputTick ?? this.tick - 1));
+        record.pendingDirectInteractionVelocity = this.limitVelocity({
+          x: (entity.avatar.desiredPosition.x - current.x) * this.tickRate / elapsedTicks,
+          y: (entity.avatar.desiredPosition.y - current.y) * this.tickRate / elapsedTicks,
+        }, entity.avatar.directInteractionMaxSpeed);
+        record.lastDirectInputTick = this.tick;
+      } else if (!entity.avatar.desiredPosition) {
+        record.pendingDirectInteractionVelocity = undefined;
+        record.lastDirectInputTick = undefined;
+      }
       entity.avatar.flicking = false;
     } else {
       entity.avatar.desiredDirection = { x: 0, y: 0 };
       entity.avatar.desiredIntensity = 0;
       entity.avatar.desiredPosition = undefined;
+      record.pendingDirectInteractionVelocity = undefined;
+      record.lastDirectInputTick = undefined;
       const length = Math.hypot(direction.x, direction.y);
       if (nextInput && intensity > 0 && length > 0) {
         const speed = Math.max(0, Math.min(1, intensity)) * entity.avatar.maxSpeed;
@@ -701,6 +725,7 @@ export class RapierWorld implements BehaviorHost {
     if (!avatar) return;
     if (avatar.disabled) {
       record.body.setLinvel({ x: 0, y: 0 }, true);
+      avatar.interactionVelocity = { x: 0, y: 0 };
       return;
     }
     if (avatar.desiredPosition) {
@@ -712,6 +737,13 @@ export class RapierWorld implements BehaviorHost {
       const moved = this.sweepDirectAvatarMovement(record, delta);
       record.body.setTranslation({ x: start.x + moved.x, y: start.y + moved.y }, true);
       record.body.setLinvel({ x: 0, y: 0 }, true);
+      avatar.interactionVelocity = Math.hypot(moved.x, moved.y) > 0
+        ? record.pendingDirectInteractionVelocity ?? this.limitVelocity(
+            { x: moved.x / dt, y: moved.y / dt },
+            avatar.directInteractionMaxSpeed,
+          )
+        : { x: 0, y: 0 };
+      record.pendingDirectInteractionVelocity = undefined;
       this.turnAvatar(record, moved, dt);
       return;
     }
@@ -734,13 +766,21 @@ export class RapierWorld implements BehaviorHost {
     }
     const movement = this.clampAgainstGeometry(record, next, dt);
     record.body.setLinvel(movement, true);
+    avatar.interactionVelocity = { ...movement };
     this.turnAvatar(record, movement, dt);
+  }
+
+  private limitVelocity(velocity: Vec2, maxSpeed: number): Vec2 {
+    const speed = Math.hypot(velocity.x, velocity.y);
+    if (speed <= maxSpeed || speed === 0) return velocity;
+    const scale = maxSpeed / speed;
+    return { x: velocity.x * scale, y: velocity.y * scale };
   }
 
   private turnAvatar(record: BodyRecord, movement: Vec2, dt: number): void {
     const avatar = record.entity.avatar;
     const speed = Math.hypot(movement.x, movement.y);
-    if (!avatar || speed < 0.05) return;
+    if (!avatar || avatar.facing === "fixed" || speed < 0.05) return;
     const current = record.body.rotation();
     const target = Math.atan2(movement.y, movement.x);
     const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current));
@@ -1339,6 +1379,7 @@ export class RapierWorld implements BehaviorHost {
   velocity(id: EntityId): Readonly<Vec2> | undefined {
     const record = this.bodies.get(id);
     if (!record) return undefined;
+    if (record.entity.avatar) return { ...record.entity.avatar.interactionVelocity };
     const velocity = record.body.linvel();
     return { x: velocity.x, y: velocity.y };
   }

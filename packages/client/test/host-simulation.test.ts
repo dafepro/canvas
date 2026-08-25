@@ -610,6 +610,123 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("keeps fixed-facing avatars upright during direct movement", () => {
+    const simulation = new HostSimulation(
+      {
+        ...rocketCanvas,
+        staticGeometry: [],
+        avatarController: {
+          ...rocketCanvas.avatarController,
+          facing: "fixed",
+        },
+      },
+      rocketCanvasDefinitions,
+      registry(),
+      60,
+    );
+    simulation.addAvatar({
+      entityId: "avatar:upright",
+      clientId: "upright",
+      userId: "upright",
+      position: { x: 25, y: 35 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:upright",
+      { x: 0, y: 1 },
+      1,
+      1,
+      true,
+      { x: 25, y: 55 },
+    );
+    simulation.step();
+
+    expect(simulation.world.registry.require("avatar:upright").transform.rotation).toBe(0);
+    simulation.free();
+  });
+
+  it("reports bounded interaction velocity for uncapped direct movement", () => {
+    const simulation = new HostSimulation(
+      {
+        ...rocketCanvas,
+        staticGeometry: [],
+        avatarController: {
+          ...rocketCanvas.avatarController,
+          directInteractionMaxSpeed: 30,
+        },
+      },
+      rocketCanvasDefinitions,
+      registry(),
+      60,
+    );
+    simulation.addAvatar({
+      entityId: "avatar:direct-impact",
+      clientId: "direct-impact",
+      userId: "direct-impact",
+      position: { x: 25, y: 35 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:direct-impact",
+      { x: 1, y: 0 },
+      1,
+      1,
+      true,
+      { x: 75, y: 35 },
+    );
+    simulation.step();
+
+    expect(simulation.world.registry.require("avatar:direct-impact").transform.x)
+      .toBeCloseTo(75, 4);
+    expect(simulation.world.velocity("avatar:direct-impact"))
+      .toEqual({ x: 30, y: 0 });
+    simulation.free();
+  });
+
+  it("estimates direct interaction velocity across input arrival ticks", () => {
+    const simulation = new HostSimulation(
+      {
+        ...rocketCanvas,
+        staticGeometry: [],
+        avatarController: {
+          ...rocketCanvas.avatarController,
+          directInteractionMaxSpeed: 30,
+        },
+      },
+      rocketCanvasDefinitions,
+      registry(),
+      60,
+    );
+    simulation.addAvatar({
+      entityId: "avatar:cadence",
+      clientId: "cadence",
+      userId: "cadence",
+      position: { x: 25, y: 35 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:cadence",
+      { x: 0, y: 0 },
+      0,
+      1,
+      true,
+      { x: 25, y: 35 },
+    );
+    for (let tick = 0; tick < 4; tick++) simulation.step();
+    simulation.world.setAvatarInput(
+      "avatar:cadence",
+      { x: 1, y: 0 },
+      1,
+      2,
+      true,
+      { x: 26, y: 35 },
+    );
+    simulation.step();
+
+    expect(simulation.world.velocity("avatar:cadence")!.x).toBeCloseTo(15, 5);
+    simulation.free();
+  });
+
   it("still blocks an uncapped direct drag at solid geometry", () => {
     const simulation = build();
     simulation.addAvatar({

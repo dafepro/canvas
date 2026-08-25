@@ -42,6 +42,10 @@ export interface AvatarComponent {
   acceleration: number;
   flickDeceleration: number;
   maxTurnSpeed: number;
+  facing: "movement" | "fixed";
+  directInteractionMaxSpeed: number;
+  /** Host-tick velocity used by contact behaviors for direct pointer movement. */
+  interactionVelocity: Vec2;
   /** True while a one-shot direct-control flick is coasting to rest. */
   flicking: boolean;
   /** Newest input sequence the host applied for this avatar. */
