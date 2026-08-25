@@ -14,12 +14,20 @@ checks:
   `room.proto` contract and fails on any checked-in difference.
 - **Cross-platform verification (ubuntu-latest)** builds the reusable packages,
   installs their packed archives into clean external consumers, builds both
-  reference integrations from those archives, runs the TypeScript suite, and
-  runs the Go suite with race detection.
+  reference integrations from those archives, runs the TypeScript suite, runs
+  the scene/network load budget in an isolated process, and runs the Go suite
+  with race detection.
 - **Cross-platform verification (windows-latest)** runs the same gate on
   Windows, including the external packed-consumer installations and ordinary
   Go tests. Race detection remains a required Linux check because Go's race
   detector requires a C toolchain that is not part of the Windows contract.
+
+The load budget is deliberately excluded from the broad Vitest invocation and
+then run as its own required step. Its wall-clock settle window and traffic
+measurement must not compete with the reconnect, packet-fault, migration, and
+other real-process suites running in parallel. Isolation makes the fixed 20
+KB/s resting-room threshold stricter and repeatable; CI does not raise or skip
+the budget when a runner is busy.
 
 The workflow has read-only repository permission and does not publish packages,
 push generated files, create tags, or deploy an example. Passing CI means the

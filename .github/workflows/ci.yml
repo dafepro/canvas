@@ -77,6 +77,9 @@ jobs:
           --exclude test/package-artifacts.test.ts
           --exclude test/release-contract.test.ts
           --exclude test/library-boundaries.test.ts
+          --exclude packages/client/test/load-budget.test.ts
+      - name: Isolated scene and network load budget
+        run: pnpm vitest run packages/client/test/load-budget.test.ts
       - name: Go rooms SDK and service tests
         run: go -C server test ./...
       - name: Go race detection
