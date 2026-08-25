@@ -4,3 +4,4 @@ examples/*/.data/
 examples/*/.data-retired-*/
 *.tsbuildinfo
 .DS_Store
+.codex-runtime/

@@ -26,7 +26,7 @@ main {
 
 header {
   display: grid;
-  grid-template-columns: 1fr minmax(330px, 490px) 1fr;
+  grid-template-columns: 1fr auto;
   gap: 20px;
   align-items: center;
   margin-bottom: 18px;
@@ -122,7 +122,7 @@ main:fullscreen {
 
 main:fullscreen header { margin-bottom: 10px; }
 main:fullscreen .arena-card {
-  width: min(100%, calc((100vh - 190px) * 5 / 3));
+  width: min(100%, calc((100vh - 150px) * 5 / 3));
   margin: 0 auto;
 }
 main:fullscreen aside { display: none; }
@@ -137,18 +137,25 @@ main:fullscreen aside { display: none; }
 }
 
 #stage {
+  position: relative;
   width: 100%;
   aspect-ratio: 5 / 3;
+  overflow: hidden;
   touch-action: none;
 }
 
-#stage canvas { display: block; width: 100%; height: 100%; }
+#stage canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
 
 .game-message {
-  position: absolute;
-  left: 50%;
-  bottom: 14px;
-  transform: translateX(-50%);
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto 10px;
   padding: 8px 15px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 999px;
@@ -158,6 +165,47 @@ main:fullscreen aside { display: none; }
   font-weight: 800;
   white-space: nowrap;
   pointer-events: none;
+}
+
+.court-score {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  display: grid;
+  width: clamp(54px, 8vw, 100px);
+  aspect-ratio: 1.5 / 1;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.court-score[data-ready="true"] { opacity: 1; }
+
+.court-score strong {
+  display: grid;
+  min-width: 48%;
+  min-height: 42%;
+  border-radius: 28%;
+  background: #02050c;
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(1.2rem, 3.2vw, 2.8rem);
+  line-height: 1;
+  place-items: center;
+  text-shadow: 0 0 8px currentColor, 0 2px 3px #000;
+}
+
+.court-score.teal { color: #56e0d8; }
+.court-score.coral { color: #ff765f; }
+.court-score.score-flash { animation: court-score-pulse 420ms ease-out; }
+.court-score.reset-flash { animation: reset-pulse 680ms ease-out; }
+
+@keyframes court-score-pulse {
+  0%, 100% { filter: none; }
+  45% { filter: drop-shadow(0 0 18px #ffd166) brightness(1.35); }
 }
 
 aside {

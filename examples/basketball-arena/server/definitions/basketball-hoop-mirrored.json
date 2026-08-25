@@ -1,0 +1,26 @@
+{
+  "definitionId": "basketball-hoop-mirrored",
+  "version": 1,
+  "displayName": "Mirrored basket and backboard",
+  "visual": {
+    "spriteId": "basketball.hoop",
+    "size": { "width": 14, "height": 9.3 },
+    "anchor": { "x": 0.5, "y": 0.5 },
+    "mirrorX": true,
+    "zIndex": 4
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [],
+  "defaultConfig": {},
+  "persistence": {
+    "transform": true,
+    "behaviorState": false,
+    "onRoomSleep": "pause"
+  },
+  "complexity": "simple",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

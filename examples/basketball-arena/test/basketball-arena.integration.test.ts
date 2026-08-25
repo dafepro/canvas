@@ -17,6 +17,9 @@ import canvasJson from "../server/canvases/basketball-arena.json";
 import avatarJson from "../server/definitions/avatar.json";
 import ballJson from "../server/definitions/basketball-game-ball.json";
 import hoopJson from "../server/definitions/basketball-hoop.json";
+import mirroredHoopJson from "../server/definitions/basketball-hoop-mirrored.json";
+import tealScoreboardJson from "../server/definitions/basketball-scoreboard-teal.json";
+import coralScoreboardJson from "../server/definitions/basketball-scoreboard-coral.json";
 import { basketballAssets } from "../src/assets.js";
 import {
   BasketballBehavior,
@@ -26,7 +29,10 @@ import {
   basketballAvatarDefinition,
   basketballBallDefinition,
   basketballCanvas,
+  basketballCoralScoreboardDefinition,
   basketballHoopDefinition,
+  basketballMirroredHoopDefinition,
+  basketballTealScoreboardDefinition,
 } from "../src/basketball-content.js";
 
 const canvas = canvasJson as unknown as CanvasDefinition;
@@ -61,12 +67,18 @@ describe("basketball arena integration", () => {
     expect(canvasJson).toEqual(basketballCanvas);
     expect(ballJson).toMatchObject(basketballBallDefinition);
     expect(hoopJson).toMatchObject(basketballHoopDefinition);
+    expect(mirroredHoopJson).toMatchObject(basketballMirroredHoopDefinition);
+    expect(tealScoreboardJson).toMatchObject(basketballTealScoreboardDefinition);
+    expect(coralScoreboardJson).toMatchObject(basketballCoralScoreboardDefinition);
     expect(avatarJson).toMatchObject(basketballAvatarDefinition);
     expect(validateCanvasDefinition(canvas)).toEqual({ ok: true });
     expect(
       validateAssetReferences(basketballAssets, canvas, [
         basketballBallDefinition,
         basketballHoopDefinition,
+        basketballMirroredHoopDefinition,
+        basketballTealScoreboardDefinition,
+        basketballCoralScoreboardDefinition,
         basketballAvatarDefinition,
       ]),
     ).toEqual([]);
@@ -105,7 +117,17 @@ describe("basketball arena integration", () => {
       maxSpeed: 19,
       acceleration: 115,
       flickDeceleration: 14,
+      maxTurnSpeed: 7,
     });
+    expect(canvas.systemItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        entityId: "right-basketball-hoop",
+        definitionId: "basketball-hoop-mirrored",
+        transform: expect.objectContaining({ rotation: 0 }),
+      }),
+      expect.objectContaining({ entityId: "teal-scoreboard" }),
+      expect.objectContaining({ entityId: "coral-scoreboard" }),
+    ]));
   });
 
   it("scores through configured hoop geometry while physics remains live", () => {

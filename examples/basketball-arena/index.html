@@ -17,17 +17,6 @@
           <p>Configuration-first multiplayer basketball</p>
         </div>
 
-        <section id="scoreboard" class="scoreboard" aria-label="Basketball scoreboard">
-          <div class="score-side teal">
-            <span>Teal</span>
-            <strong id="teal-score">0</strong>
-          </div>
-          <div class="score-side coral">
-            <span>Coral</span>
-            <strong id="coral-score">0</strong>
-          </div>
-        </section>
-
         <div class="connection-status">
           <span id="status">Not connected</span>
           <span><strong id="participant-count">0</strong> on court</span>
@@ -37,9 +26,15 @@
         </div>
       </header>
 
+      <div id="game-message" class="game-message">First to 6 · baskets score 2</div>
       <section class="arena-card">
         <div id="stage" aria-label="Top-down basketball court"></div>
-        <div id="game-message" class="game-message">First to 6 · baskets score 2</div>
+        <div id="teal-scoreboard" class="court-score teal" aria-label="Teal score">
+          <strong id="teal-score">0</strong>
+        </div>
+        <div id="coral-scoreboard" class="court-score coral" aria-label="Coral score">
+          <strong id="coral-score">0</strong>
+        </div>
       </section>
 
       <aside>

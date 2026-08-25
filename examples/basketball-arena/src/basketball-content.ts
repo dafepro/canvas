@@ -81,6 +81,39 @@ export const basketballHoopDefinition: ItemDefinition<Record<string, never>> = {
   complexity: "simple",
 };
 
+export const basketballMirroredHoopDefinition: ItemDefinition<Record<string, never>> = {
+  ...basketballHoopDefinition,
+  definitionId: "basketball-hoop-mirrored",
+  displayName: "Mirrored basket and backboard",
+  visual: { ...basketballHoopDefinition.visual, mirrorX: true },
+};
+
+const scoreboardDefinition = (
+  team: "teal" | "coral",
+): ItemDefinition<Record<string, never>> => ({
+  definitionId: `basketball-scoreboard-${team}`,
+  version: 1,
+  displayName: `${team === "teal" ? "Teal" : "Coral"} scoreboard`,
+  visual: {
+    spriteId: `basketball.scoreboard.${team}`,
+    size: { width: 9, height: 6 },
+    anchor: { x: 0.5, y: 0.5 },
+    zIndex: 5,
+  },
+  body: { mode: "fixed", gravityScale: 0, lockRotation: true },
+  colliders: [],
+  defaultConfig: {},
+  persistence: {
+    transform: true,
+    behaviorState: false,
+    onRoomSleep: "pause",
+  },
+  complexity: "simple",
+});
+
+export const basketballTealScoreboardDefinition = scoreboardDefinition("teal");
+export const basketballCoralScoreboardDefinition = scoreboardDefinition("coral");
+
 export const basketballAvatarDefinition: ItemDefinition<Record<string, never>> = {
   definitionId: "avatar",
   version: 1,
@@ -105,12 +138,15 @@ export const basketballAvatarDefinition: ItemDefinition<Record<string, never>> =
 export const basketballDefinitions: ItemDefinition[] = [
   basketballBallDefinition as ItemDefinition,
   basketballHoopDefinition as ItemDefinition,
+  basketballMirroredHoopDefinition as ItemDefinition,
+  basketballTealScoreboardDefinition as ItemDefinition,
+  basketballCoralScoreboardDefinition as ItemDefinition,
   basketballAvatarDefinition as ItemDefinition,
 ];
 
 export const basketballCanvas: CanvasDefinition = {
-  id: "basketball-arena",
-  version: 1,
+  id: "basketball-arena-v2",
+  version: 2,
   size: { width: 70, height: 42 },
   orientation: "topDown",
   backgroundAssetId: "basketball.court",
@@ -121,6 +157,7 @@ export const basketballCanvas: CanvasDefinition = {
     maxSpeed: 19,
     acceleration: 115,
     flickDeceleration: 14,
+    maxTurnSpeed: 7,
   },
   staticGeometry: [
     {
@@ -221,11 +258,25 @@ export const basketballCanvas: CanvasDefinition = {
     },
     {
       entityId: "right-basketball-hoop",
-      definitionId: basketballHoopDefinition.definitionId,
-      definitionVersion: basketballHoopDefinition.version,
-      transform: { x: 66, y: 21, rotation: Math.PI, scale: 1 },
+      definitionId: basketballMirroredHoopDefinition.definitionId,
+      definitionVersion: basketballMirroredHoopDefinition.version,
+      transform: { x: 66, y: 21, rotation: 0, scale: 1 },
+      resolvedConfig: {},
+    },
+    {
+      entityId: "teal-scoreboard",
+      definitionId: basketballTealScoreboardDefinition.definitionId,
+      definitionVersion: basketballTealScoreboardDefinition.version,
+      transform: { x: 11, y: 7, rotation: 0, scale: 1 },
+      resolvedConfig: {},
+    },
+    {
+      entityId: "coral-scoreboard",
+      definitionId: basketballCoralScoreboardDefinition.definitionId,
+      definitionVersion: basketballCoralScoreboardDefinition.version,
+      transform: { x: 59, y: 7, rotation: 0, scale: 1 },
       resolvedConfig: {},
     },
   ],
-  limits: { maxAvatars: 16, maxItems: 3, maxComplexPhysicsItems: 0 },
+  limits: { maxAvatars: 16, maxItems: 5, maxComplexPhysicsItems: 0 },
 };

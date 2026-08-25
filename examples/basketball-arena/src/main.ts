@@ -19,7 +19,13 @@ const leaveButton = document.querySelector<HTMLButtonElement>("#leave")!;
 const fullscreenButton = document.querySelector<HTMLButtonElement>("#fullscreen")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const participantCount = document.querySelector<HTMLElement>("#participant-count")!;
-const scoreboard = document.querySelector<HTMLElement>("#scoreboard")!;
+const tealScoreboard = document.querySelector<HTMLElement>("#teal-scoreboard")!;
+const coralScoreboard = document.querySelector<HTMLElement>("#coral-scoreboard")!;
+const scoreboards = [tealScoreboard, coralScoreboard] as const;
+const scoreboardOverlays = new Map([
+  ["teal-scoreboard", tealScoreboard],
+  ["coral-scoreboard", coralScoreboard],
+]);
 const tealScore = document.querySelector<HTMLElement>("#teal-score")!;
 const coralScore = document.querySelector<HTMLElement>("#coral-score")!;
 const gameMessage = document.querySelector<HTMLElement>("#game-message")!;
@@ -65,8 +71,10 @@ const waitForPresentation = async (next: CanvasRuntime): Promise<void> => {
 const renderScore = (state: Readonly<BasketballState>): void => {
   tealScore.textContent = String(state.tealScore);
   coralScore.textContent = String(state.coralScore);
-  scoreboard.dataset.phase = state.phase;
-  scoreboard.dataset.team = state.lastScoringTeam ?? "";
+  for (const board of scoreboards) {
+    board.dataset.phase = state.phase;
+    board.dataset.team = state.lastScoringTeam ?? "";
+  }
 
   if (state.phase === "gameOver") {
     gameMessage.textContent =
@@ -95,7 +103,7 @@ const join = async (): Promise<void> => {
       name: "basketball-arena-simulation",
     });
     next = new CanvasRuntime({
-      roomId: "basketball-arena",
+      roomId: "basketball-arena-v2",
       serverUrl,
       credentialProvider: async () =>
         devRealtimeCredential(userInput.value, userInput.value),
@@ -107,6 +115,16 @@ const join = async (): Promise<void> => {
       scene: {
         background: 0x071a32,
         debug: params.has("debug"),
+        motionTrails: [{
+          effect: "avatarFireTrail",
+          kinds: ["avatar"],
+          minSpeed: 2.5,
+          fullSpeed: 19,
+          emissionRate: { min: 10, max: 105 },
+          colors: [0xffe45e, 0xffa31a, 0xff4b13, 0xe51b12],
+          sizePx: { min: 2.4, max: 8.5 },
+          lifeMs: { min: 220, max: 620 },
+        }],
       },
       pointer: {
         mode: "avatarDrag",
@@ -151,6 +169,19 @@ const join = async (): Promise<void> => {
         );
         if (game) renderScore(game.state as BasketballState);
       }),
+      next.subscribeOverlayProjection((snapshot) => {
+        for (const entity of snapshot.entities) {
+          const overlay = scoreboardOverlays.get(entity.entityId);
+          if (!overlay) continue;
+          overlay.style.left = `${entity.screen.x}px`;
+          overlay.style.top = `${entity.screen.y}px`;
+          overlay.dataset.ready = String(entity.visible && entity.inViewport);
+        }
+      }, {
+        maxHz: 60,
+        maxEntities: 2,
+        entityIds: ["teal-scoreboard", "coral-scoreboard"],
+      }),
       next.subscribePresence((snapshot) => {
         participantCount.textContent = String(
           snapshot.participants.filter(({ status: state }) => state !== "disconnected").length,
@@ -158,11 +189,13 @@ const join = async (): Promise<void> => {
       }),
       next.subscribeEffects((effect) => {
         if (effect.effect !== "basketScored" && effect.effect !== "gameReset") return;
-        scoreboard.classList.remove("score-flash", "reset-flash");
+        for (const board of scoreboards) board.classList.remove("score-flash", "reset-flash");
         requestAnimationFrame(() => {
-          scoreboard.classList.add(
-            effect.effect === "gameReset" ? "reset-flash" : "score-flash",
-          );
+          for (const board of scoreboards) {
+            board.classList.add(
+              effect.effect === "gameReset" ? "reset-flash" : "score-flash",
+            );
+          }
         });
       }),
       next.subscribeFullscreen((active) => {

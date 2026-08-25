@@ -142,8 +142,7 @@ export const BasketballBehavior: ItemBehavior<BasketballConfig, BasketballState>
   ): BehaviorResult<BasketballState> {
     if (event.type === "room.wake") {
       if (state.phase === "gameOver") return resetGame(state, config.centre);
-      if (state.phase === "basket") return resetPossession(state, config.centre);
-      return { state: { ...state, cooldownUntil: [] }, commands: [] };
+      return resetPossession(state, config.centre);
     }
 
     if (event.type === "timer" && event.key === POSSESSION_RESET_TIMER) {

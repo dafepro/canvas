@@ -1,6 +1,6 @@
 {
-  "id": "basketball-arena",
-  "version": 1,
+  "id": "basketball-arena-v2",
+  "version": 2,
   "size": { "width": 70, "height": 42 },
   "orientation": "topDown",
   "backgroundAssetId": "basketball.court",
@@ -10,7 +10,8 @@
     "radius": 1.35,
     "maxSpeed": 19,
     "acceleration": 115,
-    "flickDeceleration": 14
+    "flickDeceleration": 14,
+    "maxTurnSpeed": 7
   },
   "staticGeometry": [
     {
@@ -139,11 +140,25 @@
     },
     {
       "entityId": "right-basketball-hoop",
-      "definitionId": "basketball-hoop",
+      "definitionId": "basketball-hoop-mirrored",
       "definitionVersion": 1,
-      "transform": { "x": 66, "y": 21, "rotation": 3.141592653589793, "scale": 1 },
+      "transform": { "x": 66, "y": 21, "rotation": 0, "scale": 1 },
+      "resolvedConfig": {}
+    },
+    {
+      "entityId": "teal-scoreboard",
+      "definitionId": "basketball-scoreboard-teal",
+      "definitionVersion": 1,
+      "transform": { "x": 11, "y": 7, "rotation": 0, "scale": 1 },
+      "resolvedConfig": {}
+    },
+    {
+      "entityId": "coral-scoreboard",
+      "definitionId": "basketball-scoreboard-coral",
+      "definitionVersion": 1,
+      "transform": { "x": 59, "y": 7, "rotation": 0, "scale": 1 },
       "resolvedConfig": {}
     }
   ],
-  "limits": { "maxAvatars": 16, "maxItems": 3, "maxComplexPhysicsItems": 0 }
+  "limits": { "maxAvatars": 16, "maxItems": 5, "maxComplexPhysicsItems": 0 }
 }

@@ -1,0 +1,17 @@
+{
+  "definitionId": "basketball-scoreboard-teal",
+  "version": 1,
+  "displayName": "Teal scoreboard",
+  "visual": {
+    "spriteId": "basketball.scoreboard.teal",
+    "size": { "width": 9, "height": 6 },
+    "anchor": { "x": 0.5, "y": 0.5 },
+    "zIndex": 5
+  },
+  "body": { "mode": "fixed", "gravityScale": 0, "lockRotation": true },
+  "colliders": [],
+  "defaultConfig": {},
+  "persistence": { "transform": true, "behaviorState": false, "onRoomSleep": "pause" },
+  "complexity": "simple",
+  "configSchema": { "type": "object", "additionalProperties": false, "properties": {} }
+}

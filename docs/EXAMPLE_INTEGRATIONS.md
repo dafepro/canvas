@@ -151,7 +151,9 @@ configuration, rotation, and delete commands.
 `examples/basketball-arena` is a compact configuration-first full-court game.
 Its authoritative canvas owns mirrored hoop placement, matching backboards and
 rim collision, circular score sensors, localized net damping, player tuning,
-spawn points, and the immutable system ball. The ball's resolved configuration
+spawn points, two immutable scoreboard items, and the immutable system ball.
+The right hoop uses definition-level horizontal art mirroring rather than a
+180-degree physics transform. The ball's resolved configuration
 owns impulse feel, team-award tags, points per basket, winning score, possession
 and game-reset delays, and the center reset location.
 
@@ -160,9 +162,13 @@ match values. It maps configured contacts and region tags into physics commands
 and durable score state. Ordinary physics continues during the score display;
 the ball then teleports to the configured center. Reaching the configured win
 threshold presents the winner before atomically resetting both scores and the
-ball for a new game.
+ball for a new game. A sleeping-room wake also centers the live ball so a stale
+durable transform never becomes the opening possession.
 
 The generated court, ball, mirrored hoop, avatar, and scoreboard shell remain
 consumer-owned assets. Canvas preloads and renders world assets through its
-public manifest, while product DOM projects the replicated behavior state into
-live numbers inside the generated scoreboard frame.
+public manifest. Product DOM projects the replicated behavior state at 60 Hz
+onto the two scoreboard item positions through the CSS-pixel-safe overlay seam.
+The rules message sits outside the playable frame, including in fullscreen.
+The avatar fire trail is `SceneOptions.motionTrails` configuration: it filters
+avatars and scales emission, size, and lifetime from their interpolated speed.

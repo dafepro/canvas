@@ -148,4 +148,16 @@ describe("BasketballBehavior", () => {
     expect(h.state).toMatchObject({ phase: "playing", tealScore: 2, coralScore: 0 });
     expect(h.host.body(h.entityId).transform).toMatchObject({ x: 35, y: 21 });
   });
+
+  it("centres a live persisted ball when a fresh room host wakes", () => {
+    const h = harness();
+    h.host.body(h.entityId).transform = { x: 12, y: 31, rotation: 1 };
+    h.host.body(h.entityId).velocity = { x: 4, y: -2 };
+
+    h.send({ type: "room.wake", fromSnapshot: true }).flush();
+
+    expect(h.state).toMatchObject({ phase: "playing", tealScore: 0, coralScore: 0 });
+    expect(h.host.body(h.entityId).transform).toMatchObject({ x: 35, y: 21, rotation: 0 });
+    expect(h.host.body(h.entityId).velocity).toEqual({ x: 0, y: 0 });
+  });
 });

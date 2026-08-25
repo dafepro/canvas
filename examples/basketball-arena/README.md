@@ -20,8 +20,8 @@ the reusable game recipe:
 
 - court size, solid edges, player movement, spawn points, and system items;
 - direct avatar dragging, quick-flick thresholds, and canvas-owned slide
-  deceleration;
-- mirrored decorative hoops plus matching backboard and rim collision;
+  deceleration plus bounded facing turn speed;
+- definition-level mirrored hoop art plus matching backboard and rim collision;
 - circular basket sensors and team-award tags;
 - localized net damping around each hoop;
 - kick, pinch, spin, cooldown, and impulse tuning;
@@ -33,9 +33,11 @@ contacts into impulses, configured region tags into score changes, and timer
 events into the configured possession or game reset. It does not contain court
 coordinates, team tags, score values, win thresholds, or delays.
 
-The scoreboard is product-owned DOM using replicated immutable behavior state.
-Its generated frame remains ordinary UI art; Canvas does not learn about team
-names or sports scoreboards.
+Each generated scoreboard shell is an immutable system item above its basket.
+Product-owned DOM projects replicated immutable behavior state into the item at
+60 Hz through Canvas's renderer-safe overlay seam. Canvas does not learn about
+team names or score rules. The speed-scaled avatar fire trail is likewise
+product configuration through `scene.motionTrails`, not basketball engine code.
 
 The fullscreen button uses `CanvasRuntime.toggleFullscreen()` with the product
 shell supplied as `fullscreenElement`. Consumers own the button and layout;
@@ -44,3 +46,4 @@ host-resolved input: while held, the avatar center follows the absolute pointer
 position in one tick without a speed cap, with fixed geometry swept across the
 entire move. Release-flick thresholds live in runtime input configuration, while
 `avatarController.flickDeceleration` lives in the authoritative canvas.
+`avatarController.maxTurnSpeed` keeps direct-drag facing changes smooth.
