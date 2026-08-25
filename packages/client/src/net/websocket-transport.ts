@@ -15,6 +15,8 @@ import {
 export interface WebSocketTransportOptions {
   /** Supplies a short-lived WebSocket subprotocol ticket for every attempt. */
   credentialProvider: RealtimeCredentialProvider;
+  /** Maximum time for one socket handshake. Defaults to 10 seconds. */
+  connectTimeoutMs?: number;
   /** Reconnect delays in milliseconds. The last value repeats. */
   backoffMs?: number[];
   maxReconnects?: number;
@@ -53,11 +55,13 @@ export class WebSocketRoomTransport implements RoomTransport {
   private closedByCaller = false;
   private readonly backoffMs: number[];
   private readonly maxReconnects: number;
+  private readonly connectTimeoutMs: number;
   private readonly credentialProvider: RealtimeCredentialProvider;
   readonly traffic: TransportTraffic = emptyTraffic();
 
   constructor(options: WebSocketTransportOptions) {
     this.credentialProvider = options.credentialProvider;
+    this.connectTimeoutMs = Math.max(1, options.connectTimeoutMs ?? 10_000);
     this.backoffMs = options.backoffMs ?? [250, 500, 1000, 2000, 4000];
     this.maxReconnects = options.maxReconnects ?? 20;
   }
@@ -94,8 +98,22 @@ export class WebSocketRoomTransport implements RoomTransport {
       const socket = new WebSocket(this.url(join), [REALTIME_SUBPROTOCOL, credential]);
       socket.binaryType = "arraybuffer";
       this.socket = socket;
+      let opened = false;
+      let timedOut = false;
+      const handshakeTimer = setTimeout(() => {
+        if (opened || socket.readyState === WebSocket.OPEN) return;
+        timedOut = true;
+        if (this.socket === socket) this.socket = undefined;
+        const message = `websocket connection timed out after ${this.connectTimeoutMs}ms`;
+        this.setStatus("failed", message);
+        socket.close(4000, "connection timeout");
+        reject(new Error(message));
+      }, this.connectTimeoutMs);
+      const finishHandshake = () => clearTimeout(handshakeTimer);
 
       socket.onopen = () => {
+        opened = true;
+        finishHandshake();
         this.reconnects = 0;
         this.setStatus("open");
         resolve();
@@ -116,15 +134,24 @@ export class WebSocketRoomTransport implements RoomTransport {
       };
 
       socket.onerror = () => {
-        if (this.currentStatus === "connecting") {
+        if (!opened) {
+          finishHandshake();
           reject(new Error("websocket connection failed"));
         }
       };
 
       socket.onclose = (event) => {
-        this.socket = undefined;
+        finishHandshake();
+        if (this.socket === socket) this.socket = undefined;
         if (this.closedByCaller) {
           this.setStatus("closed");
+          return;
+        }
+        if (!opened) {
+          if (timedOut) return;
+          const detail = event.reason || `code ${event.code}`;
+          this.scheduleReconnect(detail);
+          reject(new Error(`websocket closed before opening: ${detail}`));
           return;
         }
         this.scheduleReconnect(event.reason || `code ${event.code}`);
@@ -142,10 +169,11 @@ export class WebSocketRoomTransport implements RoomTransport {
     this.reconnects++;
     this.setStatus("reconnecting", detail);
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
       void this.open().catch((error) => {
         // A socket close schedules itself. Credential failures happen before a
         // socket exists and therefore need another attempt here.
-        if (!this.socket && !this.closedByCaller) {
+        if (!this.socket && !this.reconnectTimer && !this.closedByCaller) {
           this.scheduleReconnect(error instanceof Error ? error.message : String(error));
         }
       });

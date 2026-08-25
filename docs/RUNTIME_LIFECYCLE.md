@@ -28,6 +28,12 @@ a canonical frame, every durable snapshot item, and every connected avatar to
 be represented. Use that stronger gate before revealing a staged room. Starting
 a stopped or failed instance rejects.
 
+Each WebSocket opening handshake is bounded to 10 seconds by default. A socket
+that closes before opening or exceeds that deadline rejects the current
+attempt instead of leaving `start()` pending. Direct transport consumers may
+set `connectTimeoutMs`; applications should also bound their product-specific
+`whenPresented()` loading experience and offer a retry with a fresh runtime.
+
 Reconnect is automatic on the same instance. It moves through `reconnecting`
 and `joining`, obtains a new ephemeral connection ID, then returns to `active`
 or `backgrounded`. Stable participant and avatar IDs do not change.

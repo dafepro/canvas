@@ -10,6 +10,7 @@ class FakeWebSocket {
   binaryType = "";
   bufferedAmount = 0;
   readyState = 0;
+  closeCalls = 0;
   onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
@@ -34,6 +35,7 @@ class FakeWebSocket {
   send(): void {}
 
   close(): void {
+    this.closeCalls++;
     this.readyState = 3;
   }
 }
@@ -45,6 +47,52 @@ afterEach(() => {
 });
 
 describe("WebSocketRoomTransport credentials", () => {
+  it("rejects when a socket closes before its opening handshake completes", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const transport = new WebSocketRoomTransport({
+      credentialProvider: async () => "ticket.closed",
+      backoffMs: [100],
+      maxReconnects: 1,
+    });
+
+    const opening = transport.connect({
+      roomId: "closed-room",
+      serverUrl: "http://rooms.example.test",
+    });
+    await vi.waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+    const rejection = expect(opening).rejects.toThrow(
+      "websocket closed before opening: test disconnect",
+    );
+    FakeWebSocket.sockets[0]!.disconnect();
+
+    await rejection;
+    transport.close();
+  });
+
+  it("rejects and closes a socket that never finishes connecting", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const transport = new WebSocketRoomTransport({
+      credentialProvider: async () => "ticket.timeout",
+      connectTimeoutMs: 50,
+    });
+
+    const opening = transport.connect({
+      roomId: "slow-room",
+      serverUrl: "http://rooms.example.test",
+    });
+    await vi.waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+    const rejection = expect(opening).rejects.toThrow(
+      "websocket connection timed out after 50ms",
+    );
+    await vi.advanceTimersByTimeAsync(50);
+
+    await rejection;
+    expect(FakeWebSocket.sockets[0]!.closeCalls).toBe(1);
+    expect(transport.status).toBe("failed");
+  });
+
   it("requests a fresh credential for the initial socket and every reconnect", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("WebSocket", FakeWebSocket);
