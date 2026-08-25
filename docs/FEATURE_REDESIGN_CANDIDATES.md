@@ -90,10 +90,10 @@ unrelated transitions still mutate shared booleans, maps, buffers, and timers.
 
 The inventory found one additional race boundary: simulation responses were not
 tagged with the worker/role generation that produced them. A delayed `ready`,
-`render`, `effects`, or `snapshot` response can therefore arrive after a host
+`render`, `effects`, or `snapshot` response could therefore arrive after a host
 promotion, demotion, reconnect, or stop and be interpreted as current. The
-`render.isHost` value exists but is not a sufficient fence and is currently not
-used by `RoomSession` when accepting the frame.
+`render.isHost` value existed but was not a sufficient fence and was not used
+by `RoomSession` when accepting the frame.
 
 **Implemented design.** Keep `RoomSession` as the public facade, but move state into
 explicit collaborating machines: `ConnectionSession`, `HostRoleSession`,
