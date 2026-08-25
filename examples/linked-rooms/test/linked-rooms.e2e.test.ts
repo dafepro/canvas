@@ -132,7 +132,25 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
       "the returned peer to move after travel",
       () => (view(host).find((entity) => entity.id === returnedAvatar)?.x ?? startX) > startX + 1,
     );
+    const beforeStopSequence = returned.diagnostics().inputSequence;
     returningIntent = STILL;
+    await waitFor(
+      "the returned peer's stop input to become canonical",
+      () => {
+        // Pull peer presentation so acknowledgement/reconciliation observes
+        // the newest canonical packet instead of comparing a pre-stop host
+        // sample with the later server-retained rejoin position.
+        view(returned);
+        const avatar = view(host).find((entity) => entity.id === returnedAvatar);
+        const diagnostics = returned.diagnostics();
+        return (
+          diagnostics.inputSequence > beforeStopSequence &&
+          diagnostics.acknowledgedInputSequence > beforeStopSequence &&
+          (avatar?.lastProcessedInputSequence ?? 0) > beforeStopSequence &&
+          Math.hypot(avatar?.vx ?? Infinity, avatar?.vy ?? Infinity) < 0.05
+        );
+      },
+    );
     const movedX = view(host).find((entity) => entity.id === returnedAvatar)!.x;
 
     await returned.stopGracefully();
