@@ -10,6 +10,10 @@ import { PixiScene, type SceneOptions } from "../render/pixi-scene.js";
 import { FrameProfiler } from "../render/frame-profiler.js";
 import { KeyboardController } from "../input/keyboard-controller.js";
 import {
+  FullscreenController,
+  type FullscreenObserver,
+} from "../input/fullscreen-controller.js";
+import {
   PointerDragController,
   type PointerDragOptions,
 } from "../input/pointer-drag-controller.js";
@@ -60,6 +64,8 @@ export interface CanvasRuntimeOptions {
   /** Required when transport is omitted. Called for every WebSocket attempt. */
   credentialProvider?: RealtimeCredentialProvider;
   mount: HTMLElement;
+  /** Element promoted to fullscreen. Defaults to the renderer mount. */
+  fullscreenElement?: HTMLElement;
   /** Item definitions the client knows. Bundled for now (spec 26). */
   definitions: ItemDefinition[];
   transport?: RoomTransport;
@@ -128,8 +134,14 @@ export class CanvasRuntime {
   private assetBundle?: LoadedAssetBundle<Texture>;
   private startPromise?: Promise<void>;
   private readonly overlayProjections = new OverlayProjectionStore();
+  private readonly fullscreen?: FullscreenController;
 
   constructor(private readonly options: CanvasRuntimeOptions) {
+    if (typeof document !== "undefined") {
+      this.fullscreen = new FullscreenController(
+        options.fullscreenElement ?? options.mount,
+      );
+    }
     this.session = new RoomSession({
       roomId: options.roomId,
       serverUrl: options.serverUrl,
@@ -171,6 +183,26 @@ export class CanvasRuntime {
 
   subscribeEffects(...args: Parameters<RoomSession["subscribeEffects"]>) {
     return this.session.subscribeEffects(...args);
+  }
+
+  get isFullscreen(): boolean {
+    return this.fullscreen?.active ?? false;
+  }
+
+  enterFullscreen(): Promise<boolean> {
+    return this.fullscreen?.enter() ?? Promise.resolve(false);
+  }
+
+  exitFullscreen(): Promise<boolean> {
+    return this.fullscreen?.exit() ?? Promise.resolve(false);
+  }
+
+  toggleFullscreen(): Promise<boolean> {
+    return this.fullscreen?.toggle() ?? Promise.resolve(false);
+  }
+
+  subscribeFullscreen(observer: FullscreenObserver): () => void {
+    return this.fullscreen?.subscribe(observer) ?? (() => {});
   }
 
   get lifecycleState(): CanvasLifecycleState {
@@ -280,6 +312,8 @@ export class CanvasRuntime {
     this.keyboard?.destroy();
     this.keyboard = undefined;
     this.overlayProjections.clear();
+    if (this.fullscreen?.active) void this.fullscreen.exit();
+    this.fullscreen?.destroy();
   }
 
   private destroyScene(): void {

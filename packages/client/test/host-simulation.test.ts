@@ -498,6 +498,52 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("applies a flick once, then decelerates it with canvas-owned tuning", () => {
+    const simulation = new HostSimulation(
+      {
+        ...rocketCanvas,
+        avatarController: {
+          ...rocketCanvas.avatarController,
+          flickDeceleration: 24,
+        },
+      },
+      rocketCanvasDefinitions,
+      registry(),
+      60,
+    );
+    simulation.addAvatar({
+      entityId: "avatar:flicker",
+      clientId: "flicker",
+      userId: "flicker",
+      position: { x: 50, y: 35 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:flicker",
+      { x: 1, y: 0 },
+      1,
+      1,
+      false,
+    );
+    const sampleVelocity = (): number => {
+      const before = simulation.world.registry.require("avatar:flicker").transform.x;
+      simulation.step();
+      const after = simulation.world.registry.require("avatar:flicker").transform.x;
+      return (after - before) * 60;
+    };
+    const initialVelocity = sampleVelocity();
+    for (let index = 0; index < 19; index++) simulation.step();
+    const slidingVelocity = sampleVelocity();
+    for (let index = 0; index < 59; index++) simulation.step();
+    const stoppedVelocity = sampleVelocity();
+
+    expect(initialVelocity).toBeGreaterThan(15);
+    expect(slidingVelocity).toBeGreaterThan(4);
+    expect(slidingVelocity).toBeLessThan(initialVelocity);
+    expect(stoppedVelocity).toBeCloseTo(0, 4);
+    simulation.free();
+  });
+
   it("accepts simultaneous pushes from two participant avatars", () => {
     const simulation = build();
     simulation.addItem(instance("shared-ball", ballDefinition as ItemDefinition, 50, 65));

@@ -17,6 +17,21 @@ export interface DragGesture {
   intensity: number;
 }
 
+export interface PointerFlickOptions {
+  /** Recent pointer history used to estimate release speed. */
+  sampleWindowMs?: number;
+  /** Slower releases stop normally instead of imparting momentum. */
+  minimumSpeedPxPerSecond?: number;
+  /** Release speed that maps to the canvas avatar's full movement speed. */
+  fullSpeedPxPerSecond?: number;
+}
+
+export const defaultPointerFlickOptions: Required<PointerFlickOptions> = {
+  sampleWindowMs: 100,
+  minimumSpeedPxPerSecond: 300,
+  fullSpeedPxPerSecond: 1_300,
+};
+
 export interface PointerDragOptions {
   /** Relative thumbstick by default, or a target that follows the local avatar. */
   mode?: "thumbstick" | "avatarDrag";
@@ -28,6 +43,8 @@ export interface PointerDragOptions {
   grabRadiusPx?: number;
   /** Current local-avatar position in element pixels. Required by avatarDrag. */
   avatarPosition?: () => Vec2 | undefined;
+  /** Avatar-drag release momentum. Enabled by default; pass false to disable it. */
+  flick?: false | PointerFlickOptions;
   /** Lets a live editor reserve pointer-down locations without disabling movement. */
   allowStart?: (point: Readonly<Vec2>) => boolean;
 }
@@ -42,12 +59,15 @@ export class PointerDragController {
   private originLocal?: Vec2;
   private pointLocal?: Vec2;
   private grabOffset?: Vec2;
+  private samples: { point: Vec2; atMs: number }[] = [];
+  private releaseIntent?: DragIntent;
   private current: DragIntent = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
   private readonly mode: "thumbstick" | "avatarDrag";
   private readonly fullRangePx: number;
   private readonly deadZonePx: number;
   private readonly grabRadiusPx: number;
   private readonly avatarPosition?: () => Vec2 | undefined;
+  private readonly flick?: Required<PointerFlickOptions>;
   private readonly allowStart?: (point: Readonly<Vec2>) => boolean;
   private readonly detach: () => void;
 
@@ -60,6 +80,9 @@ export class PointerDragController {
     this.deadZonePx = options.deadZonePx ?? 6;
     this.grabRadiusPx = options.grabRadiusPx ?? 32;
     this.avatarPosition = options.avatarPosition;
+    this.flick = options.flick === false
+      ? undefined
+      : { ...defaultPointerFlickOptions, ...options.flick };
     this.allowStart = options.allowStart;
 
     const onDown = (event: PointerEvent) => {
@@ -82,6 +105,8 @@ export class PointerDragController {
       this.origin = { x: event.clientX, y: event.clientY };
       this.originLocal = point;
       this.pointLocal = { ...this.originLocal };
+      this.samples = [{ point: { ...point }, atMs: event.timeStamp }];
+      this.releaseIntent = undefined;
       this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: true };
     };
     const onMove = (event: PointerEvent) => {
@@ -89,6 +114,7 @@ export class PointerDragController {
       event.preventDefault();
       this.pointLocal = this.toLocal(event);
       if (this.mode === "avatarDrag") {
+        this.rememberSample(this.pointLocal, event.timeStamp);
         this.updateAvatarDragIntent();
         return;
       }
@@ -108,6 +134,10 @@ export class PointerDragController {
     };
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== this.activePointerId) return;
+      if (this.mode === "avatarDrag") {
+        this.rememberSample(this.toLocal(event), event.timeStamp);
+        this.releaseIntent = this.flickIntent();
+      }
       if (this.element.hasPointerCapture(event.pointerId)) {
         this.element.releasePointerCapture(event.pointerId);
       }
@@ -116,7 +146,7 @@ export class PointerDragController {
       this.originLocal = undefined;
       this.pointLocal = undefined;
       this.grabOffset = undefined;
-      // Release decelerates to zero through avatar drag.
+      this.samples = [];
       this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
     };
 
@@ -133,6 +163,11 @@ export class PointerDragController {
   }
 
   get intent(): DragIntent {
+    if (this.releaseIntent) {
+      const intent = this.releaseIntent;
+      this.releaseIntent = undefined;
+      return intent;
+    }
     if (this.mode === "avatarDrag" && this.current.held) {
       this.updateAvatarDragIntent();
     }
@@ -184,7 +219,37 @@ export class PointerDragController {
     };
   }
 
+  private rememberSample(point: Readonly<Vec2>, atMs: number): void {
+    this.samples.push({ point: { ...point }, atMs });
+    const cutoff = atMs - (this.flick?.sampleWindowMs ?? 0);
+    this.samples = this.samples.filter((sample) => sample.atMs >= cutoff);
+  }
+
+  private flickIntent(): DragIntent | undefined {
+    const config = this.flick;
+    const first = this.samples[0];
+    const last = this.samples[this.samples.length - 1];
+    if (!config || !first || !last || last.atMs <= first.atMs) return undefined;
+    const elapsedSeconds = (last.atMs - first.atMs) / 1_000;
+    const dx = last.point.x - first.point.x;
+    const dy = last.point.y - first.point.y;
+    const distance = Math.hypot(dx, dy);
+    const speed = distance / elapsedSeconds;
+    if (distance === 0 || speed <= config.minimumSpeedPxPerSecond) return undefined;
+    const range = Math.max(
+      1,
+      config.fullSpeedPxPerSecond - config.minimumSpeedPxPerSecond,
+    );
+    return {
+      direction: { x: dx / distance, y: dy / distance },
+      intensity: Math.min(1, (speed - config.minimumSpeedPxPerSecond) / range),
+      held: false,
+    };
+  }
+
   destroy(): void {
+    this.releaseIntent = undefined;
+    this.samples = [];
     this.detach();
   }
 }

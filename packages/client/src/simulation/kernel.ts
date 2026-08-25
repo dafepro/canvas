@@ -160,6 +160,7 @@ export class SimulationKernel {
           request.direction,
           request.intensity,
           request.inputSequence,
+          request.held,
         );
         break;
 

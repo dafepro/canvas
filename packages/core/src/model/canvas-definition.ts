@@ -91,12 +91,15 @@ export interface AvatarControllerDefinition {
   radius?: number;
   maxSpeed?: number;
   acceleration?: number;
+  /** Deceleration applied after a direct-control flick. */
+  flickDeceleration?: number;
 }
 
 export const defaultAvatarController: Required<AvatarControllerDefinition> = {
   radius: 1.2,
   maxSpeed: 18,
   acceleration: 90,
+  flickDeceleration: 24,
 };
 
 export const resolveAvatarController = (

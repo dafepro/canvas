@@ -16,6 +16,7 @@ export * from "./render/interpolation-buffer.js";
 export * from "./render/frame-profiler.js";
 export * from "./render/overlay-projection.js";
 export * from "./input/pointer-drag-controller.js";
+export * from "./input/fullscreen-controller.js";
 export * from "./input/item-edit-controller.js";
 export * from "./input/keyboard-controller.js";
 export * from "./runtime/room-session.js";

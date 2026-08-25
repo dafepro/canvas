@@ -38,6 +38,7 @@ export interface AvatarSpawn {
   radius?: number;
   maxSpeed?: number;
   acceleration?: number;
+  flickDeceleration?: number;
 }
 
 interface BodyRecord {
@@ -419,6 +420,8 @@ export class RapierWorld implements BehaviorHost {
         radius,
         maxSpeed: spawn.maxSpeed ?? controller.maxSpeed,
         acceleration: spawn.acceleration ?? controller.acceleration,
+        flickDeceleration: spawn.flickDeceleration ?? controller.flickDeceleration,
+        flicking: false,
         lastProcessedInputSeq: 0,
         desiredDirection: { x: 0, y: 0 },
         desiredIntensity: 0,
@@ -485,6 +488,7 @@ export class RapierWorld implements BehaviorHost {
       record.body.setAngvel(0, true);
       avatar.desiredDirection = { x: 0, y: 0 };
       avatar.desiredIntensity = 0;
+      avatar.flicking = false;
       // A contact that was open when the avatar was disabled must end, or a
       // behavior that counts avatars keeps counting this one. A disabled
       // collider raises no stop event, so the exit is emitted here.
@@ -561,16 +565,35 @@ export class RapierWorld implements BehaviorHost {
     direction: Vec2,
     intensity: number,
     inputSequence: number,
+    held = true,
   ): void {
-    const entity = this.registry.get(entityId);
-    if (!entity?.avatar) return;
+    const record = this.bodies.get(entityId);
+    const entity = record?.entity;
+    if (!record || !entity?.avatar) return;
     if (entity.avatar.disabled) {
       entity.avatar.desiredDirection = { x: 0, y: 0 };
       entity.avatar.desiredIntensity = 0;
+      entity.avatar.flicking = false;
       return;
     }
-    entity.avatar.desiredDirection = direction;
-    entity.avatar.desiredIntensity = Math.max(0, Math.min(1, intensity));
+    const nextInput = inputSequence > entity.avatar.lastProcessedInputSeq;
+    if (held) {
+      entity.avatar.desiredDirection = direction;
+      entity.avatar.desiredIntensity = Math.max(0, Math.min(1, intensity));
+      entity.avatar.flicking = false;
+    } else {
+      entity.avatar.desiredDirection = { x: 0, y: 0 };
+      entity.avatar.desiredIntensity = 0;
+      const length = Math.hypot(direction.x, direction.y);
+      if (nextInput && intensity > 0 && length > 0) {
+        const speed = Math.max(0, Math.min(1, intensity)) * entity.avatar.maxSpeed;
+        record.body.setLinvel({
+          x: direction.x / length * speed,
+          y: direction.y / length * speed,
+        }, true);
+        entity.avatar.flicking = true;
+      }
+    }
     if (inputSequence > entity.avatar.lastProcessedInputSeq) {
       entity.avatar.lastProcessedInputSeq = inputSequence;
     }
@@ -675,12 +698,17 @@ export class RapierWorld implements BehaviorHost {
       y: avatar.desiredDirection.y * avatar.desiredIntensity * avatar.maxSpeed,
     };
     const current = record.body.linvel();
-    const maxChange = avatar.acceleration * dt;
+    const maxChange = (avatar.flicking
+      ? avatar.flickDeceleration
+      : avatar.acceleration) * dt;
     const deltaX = desired.x - current.x;
     const deltaY = desired.y - current.y;
     const distance = Math.hypot(deltaX, deltaY);
     const scale = distance > maxChange && distance > 0 ? maxChange / distance : 1;
     const next = { x: current.x + deltaX * scale, y: current.y + deltaY * scale };
+    if (avatar.flicking && Math.hypot(next.x, next.y) < 0.001) {
+      avatar.flicking = false;
+    }
     record.body.setLinvel(this.clampAgainstGeometry(record, next, dt), true);
   }
 

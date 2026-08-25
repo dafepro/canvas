@@ -27,7 +27,12 @@ export const validateCanvasDefinition = (
   if (canvas.limits.maxItems < 0) {
     problems.push({ path: "limits.maxItems", message: "must be >= 0" });
   }
-  for (const key of ["radius", "maxSpeed", "acceleration"] as const) {
+  for (const key of [
+    "radius",
+    "maxSpeed",
+    "acceleration",
+    "flickDeceleration",
+  ] as const) {
     const value = canvas.avatarController?.[key];
     if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
       problems.push({

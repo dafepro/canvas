@@ -31,11 +31,12 @@ class PointerSurface {
     return { left: 10, top: 20 } as DOMRect;
   }
 
-  emit(type: string, x: number, y: number, pointerId = 7): void {
+  emit(type: string, x: number, y: number, pointerId = 7, timeStamp = 0): void {
     const event = {
       pointerId,
       clientX: x + 10,
       clientY: y + 20,
+      timeStamp,
       preventDefault: () => {},
     } as PointerEvent;
     for (const listener of this.listeners.get(type) ?? []) listener(event);
@@ -136,6 +137,83 @@ describe("PointerDragController", () => {
 
     surface.emit("pointerup", 66, 40);
     expect(controller.intent.held).toBe(false);
+    controller.destroy();
+  });
+
+  it("turns a quick avatar release into one bounded flick intent", () => {
+    const surface = new PointerSurface();
+    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+      mode: "avatarDrag",
+      avatarPosition: () => ({ x: 50, y: 40 }),
+      grabRadiusPx: 24,
+      flick: {
+        sampleWindowMs: 100,
+        minimumSpeedPxPerSecond: 300,
+        fullSpeedPxPerSecond: 1_300,
+      },
+    });
+
+    surface.emit("pointerdown", 50, 40, 7, 0);
+    surface.emit("pointermove", 90, 40, 7, 50);
+    surface.emit("pointerup", 110, 40, 7, 75);
+
+    expect(controller.intent).toEqual({
+      direction: { x: 1, y: 0 },
+      intensity: 0.5,
+      held: false,
+    });
+    expect(controller.intent).toEqual({
+      direction: { x: 0, y: 0 },
+      intensity: 0,
+      held: false,
+    });
+    controller.destroy();
+  });
+
+  it("stays still when an avatar drag release is below the flick threshold", () => {
+    const surface = new PointerSurface();
+    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+      mode: "avatarDrag",
+      avatarPosition: () => ({ x: 50, y: 40 }),
+      grabRadiusPx: 24,
+      flick: {
+        sampleWindowMs: 100,
+        minimumSpeedPxPerSecond: 300,
+        fullSpeedPxPerSecond: 1_300,
+      },
+    });
+
+    surface.emit("pointerdown", 50, 40, 7, 0);
+    surface.emit("pointermove", 55, 40, 7, 100);
+    surface.emit("pointerup", 55, 40, 7, 200);
+
+    expect(controller.intent).toEqual({
+      direction: { x: 0, y: 0 },
+      intensity: 0,
+      held: false,
+    });
+    controller.destroy();
+  });
+
+  it("lets a consumer disable avatar flicks without disabling direct dragging", () => {
+    const surface = new PointerSurface();
+    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+      mode: "avatarDrag",
+      avatarPosition: () => ({ x: 50, y: 40 }),
+      grabRadiusPx: 24,
+      flick: false,
+    });
+
+    surface.emit("pointerdown", 50, 40, 7, 0);
+    surface.emit("pointermove", 90, 40, 7, 25);
+    expect(controller.intent.intensity).toBeGreaterThan(0);
+    surface.emit("pointerup", 110, 40, 7, 50);
+
+    expect(controller.intent).toEqual({
+      direction: { x: 0, y: 0 },
+      intensity: 0,
+      held: false,
+    });
     controller.destroy();
   });
 });

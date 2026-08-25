@@ -45,6 +45,7 @@ export type SimulationRequest =
       direction: Vec2;
       intensity: number;
       inputSequence: number;
+      held: boolean;
       /** Addendum A1. True while the client asks for a disabled avatar. */
       disabled?: boolean;
     }

@@ -128,16 +128,21 @@ describe("validation", () => {
   it("validates optional canvas-owned avatar movement tuning", () => {
     expect(validateCanvasDefinition({
       ...canvas,
-      avatarController: { maxSpeed: 26, acceleration: 150 },
+      avatarController: { maxSpeed: 26, acceleration: 150, flickDeceleration: 24 },
     })).toEqual({ ok: true });
     expect(validateCanvasDefinition({
       ...canvas,
-      avatarController: { maxSpeed: 0, acceleration: Number.NaN },
+      avatarController: {
+        maxSpeed: 0,
+        acceleration: Number.NaN,
+        flickDeceleration: -1,
+      },
     })).toMatchObject({
       ok: false,
       problems: expect.arrayContaining([
         expect.objectContaining({ path: "avatarController.maxSpeed" }),
         expect.objectContaining({ path: "avatarController.acceleration" }),
+        expect.objectContaining({ path: "avatarController.flickDeceleration" }),
       ]),
     });
   });

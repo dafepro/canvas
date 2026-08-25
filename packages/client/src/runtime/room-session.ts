@@ -689,6 +689,7 @@ export class RoomSession {
         direction: input.direction ?? { x: 0, y: 0 },
         intensity: input.intensity,
         inputSequence: input.inputSequence,
+        held: input.held,
         disabled: input.avatarDisabled,
       });
       if (
@@ -1086,6 +1087,7 @@ export class RoomSession {
       direction: intent.direction,
       intensity: intent.intensity,
       inputSequence: this.inputSequence,
+      held: intent.held,
       disabled,
     });
     if (!this.client.isHost) {

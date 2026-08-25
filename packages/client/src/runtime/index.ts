@@ -22,6 +22,13 @@ export type {
   CanvasLifecycleState,
 } from "./lifecycle.js";
 export * from "../render/overlay-projection.js";
+export { defaultPointerFlickOptions } from "../input/pointer-drag-controller.js";
+export type {
+  PointerDragOptions,
+  PointerFlickOptions,
+} from "../input/pointer-drag-controller.js";
+export { FullscreenController } from "../input/fullscreen-controller.js";
+export type { FullscreenObserver } from "../input/fullscreen-controller.js";
 export { SimulationDriver } from "../simulation/driver.js";
 export {
   devRealtimeCredential,
