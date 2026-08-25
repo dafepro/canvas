@@ -39,16 +39,34 @@ type ItemDefinitionRecord struct {
 
 // SnapshotRecord is one canonical checkpoint (spec 13.1).
 type SnapshotRecord struct {
-	RoomID             string          `json:"roomId"`
-	CanvasID           string          `json:"canvasId"`
-	CanvasVersion      uint32          `json:"canvasVersion"`
-	SceneRevision      uint64          `json:"sceneRevision"`
-	CheckpointRevision uint64          `json:"checkpointRevision"`
-	HostEpoch          uint64          `json:"hostEpoch"`
-	Tick               uint64          `json:"tick"`
-	Normalized         bool            `json:"normalized"`
-	CapturedAt         time.Time       `json:"capturedAt"`
-	SnapshotRaw        json.RawMessage `json:"snapshot"`
+	RoomID             string                    `json:"roomId"`
+	CanvasID           string                    `json:"canvasId"`
+	CanvasVersion      uint32                    `json:"canvasVersion"`
+	SceneRevision      uint64                    `json:"sceneRevision"`
+	CheckpointRevision uint64                    `json:"checkpointRevision"`
+	HostEpoch          uint64                    `json:"hostEpoch"`
+	Tick               uint64                    `json:"tick"`
+	Normalized         bool                      `json:"normalized"`
+	CapturedAt         time.Time                 `json:"capturedAt"`
+	SnapshotRaw        json.RawMessage           `json:"snapshot"`
+	MutationReceipts   []MutationReceiptRecord   `json:"mutationReceipts,omitempty"`
+	MutationHighWater  []MutationHighWaterRecord `json:"mutationHighWater,omitempty"`
+}
+
+// MutationReceiptRecord is the bounded persisted idempotency window for one
+// logical browser session. ResultBytes is a protobuf ItemMutationResult.
+type MutationReceiptRecord struct {
+	UserID          string `json:"userId"`
+	ClientSessionID string `json:"clientSessionId"`
+	MutationID      uint64 `json:"mutationId"`
+	ResultBytes     []byte `json:"result"`
+}
+
+// MutationHighWaterRecord prevents an evicted duplicate from being reapplied.
+type MutationHighWaterRecord struct {
+	UserID          string `json:"userId"`
+	ClientSessionID string `json:"clientSessionId"`
+	MutationID      uint64 `json:"mutationId"`
 }
 
 // Store is the persistence port. Replace MemoryStore with a database-backed

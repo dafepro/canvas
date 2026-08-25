@@ -19,6 +19,9 @@ type Config struct {
 	HostLeaseTTL time.Duration
 	// HeartbeatInterval is the rate the SDK expects host heartbeats at.
 	HeartbeatInterval time.Duration
+	// ItemEditLeaseTTL bounds an abandoned live-preview session. The client
+	// renews the lease while item controls remain open.
+	ItemEditLeaseTTL time.Duration
 	// SleepGrace is how long a room stays in memory after the last client left.
 	SleepGrace time.Duration
 	// MaxClientsPerRoom refuses a join above the limit. 0 means use the canvas
@@ -41,6 +44,7 @@ const (
 	defaultTickRate          = 60
 	defaultHostLeaseTTL      = 2500 * time.Millisecond
 	defaultHeartbeatInterval = 500 * time.Millisecond
+	defaultItemEditLeaseTTL  = 5 * time.Second
 	defaultSleepGrace        = 2 * time.Second
 	defaultMaxClients        = 20
 	defaultProtocolVersion   = 8
@@ -55,6 +59,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.HeartbeatInterval <= 0 {
 		c.HeartbeatInterval = defaultHeartbeatInterval
+	}
+	if c.ItemEditLeaseTTL <= 0 {
+		c.ItemEditLeaseTTL = defaultItemEditLeaseTTL
 	}
 	if c.SleepGrace <= 0 {
 		c.SleepGrace = defaultSleepGrace

@@ -32,6 +32,7 @@ func (r *Room) grantHost(clientID string, reason string) {
 			LeaseExpiresAtUnixMs: uint64(r.hostLeaseUntil.UnixMilli()),
 		}},
 	})
+	r.replayItemEditPreviews(client)
 
 	// Every other client clears its interpolation history when the epoch moves.
 	r.broadcastExcept(clientID, &pb.RoomEnvelope{

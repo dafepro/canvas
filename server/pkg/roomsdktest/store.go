@@ -171,6 +171,17 @@ func conformanceSnapshot(
 		Normalized:         revision%2 == 0,
 		CapturedAt:         time.Unix(int64(1_800_000_000+revision), 0).UTC(),
 		SnapshotRaw:        json.RawMessage(fmt.Sprintf(`{"revision":%d}`, revision)),
+		MutationReceipts: []roomsdk.MutationReceiptRecord{{
+			UserID:          "owner",
+			ClientSessionID: "browser-session",
+			MutationID:      revision,
+			ResultBytes:     []byte{byte(revision)},
+		}},
+		MutationHighWater: []roomsdk.MutationHighWaterRecord{{
+			UserID:          "owner",
+			ClientSessionID: "browser-session",
+			MutationID:      revision,
+		}},
 	}
 }
 

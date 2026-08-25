@@ -55,9 +55,14 @@ type Room struct {
 	avatarPositions map[string]SnapshotAvatar
 	// previews records transforms shown by the host but not yet committed.
 	// Checkpoints must not turn these transient edits into durable placement.
-	previews     map[string]string
-	definitions  map[string]ItemDefinitionRecord
-	nextEntityNo uint64
+	previews             map[string]string
+	editSessions         map[string]*itemEditSession
+	editByEntity         map[string]string
+	mutationReceipts     map[string]*storedMutationReceipt
+	mutationReceiptOrder []string
+	mutationHighWater    map[string]uint64
+	definitions          map[string]ItemDefinitionRecord
+	nextEntityNo         uint64
 
 	joins      chan *Client
 	departures chan departure
@@ -79,26 +84,30 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 	}
 
 	room := &Room{
-		cfg:             &server.cfg,
-		server:          server,
-		roomID:          roomID,
-		canvasID:        record.CanvasID,
-		canvasShape:     shape,
-		definitionRaw:   record.DefinitionRaw,
-		clients:         make(map[string]*Client),
-		participants:    make(map[string]struct{}),
-		items:           make(map[string]*SnapshotItem),
-		avatarPositions: make(map[string]SnapshotAvatar),
-		previews:        make(map[string]string),
-		definitions:     make(map[string]ItemDefinitionRecord),
-		joins:           make(chan *Client, 8),
-		departures:      make(chan departure, 8),
-		messages:        make(chan inbound, 512),
-		done:            make(chan struct{}),
-		persistQueue:    make(chan SnapshotRecord, 1),
-		persistStop:     make(chan struct{}),
-		persistDone:     make(chan struct{}),
-		sleeping:        true,
+		cfg:               &server.cfg,
+		server:            server,
+		roomID:            roomID,
+		canvasID:          record.CanvasID,
+		canvasShape:       shape,
+		definitionRaw:     record.DefinitionRaw,
+		clients:           make(map[string]*Client),
+		participants:      make(map[string]struct{}),
+		items:             make(map[string]*SnapshotItem),
+		avatarPositions:   make(map[string]SnapshotAvatar),
+		previews:          make(map[string]string),
+		editSessions:      make(map[string]*itemEditSession),
+		editByEntity:      make(map[string]string),
+		mutationReceipts:  make(map[string]*storedMutationReceipt),
+		mutationHighWater: make(map[string]uint64),
+		definitions:       make(map[string]ItemDefinitionRecord),
+		joins:             make(chan *Client, 8),
+		departures:        make(chan departure, 8),
+		messages:          make(chan inbound, 512),
+		done:              make(chan struct{}),
+		persistQueue:      make(chan SnapshotRecord, 1),
+		persistStop:       make(chan struct{}),
+		persistDone:       make(chan struct{}),
+		sleeping:          true,
 	}
 
 	if len(snapshot.SnapshotRaw) > 0 {
@@ -115,6 +124,9 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 		room.hostEpoch = snapshot.HostEpoch
 		if room.snapshot.HostEpoch > room.hostEpoch {
 			room.hostEpoch = room.snapshot.HostEpoch
+		}
+		if err := room.loadMutationReceipts(snapshot); err != nil {
+			return nil, err
 		}
 	} else {
 		room.snapshot = emptySnapshot(record.CanvasID, shape.Version, server.cfg.Now())
@@ -244,6 +256,7 @@ func (r *Room) run() {
 			r.handleMessage(msg)
 		case <-ticker.C:
 			r.checkHostLease()
+			r.checkItemEditLeases()
 			if len(r.clients) == 0 && r.cfg.Now().Sub(r.emptyAt) >= r.cfg.SleepGrace {
 				r.sleep()
 				return
@@ -351,6 +364,7 @@ func (r *Room) removeClient(client *Client, reason string) bool {
 	client.close()
 	r.cfg.Metrics.ClientLeft(r.roomID, reason)
 	r.cancelPreviews(client)
+	r.cancelItemEdits(client)
 
 	if r.hostClientID == client.ID {
 		r.hostClientID = ""
@@ -388,6 +402,21 @@ func (r *Room) handleMessage(msg inbound) {
 
 	case *pb.RoomEnvelope_DurableCommand:
 		r.handleDurableCommand(client, payload.DurableCommand)
+
+	case *pb.RoomEnvelope_ItemMutation:
+		r.handleItemMutation(client, payload.ItemMutation)
+
+	case *pb.RoomEnvelope_BeginItemEdit:
+		r.handleBeginItemEdit(client, payload.BeginItemEdit)
+
+	case *pb.RoomEnvelope_RenewItemEdit:
+		r.handleRenewItemEdit(client, payload.RenewItemEdit)
+
+	case *pb.RoomEnvelope_EndItemEdit:
+		r.handleEndItemEdit(client, payload.EndItemEdit)
+
+	case *pb.RoomEnvelope_ItemEditPreview:
+		r.handleItemEditPreview(client, payload.ItemEditPreview)
 
 	case *pb.RoomEnvelope_Checkpoint:
 		r.handleCheckpoint(client, envelope.HostEpoch, payload.Checkpoint)
@@ -738,7 +767,7 @@ func (r *Room) withinBounds(t Transform) bool {
 }
 
 func (r *Room) snapshotRecord() SnapshotRecord {
-	return SnapshotRecord{
+	record := SnapshotRecord{
 		RoomID:             r.roomID,
 		CanvasID:           r.canvasID,
 		CanvasVersion:      r.snapshot.CanvasVersion,
@@ -750,6 +779,39 @@ func (r *Room) snapshotRecord() SnapshotRecord {
 		CapturedAt:         r.cfg.Now().UTC(),
 		SnapshotRaw:        append(json.RawMessage(nil), r.snapshotRaw...),
 	}
+	for _, key := range r.mutationReceiptOrder {
+		receipt := r.mutationReceipts[key]
+		if receipt == nil {
+			continue
+		}
+		resultBytes, err := proto.Marshal(receipt.result)
+		if err != nil {
+			continue
+		}
+		record.MutationReceipts = append(record.MutationReceipts, MutationReceiptRecord{
+			UserID:          receipt.userID,
+			ClientSessionID: receipt.result.ClientSessionId,
+			MutationID:      receipt.result.MutationId,
+			ResultBytes:     resultBytes,
+		})
+	}
+	for key, mutationID := range r.mutationHighWater {
+		userID, clientSessionID := splitClientSessionKey(key)
+		record.MutationHighWater = append(record.MutationHighWater, MutationHighWaterRecord{
+			UserID:          userID,
+			ClientSessionID: clientSessionID,
+			MutationID:      mutationID,
+		})
+	}
+	sort.Slice(record.MutationHighWater, func(i, j int) bool {
+		left := record.MutationHighWater[i]
+		right := record.MutationHighWater[j]
+		if left.UserID != right.UserID {
+			return left.UserID < right.UserID
+		}
+		return left.ClientSessionID < right.ClientSessionID
+	})
+	return record
 }
 
 func (r *Room) persistAsync() {
