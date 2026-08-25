@@ -10,7 +10,6 @@ import {
 import {
   fromJsonBytes,
   toJsonBytes,
-  type Peer,
 } from "@canvas-physics/protocol";
 import { RoomClient } from "../net/room-client.js";
 import type { RoomTransport } from "../net/transport.js";
@@ -35,11 +34,29 @@ import {
   type BehaviorStateSnapshot,
   type CanonicalStateSnapshot,
 } from "./session/replication-timeline.js";
+import {
+  ParticipantRoster,
+  type ParticipantAvatarProjection,
+  type ParticipantAvatarProjectionContext,
+  type ParticipantAvatarProjector,
+  type ParticipantPresence,
+  type ParticipantStatus,
+  type PresenceSnapshot,
+} from "./session/participant-roster.js";
+import { PresentationGate } from "./session/presentation-gate.js";
 
 export type {
   BehaviorStateSnapshot,
   CanonicalStateSnapshot,
 } from "./session/replication-timeline.js";
+export type {
+  ParticipantAvatarProjection,
+  ParticipantAvatarProjectionContext,
+  ParticipantAvatarProjector,
+  ParticipantPresence,
+  ParticipantStatus,
+  PresenceSnapshot,
+} from "./session/participant-roster.js";
 
 /** One sample of movement intent, from a pointer, a key, or a test. */
 export interface InputIntent {
@@ -105,41 +122,6 @@ export interface RoomSessionOptions {
   onError?: (error: CanvasConsumerError) => void;
 }
 
-export type ParticipantStatus = "active" | "inactive" | "disconnected";
-
-export interface ParticipantPresence {
-  /** Stable authenticated identity. It survives socket reconnects. */
-  readonly participantId: string;
-  readonly userId: string;
-  readonly displayName: string;
-  /** Ephemeral socket identity. Absent after disconnect. */
-  readonly connectionId?: string;
-  /** Stable physics identity derived from participantId. */
-  readonly avatarEntityId: string;
-  readonly status: ParticipantStatus;
-  readonly isHost: boolean;
-  readonly hostEligible: boolean;
-}
-
-export interface ParticipantAvatarProjectionContext {
-  readonly canvas: CanvasDefinition;
-  readonly previousStatus?: ParticipantStatus;
-}
-
-export interface ParticipantAvatarProjection {
-  /** A discontinuous product-owned placement applied on this transition. */
-  readonly position?: Vec2;
-}
-
-export type ParticipantAvatarProjector = (
-  participant: Readonly<ParticipantPresence>,
-  context: Readonly<ParticipantAvatarProjectionContext>,
-) => ParticipantAvatarProjection | undefined;
-
-export interface PresenceSnapshot {
-  readonly participants: readonly Readonly<ParticipantPresence>[];
-}
-
 type Observer<T> = (value: T) => void;
 
 interface PendingJoin {
@@ -199,6 +181,8 @@ export class RoomSession {
   private timers: ReturnType<typeof setInterval>[] = [];
   private readonly durable: DurableCommandSession;
   private readonly timeline: ReplicationTimeline;
+  private readonly roster: ParticipantRoster;
+  private readonly presentation = new PresentationGate();
   private localAvatarId = "";
   private inputSequence = 0;
   private simulationReady = false;
@@ -209,14 +193,8 @@ export class RoomSession {
   private consumerInitialization?: Promise<void>;
   private consumerInitialized = false;
   private initializedCanvas?: Readonly<{ id: string; version: number }>;
-  private latestPeers?: Peer[];
-  private readonly participantsById = new Map<string, ParticipantPresence>();
-  private latestPresenceSnapshot?: PresenceSnapshot;
-  private readonly presenceObservers = new Set<Observer<PresenceSnapshot>>();
   private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
   private readonly hostAvatarIds = new Set<string>();
-  private readonly appliedParticipantStatus = new Map<string, ParticipantStatus>();
-  private readonly lastCanonicalAvatarPositions = new Map<string, Vec2>();
   private finalCheckpointSent?: () => void;
   private terminated = false;
   private stats = {
@@ -233,11 +211,6 @@ export class RoomSession {
   private lifecycleSnapshot: CanvasLifecycleSnapshot = Object.freeze({ state: "idle" });
   private readonly lifecycleObservers = new Set<Observer<CanvasLifecycleSnapshot>>();
   private readonly readyWaiters = new Set<{
-    resolve: () => void;
-    reject: (error: CanvasConsumerError) => void;
-  }>();
-  private presentationReady = false;
-  private readonly presentationWaiters = new Set<{
     resolve: () => void;
     reject: (error: CanvasConsumerError) => void;
   }>();
@@ -294,14 +267,20 @@ export class RoomSession {
       }),
       emit: (effect) => this.applyDurableEffect(effect),
     });
+    this.roster = new ParticipantRoster({
+      projectAvatar: options.projectParticipantAvatar,
+    });
     this.timeline = new ReplicationTimeline({
       sceneRevision: () => this.client.sceneRevision,
       decorate: (entity) => this.durable.decorate(entity),
       onCanonical: (tick, entities) => {
         const canonical = [...entities];
-        this.updateParticipantActivity(canonical);
-        this.rememberFullAvatarState(canonical);
+        this.roster.observeCanonical(canonical);
         this.syncCountdowns(canonical, tick);
+        this.presentation.markCanonical(
+          this.connectionGeneration,
+          canonical.map((entity) => entity.id),
+        );
       },
     });
     this.wireClient();
@@ -329,9 +308,7 @@ export class RoomSession {
   }
 
   subscribePresence(observer: Observer<PresenceSnapshot>): () => void {
-    this.presenceObservers.add(observer);
-    if (this.latestPresenceSnapshot) observer(this.latestPresenceSnapshot);
-    return () => this.presenceObservers.delete(observer);
+    return this.roster.subscribe(observer);
   }
 
   subscribeCanonicalState(observer: Observer<CanonicalStateSnapshot>): () => void {
@@ -378,7 +355,6 @@ export class RoomSession {
 
   /** Resolves after the first complete authoritative room frame is available. */
   whenPresented(): Promise<void> {
-    if (this.presentationReady) return Promise.resolve();
     if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
         this.lifecycle === "stopped") {
       return Promise.reject(
@@ -388,9 +364,7 @@ export class RoomSession {
         ),
       );
     }
-    return new Promise<void>((resolve, reject) => {
-      this.presentationWaiters.add({ resolve, reject });
-    });
+    return this.presentation.wait();
   }
 
   /** Opens the transport and sends JOIN. Use whenReady() to await initialization. */
@@ -510,7 +484,7 @@ export class RoomSession {
     this.finalCheckpointSent = undefined;
     this.driver.terminate();
     this.client.close();
-    this.presenceObservers.clear();
+    this.roster.clearObservers();
     this.timeline.clearObservers();
     this.effectObservers.clear();
   }
@@ -532,8 +506,7 @@ export class RoomSession {
       );
       for (const waiter of this.readyWaiters) waiter.reject(error);
       this.readyWaiters.clear();
-      for (const waiter of this.presentationWaiters) waiter.reject(error);
-      this.presentationWaiters.clear();
+      this.presentation.fail(error);
     }
   }
 
@@ -578,10 +551,12 @@ export class RoomSession {
           break;
         case "open":
           this.connectionGeneration++;
+          this.presentation.resetConnection(this.connectionGeneration);
           this.transition("joining", detail);
           break;
         case "reconnecting":
           this.connectionGeneration++;
+          this.presentation.resetConnection(this.connectionGeneration);
           this.pendingJoin = undefined;
           this.durable.resetConnection();
           this.transition("reconnecting", detail);
@@ -616,7 +591,7 @@ export class RoomSession {
       // A migration checkpoint may trail the latest replicated state by up to
       // one checkpoint interval. Keep positions already observed from the old
       // host and use snapshot positions only as a cold-start fallback.
-      if (snapshot) this.rememberSnapshotAvatarPositions(snapshot, true);
+      if (snapshot) this.roster.loadSnapshotPositions(snapshot, true);
       this.driver.send({
         type: "setHost",
         generation,
@@ -626,7 +601,8 @@ export class RoomSession {
       });
       // Rebuilding the world drops the local avatar, so add it again.
       this.hostAvatarIds.clear();
-      this.appliedParticipantStatus.clear();
+      this.roster.resetHostProjection();
+      this.presentation.resetRole(this.connectionGeneration);
       this.spawnLocalAvatar();
       if (this.localAvatarId) this.hostAvatarIds.add(this.localAvatarId);
       this.syncHostAvatars();
@@ -642,7 +618,8 @@ export class RoomSession {
         const generation = ++this.simulationGeneration;
         this.driver.send({ type: "setHost", generation, isHost: false });
         this.hostAvatarIds.clear();
-        this.appliedParticipantStatus.clear();
+        this.roster.resetHostProjection();
+        this.presentation.resetRole(this.connectionGeneration);
         this.spawnLocalAvatar();
       }
     });
@@ -675,9 +652,7 @@ export class RoomSession {
 
     this.client.on("playerInput", (input, fromClientId) => {
       if (!this.client.isHost) return;
-      const participant = this.latestPeers?.find(
-        (candidate) => candidate.clientId === fromClientId,
-      );
+      const participant = this.roster.peerForConnection(fromClientId);
       if (!participant) return;
       this.driver.send({
         type: "input",
@@ -689,20 +664,18 @@ export class RoomSession {
         target: input.targetPosition,
         disabled: input.avatarDisabled,
       });
-      if (
-        this.setParticipantStatus(
-          participant.userId,
-          input.avatarDisabled ? "inactive" : "active",
-        )
-      ) {
-        this.publishParticipantSnapshot();
-        this.syncHostAvatars();
-      }
+      if (this.roster.setActivity(
+        participant.userId,
+        input.avatarDisabled ? "inactive" : "active",
+      )) this.syncHostAvatars();
     });
 
     this.client.on("presence", (peers) => {
-      this.latestPeers = peers;
-      this.publishPresence(peers);
+      this.roster.updatePresence(peers);
+      this.presentation.markPresence(
+        this.connectionGeneration,
+        this.roster.connectedAvatarIds,
+      );
       this.syncHostAvatars();
       this.checkPresentationReady();
     });
@@ -710,6 +683,7 @@ export class RoomSession {
     this.client.on("durableAccepted", (command, _revision, itemJson) => {
       const item = itemJson as SnapshotItem | undefined;
       this.durable.accept(command, item);
+      this.checkPresentationReady();
     });
 
     this.client.on("durablePreview", (command) => {
@@ -727,73 +701,6 @@ export class RoomSession {
         { source: "protocol", details: { serverCode: code } },
       ));
     });
-  }
-
-  private publishPresence(peers: Peer[]): void {
-    const connectedIds = new Set(peers.map((peer) => peer.userId));
-    for (const [participantId, participant] of this.participantsById) {
-      if (connectedIds.has(participantId)) continue;
-      this.participantsById.set(participantId, {
-        ...participant,
-        connectionId: undefined,
-        status: "disconnected",
-        isHost: false,
-        hostEligible: false,
-      });
-    }
-    for (const peer of peers) {
-      const current = this.participantsById.get(peer.userId);
-      this.participantsById.set(peer.userId, {
-        participantId: peer.userId,
-        userId: peer.userId,
-        displayName: peer.displayName,
-        connectionId: peer.clientId,
-        avatarEntityId: avatarEntityId(peer.userId),
-        status:
-          current?.connectionId === peer.clientId && current.status === "inactive"
-            ? "inactive"
-            : "active",
-        isHost: peer.isHost,
-        hostEligible: peer.hostEligible,
-      });
-    }
-    this.publishParticipantSnapshot();
-  }
-
-  private publishParticipantSnapshot(): void {
-    const participants = Object.freeze(
-      [...this.participantsById.values()]
-        .sort((a, b) => a.participantId.localeCompare(b.participantId))
-        .map((participant) => Object.freeze({ ...participant })),
-    );
-    const snapshot = Object.freeze({ participants });
-    this.latestPresenceSnapshot = snapshot;
-    for (const observer of this.presenceObservers) observer(snapshot);
-  }
-
-  private setParticipantStatus(
-    participantId: string,
-    status: ParticipantStatus,
-  ): boolean {
-    const participant = this.participantsById.get(participantId);
-    if (!participant || participant.status === "disconnected" || participant.status === status) {
-      return false;
-    }
-    this.participantsById.set(participantId, { ...participant, status });
-    return true;
-  }
-
-  private updateParticipantActivity(entities: RenderEntity[]): void {
-    let changed = false;
-    for (const entity of entities) {
-      if (entity.kind !== "avatar" || !entity.userId) continue;
-      changed =
-        this.setParticipantStatus(
-          entity.userId,
-          entity.disabled ? "inactive" : "active",
-        ) || changed;
-    }
-    if (changed) this.publishParticipantSnapshot();
   }
 
   private publishEffect(emission: EffectEmission): void {
@@ -888,7 +795,11 @@ export class RoomSession {
       }
       this.durable.loadSnapshot(join.snapshot);
       this.timeline.resetEpoch(this.client.hostEpoch);
-      this.rememberSnapshotAvatarPositions(join.snapshot);
+      this.roster.loadSnapshotPositions(join.snapshot);
+      this.presentation.markItems(
+        join.generation,
+        this.durable.itemEntityIds,
+      );
       this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
       this.pendingJoin = undefined;
       this.transition(this.pageVisible ? "active" : "backgrounded");
@@ -969,68 +880,22 @@ export class RoomSession {
 
   private avatarSpawnPosition(entityId: string): Vec2 {
     if (this.options.spawnPointId) return this.spawnPosition(entityId);
-    const canonical = this.lastCanonicalAvatarPositions.get(entityId);
-    return canonical ? { ...canonical } : this.spawnPosition(entityId);
-  }
-
-  private rememberSnapshotAvatarPositions(
-    snapshot: CanvasSnapshot,
-    preserveExisting = false,
-  ): void {
-    for (const avatar of snapshot.avatars) {
-      if (preserveExisting && this.lastCanonicalAvatarPositions.has(avatar.entityId)) continue;
-      this.lastCanonicalAvatarPositions.set(avatar.entityId, { ...avatar.position });
-    }
-  }
-
-  private rememberFullAvatarState(entities: RenderEntity[]): void {
-    this.lastCanonicalAvatarPositions.clear();
-    for (const entity of entities) {
-      if (entity.kind !== "avatar") continue;
-      this.lastCanonicalAvatarPositions.set(entity.id, { x: entity.x, y: entity.y });
-    }
+    return this.roster.spawnPosition(entityId, () => this.spawnPosition(entityId));
   }
 
   /** Keeps the host simulation's transient avatars identical to presence. */
   private syncHostAvatars(): void {
-    if (!this.client.isHost || !this.simulationReady || !this.latestPeers) return;
-    const desired = new Map(
-      [...this.participantsById.values()].map((participant) => [
-        participant.avatarEntityId,
-        participant,
-      ]),
-    );
-
-    for (const [entityId, participant] of desired) {
-      const previousStatus = this.appliedParticipantStatus.get(entityId);
-      const projection = previousStatus === participant.status
-        ? undefined
-        : this.options.projectParticipantAvatar?.(
-            Object.freeze({ ...participant }),
-            Object.freeze({ canvas: this.canvasDefinition!, previousStatus }),
-          );
-      if (!this.hostAvatarIds.has(entityId)) {
-        this.driver.send({
-          type: "addAvatar",
-          spawn: {
-            entityId,
-            clientId: participant.connectionId ?? "",
-            userId: participant.userId,
-            position: projection?.position ?? this.avatarSpawnPosition(entityId),
-          },
-        });
-        this.hostAvatarIds.add(entityId);
-      }
-      if (previousStatus !== participant.status) {
-        this.driver.send({
-          type: "setAvatarLifecycle",
-          entityId,
-          disabled: participant.status !== "active",
-          ...(projection?.position ? { position: projection.position } : {}),
-        });
-        this.appliedParticipantStatus.set(entityId, participant.status);
-      }
-    }
+    if (
+      !this.client.isHost ||
+      !this.simulationReady ||
+      !this.roster.presenceKnown ||
+      !this.canvasDefinition
+    ) return;
+    for (const request of this.roster.reconcileHostAvatars({
+      canvas: this.canvasDefinition,
+      hostAvatarIds: this.hostAvatarIds,
+      spawnPosition: (entityId) => this.avatarSpawnPosition(entityId),
+    })) this.driver.send(request);
   }
 
   // ---------- loops ----------
@@ -1054,15 +919,10 @@ export class RoomSession {
     const intent = this.options.intent?.() ?? NO_INTENT;
     this.inputSequence++;
     const disabled = intent.disabled === true;
-    if (
-      this.setParticipantStatus(
-        this.client.userId,
-        disabled ? "inactive" : "active",
-      )
-    ) {
-      this.publishParticipantSnapshot();
-      this.syncHostAvatars();
-    }
+    if (this.roster.setActivity(
+      this.client.userId,
+      disabled ? "inactive" : "active",
+    )) this.syncHostAvatars();
     // The host applies its own input directly; a peer sends it through the relay.
     this.driver.send({
       type: "input",
@@ -1098,8 +958,7 @@ export class RoomSession {
             .filter((entity) => entity.kind === "avatar")
             .map((entity) => ({
               entityId: entity.id,
-              clientId:
-                this.participantsById.get(entity.userId ?? "")?.connectionId ?? "",
+              clientId: this.roster.connectionId(entity.userId ?? "") ?? "",
               userId: entity.userId ?? "",
               displayName: entity.userId ?? "",
             })),
@@ -1200,6 +1059,7 @@ export class RoomSession {
     switch (message.type) {
       case "ready":
         this.simulationReady = true;
+        this.presentation.markSimulationReady(this.connectionGeneration);
         this.syncHostAvatars();
         this.checkPresentationReady();
         break;
@@ -1267,21 +1127,20 @@ export class RoomSession {
   }
 
   private checkPresentationReady(): void {
-    if (this.presentationReady || !this.simulationReady || !this.latestPeers) return;
+    const generation = this.connectionGeneration;
+    if (this.simulationReady) this.presentation.markSimulationReady(generation);
+    if (this.roster.presenceKnown) {
+      this.presentation.markPresence(generation, this.roster.connectedAvatarIds);
+    }
+    this.presentation.markItems(generation, this.durable.itemEntityIds);
     const authoritative = this.client.isHost
       ? this.timeline.hostEntities
       : this.timeline.latestEntities;
     if (!this.client.isHost && this.timeline.latestPeerTick === undefined) return;
-    const ids = new Set(authoritative.map((entity) => entity.id));
-    for (const itemId of this.durable.itemEntityIds) {
-      if (!ids.has(itemId)) return;
-    }
-    for (const peer of this.latestPeers) {
-      if (!ids.has(avatarEntityId(peer.userId))) return;
-    }
-    this.presentationReady = true;
-    for (const waiter of this.presentationWaiters) waiter.resolve();
-    this.presentationWaiters.clear();
+    this.presentation.markCanonical(
+      generation,
+      authoritative.map((entity) => entity.id),
+    );
   }
 
   moveItem(entityId: string, transform: Transform, preview = false): void {
