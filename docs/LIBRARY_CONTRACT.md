@@ -77,6 +77,16 @@ Behaviors may publish an optional RGB sprite tint with `setSpriteTint`. Tint is
 a generic render attribute, replicated with canonical entity state and stored
 in checkpoints. Consumers still own the meaning and selection of colors.
 
+## Rendering density
+
+The renderer keeps canvas layout in CSS pixels but allocates a denser backing
+buffer for high-density displays. `scene.resolution` defaults to the device
+pixel ratio capped at 2, which avoids blurry enlarged pixels on phones and
+retina-class screens without silently multiplying GPU cost beyond 4x. A
+consumer may set an explicit positive resolution when its quality and device
+budget call for a different tradeoff. This setting does not change world
+coordinates, camera framing, collider dimensions, or visual-definition sizes.
+
 ## Avatar presentation
 
 Consumers may register an item definition with the reserved ID `avatar` to

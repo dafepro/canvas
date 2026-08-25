@@ -7,7 +7,7 @@ import {
   type AssetManifest,
 } from "../src/assets/index.js";
 import { buildEntityDisplay } from "../src/render/entity-display.js";
-import { PixiScene } from "../src/render/pixi-scene.js";
+import { PixiScene, resolveSceneResolution } from "../src/render/pixi-scene.js";
 import type { CanvasDefinition } from "@canvas-physics/core";
 
 vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
@@ -58,6 +58,13 @@ const definition: ItemDefinition = {
 };
 
 describe("asset rendering", () => {
+  it("uses a high-density backing buffer without changing canvas layout size", () => {
+    expect(resolveSceneResolution(undefined, 1)).toBe(1);
+    expect(resolveSceneResolution(undefined, 1.25)).toBe(1.25);
+    expect(resolveSceneResolution(undefined, 3)).toBe(2);
+    expect(resolveSceneResolution(3, 1)).toBe(3);
+  });
+
   it("draws background art while keeping collision geometry debug-only", () => {
     const canvas = {
       size: { width: 100, height: 50 },

@@ -17,7 +17,19 @@ export interface SceneOptions {
   background?: number;
   /** Draw collider outlines and region bands (spec 21.4). */
   debug?: boolean;
+  /** Backing pixels per CSS pixel. Defaults to device density, capped at 2. */
+  resolution?: number;
 }
+
+export const resolveSceneResolution = (
+  requested: number | undefined,
+  deviceResolution = globalThis.devicePixelRatio ?? 1,
+): number => {
+  if (requested !== undefined && Number.isFinite(requested) && requested > 0) {
+    return requested;
+  }
+  return Math.min(2, Math.max(1, deviceResolution));
+};
 
 interface SpriteRecord {
   display: Container;
@@ -70,6 +82,8 @@ export class PixiScene {
       background: this.options.background ?? 0x0b1020,
       resizeTo: element,
       antialias: true,
+      autoDensity: true,
+      resolution: resolveSceneResolution(this.options.resolution),
       preference: "webgl",
     });
     element.appendChild(this.app.canvas);
