@@ -40,6 +40,7 @@ names or sports scoreboards.
 The fullscreen button uses `CanvasRuntime.toggleFullscreen()` with the product
 shell supplied as `fullscreenElement`. Consumers own the button and layout;
 Canvas owns the small enter/exit/state capability. `avatarDrag` remains
-collision-safe movement intent rather than authoritative teleportation. Its
-pointer-speed thresholds live in runtime input configuration, while
+host-resolved input: while held, the avatar center follows the absolute pointer
+position in one tick without a speed cap, with fixed geometry swept across the
+entire move. Release-flick thresholds live in runtime input configuration, while
 `avatarController.flickDeceleration` lives in the authoritative canvas.

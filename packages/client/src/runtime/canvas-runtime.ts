@@ -470,6 +470,12 @@ export class CanvasRuntime {
       return { direction: { x: 0, y: 0 }, intensity: 0, held: false, disabled: true };
     }
     const pointer = this.pointer?.intent;
+    if (pointer?.target && this.scene) {
+      return {
+        ...pointer,
+        target: this.scene.camera.toWorld(pointer.target.x, pointer.target.y),
+      };
+    }
     if (pointer && pointer.intensity > 0) return pointer;
     const keyboard = this.keyboard?.intent;
     if (keyboard && keyboard.intensity > 0) return keyboard;

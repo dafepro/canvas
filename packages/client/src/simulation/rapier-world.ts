@@ -488,6 +488,7 @@ export class RapierWorld implements BehaviorHost {
       record.body.setAngvel(0, true);
       avatar.desiredDirection = { x: 0, y: 0 };
       avatar.desiredIntensity = 0;
+      avatar.desiredPosition = undefined;
       avatar.flicking = false;
       // A contact that was open when the avatar was disabled must end, or a
       // behavior that counts avatars keeps counting this one. A disabled
@@ -566,6 +567,7 @@ export class RapierWorld implements BehaviorHost {
     intensity: number,
     inputSequence: number,
     held = true,
+    target?: Vec2,
   ): void {
     const record = this.bodies.get(entityId);
     const entity = record?.entity;
@@ -573,6 +575,7 @@ export class RapierWorld implements BehaviorHost {
     if (entity.avatar.disabled) {
       entity.avatar.desiredDirection = { x: 0, y: 0 };
       entity.avatar.desiredIntensity = 0;
+      entity.avatar.desiredPosition = undefined;
       entity.avatar.flicking = false;
       return;
     }
@@ -580,10 +583,17 @@ export class RapierWorld implements BehaviorHost {
     if (held) {
       entity.avatar.desiredDirection = direction;
       entity.avatar.desiredIntensity = Math.max(0, Math.min(1, intensity));
+      entity.avatar.desiredPosition = target && Number.isFinite(target.x) && Number.isFinite(target.y)
+        ? {
+            x: Math.max(0, Math.min(this.canvas.size.width, target.x)),
+            y: Math.max(0, Math.min(this.canvas.size.height, target.y)),
+          }
+        : undefined;
       entity.avatar.flicking = false;
     } else {
       entity.avatar.desiredDirection = { x: 0, y: 0 };
       entity.avatar.desiredIntensity = 0;
+      entity.avatar.desiredPosition = undefined;
       const length = Math.hypot(direction.x, direction.y);
       if (nextInput && intensity > 0 && length > 0) {
         const speed = Math.max(0, Math.min(1, intensity)) * entity.avatar.maxSpeed;
@@ -692,6 +702,20 @@ export class RapierWorld implements BehaviorHost {
       record.body.setLinvel({ x: 0, y: 0 }, true);
       return;
     }
+    if (avatar.desiredPosition) {
+      const start = record.body.translation();
+      const delta = {
+        x: avatar.desiredPosition.x - start.x,
+        y: avatar.desiredPosition.y - start.y,
+      };
+      const moved = this.sweepDirectAvatarMovement(record, delta);
+      record.body.setTranslation({ x: start.x + moved.x, y: start.y + moved.y }, true);
+      record.body.setLinvel({ x: 0, y: 0 }, true);
+      if (moved.x !== 0 || moved.y !== 0) {
+        record.body.setRotation(Math.atan2(moved.y, moved.x), true);
+      }
+      return;
+    }
     // Spec 6.1. Intent accelerates the avatar toward a desired velocity.
     const desired = {
       x: avatar.desiredDirection.x * avatar.desiredIntensity * avatar.maxSpeed,
@@ -710,6 +734,46 @@ export class RapierWorld implements BehaviorHost {
       avatar.flicking = false;
     }
     record.body.setLinvel(this.clampAgainstGeometry(record, next, dt), true);
+  }
+
+  /**
+   * A held direct drag follows the pointer in one simulation tick, regardless
+   * of distance. Sweep the full displacement first so that this deliberately
+   * uncapped movement cannot tunnel through fixed room geometry.
+   */
+  private sweepDirectAvatarMovement(record: BodyRecord, movement: Vec2): Vec2 {
+    const collider = record.colliders.get("body");
+    if (!collider || (movement.x === 0 && movement.y === 0)) return movement;
+    let fraction = 1;
+    for (const candidate of this.bodies.values()) {
+      if (candidate === record || !candidate.body.isFixed()) continue;
+      for (const obstacle of candidate.colliders.values()) {
+        if (!obstacle.isEnabled() || obstacle.isSensor()) continue;
+        if (!this.collisionGroupsMatch(collider.collisionGroups(), obstacle.collisionGroups())) {
+          continue;
+        }
+        const hit = collider.castCollider(
+          movement,
+          obstacle,
+          { x: 0, y: 0 },
+          0.02,
+          1,
+          true,
+        );
+        if (hit) fraction = Math.min(fraction, hit.time_of_impact);
+      }
+    }
+    fraction = Math.max(0, Math.min(1, fraction));
+    return { x: movement.x * fraction, y: movement.y * fraction };
+  }
+
+  private collisionGroupsMatch(first: number, second: number): boolean {
+    const firstMembership = (first >>> 16) & 0xffff;
+    const firstFilter = first & 0xffff;
+    const secondMembership = (second >>> 16) & 0xffff;
+    const secondFilter = second & 0xffff;
+    return (firstMembership & secondFilter) !== 0 &&
+      (secondMembership & firstFilter) !== 0;
   }
 
   /**

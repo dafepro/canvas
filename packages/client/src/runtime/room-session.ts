@@ -39,6 +39,8 @@ export interface InputIntent {
   direction: Vec2;
   intensity: number;
   held: boolean;
+  /** Absolute world target for collision-safe direct avatar dragging. */
+  target?: Vec2;
   /** Addendum A1. True while the player asks for a disabled avatar. */
   disabled?: boolean;
 }
@@ -690,6 +692,7 @@ export class RoomSession {
         intensity: input.intensity,
         inputSequence: input.inputSequence,
         held: input.held,
+        target: input.targetPosition,
         disabled: input.avatarDisabled,
       });
       if (
@@ -1088,6 +1091,7 @@ export class RoomSession {
       intensity: intent.intensity,
       inputSequence: this.inputSequence,
       held: intent.held,
+      target: intent.target,
       disabled,
     });
     if (!this.client.isHost) {
@@ -1098,6 +1102,7 @@ export class RoomSession {
         clientTimeUnixMs: Date.now(),
         held: intent.held,
         avatarDisabled: disabled,
+        targetPosition: intent.target,
       });
     }
   }

@@ -258,7 +258,7 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     );
   }, 90_000);
 
-  it("moves the peer avatar on the host from relayed input", async () => {
+  it("moves the peer avatar to an uncapped absolute target relayed through the host", async () => {
     let bobIntent: InputIntent = STILL;
     const alice = session("alice");
     await alice.start();
@@ -270,14 +270,21 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
 
     const bobAvatar = avatarEntityId(bob.client.userId);
     await waitFor("the host to add the peer avatar", () => entity(alice, bobAvatar) !== undefined);
-    const startX = entity(alice, bobAvatar)!.x;
+    const start = entity(alice, bobAvatar)!;
+    const target = { x: start.x + 20, y: start.y };
 
-    bobIntent = { direction: { x: 1, y: 0 }, intensity: 1, held: true };
+    bobIntent = {
+      direction: { x: 0, y: 0 },
+      intensity: 0,
+      held: true,
+      target,
+    };
     await waitFor(
-      "the host to move the peer avatar",
+      "the host to place the peer avatar at its absolute target",
       () => {
         const onHost = entity(alice, bobAvatar);
-        return onHost !== undefined && onHost.x - startX > 8;
+        return onHost !== undefined &&
+          Math.hypot(onHost.x - target.x, onHost.y - target.y) < 0.2;
       },
       20_000,
     );

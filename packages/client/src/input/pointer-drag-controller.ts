@@ -4,6 +4,8 @@ export interface DragIntent {
   direction: Vec2;
   intensity: number;
   held: boolean;
+  /** Direct-drag target in element pixels. CanvasRuntime converts it to world units. */
+  target?: Vec2;
 }
 
 /** The on-screen state of the drag, in element pixels, for the overlay. */
@@ -33,7 +35,7 @@ export const defaultPointerFlickOptions: Required<PointerFlickOptions> = {
 };
 
 export interface PointerDragOptions {
-  /** Relative thumbstick by default, or a target that follows the local avatar. */
+  /** Relative thumbstick by default, or direct positioning under the pointer. */
   mode?: "thumbstick" | "avatarDrag";
   /** Drag distance in pixels that maps to full intensity. */
   fullRangePx?: number;
@@ -50,15 +52,15 @@ export interface PointerDragOptions {
 }
 
 /**
- * Spec 6.1. Treats touch and click-drag as movement intent, never as an
- * authoritative position, so a pointer jump cannot teleport through a wall.
+ * Spec 6.1. Thumbstick mode emits relative movement. Avatar-drag mode emits an
+ * absolute target that host simulation reaches without a speed cap while its
+ * full-path shape sweep still prevents tunneling through solid geometry.
  */
 export class PointerDragController {
   private activePointerId?: number;
   private origin?: { x: number; y: number };
   private originLocal?: Vec2;
   private pointLocal?: Vec2;
-  private grabOffset?: Vec2;
   private samples: { point: Vec2; atMs: number }[] = [];
   private releaseIntent?: DragIntent;
   private current: DragIntent = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
@@ -97,7 +99,6 @@ export class PointerDragController {
         ) {
           return;
         }
-        this.grabOffset = { x: avatar.x - point.x, y: avatar.y - point.y };
       }
       event.preventDefault();
       this.element.setPointerCapture(event.pointerId);
@@ -107,7 +108,9 @@ export class PointerDragController {
       this.pointLocal = { ...this.originLocal };
       this.samples = [{ point: { ...point }, atMs: event.timeStamp }];
       this.releaseIntent = undefined;
-      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: true };
+      this.current = this.mode === "avatarDrag"
+        ? { direction: { x: 0, y: 0 }, intensity: 0, held: true, target: { ...point } }
+        : { direction: { x: 0, y: 0 }, intensity: 0, held: true };
     };
     const onMove = (event: PointerEvent) => {
       if (event.pointerId !== this.activePointerId || !this.origin) return;
@@ -145,7 +148,6 @@ export class PointerDragController {
       this.origin = undefined;
       this.originLocal = undefined;
       this.pointLocal = undefined;
-      this.grabOffset = undefined;
       this.samples = [];
       this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
     };
@@ -197,25 +199,28 @@ export class PointerDragController {
 
   private updateAvatarDragIntent(): void {
     const avatar = this.avatarPosition?.();
-    if (!avatar || !this.pointLocal || !this.grabOffset) {
+    if (!avatar || !this.pointLocal) {
       this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: true };
       return;
     }
-    const target = {
-      x: this.pointLocal.x + this.grabOffset.x,
-      y: this.pointLocal.y + this.grabOffset.y,
-    };
+    const target = { ...this.pointLocal };
     const dx = target.x - avatar.x;
     const dy = target.y - avatar.y;
     const distance = Math.hypot(dx, dy);
     if (distance <= this.deadZonePx) {
-      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: true };
+      this.current = {
+        direction: { x: 0, y: 0 },
+        intensity: 0,
+        held: true,
+        target,
+      };
       return;
     }
     this.current = {
       direction: { x: dx / distance, y: dy / distance },
       intensity: Math.min(1, (distance - this.deadZonePx) / this.fullRangePx),
       held: true,
+      target,
     };
   }
 

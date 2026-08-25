@@ -122,6 +122,8 @@ message PlayerInput {
   // Addendum A1. True while the sender asks the host to disable its avatar.
   // The flag rides on every input, so a lost packet cannot leave a stale value.
   bool avatar_disabled = 6;
+  // Absolute world target for collision-safe direct avatar dragging.
+  Vec2 target_position = 7;
 }
 
 message EntityState {

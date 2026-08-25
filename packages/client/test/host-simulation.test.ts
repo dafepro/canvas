@@ -544,6 +544,61 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("moves a directly dragged avatar to its absolute target without a speed cap", () => {
+    const simulation = new HostSimulation(
+      { ...rocketCanvas, staticGeometry: [] },
+      rocketCanvasDefinitions,
+      registry(),
+      60,
+    );
+    simulation.addAvatar({
+      entityId: "avatar:direct",
+      clientId: "direct",
+      userId: "direct",
+      position: { x: 25, y: 35 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:direct",
+      { x: 1, y: 0 },
+      1,
+      1,
+      true,
+      { x: 75, y: 35 },
+    );
+    simulation.step();
+
+    const avatar = simulation.world.registry.require("avatar:direct");
+    expect(avatar.transform.x).toBeCloseTo(75, 4);
+    expect(avatar.transform.y).toBeCloseTo(35, 4);
+    simulation.free();
+  });
+
+  it("still blocks an uncapped direct drag at solid geometry", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:blocked-direct",
+      clientId: "blocked-direct",
+      userId: "blocked-direct",
+      position: { x: 50, y: 55 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:blocked-direct",
+      { x: 0, y: 1 },
+      1,
+      1,
+      true,
+      { x: 50, y: 70 },
+    );
+    simulation.step();
+
+    const y = simulation.world.registry.require("avatar:blocked-direct").transform.y;
+    expect(y).toBeGreaterThan(60);
+    expect(y).toBeLessThan(66);
+    simulation.free();
+  });
+
   it("accepts simultaneous pushes from two participant avatars", () => {
     const simulation = build();
     simulation.addItem(instance("shared-ball", ballDefinition as ItemDefinition, 50, 65));

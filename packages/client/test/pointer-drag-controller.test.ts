@@ -105,7 +105,7 @@ describe("PointerDragController", () => {
     controller.destroy();
   });
 
-  it("drives the avatar toward the dragged target and stops when it catches up", () => {
+  it("places the avatar target exactly under the pointer without retaining a grab offset", () => {
     const surface = new PointerSurface();
     let avatar = { x: 50, y: 40 };
     const controller = new PointerDragController(surface as unknown as HTMLElement, {
@@ -116,23 +116,25 @@ describe("PointerDragController", () => {
       fullRangePx: 20,
     });
 
-    // Grab four pixels right of centre, then drag 12 pixels right. Retaining the
-    // grab offset makes the avatar's target 12 pixels right of its centre.
+    // Grabbing off-centre still puts the avatar centre directly under the
+    // pointer instead of retaining the original four-pixel grab offset.
     surface.emit("pointerdown", 54, 40);
     surface.emit("pointermove", 66, 40);
 
     expect(controller.intent).toEqual({
       direction: { x: 1, y: 0 },
-      intensity: 0.5,
+      intensity: 0.7,
       held: true,
+      target: { x: 66, y: 40 },
     });
     expect(controller.gesture).toBeUndefined();
 
-    avatar = { x: 62, y: 40 };
+    avatar = { x: 66, y: 40 };
     expect(controller.intent).toEqual({
       direction: { x: 0, y: 0 },
       intensity: 0,
       held: true,
+      target: { x: 66, y: 40 },
     });
 
     surface.emit("pointerup", 66, 40);

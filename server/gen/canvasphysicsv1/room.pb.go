@@ -1042,6 +1042,8 @@ type PlayerInput struct {
 	// Addendum A1. True while the sender asks the host to disable its avatar.
 	// The flag rides on every input, so a lost packet cannot leave a stale value.
 	AvatarDisabled bool `protobuf:"varint,6,opt,name=avatar_disabled,json=avatarDisabled,proto3" json:"avatar_disabled,omitempty"`
+	// Absolute world target for collision-safe direct avatar dragging.
+	TargetPosition *Vec2 `protobuf:"bytes,7,opt,name=target_position,json=targetPosition,proto3" json:"target_position,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1116,6 +1118,13 @@ func (x *PlayerInput) GetAvatarDisabled() bool {
 		return x.AvatarDisabled
 	}
 	return false
+}
+
+func (x *PlayerInput) GetTargetPosition() *Vec2 {
+	if x != nil {
+		return x.TargetPosition
+	}
+	return nil
 }
 
 type EntityState struct {
@@ -2103,14 +2112,15 @@ const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"\x0fsent_at_unix_ms\x18\x01 \x01(\x04R\fsentAtUnixMs\x12#\n" +
 	"\rsimulation_hz\x18\x02 \x01(\x02R\fsimulationHz\x12&\n" +
 	"\x0fworker_drift_ms\x18\x03 \x01(\x02R\rworkerDriftMs\x12!\n" +
-	"\fpage_visible\x18\x04 \x01(\bR\vpageVisible\"\xf4\x01\n" +
+	"\fpage_visible\x18\x04 \x01(\bR\vpageVisible\"\xb5\x02\n" +
 	"\vPlayerInput\x12%\n" +
 	"\x0einput_sequence\x18\x01 \x01(\rR\rinputSequence\x124\n" +
 	"\tdirection\x18\x02 \x01(\v2\x16.canvasphysics.v1.Vec2R\tdirection\x12\x1c\n" +
 	"\tintensity\x18\x03 \x01(\x02R\tintensity\x12-\n" +
 	"\x13client_time_unix_ms\x18\x04 \x01(\x04R\x10clientTimeUnixMs\x12\x12\n" +
 	"\x04held\x18\x05 \x01(\bR\x04held\x12'\n" +
-	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\"\xc1\x05\n" +
+	"\x0favatar_disabled\x18\x06 \x01(\bR\x0eavatarDisabled\x12?\n" +
+	"\x0ftarget_position\x18\a \x01(\v2\x16.canvasphysics.v1.Vec2R\x0etargetPosition\"\xc1\x05\n" +
 	"\vEntityState\x12\x1b\n" +
 	"\tentity_id\x18\x01 \x01(\tR\bentityId\x12U\n" +
 	"\x13quantized_transform\x18\x02 \x01(\v2$.canvasphysics.v1.QuantizedTransformR\x12quantizedTransform\x12A\n" +
@@ -2272,18 +2282,19 @@ var file_packages_protocol_proto_room_proto_depIdxs = []int32{
 	8,  // 14: canvasphysics.v1.Presence.peers:type_name -> canvasphysics.v1.Peer
 	0,  // 15: canvasphysics.v1.HostControl.kind:type_name -> canvasphysics.v1.HostControlKind
 	3,  // 16: canvasphysics.v1.PlayerInput.direction:type_name -> canvasphysics.v1.Vec2
-	13, // 17: canvasphysics.v1.EntityState.quantized_transform:type_name -> canvasphysics.v1.QuantizedTransform
-	12, // 18: canvasphysics.v1.StateDelta.entities:type_name -> canvasphysics.v1.EntityState
-	12, // 19: canvasphysics.v1.FullState.entities:type_name -> canvasphysics.v1.EntityState
-	16, // 20: canvasphysics.v1.FullState.avatars:type_name -> canvasphysics.v1.AvatarPresence
-	1,  // 21: canvasphysics.v1.DurableCommand.kind:type_name -> canvasphysics.v1.DurableCommandKind
-	3,  // 22: canvasphysics.v1.DurableCommand.position:type_name -> canvasphysics.v1.Vec2
-	18, // 23: canvasphysics.v1.DurableCommandResult.command:type_name -> canvasphysics.v1.DurableCommand
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	3,  // 17: canvasphysics.v1.PlayerInput.target_position:type_name -> canvasphysics.v1.Vec2
+	13, // 18: canvasphysics.v1.EntityState.quantized_transform:type_name -> canvasphysics.v1.QuantizedTransform
+	12, // 19: canvasphysics.v1.StateDelta.entities:type_name -> canvasphysics.v1.EntityState
+	12, // 20: canvasphysics.v1.FullState.entities:type_name -> canvasphysics.v1.EntityState
+	16, // 21: canvasphysics.v1.FullState.avatars:type_name -> canvasphysics.v1.AvatarPresence
+	1,  // 22: canvasphysics.v1.DurableCommand.kind:type_name -> canvasphysics.v1.DurableCommandKind
+	3,  // 23: canvasphysics.v1.DurableCommand.position:type_name -> canvasphysics.v1.Vec2
+	18, // 24: canvasphysics.v1.DurableCommandResult.command:type_name -> canvasphysics.v1.DurableCommand
+	25, // [25:25] is the sub-list for method output_type
+	25, // [25:25] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_packages_protocol_proto_room_proto_init() }

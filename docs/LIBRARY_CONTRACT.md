@@ -91,10 +91,12 @@ align those decorations with drawn avatars through the bounded overlay
 projection API without importing Pixi or observing the render loop.
 
 `CanvasRuntime` supports `thumbstick` and collision-safe `avatarDrag` pointer
-input. Direct dragging steers toward the held pointer; it never teleports the
-avatar through geometry. A quick release emits one bounded flick, while a
-release below the configured pixel-speed threshold emits no momentum. Gesture
-thresholds are client/runtime configuration. The authoritative canvas owns
+input. While held, direct dragging places the avatar center at the pointer's
+absolute world position in one simulation tick with no maximum speed. The host
+sweeps the complete displacement against fixed, avatar-blocking geometry, so a
+large pointer jump cannot tunnel through a wall. A quick release emits one
+bounded flick, while a release below the configured pixel-speed threshold emits
+no momentum. Gesture thresholds are client/runtime configuration. The canvas owns
 `avatarController.flickDeceleration`, so host simulation and local prediction
 agree on how the resulting slide comes to rest.
 

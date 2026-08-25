@@ -47,6 +47,8 @@ export interface AvatarComponent {
   lastProcessedInputSeq: number;
   desiredDirection: Vec2;
   desiredIntensity: number;
+  /** Absolute world target while the avatar is held by direct pointer input. */
+  desiredPosition?: Vec2;
   /**
    * Addendum A1. True when no physics act on this avatar. The avatar keeps its
    * position, its identity, and its ownership, but it does not move, it does

@@ -247,6 +247,8 @@ export interface PlayerInput {
    * The flag rides on every input, so a lost packet cannot leave a stale value.
    */
   avatarDisabled: boolean;
+  /** Absolute world target for collision-safe direct avatar dragging. */
+  targetPosition?: Vec2 | undefined;
 }
 
 export interface EntityState {
@@ -1936,6 +1938,7 @@ function createBasePlayerInput(): PlayerInput {
     clientTimeUnixMs: 0,
     held: false,
     avatarDisabled: false,
+    targetPosition: undefined,
   };
 }
 
@@ -1958,6 +1961,9 @@ export const PlayerInput: MessageFns<PlayerInput> = {
     }
     if (message.avatarDisabled !== false) {
       writer.uint32(48).bool(message.avatarDisabled);
+    }
+    if (message.targetPosition !== undefined) {
+      Vec2.encode(message.targetPosition, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -2023,6 +2029,14 @@ export const PlayerInput: MessageFns<PlayerInput> = {
             message.avatarDisabled = reader.bool();
             continue;
           }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.targetPosition = Vec2.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2055,6 +2069,11 @@ export const PlayerInput: MessageFns<PlayerInput> = {
         : isSet(object.avatar_disabled)
         ? globalThis.Boolean(object.avatar_disabled)
         : false,
+      targetPosition: isSet(object.targetPosition)
+        ? Vec2.fromJSON(object.targetPosition)
+        : isSet(object.target_position)
+        ? Vec2.fromJSON(object.target_position)
+        : undefined,
     };
   },
 
@@ -2078,6 +2097,9 @@ export const PlayerInput: MessageFns<PlayerInput> = {
     if (message.avatarDisabled !== false) {
       obj.avatarDisabled = message.avatarDisabled;
     }
+    if (message.targetPosition !== undefined) {
+      obj.targetPosition = Vec2.toJSON(message.targetPosition);
+    }
     return obj;
   },
 
@@ -2094,6 +2116,9 @@ export const PlayerInput: MessageFns<PlayerInput> = {
     message.clientTimeUnixMs = object.clientTimeUnixMs ?? 0;
     message.held = object.held ?? false;
     message.avatarDisabled = object.avatarDisabled ?? false;
+    message.targetPosition = (object.targetPosition !== undefined && object.targetPosition !== null)
+      ? Vec2.fromPartial(object.targetPosition)
+      : undefined;
     return message;
   },
 };
