@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { ItemDefinition } from "@canvas-physics/core";
 import {
   ItemEditPresentation,
-  ItemEditController,
+  ItemEditInteraction,
   findOwnedItemAt,
+  type ItemEditInteractionOptions,
 } from "../src/input/item-edit-controller.js";
+import { PointerInteractionCoordinator } from "../src/input/pointer-interaction-coordinator.js";
+import type { Vec2 } from "@canvas-physics/core";
 import type { RenderEntity } from "../src/simulation/messages.js";
 
 class PointerSurface {
@@ -41,11 +44,47 @@ class PointerSurface {
   emit(type: string, x: number, y: number): void {
     const event = {
       pointerId: 7,
+      pointerType: "mouse",
+      buttons: type === "pointerup" || type === "pointercancel" ? 0 : 1,
       clientX: x + 10,
       clientY: y + 20,
+      timeStamp: 100,
+      relatedTarget: this,
       preventDefault: () => {},
     } as PointerEvent;
     for (const listener of this.listeners.get(type) ?? []) listener(event);
+  }
+}
+
+class ItemEditHarness {
+  private readonly interaction: ItemEditInteraction;
+  private readonly coordinator: PointerInteractionCoordinator;
+
+  constructor(
+    surface: HTMLElement,
+    options: ItemEditInteractionOptions & { toWorld(point: Vec2): Vec2 },
+  ) {
+    const { toWorld, ...interactionOptions } = options;
+    this.interaction = new ItemEditInteraction(interactionOptions);
+    this.coordinator = new PointerInteractionCoordinator(surface, {
+      strategies: [this.interaction],
+      toWorld,
+    });
+  }
+
+  clear(): void {
+    this.coordinator.cancel("selection_changed");
+    this.interaction.clear();
+  }
+
+  select(entity: RenderEntity | undefined): void {
+    this.coordinator.cancel("selection_changed");
+    this.interaction.select(entity);
+  }
+
+  destroy(): void {
+    this.coordinator.destroy();
+    this.interaction.clear();
   }
 }
 
@@ -131,7 +170,7 @@ describe("item edit interaction", () => {
     const previews: number[] = [];
     const commits: number[] = [];
     const states: Array<{ selectedEntityId?: string; ghostX?: number }> = [];
-    const controller = new ItemEditController(surface as unknown as HTMLElement, {
+    const controller = new ItemEditHarness(surface as unknown as HTMLElement, {
       enabled: () => true,
       pick: () => item(),
       toWorld: (point) => ({ x: point.x / 2, y: point.y / 2 }),
@@ -184,7 +223,7 @@ describe("item edit interaction", () => {
     let pickItem = true;
     let commits = 0;
     const selected: Array<string | undefined> = [];
-    const controller = new ItemEditController(surface as unknown as HTMLElement, {
+    const controller = new ItemEditHarness(surface as unknown as HTMLElement, {
       enabled: () => enabled,
       pick: () => (pickItem ? item() : undefined),
       toWorld: (point) => point,
@@ -234,7 +273,7 @@ describe("item edit interaction", () => {
     const surface = new PointerSurface();
     const previews: number[] = [];
     const selections: Array<string | undefined> = [];
-    const controller = new ItemEditController(surface as unknown as HTMLElement, {
+    const controller = new ItemEditHarness(surface as unknown as HTMLElement, {
       enabled: () => true,
       pick: () => item(),
       toWorld: (point) => ({ x: point.x / 2, y: point.y / 2 }),
@@ -257,7 +296,7 @@ describe("item edit interaction", () => {
     const upper = { ...item(), id: "upper" };
     const preferred: Array<string | undefined> = [];
     const previews: string[] = [];
-    const controller = new ItemEditController(surface as unknown as HTMLElement, {
+    const controller = new ItemEditHarness(surface as unknown as HTMLElement, {
       enabled: () => true,
       pick: (_point, preferredEntityId) => {
         preferred.push(preferredEntityId);

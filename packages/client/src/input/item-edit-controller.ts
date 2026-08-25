@@ -1,15 +1,19 @@
 import type { ItemDefinition, Transform, Vec2 } from "@canvas-physics/core";
 import type { RenderEntity } from "../simulation/messages.js";
+import type {
+  PointerInteractionClaim,
+  PointerInteractionSample,
+  PointerInteractionStrategy,
+} from "./pointer-interaction-coordinator.js";
 
 export interface ItemEditState {
   selectedEntityId?: string;
   ghost?: { entityId: string; definitionId: string; transform: Transform };
 }
 
-export interface ItemEditControllerOptions {
+export interface ItemEditInteractionOptions {
   enabled(): boolean;
   pick(point: Vec2, preferredEntityId?: string): RenderEntity | undefined;
-  toWorld(point: Vec2): Vec2;
   onPreview(entityId: string, transform: Transform): void;
   onCommit(entityId: string, transform: Transform): void;
   onChange(state: ItemEditState): void;
@@ -131,16 +135,14 @@ export const findOwnedItemAt = (
  * Spec 14.2. Owns the local edit gesture only. The session still rate-limits,
  * validates through the server, and applies accepted transforms on the host.
  */
-export class ItemEditController {
+export class ItemEditInteraction implements PointerInteractionStrategy {
+  readonly id = "item-edit";
+  readonly priority = 200;
+
   private selected?: RenderEntity;
-  private pendingTap?: {
-    pointerId: number;
+  private gesture?: {
+    kind: "select" | "drag";
     entity: RenderEntity;
-    originLocal: Vec2;
-    moved: boolean;
-  };
-  private drag?: {
-    pointerId: number;
     entityId: string;
     definitionId: string;
     originLocal: Vec2;
@@ -148,151 +150,55 @@ export class ItemEditController {
     transform: Transform;
     moved: boolean;
   };
-  private readonly detach: () => void;
 
-  constructor(
-    private readonly element: HTMLElement,
-    private readonly options: ItemEditControllerOptions,
-  ) {
-    const onDown = (event: PointerEvent) => {
-      if (!this.options.enabled()) return;
-      const local = this.toLocal(event);
-      const selected = this.options.pick(local, this.selected?.id);
-      const wasSelected = selected !== undefined && this.selected?.id === selected.id;
-      if (!selected) {
-        this.selected = undefined;
-        this.pendingTap = undefined;
-        this.drag = undefined;
-        this.emit();
-        return;
-      }
+  constructor(private readonly options: ItemEditInteractionOptions) {}
 
-      // Selection is decided on pointer-up. Starting on an item and dragging
-      // away is not a tap, so it must neither open editing nor move the item.
-      if (!wasSelected) {
-        this.pendingTap = {
-          pointerId: event.pointerId,
-          entity: selected,
-          originLocal: local,
-          moved: false,
-        };
-        this.drag = undefined;
-        this.element.setPointerCapture(event.pointerId);
-        event.preventDefault();
-        return;
-      }
+  claim(sample: Readonly<PointerInteractionSample>): PointerInteractionClaim | undefined {
+    if (!this.options.enabled()) return undefined;
+    const entity = this.options.pick({ ...sample.local }, this.selected?.id);
+    if (!entity) {
+      this.selected = undefined;
+      this.gesture = undefined;
+      this.emit();
+      return undefined;
+    }
 
-      const world = this.options.toWorld(local);
-      const transform: Transform = {
-        x: selected.x,
-        y: selected.y,
-        rotation: selected.rotation,
-        scale: selected.scale ?? 1,
-        z: selected.z,
-      };
-      this.drag = {
-        pointerId: event.pointerId,
-        entityId: selected.id,
-        definitionId: selected.definitionId,
-        originLocal: local,
-        offset: { x: selected.x - world.x, y: selected.y - world.y },
-        transform,
+    const wasSelected = this.selected?.id === entity.id;
+    if (!wasSelected) {
+      this.gesture = {
+        kind: "select",
+        entity,
+        entityId: entity.id,
+        definitionId: entity.definitionId,
+        originLocal: { ...sample.local },
+        offset: { x: 0, y: 0 },
+        transform: this.transform(entity),
         moved: false,
       };
-      this.element.setPointerCapture(event.pointerId);
-      event.preventDefault();
-      this.emit();
-    };
-
-    const onMove = (event: PointerEvent) => {
-      const pendingTap = this.pendingTap;
-      if (pendingTap?.pointerId === event.pointerId) {
-        const local = this.toLocal(event);
-        if (
-          Math.hypot(
-            local.x - pendingTap.originLocal.x,
-            local.y - pendingTap.originLocal.y,
-          ) >= 3
-        ) {
-          pendingTap.moved = true;
-        }
-        event.preventDefault();
-        return;
-      }
-      const drag = this.drag;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-      const local = this.toLocal(event);
-      if (
-        !drag.moved &&
-        Math.hypot(local.x - drag.originLocal.x, local.y - drag.originLocal.y) < 3
-      ) {
-        return;
-      }
-      drag.moved = true;
-      const world = this.options.toWorld(local);
-      drag.transform = {
-        ...drag.transform,
-        x: world.x + drag.offset.x,
-        y: world.y + drag.offset.y,
+    } else {
+      const world = sample.world;
+      if (!world) return undefined;
+      this.selected = entity;
+      this.gesture = {
+        kind: "drag",
+        entity,
+        entityId: entity.id,
+        definitionId: entity.definitionId,
+        originLocal: { ...sample.local },
+        offset: { x: entity.x - world.x, y: entity.y - world.y },
+        transform: this.transform(entity),
+        moved: false,
       };
-      this.options.onPreview(drag.entityId, drag.transform);
-      event.preventDefault();
-      this.emit();
-    };
+    }
 
-    const onUp = (event: PointerEvent) => {
-      const pendingTap = this.pendingTap;
-      if (pendingTap?.pointerId === event.pointerId) {
-        if (this.element.hasPointerCapture(event.pointerId)) {
-          this.element.releasePointerCapture(event.pointerId);
-        }
-        this.pendingTap = undefined;
-        if (!pendingTap.moved) {
-          this.selected = pendingTap.entity;
-          this.emit();
-        }
-        event.preventDefault();
-        return;
-      }
-      const drag = this.drag;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-      if (this.element.hasPointerCapture(event.pointerId)) {
-        this.element.releasePointerCapture(event.pointerId);
-      }
-      this.drag = undefined;
-      if (drag.moved) this.options.onCommit(drag.entityId, drag.transform);
-      event.preventDefault();
-      this.emit();
-    };
-
-    const onCancel = (event: PointerEvent) => {
-      const pendingTap = this.pendingTap;
-      if (pendingTap?.pointerId === event.pointerId) {
-        if (this.element.hasPointerCapture(event.pointerId)) {
-          this.element.releasePointerCapture(event.pointerId);
-        }
-        this.pendingTap = undefined;
-        return;
-      }
-      const drag = this.drag;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-      if (this.element.hasPointerCapture(event.pointerId)) {
-        this.element.releasePointerCapture(event.pointerId);
-      }
-      this.drag = undefined;
-      event.preventDefault();
-      this.emit();
-    };
-
-    this.element.addEventListener("pointerdown", onDown);
-    this.element.addEventListener("pointermove", onMove);
-    this.element.addEventListener("pointerup", onUp);
-    this.element.addEventListener("pointercancel", onCancel);
-    this.detach = () => {
-      this.element.removeEventListener("pointerdown", onDown);
-      this.element.removeEventListener("pointermove", onMove);
-      this.element.removeEventListener("pointerup", onUp);
-      this.element.removeEventListener("pointercancel", onCancel);
+    return {
+      kind: this.gesture.kind === "select" ? "item-select" : "item-drag",
+      phase: () => this.gesture?.moved ? "active" : "pending",
+      move: (next) => this.move(next),
+      release: () => this.release(),
+      cancel: () => this.cancelGesture(),
+      suspend: () => {},
+      resume: (next) => this.move(next),
     };
   }
 
@@ -302,16 +208,13 @@ export class ItemEditController {
 
   /** Synchronizes a product-owned list/menu selection with pointer editing. */
   select(entity: RenderEntity | undefined): void {
-    this.releasePointer(this.pendingTap?.pointerId);
-    this.releasePointer(this.drag?.pointerId);
-    this.pendingTap = undefined;
-    this.drag = undefined;
+    this.gesture = undefined;
     this.selected = entity;
     this.emit();
   }
 
   private emit(): void {
-    const drag = this.drag;
+    const drag = this.gesture?.kind === "drag" ? this.gesture : undefined;
     this.options.onChange({
       selectedEntityId: this.selected?.id,
       ghost: drag
@@ -324,23 +227,58 @@ export class ItemEditController {
     });
   }
 
-  private toLocal(event: PointerEvent): Vec2 {
-    const rect = this.element.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  }
-
-  private releasePointer(pointerId: number | undefined): void {
-    if (pointerId !== undefined && this.element.hasPointerCapture(pointerId)) {
-      this.element.releasePointerCapture(pointerId);
+  private move(sample: Readonly<PointerInteractionSample>): void {
+    const gesture = this.gesture;
+    if (!gesture) return;
+    const distance = Math.hypot(
+      sample.local.x - gesture.originLocal.x,
+      sample.local.y - gesture.originLocal.y,
+    );
+    if (gesture.kind === "select") {
+      if (distance >= 3) gesture.moved = true;
+      return;
     }
+    if (!gesture.moved && distance < 3) return;
+    const world = sample.world;
+    if (!world) return;
+    gesture.moved = true;
+    gesture.transform = {
+      ...gesture.transform,
+      x: world.x + gesture.offset.x,
+      y: world.y + gesture.offset.y,
+    };
+    this.options.onPreview(gesture.entityId, gesture.transform);
+    this.emit();
   }
 
-  destroy(): void {
-    this.detach();
-    this.releasePointer(this.pendingTap?.pointerId);
-    this.releasePointer(this.drag?.pointerId);
-    this.pendingTap = undefined;
-    this.drag = undefined;
-    this.selected = undefined;
+  private release(): void {
+    const gesture = this.gesture;
+    this.gesture = undefined;
+    if (!gesture) return;
+    if (gesture.kind === "select") {
+      if (!gesture.moved) {
+        this.selected = gesture.entity;
+        this.emit();
+      }
+      return;
+    }
+    if (gesture.moved) this.options.onCommit(gesture.entityId, gesture.transform);
+    this.emit();
+  }
+
+  private cancelGesture(): void {
+    const changed = this.gesture?.kind === "drag" && this.gesture.moved;
+    this.gesture = undefined;
+    if (changed) this.emit();
+  }
+
+  private transform(entity: Readonly<RenderEntity>): Transform {
+    return {
+      x: entity.x,
+      y: entity.y,
+      rotation: entity.rotation,
+      scale: entity.scale ?? 1,
+      z: entity.z,
+    };
   }
 }

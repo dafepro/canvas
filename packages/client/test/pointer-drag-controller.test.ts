@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { PointerDragController } from "../src/input/pointer-drag-controller.js";
+import {
+  AvatarPointerInteraction,
+  type AvatarPointerOptions,
+} from "../src/input/avatar-pointer-interaction.js";
+import { PointerInteractionCoordinator } from "../src/input/pointer-interaction-coordinator.js";
 
 class PointerSurface {
   private readonly listeners = new Map<string, Set<(event: PointerEvent) => void>>();
@@ -62,10 +66,39 @@ class WindowTrackedPointerSurface extends PointerSurface {
   };
 }
 
+class AvatarPointerHarness {
+  private readonly interaction: AvatarPointerInteraction;
+  private readonly coordinator: PointerInteractionCoordinator;
+
+  constructor(element: HTMLElement, options: AvatarPointerOptions = {}) {
+    this.interaction = new AvatarPointerInteraction(options);
+    this.coordinator = new PointerInteractionCoordinator(element, {
+      strategies: [this.interaction],
+    });
+  }
+
+  get intent() {
+    return this.interaction.intent;
+  }
+
+  get gesture() {
+    return this.interaction.gesture;
+  }
+
+  get phase() {
+    return this.coordinator.diagnostics.phase;
+  }
+
+  destroy(): void {
+    this.coordinator.destroy();
+    this.interaction.reset();
+  }
+}
+
 describe("PointerDragController", () => {
   it("keeps thumbstick drag as the default input mode", () => {
     const surface = new PointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       deadZonePx: 0,
       fullRangePx: 40,
     });
@@ -87,7 +120,7 @@ describe("PointerDragController", () => {
 
   it("starts avatar drag only when the pointer grabs the local avatar", () => {
     const surface = new PointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => ({ x: 50, y: 40 }),
       grabRadiusPx: 24,
@@ -104,30 +137,42 @@ describe("PointerDragController", () => {
     controller.destroy();
   });
 
-  it("does not start movement when a live editor owns that pointer location", () => {
+  it("yields pointer ownership to a higher-priority interaction", () => {
     const surface = new PointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const avatar = new AvatarPointerInteraction({
       deadZonePx: 0,
       fullRangePx: 40,
-      allowStart: (point) => point.x > 30,
     });
+    const coordinator = new PointerInteractionCoordinator(
+      surface as unknown as HTMLElement,
+      {
+        strategies: [
+          {
+            id: "editor",
+            priority: 200,
+            claim: () => ({ release: () => {}, cancel: () => {} }),
+          },
+          avatar,
+        ],
+      },
+    );
 
     surface.emit("pointerdown", 20, 20);
     surface.emit("pointermove", 60, 20);
 
-    expect(controller.intent).toEqual({
+    expect(avatar.intent).toEqual({
       direction: { x: 0, y: 0 },
       intensity: 0,
       held: false,
     });
-    expect(surface.captured).toBeUndefined();
-    controller.destroy();
+    expect(coordinator.diagnostics.strategyId).toBe("editor");
+    coordinator.destroy();
   });
 
   it("places the avatar target exactly under the pointer without retaining a grab offset", () => {
     const surface = new PointerSurface();
     let avatar = { x: 50, y: 40 };
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => avatar,
       grabRadiusPx: 24,
@@ -163,7 +208,7 @@ describe("PointerDragController", () => {
 
   it("ends a canceled gesture and allows the edge avatar to be grabbed again", () => {
     const surface = new PointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => ({ x: 50, y: 40 }),
       grabRadiusPx: 24,
@@ -187,7 +232,7 @@ describe("PointerDragController", () => {
 
   it("tracks an active avatar drag through the owning window outside the canvas", () => {
     const surface = new WindowTrackedPointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => ({ x: 50, y: 40 }),
       grabRadiusPx: 24,
@@ -214,7 +259,7 @@ describe("PointerDragController", () => {
 
   it("suspends on lost capture and resumes only while the primary button remains held", () => {
     const surface = new WindowTrackedPointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => ({ x: 50, y: 40 }),
       grabRadiusPx: 24,
@@ -226,7 +271,7 @@ describe("PointerDragController", () => {
     expect(controller.intent.held).toBe(false);
 
     surface.windowTarget.emit("pointermove", 90, 40, 7, 40, 1);
-    expect(controller.phase).toBe("held");
+    expect(controller.phase).toBe("active");
     expect(controller.intent).toMatchObject({ held: true, target: { x: 90, y: 40 } });
 
     surface.emit("lostpointercapture", 90, 40, 7, 50, 1);
@@ -237,7 +282,7 @@ describe("PointerDragController", () => {
 
   it("detects a release missed outside the browser and permits an immediate re-grab", () => {
     const surface = new WindowTrackedPointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => ({ x: 50, y: 40 }),
       grabRadiusPx: 24,
@@ -252,14 +297,14 @@ describe("PointerDragController", () => {
     expect(controller.phase).toBe("idle");
 
     surface.emit("pointerdown", 50, 40, 7, 50, 1);
-    expect(controller.phase).toBe("held");
+    expect(controller.phase).toBe("active");
     expect(controller.intent.held).toBe(true);
     controller.destroy();
   });
 
   it("turns a quick avatar release into one bounded flick intent", () => {
     const surface = new PointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => ({ x: 50, y: 40 }),
       grabRadiusPx: 24,
@@ -289,7 +334,7 @@ describe("PointerDragController", () => {
 
   it("stays still when an avatar drag release is below the flick threshold", () => {
     const surface = new PointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => ({ x: 50, y: 40 }),
       grabRadiusPx: 24,
@@ -314,7 +359,7 @@ describe("PointerDragController", () => {
 
   it("lets a consumer disable avatar flicks without disabling direct dragging", () => {
     const surface = new PointerSurface();
-    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+    const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
       avatarPosition: () => ({ x: 50, y: 40 }),
       grabRadiusPx: 24,
