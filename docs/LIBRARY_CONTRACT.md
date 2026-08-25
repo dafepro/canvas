@@ -104,7 +104,13 @@ projection API without importing Pixi or observing the render loop.
 input. While held, direct dragging places the avatar center at the pointer's
 absolute world position in one simulation tick with no maximum speed. The host
 sweeps the complete displacement against fixed, avatar-blocking geometry, so a
-large pointer jump cannot tunnel through a wall. A quick release emits one
+large pointer jump cannot tunnel through a wall. Solid canvas edges and fixed
+colliders use a small contact skin, and the remaining displacement is projected
+along every contacted surface. This makes all four edges and corners stable:
+the avatar stays at the nearest reachable point, moves tangentially with the
+pointer, and immediately follows a pointer returning to the interior. Open,
+wrap, and respawn edges retain their authored semantics rather than being
+converted into solid drag bounds. A quick release emits one
 bounded flick, while a release below the configured pixel-speed threshold emits
 no momentum. Gesture thresholds are client/runtime configuration. The canvas owns
 `avatarController.flickDeceleration`, so host simulation and local prediction
@@ -119,12 +125,33 @@ directional facing. During direct dragging,
 contact behaviors. Absolute pointer placement remains uncapped, preventing a
 large pointer jump from becoming an unbounded authored kick or hit. Direct
 targets are inset by the avatar radius, including on canvases with open edges.
-Long direct moves use iterative shape casts: they cannot tunnel through
-avatar-blocking terrain, and any remaining displacement slides along the hit
-surface instead of pinning the avatar at the first point of contact. Once a
-direct grab begins, pointer movement is tracked on the canvas's owning window;
-an out-of-frame pointer therefore keeps projecting to the nearest reachable
-canvas edge instead of losing control at the DOM boundary.
+Long direct moves use iterative shape casts against fixed avatar-blocking
+terrain. This direct-position solver is deliberately separate from the
+velocity controller: arbitrary pointer jumps can be much longer than one
+physics step, including before the first world step. Up to eight simultaneous
+contacts are resolved so compound corners cannot pin or tunnel.
+
+Pointer ownership is an explicit `idle` / `held` / `suspended` state machine.
+Once a direct grab begins, movement, release, cancellation, browser-window
+exit, focus loss, and lost pointer capture are observed on the canvas's owning
+window. Leaving the canvas while still held therefore keeps projecting the
+pointer to the nearest reachable world edge. A lost capture or window exit
+suspends the gesture and a subsequent held move resumes it; cancellation,
+release, or a move with no primary button ends it and permits an immediate new
+grab. Canvas never fabricates a release flick after cancellation.
+
+Peers predict their local avatar for the newest input sequence. Canonical
+updates acknowledge the last processed input sequence, and reconciliation
+compares that state with the prediction recorded for the same sequence—not
+with the newest pointer position. Delayed keyframes and checkpoints therefore
+cannot pull newer tangential edge movement backward. Prediction history is
+bounded and is reset on host-role changes.
+
+`RuntimeDiagnostics.pointer` exposes the pointer phase, pointer ID, last local
+point, and capture status; `pointerWorldTarget` exposes the projected world
+target. Session diagnostics expose sent and acknowledged input sequences,
+prediction-history depth, and current predicted/canonical avatar coordinates.
+These fields are observational and must not be used as control inputs.
 
 Consumer visuals may opt into `visual.mirrorX` or `visual.mirrorY`. Reflection
 is presentation-only: world dimensions, anchors, transforms, and colliders do

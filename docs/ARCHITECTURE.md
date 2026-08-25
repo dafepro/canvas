@@ -179,6 +179,28 @@ without the current transform message.
 | Owner edit preview | Up to 15 Hz, coalesced | `RoomSession` |
 | Host heartbeat | 2 Hz | `RoomClient` |
 
+## Direct avatar input path
+
+Direct dragging crosses three independently testable layers:
+
+1. `PointerDragController` owns one browser pointer through explicit `idle`,
+   `held`, and `suspended` phases. It tracks the owning window, not only the
+   canvas DOM element.
+2. `RapierWorld` shape-casts the complete absolute displacement against fixed,
+   avatar-blocking geometry and projects the remainder along up to eight
+   contacts. Solid boundaries include a contact skin; non-solid edge policies
+   keep their authored behavior.
+3. `RoomSession` records the local predicted pose by input sequence. When the
+   host acknowledges sequence N, correction compares canonical N with predicted
+   N, so a delayed state cannot reconcile against a newer pointer target.
+
+The direct-position cast is not the velocity `KinematicCharacterController`.
+That controller is retained for ordinary per-tick velocity movement; in Rapier
+it does not provide the required result for teleport-sized pointer
+displacements before the first world step. Keeping the two paths explicit also
+prevents direct-drag collision changes from silently changing keyboard or
+thumbstick movement.
+
 ## Extending the system
 
 | Goal | Where to work |

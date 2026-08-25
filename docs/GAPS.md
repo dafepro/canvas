@@ -202,6 +202,12 @@ work below because they determine the public boundary every consumer will use.
   checkpoints. Host and peer now derive the same deterministic spawn offset,
   and display correction observes each canonical tick once before easing toward
   its newest error instead of reapplying delayed state every render frame.
+- [x] Redesign direct avatar dragging at canvas edges. Pointer ownership now has
+  explicit held/suspended lifecycle, direct placement continuously resolves
+  compound fixed-geometry contacts, and delayed canonical state reconciles
+  against the prediction for its acknowledged input sequence rather than the
+  newest pointer target. The all-edge/corner, capture-loss, and delayed-relay
+  matrices cover leaving, sliding, returning, releasing, and re-grabbing.
 - [x] Wire behavior-state migrations into snapshot loading and preserve actual
   behavior/definition versions in checkpoints.
 - [x] Add public rotate and set-config APIs, use server-authoritative accepted
@@ -254,3 +260,7 @@ work below because they determine the public boundary every consumer will use.
 - [x] Make the integration harness use the correct executable name on Windows.
 - [x] Add Windows/Linux CI. Publishable package exports and generated bindings
   are enforced by the cross-platform release gate above.
+
+Potential pre-1.0 rewrites discovered through recurring fixes are assessed in
+`FEATURE_REDESIGN_CANDIDATES.md`; that note is evidence-driven and is not a
+second compatibility promise or release checklist.
