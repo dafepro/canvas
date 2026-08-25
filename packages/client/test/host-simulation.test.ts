@@ -819,7 +819,7 @@ describe("HostSimulation with real physics", () => {
     );
     simulation.step();
 
-    expect(atEdge).toBeGreaterThan(98);
+    expect(atEdge).toBeGreaterThan(97.9);
     expect(simulation.world.registry.require("avatar:return-inward").transform.x)
       .toBeCloseTo(70, 3);
     simulation.free();
@@ -856,10 +856,64 @@ describe("HostSimulation with real physics", () => {
     simulation.step();
     const second = simulation.world.registry.require("avatar:edge-follow").transform;
 
-    expect(first.x).toBeGreaterThan(98);
+    expect(first.x).toBeGreaterThan(97.9);
     expect(first.y).toBeCloseTo(18, 3);
     expect(second.x).toBeCloseTo(first.x, 3);
     expect(second.y).toBeCloseTo(52, 3);
+    simulation.free();
+  });
+
+  it("continuously follows direct targets around every solid edge and corner", () => {
+    const canvas = {
+      ...rocketCanvas,
+      edges: { top: "solid", right: "solid", bottom: "solid", left: "solid" } as const,
+      staticGeometry: [],
+      environment: {
+        base: { gravityXY: { x: 0, y: 0 }, linearDrag: 0 },
+        regions: [],
+      },
+    };
+    const simulation = new HostSimulation(
+      canvas,
+      rocketCanvasDefinitions,
+      registry(),
+      60,
+    );
+    simulation.addAvatar({
+      entityId: "avatar:perimeter",
+      clientId: "perimeter",
+      userId: "perimeter",
+      position: { x: 50, y: 35 },
+      radius: 2,
+    });
+
+    const path = [
+      { target: { x: 150, y: 12 }, expected: { x: 98, y: 12 } },
+      { target: { x: 150, y: 58 }, expected: { x: 98, y: 58 } },
+      { target: { x: 150, y: 100 }, expected: { x: 98, y: 68 } },
+      { target: { x: 72, y: 100 }, expected: { x: 72, y: 68 } },
+      { target: { x: -50, y: 100 }, expected: { x: 2, y: 68 } },
+      { target: { x: -50, y: 48 }, expected: { x: 2, y: 48 } },
+      { target: { x: -50, y: -30 }, expected: { x: 2, y: 2 } },
+      { target: { x: 40, y: -30 }, expected: { x: 40, y: 2 } },
+      { target: { x: 150, y: -30 }, expected: { x: 98, y: 2 } },
+      { target: { x: 55, y: 35 }, expected: { x: 55, y: 35 } },
+    ];
+
+    path.forEach(({ target, expected }, index) => {
+      simulation.world.setAvatarInput(
+        "avatar:perimeter",
+        { x: 0, y: 0 },
+        1,
+        index + 1,
+        true,
+        target,
+      );
+      simulation.step();
+      const transform = simulation.world.registry.require("avatar:perimeter").transform;
+      expect(transform.x, `path ${index} x`).toBeCloseTo(expected.x, 1);
+      expect(transform.y, `path ${index} y`).toBeCloseTo(expected.y, 1);
+    });
     simulation.free();
   });
 

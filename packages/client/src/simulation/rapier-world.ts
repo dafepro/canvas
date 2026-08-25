@@ -72,9 +72,17 @@ interface BodyRecord {
 
 /** Spec 20. Half a second at 60 Hz before a still, embedded body is freed. */
 const STUCK_TICKS = 30;
-const clampBodyCentre = (value: number, size: number, radius: number): number => {
-  const inset = Math.min(radius, size / 2);
-  return Math.max(inset, Math.min(size - inset, value));
+const CHARACTER_SKIN = 0.02;
+const clampBodyCentre = (
+  value: number,
+  size: number,
+  radius: number,
+  lowEdge: CanvasDefinition["edges"]["left"],
+  highEdge: CanvasDefinition["edges"]["right"],
+): number => {
+  const lowInset = Math.min(radius + (lowEdge === "solid" ? CHARACTER_SKIN : 0), size / 2);
+  const highInset = Math.min(radius + (highEdge === "solid" ? CHARACTER_SKIN : 0), size / 2);
+  return Math.max(lowInset, Math.min(size - highInset, value));
 };
 /** Below this speed a body is treated as not moving. */
 const STUCK_SPEED = 0.2;
@@ -143,7 +151,7 @@ export class RapierWorld implements BehaviorHost {
     // Spec 6.1. The avatar is a kinematic body, so the solver never stops it.
     // The character controller clamps each move against solid geometry and
     // slides the rest along the surface.
-    this.characterController = this.world.createCharacterController(0.02);
+    this.characterController = this.world.createCharacterController(CHARACTER_SKIN);
     this.characterController.setUp({ x: 0, y: -1 });
     this.characterController.setSlideEnabled(true);
     // Every surface is climbable. This canvas has no walk cycle, so a steep
@@ -608,8 +616,20 @@ export class RapierWorld implements BehaviorHost {
       entity.avatar.desiredIntensity = Math.max(0, Math.min(1, intensity));
       entity.avatar.desiredPosition = target && Number.isFinite(target.x) && Number.isFinite(target.y)
         ? {
-            x: clampBodyCentre(target.x, this.canvas.size.width, entity.avatar.radius),
-            y: clampBodyCentre(target.y, this.canvas.size.height, entity.avatar.radius),
+            x: clampBodyCentre(
+              target.x,
+              this.canvas.size.width,
+              entity.avatar.radius,
+              this.canvas.edges.left,
+              this.canvas.edges.right,
+            ),
+            y: clampBodyCentre(
+              target.y,
+              this.canvas.size.height,
+              entity.avatar.radius,
+              this.canvas.edges.top,
+              this.canvas.edges.bottom,
+            ),
           }
         : undefined;
       if (nextInput && entity.avatar.desiredPosition) {
@@ -746,7 +766,7 @@ export class RapierWorld implements BehaviorHost {
         x: avatar.desiredPosition.x - start.x,
         y: avatar.desiredPosition.y - start.y,
       };
-      const moved = this.sweepDirectAvatarMovement(record, delta);
+      const moved = this.constrainDirectAvatarDisplacement(record, delta);
       record.body.setTranslation({ x: start.x + moved.x, y: start.y + moved.y }, true);
       record.body.setLinvel({ x: 0, y: 0 }, true);
       avatar.interactionVelocity = Math.hypot(moved.x, moved.y) > 0
@@ -802,17 +822,18 @@ export class RapierWorld implements BehaviorHost {
   }
 
   /**
-   * A held direct drag follows the pointer in one simulation tick, regardless
-   * of distance. Sweep the full displacement first so that this deliberately
-   * uncapped movement cannot tunnel through fixed room geometry.
+   * Resolves an uncapped direct displacement with one world-level continuous
+   * shape query per contact. The explicit query position lets the same tick
+   * traverse a long path; Rapier's character controller remains responsible
+   * for ordinary per-tick velocity movement.
    */
-  private sweepDirectAvatarMovement(record: BodyRecord, movement: Vec2): Vec2 {
+  private constrainDirectAvatarDisplacement(record: BodyRecord, movement: Vec2): Vec2 {
     const collider = record.colliders.get("body");
     if (!collider || (movement.x === 0 && movement.y === 0)) return movement;
     const moved = { x: 0, y: 0 };
     let remaining = { ...movement };
 
-    for (let iteration = 0; iteration < 3; iteration++) {
+    for (let iteration = 0; iteration < 8; iteration++) {
       if (Math.hypot(remaining.x, remaining.y) < 0.0001) break;
       let hit: { time_of_impact: number; normal1: Vec2 } | null = null;
       for (const candidate of this.bodies.values()) {
@@ -832,9 +853,10 @@ export class RapierWorld implements BehaviorHost {
             },
             obstacle.rotation(),
             { x: 0, y: 0 },
-            0.02,
+            CHARACTER_SKIN,
             1,
-            true,
+            // Tangential motion must escape an existing numerical overlap.
+            false,
           );
           if (candidateHit && (!hit || candidateHit.time_of_impact < hit.time_of_impact)) {
             hit = candidateHit;
@@ -881,19 +903,12 @@ export class RapierWorld implements BehaviorHost {
     const collider = record.colliders.get("body");
     if (!collider) return velocity;
     if (velocity.x === 0 && velocity.y === 0) return velocity;
-    // Only a fixed collider stops the avatar. An item is dynamic and the solver
-    // pushes it; another avatar is kinematic and never blocks. A filter
-    // predicate is not used here: in rapier2d-compat 0.20 a predicate that sees
-    // a collision leaves a Rust borrow open, and `World.free` then throws.
     this.characterController.computeColliderMovement(
       collider,
       { x: velocity.x * dt, y: velocity.y * dt },
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS |
         RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC |
         RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC,
-      // Addendum A4. The controller applies no group filter of its own, so the
-      // groups of the avatar body are given here. Terrain that does not accept
-      // the avatar layer then lets the avatar walk through.
       record.queryGroups,
     );
     const moved = this.characterController.computedMovement();
