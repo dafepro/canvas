@@ -6,7 +6,12 @@
   "backgroundAssetId": "basketball.court",
   "edges": { "top": "solid", "right": "solid", "bottom": "solid", "left": "solid" },
   "terrainDefaults": { "avatars": true, "items": true },
-  "avatarController": { "radius": 1.35, "maxSpeed": 19, "acceleration": 115 },
+  "avatarController": {
+    "radius": 1.35,
+    "maxSpeed": 19,
+    "acceleration": 115,
+    "flickDeceleration": 14
+  },
   "staticGeometry": [
     {
       "id": "left-backboard",

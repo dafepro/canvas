@@ -12,9 +12,11 @@ const serverUrl =
   import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:8085`;
 
 const stage = document.querySelector<HTMLElement>("#stage")!;
+const gameShell = document.querySelector<HTMLElement>("main")!;
 const userInput = document.querySelector<HTMLInputElement>("#user")!;
 const joinButton = document.querySelector<HTMLButtonElement>("#join")!;
 const leaveButton = document.querySelector<HTMLButtonElement>("#leave")!;
+const fullscreenButton = document.querySelector<HTMLButtonElement>("#fullscreen")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const participantCount = document.querySelector<HTMLElement>("#participant-count")!;
 const scoreboard = document.querySelector<HTMLElement>("#scoreboard")!;
@@ -80,6 +82,7 @@ const join = async (): Promise<void> => {
       credentialProvider: async () =>
         devRealtimeCredential(userInput.value, userInput.value),
       mount: stage,
+      fullscreenElement: gameShell,
       definitions: basketballDefinitions,
       assets: basketballAssets,
       driver: new SimulationDriver(worker),
@@ -87,7 +90,17 @@ const join = async (): Promise<void> => {
         background: 0x071a32,
         debug: params.has("debug"),
       },
-      pointer: { mode: "thumbstick", deadZonePx: 4, fullRangePx: 58 },
+      pointer: {
+        mode: "avatarDrag",
+        grabRadiusPx: 38,
+        deadZonePx: 4,
+        fullRangePx: 58,
+        flick: {
+          sampleWindowMs: 100,
+          minimumSpeedPxPerSecond: 300,
+          fullSpeedPxPerSecond: 1_300,
+        },
+      },
       onAssetProgress: ({ loaded, total }) => {
         status.textContent = `Loading arena art… ${loaded}/${total}`;
       },
@@ -123,10 +136,15 @@ const join = async (): Promise<void> => {
           );
         });
       }),
+      next.subscribeFullscreen((active) => {
+        fullscreenButton.textContent = active ? "Exit full screen" : "Full screen";
+        fullscreenButton.setAttribute("aria-pressed", String(active));
+      }),
     ];
     await next.start();
     await next.whenPresented();
     leaveButton.disabled = false;
+    fullscreenButton.disabled = false;
   } catch (error) {
     runtime = undefined;
     next?.stop();
@@ -149,11 +167,19 @@ const leave = (): void => {
     joinButton.disabled = false;
   });
   leaveButton.disabled = true;
+  fullscreenButton.disabled = true;
   participantCount.textContent = "0";
   status.textContent = "Not connected";
 };
 
 joinButton.addEventListener("click", () => void join());
 leaveButton.addEventListener("click", leave);
+fullscreenButton.addEventListener("click", () => {
+  const current = runtime;
+  if (!current) return;
+  void current.toggleFullscreen().catch((error) => {
+    status.textContent = `Full screen unavailable: ${String(error)}`;
+  });
+});
 
 if (params.has("autojoin")) void join();

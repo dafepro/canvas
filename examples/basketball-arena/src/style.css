@@ -102,6 +102,31 @@ h1 {
 
 .connection-status #status { color: #f5f7fb; font-weight: 800; }
 
+.fullscreen-button {
+  min-height: 34px;
+  margin-top: 8px;
+  padding: 0 12px;
+  color: #f5f7fb;
+  background: rgba(22, 42, 72, 0.88);
+}
+
+main:fullscreen {
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(20, 184, 176, 0.2), transparent 36rem),
+    #041126;
+}
+
+main:fullscreen header { margin-bottom: 10px; }
+main:fullscreen .arena-card {
+  width: min(100%, calc((100vh - 190px) * 5 / 3));
+  margin: 0 auto;
+}
+main:fullscreen aside { display: none; }
+
 .arena-card {
   position: relative;
   overflow: hidden;
@@ -201,6 +226,16 @@ button:disabled { cursor: default; opacity: 0.42; }
   .scoreboard { width: min(520px, 100%); margin: 0 auto; order: 3; }
   aside { grid-template-columns: 1fr; gap: 12px; }
   .join-controls { grid-template-columns: auto minmax(100px, 1fr) auto auto; }
+  main:fullscreen .title-block { display: none; }
+  main:fullscreen header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  main:fullscreen .scoreboard { order: initial; }
+  main:fullscreen .connection-status { align-items: flex-end; }
+  main:fullscreen .arena-card {
+    width: min(100%, calc((100vh - 145px) * 5 / 3));
+  }
 }
 
 @media (max-width: 560px) {

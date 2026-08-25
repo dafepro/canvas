@@ -101,6 +101,11 @@ describe("basketball arena integration", () => {
       "left-rim-18.9",
       "right-rim-23.1",
     ]));
+    expect(canvas.avatarController).toMatchObject({
+      maxSpeed: 19,
+      acceleration: 115,
+      flickDeceleration: 14,
+    });
   });
 
   it("scores through configured hoop geometry while physics remains live", () => {

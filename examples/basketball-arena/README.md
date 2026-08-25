@@ -19,6 +19,8 @@ The authoritative canvas and the system ball's resolved configuration contain
 the reusable game recipe:
 
 - court size, solid edges, player movement, spawn points, and system items;
+- direct avatar dragging, quick-flick thresholds, and canvas-owned slide
+  deceleration;
 - mirrored decorative hoops plus matching backboard and rim collision;
 - circular basket sensors and team-award tags;
 - localized net damping around each hoop;
@@ -34,3 +36,10 @@ coordinates, team tags, score values, win thresholds, or delays.
 The scoreboard is product-owned DOM using replicated immutable behavior state.
 Its generated frame remains ordinary UI art; Canvas does not learn about team
 names or sports scoreboards.
+
+The fullscreen button uses `CanvasRuntime.toggleFullscreen()` with the product
+shell supplied as `fullscreenElement`. Consumers own the button and layout;
+Canvas owns the small enter/exit/state capability. `avatarDrag` remains
+collision-safe movement intent rather than authoritative teleportation. Its
+pointer-speed thresholds live in runtime input configuration, while
+`avatarController.flickDeceleration` lives in the authoritative canvas.
