@@ -4,6 +4,7 @@ import type {
   PointerInteractionSample,
   PointerInteractionStrategy,
 } from "./pointer-interaction-coordinator.js";
+import { pointerInteractionPriorities } from "./pointer-interaction-coordinator.js";
 
 export interface AvatarPointerIntent {
   direction: Vec2;
@@ -62,7 +63,7 @@ const STILL: AvatarPointerIntent = {
  */
 export class AvatarPointerInteraction implements PointerInteractionStrategy {
   readonly id = "avatar-movement";
-  readonly priority = 100;
+  readonly priority = pointerInteractionPriorities.avatarMovement;
 
   private readonly mode: "thumbstick" | "avatarDrag";
   private readonly fullRangePx: number;

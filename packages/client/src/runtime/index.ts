@@ -35,6 +35,10 @@ export type {
   PointerInteractionStrategy,
   PointerInteractionTerminalReason,
 } from "../input/pointer-interaction-coordinator.js";
+export {
+  PointerInteractionCoordinator,
+  pointerInteractionPriorities,
+} from "../input/pointer-interaction-coordinator.js";
 export { FullscreenController } from "../input/fullscreen-controller.js";
 export type { FullscreenObserver } from "../input/fullscreen-controller.js";
 export { SimulationDriver } from "../simulation/driver.js";

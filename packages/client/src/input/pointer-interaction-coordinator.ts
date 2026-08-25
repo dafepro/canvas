@@ -72,6 +72,12 @@ export interface PointerInteractionDiagnostics {
   readonly lastTerminalReason?: PointerInteractionTerminalReason;
 }
 
+/** Stable built-in ordering points for consumer strategies. */
+export const pointerInteractionPriorities = Object.freeze({
+  avatarMovement: 100,
+  itemEdit: 200,
+});
+
 interface ActiveInteraction {
   pointerId: number;
   pointerType: string;
@@ -104,6 +110,17 @@ export class PointerInteractionCoordinator {
     private readonly element: HTMLElement,
     private readonly options: PointerInteractionCoordinatorOptions,
   ) {
+    const strategyIds = new Set<string>();
+    for (const strategy of options.strategies) {
+      if (!strategy.id.trim()) throw new Error("pointer interaction strategy id is required");
+      if (strategyIds.has(strategy.id)) {
+        throw new Error(`duplicate pointer interaction strategy '${strategy.id}'`);
+      }
+      if (!Number.isFinite(strategy.priority)) {
+        throw new Error(`pointer interaction strategy '${strategy.id}' has invalid priority`);
+      }
+      strategyIds.add(strategy.id);
+    }
     this.strategies = options.strategies
       .map((entry, index) => ({ entry, index }))
       .sort((left, right) =>

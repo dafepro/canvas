@@ -5,6 +5,7 @@ import type {
   PointerInteractionSample,
   PointerInteractionStrategy,
 } from "./pointer-interaction-coordinator.js";
+import { pointerInteractionPriorities } from "./pointer-interaction-coordinator.js";
 
 export interface ItemEditState {
   selectedEntityId?: string;
@@ -137,7 +138,7 @@ export const findOwnedItemAt = (
  */
 export class ItemEditInteraction implements PointerInteractionStrategy {
   readonly id = "item-edit";
-  readonly priority = 200;
+  readonly priority = pointerInteractionPriorities.itemEdit;
 
   private selected?: RenderEntity;
   private gesture?: {

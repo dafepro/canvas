@@ -94,6 +94,23 @@ const recordingClaim = (events: string[]): PointerInteractionClaim => ({
 });
 
 describe("PointerInteractionCoordinator", () => {
+  it("rejects ambiguous or invalid strategy registrations", () => {
+    const surface = new PointerSurface();
+    const duplicate = { id: "same", priority: 1, claim: () => undefined };
+    expect(() => new PointerInteractionCoordinator(
+      surface as unknown as HTMLElement,
+      { strategies: [duplicate, duplicate] },
+    )).toThrow("duplicate pointer interaction strategy 'same'");
+    expect(() => new PointerInteractionCoordinator(
+      surface as unknown as HTMLElement,
+      { strategies: [{ ...duplicate, id: "", priority: 1 }] },
+    )).toThrow("strategy id is required");
+    expect(() => new PointerInteractionCoordinator(
+      surface as unknown as HTMLElement,
+      { strategies: [{ ...duplicate, priority: Number.NaN }] },
+    )).toThrow("has invalid priority");
+  });
+
   it("gives one pointer to the highest-priority claimant and terminates it once", () => {
     const surface = new PointerSurface(true);
     const events: string[] = [];
@@ -180,6 +197,22 @@ describe("PointerInteractionCoordinator", () => {
 
     expect(events).toEqual(["suspend", "resume:80,44", "release"]);
     expect(coordinator.diagnostics.suspensions).toBe(1);
+    coordinator.destroy();
+  });
+
+  it("treats touch as held even when the browser reports no button bit", () => {
+    const surface = new PointerSurface(true);
+    const events: string[] = [];
+    const coordinator = new PointerInteractionCoordinator(
+      surface as unknown as HTMLElement,
+      { strategies: [strategy("touch", 1, recordingClaim, events)] },
+    );
+
+    surface.emit("pointerdown", 10, 10, 9, 0, { pointerType: "touch" });
+    surface.windowTarget!.emit("pointermove", 20, 20, 9, 0, { pointerType: "touch" });
+    surface.windowTarget!.emit("pointerup", 20, 20, 9, 0, { pointerType: "touch" });
+
+    expect(events).toEqual(["move:20,20", "release"]);
     coordinator.destroy();
   });
 
