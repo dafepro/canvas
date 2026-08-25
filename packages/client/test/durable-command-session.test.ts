@@ -5,7 +5,11 @@ import {
   DurableCommandSession,
   type DurableCommandEffect,
 } from "../src/runtime/session/durable-command-session.js";
-import type { SessionClock, SessionTimeout } from "../src/runtime/session/session-clock.js";
+import type {
+  SessionClock,
+  SessionInterval,
+  SessionTimeout,
+} from "../src/runtime/session/session-clock.js";
 import {
   crateDefinition,
   rocketCanvas,
@@ -30,6 +34,12 @@ class FakeClock implements SessionClock {
   clearTimeout(timeout: SessionTimeout): void {
     this.scheduled.delete(timeout as number);
   }
+
+  setInterval(_callback: () => void, _everyMs: number): SessionInterval {
+    throw new Error("durable command tests do not schedule intervals");
+  }
+
+  clearInterval(_interval: SessionInterval): void {}
 
   advance(ms: number): void {
     this.time += ms;

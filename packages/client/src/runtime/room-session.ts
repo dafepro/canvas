@@ -44,6 +44,10 @@ import {
   type PresenceSnapshot,
 } from "./session/participant-roster.js";
 import { PresentationGate } from "./session/presentation-gate.js";
+import {
+  HostRoleSession,
+  type HostRoleEffect,
+} from "./session/host-role-session.js";
 
 export type {
   BehaviorStateSnapshot,
@@ -183,19 +187,15 @@ export class RoomSession {
   private readonly timeline: ReplicationTimeline;
   private readonly roster: ParticipantRoster;
   private readonly presentation = new PresentationGate();
+  private readonly hostRole: HostRoleSession;
   private localAvatarId = "";
   private inputSequence = 0;
-  private simulationReady = false;
-  private simulationGeneration = 0;
-  private staleSimulationResponses = 0;
   private connectionGeneration = 0;
   private pendingJoin?: PendingJoin;
   private consumerInitialization?: Promise<void>;
   private consumerInitialized = false;
   private initializedCanvas?: Readonly<{ id: string; version: number }>;
   private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
-  private readonly hostAvatarIds = new Set<string>();
-  private finalCheckpointSent?: () => void;
   private terminated = false;
   private stats = {
     hz: 0,
@@ -218,9 +218,6 @@ export class RoomSession {
   private terminalError?: CanvasConsumerError;
   private pageVisible = true;
   private readonly countdowns = new Set<string>();
-  private hostMigrations = 0;
-  private lastMigrationReason?: string;
-  private quarantinedCount = 0;
   /** Spec 22.1. One sample of the transport counters, taken every second. */
   private trafficMark = {
     atMs: 0,
@@ -255,6 +252,11 @@ export class RoomSession {
         serverUrl: options.serverUrl,
       },
     });
+    this.hostRole = new HostRoleSession({
+      rates: options.rates,
+      sceneRevision: () => this.client.sceneRevision,
+      emit: (effect) => this.applyHostRoleEffect(effect),
+    });
     this.durable = new DurableCommandSession({
       definitions: options.definitions,
       previewHz: options.rates?.previewHz,
@@ -262,7 +264,7 @@ export class RoomSession {
         clientId: this.client.clientId,
         userId: this.client.userId,
         sceneRevision: this.client.sceneRevision,
-        isHost: this.client.isHost,
+        isHost: this.hostRole.isHost,
         canvas: this.canvasDefinition,
       }),
       emit: (effect) => this.applyDurableEffect(effect),
@@ -430,8 +432,8 @@ export class RoomSession {
         this.lifecycle === "stopped") return;
     const isLastHost =
       this.running &&
-      this.simulationReady &&
-      this.client.isHost &&
+      this.hostRole.simulationReady &&
+      this.hostRole.isHost &&
       this.client.peers.length === 1 &&
       this.client.peers[0]?.clientId === this.client.clientId;
     if (!isLastHost) {
@@ -442,26 +444,7 @@ export class RoomSession {
     this.running = false;
     this.transition("stopping");
     this.clearTimers();
-    const sent = new Promise<void>((resolve) => {
-      this.finalCheckpointSent = resolve;
-    });
-    this.driver.send({
-      type: "requestSnapshot",
-      generation: this.simulationGeneration,
-      final: true,
-      sceneRevision: this.client.sceneRevision,
-      hostEpoch: this.client.hostEpoch,
-    });
-
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      sent,
-      new Promise<void>((resolve) => {
-        timeout = setTimeout(resolve, timeoutMs);
-      }),
-    ]);
-    if (timeout) clearTimeout(timeout);
-    this.finalCheckpointSent = undefined;
+    await this.hostRole.requestFinalCheckpoint(this.client.sceneRevision, timeoutMs);
     this.finishStop();
   }
 
@@ -480,8 +463,7 @@ export class RoomSession {
     if (this.terminated) return;
     this.terminated = true;
     this.durable.destroy();
-    this.finalCheckpointSent?.();
-    this.finalCheckpointSent = undefined;
+    this.hostRole.destroy();
     this.driver.terminate();
     this.client.close();
     this.roster.clearObservers();
@@ -581,57 +563,25 @@ export class RoomSession {
     });
 
     this.client.on("hostGranted", (epoch, snapshot, reason) => {
-      if (reason && reason !== "first_join") {
-        this.hostMigrations++;
-        this.lastMigrationReason = reason;
-      }
-      this.timeline.resetEpoch(epoch);
-      this.simulationReady = false;
-      const generation = ++this.simulationGeneration;
-      // A migration checkpoint may trail the latest replicated state by up to
-      // one checkpoint interval. Keep positions already observed from the old
-      // host and use snapshot positions only as a cold-start fallback.
-      if (snapshot) this.roster.loadSnapshotPositions(snapshot, true);
-      this.driver.send({
-        type: "setHost",
-        generation,
-        isHost: true,
-        snapshot,
-        wakeFromSleep: false,
-      });
-      // Rebuilding the world drops the local avatar, so add it again.
-      this.hostAvatarIds.clear();
-      this.roster.resetHostProjection();
-      this.presentation.resetRole(this.connectionGeneration);
-      this.spawnLocalAvatar();
-      if (this.localAvatarId) this.hostAvatarIds.add(this.localAvatarId);
-      this.syncHostAvatars();
+      this.hostRole.grant({ epoch, snapshot, reason });
     });
 
     this.client.on("hostChanged", (epoch, hostClientId, reason) => {
-      // Spec 11.2. Clear stale interpolation history when the epoch changes.
-      this.hostMigrations++;
-      this.lastMigrationReason = reason || undefined;
-      this.timeline.resetEpoch(epoch);
-      if (hostClientId !== this.client.clientId) {
-        this.simulationReady = false;
-        const generation = ++this.simulationGeneration;
-        this.driver.send({ type: "setHost", generation, isHost: false });
-        this.hostAvatarIds.clear();
-        this.roster.resetHostProjection();
-        this.presentation.resetRole(this.connectionGeneration);
-        this.spawnLocalAvatar();
-      }
+      this.hostRole.change({
+        epoch,
+        localIsHost: hostClientId === this.client.clientId,
+        reason,
+      });
     });
 
     this.client.on("fullState", (state, _epoch, tick) => {
-      if (this.client.isHost) return;
+      if (this.hostRole.isHost) return;
       this.timeline.acceptFullState(state, tick);
       this.checkPresentationReady();
     });
 
     this.client.on("stateDelta", (delta, _epoch, tick) => {
-      if (this.client.isHost) return;
+      if (this.hostRole.isHost) return;
       this.timeline.acceptDelta(delta, tick);
       this.checkPresentationReady();
     });
@@ -651,7 +601,7 @@ export class RoomSession {
     });
 
     this.client.on("playerInput", (input, fromClientId) => {
-      if (!this.client.isHost) return;
+      if (!this.hostRole.isHost) return;
       const participant = this.roster.peerForConnection(fromClientId);
       if (!participant) return;
       this.driver.send({
@@ -794,7 +744,7 @@ export class RoomSession {
         );
       }
       this.durable.loadSnapshot(join.snapshot);
-      this.timeline.resetEpoch(this.client.hostEpoch);
+      this.timeline.resetEpoch(this.hostRole.hostEpoch || this.client.hostEpoch);
       this.roster.loadSnapshotPositions(join.snapshot);
       this.presentation.markItems(
         join.generation,
@@ -842,14 +792,13 @@ export class RoomSession {
     this.canvasDefinition = canvas;
     this.localAvatarId = nextAvatarId;
 
-    this.driver.send({
-      type: "init",
-      generation: ++this.simulationGeneration,
+    this.hostRole.initialize({
+      epoch: this.client.hostEpoch,
+      isHost: this.client.isHost,
       canvas,
       definitions: this.options.definitions,
       tickRate: this.client.tickRate,
-      isHost: this.client.isHost,
-      snapshot: this.client.isHost ? snapshot : undefined,
+      snapshot,
       wakeFromSleep: wasSleeping,
       localAvatar: {
         entityId: this.localAvatarId,
@@ -859,15 +808,12 @@ export class RoomSession {
       },
     });
 
-    this.hostAvatarIds.clear();
-    if (this.client.isHost) this.hostAvatarIds.add(this.localAvatarId);
-
     this.startSendLoops();
   }
 
   private spawnLocalAvatar(): void {
     if (!this.localAvatarId) return;
-    this.driver.send({
+    this.hostRole.recordAvatarRequest({
       type: "addAvatar",
       spawn: {
         entityId: this.localAvatarId,
@@ -886,16 +832,53 @@ export class RoomSession {
   /** Keeps the host simulation's transient avatars identical to presence. */
   private syncHostAvatars(): void {
     if (
-      !this.client.isHost ||
-      !this.simulationReady ||
+      !this.hostRole.isHost ||
+      !this.hostRole.simulationReady ||
       !this.roster.presenceKnown ||
       !this.canvasDefinition
     ) return;
     for (const request of this.roster.reconcileHostAvatars({
       canvas: this.canvasDefinition,
-      hostAvatarIds: this.hostAvatarIds,
+      hostAvatarIds: new Set(this.hostRole.hostAvatarIds),
       spawnPosition: (entityId) => this.avatarSpawnPosition(entityId),
-    })) this.driver.send(request);
+    })) this.hostRole.recordAvatarRequest(request);
+  }
+
+  private applyHostRoleEffect(effect: HostRoleEffect): void {
+    switch (effect.type) {
+      case "simulate":
+        this.driver.send(effect.request);
+        break;
+      case "publishFrame":
+        this.sendDelta(effect.keyframe);
+        break;
+      case "requestCheckpoint":
+        this.driver.send({
+          type: "requestSnapshot",
+          generation: effect.generation,
+          final: effect.final,
+          sceneRevision: effect.sceneRevision,
+          hostEpoch: effect.hostEpoch,
+        });
+        break;
+      case "yieldHost":
+        this.client.yieldHost(effect.reason);
+        break;
+      case "roleRebuilt":
+        // Spec 11.2. A role generation cannot retain interpolation,
+        // prediction, projection, or readiness facts from the old authority.
+        this.timeline.resetEpoch(effect.epoch);
+        if (effect.snapshot) {
+          // Migration checkpoints may trail a frame already observed locally.
+          this.roster.loadSnapshotPositions(effect.snapshot, true);
+        }
+        this.roster.resetHostProjection();
+        this.presentation.resetRole(this.connectionGeneration);
+        this.driver.send(effect.request);
+        this.spawnLocalAvatar();
+        this.syncHostAvatars();
+        break;
+    }
   }
 
   // ---------- loops ----------
@@ -903,16 +886,7 @@ export class RoomSession {
   private startSendLoops(): void {
     const rates = this.options.rates ?? {};
     const inputHz = rates.inputHz ?? 30;
-    const deltaHz = rates.deltaHz ?? 15;
-    const keyframeHz = rates.keyframeHz ?? 2;
-    const checkpointHz = rates.checkpointHz ?? 1;
-
-    this.timers.push(
-      setInterval(() => this.sendInput(), 1000 / inputHz),
-      setInterval(() => this.sendDelta(false), 1000 / deltaHz),
-      setInterval(() => this.sendDelta(true), 1000 / keyframeHz),
-      setInterval(() => this.requestCheckpoint(), 1000 / checkpointHz),
-    );
+    this.timers.push(setInterval(() => this.sendInput(), 1000 / inputHz));
   }
 
   private sendInput(): void {
@@ -934,7 +908,7 @@ export class RoomSession {
       target: intent.target,
       disabled,
     });
-    if (!this.client.isHost) {
+    if (!this.hostRole.isHost) {
       this.client.sendInput({
         inputSequence: this.inputSequence,
         direction: intent.direction,
@@ -948,7 +922,7 @@ export class RoomSession {
   }
 
   private sendDelta(keyframe: boolean): void {
-    if (!this.client.isHost || this.timeline.hostEntities.length === 0) return;
+    if (!this.hostRole.isHost || this.timeline.hostEntities.length === 0) return;
     const frame = this.timeline.encodeHostFrame(keyframe);
     if (keyframe) {
       this.client.sendFullState(
@@ -980,23 +954,12 @@ export class RoomSession {
     );
   }
 
-  private requestCheckpoint(): void {
-    if (!this.client.isHost) return;
-    this.driver.send({
-      type: "requestSnapshot",
-      generation: this.simulationGeneration,
-      final: false,
-      sceneRevision: this.client.sceneRevision,
-      hostEpoch: this.client.hostEpoch,
-    });
-  }
-
   /**
    * The entities to draw at `nowMs`. The host draws its own world. A peer draws
    * the interpolated remote state plus its reconciled local avatar.
    */
   entitiesToDraw(nowMs: number): RenderEntity[] {
-    return this.timeline.frame(nowMs, this.localAvatarId, this.client.isHost);
+    return this.timeline.frame(nowMs, this.localAvatarId, this.hostRole.isHost);
   }
 
   /**
@@ -1040,7 +1003,7 @@ export class RoomSession {
   setPageVisible(visible: boolean): void {
     this.pageVisible = visible;
     this.client.health.pageVisible = visible;
-    if (!visible && this.client.isHost) this.client.yieldHost("page_hidden");
+    this.hostRole.setPageVisible(visible);
     this.client.setHostEligible(visible);
     if (!visible && this.lifecycle === "active") {
       this.transition("backgrounded");
@@ -1052,13 +1015,9 @@ export class RoomSession {
   // ---------- simulation messages ----------
 
   private onSimulation(message: SimulationResponse): void {
-    if (message.generation !== this.simulationGeneration || this.terminated) {
-      this.staleSimulationResponses++;
-      return;
-    }
+    if (this.terminated || !this.hostRole.acceptSimulation(message)) return;
     switch (message.type) {
       case "ready":
-        this.simulationReady = true;
         this.presentation.markSimulationReady(this.connectionGeneration);
         this.syncHostAvatars();
         this.checkPresentationReady();
@@ -1067,10 +1026,12 @@ export class RoomSession {
         this.stats = { ...message.stats };
         this.client.health.simulationHz = message.stats.hz;
         this.client.health.workerDriftMs = message.stats.driftMs;
-        if (this.client.isHost) {
+        if (this.hostRole.isHost) {
           this.timeline.acceptHostFrame(message.tick, message.entities);
           // Spec 22.1. The host is the only client that can quarantine a body.
-          this.quarantinedCount = message.entities.filter((e) => e.quarantined).length;
+          this.hostRole.recordHostFrame(
+            message.entities.filter((entity) => entity.quarantined).length,
+          );
         } else {
           this.timeline.acceptLocalPredictionFrame(
             message.tick,
@@ -1084,7 +1045,7 @@ export class RoomSession {
       case "effects":
         for (const effect of message.effects) {
           this.publishEffect(effect);
-          if (this.client.isHost) {
+          if (this.hostRole.isHost) {
             this.client.sendEffect(
               {
                 entityId: effect.entityId,
@@ -1103,10 +1064,6 @@ export class RoomSession {
           message.snapshot.checkpointRevision,
           message.final,
         );
-        if (message.final) {
-          this.finalCheckpointSent?.();
-          this.finalCheckpointSent = undefined;
-        }
         this.checkPresentationReady();
         break;
       case "error":
@@ -1128,15 +1085,15 @@ export class RoomSession {
 
   private checkPresentationReady(): void {
     const generation = this.connectionGeneration;
-    if (this.simulationReady) this.presentation.markSimulationReady(generation);
+    if (this.hostRole.simulationReady) this.presentation.markSimulationReady(generation);
     if (this.roster.presenceKnown) {
       this.presentation.markPresence(generation, this.roster.connectedAvatarIds);
     }
     this.presentation.markItems(generation, this.durable.itemEntityIds);
-    const authoritative = this.client.isHost
+    const authoritative = this.hostRole.isHost
       ? this.timeline.hostEntities
       : this.timeline.latestEntities;
-    if (!this.client.isHost && this.timeline.latestPeerTick === undefined) return;
+    if (!this.hostRole.isHost && this.timeline.latestPeerTick === undefined) return;
     this.presentation.markCanonical(
       generation,
       authoritative.map((entity) => entity.id),
@@ -1220,14 +1177,15 @@ export class RoomSession {
 
   diagnostics(): SessionDiagnostics {
     const timeline = this.timeline.diagnostics;
+    const hostRole = this.hostRole.diagnostics;
     const canonicalAvatar = this.timeline.canonicalAvatar(
       this.localAvatarId,
-      this.client.isHost,
+      this.hostRole.isHost,
     );
     return {
-      status: this.client.isHost ? "host" : "peer",
-      isHost: this.client.isHost,
-      hostEpoch: this.client.hostEpoch,
+      status: this.hostRole.isHost ? "host" : "peer",
+      isHost: this.hostRole.isHost,
+      hostEpoch: hostRole.hostEpoch,
       hostClientId: this.client.hostClientId,
       clientId: this.client.clientId,
       peers: this.client.peers.length,
@@ -1252,10 +1210,10 @@ export class RoomSession {
       lastRejection: this.lastRejection,
       ...this.trafficRates(),
       droppedOutbound: this.client.traffic.droppedOutbound,
-      hostMigrations: this.hostMigrations,
-      lastMigrationReason: this.lastMigrationReason,
-      quarantined: this.quarantinedCount,
-      staleSimulationResponses: this.staleSimulationResponses,
+      hostMigrations: hostRole.hostMigrations,
+      lastMigrationReason: hostRole.lastMigrationReason,
+      quarantined: hostRole.quarantined,
+      staleSimulationResponses: hostRole.staleSimulationResponses,
     };
   }
 
