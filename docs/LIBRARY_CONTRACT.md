@@ -121,7 +121,10 @@ large pointer jump from becoming an unbounded authored kick or hit. Direct
 targets are inset by the avatar radius, including on canvases with open edges.
 Long direct moves use iterative shape casts: they cannot tunnel through
 avatar-blocking terrain, and any remaining displacement slides along the hit
-surface instead of pinning the avatar at the first point of contact.
+surface instead of pinning the avatar at the first point of contact. Once a
+direct grab begins, pointer movement is tracked on the canvas's owning window;
+an out-of-frame pointer therefore keeps projecting to the nearest reachable
+canvas edge instead of losing control at the DOM boundary.
 
 Consumer visuals may opt into `visual.mirrorX` or `visual.mirrorY`. Reflection
 is presentation-only: world dimensions, anchors, transforms, and colliders do
@@ -129,14 +132,17 @@ not change. Definitions that omit the flags retain their source orientation.
 
 `SceneOptions.motionTrails` is the product-owned seam for speed-derived local
 particles. Filters select entity kinds or definitions; thresholds, emission
-rate, palette, size, and lifetime are data. Canvas samples the same interpolated
-velocity and position it draws, scales intensity between the configured speeds,
-and never persists or networks the resulting particles.
+rate, palette, size, lifetime, and starting alpha are data. Canvas samples the
+same interpolated velocity and position it draws, scales intensity between the
+configured speeds, and never persists or networks the resulting particles.
 
 Fullscreen presentation remains product-owned UI. A consumer may provide a
 `fullscreenElement` and drive `enterFullscreen`, `exitFullscreen`, or
 `toggleFullscreen`, with `subscribeFullscreen` keeping its control label in
-sync. Canvas supplies no mandatory button, styling, or fullscreen layout.
+sync. Canvas supplies no mandatory button, styling, or fullscreen layout. Its
+renderer does observe the mount element itself, so a consumer's fullscreen or
+orientation layout change updates camera fitting and backing-buffer resolution
+without rebuilding the runtime.
 
 ## Room template items
 

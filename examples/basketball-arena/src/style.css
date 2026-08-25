@@ -110,22 +110,70 @@ h1 {
   background: rgba(22, 42, 72, 0.88);
 }
 
-main:fullscreen {
+main:fullscreen,
+main:-webkit-full-screen {
   width: 100%;
+  max-width: none;
   height: 100%;
-  padding: 12px;
-  overflow: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  padding:
+    max(8px, env(safe-area-inset-top))
+    max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
+  display: grid;
+  overflow: hidden;
+  place-items: center;
   background:
     radial-gradient(circle at 50% 0%, rgba(20, 184, 176, 0.2), transparent 36rem),
     #041126;
 }
 
-main:fullscreen header { margin-bottom: 10px; }
-main:fullscreen .arena-card {
-  width: min(100%, calc((100vh - 150px) * 5 / 3));
+main:fullscreen header,
+main:-webkit-full-screen header {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 8;
+  display: block;
+  margin: 0;
+}
+
+main:fullscreen .title-block,
+main:fullscreen .connection-status > span,
+main:fullscreen .game-message,
+main:fullscreen .control-badge,
+main:-webkit-full-screen .title-block,
+main:-webkit-full-screen .connection-status > span,
+main:-webkit-full-screen .game-message,
+main:-webkit-full-screen .control-badge {
+  display: none;
+}
+
+main:fullscreen .connection-status,
+main:-webkit-full-screen .connection-status {
+  display: block;
+}
+
+main:fullscreen .fullscreen-button,
+main:-webkit-full-screen .fullscreen-button {
+  margin: 0;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(3, 11, 24, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+main:fullscreen .arena-card,
+main:-webkit-full-screen .arena-card {
+  width: min(100%, calc((100dvh - 16px) * 5 / 3));
+  max-width: none;
   margin: 0 auto;
 }
-main:fullscreen aside { display: none; }
+
+main:fullscreen aside,
+main:-webkit-full-screen aside { display: none; }
 
 .arena-card {
   position: relative;
@@ -295,16 +343,6 @@ button:disabled { cursor: default; opacity: 0.42; }
   .scoreboard { width: min(520px, 100%); margin: 0 auto; order: 3; }
   aside { grid-template-columns: 1fr; gap: 12px; }
   .join-controls { grid-template-columns: auto minmax(100px, 1fr) auto auto; }
-  main:fullscreen .title-block { display: none; }
-  main:fullscreen header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-  }
-  main:fullscreen .scoreboard { order: initial; }
-  main:fullscreen .connection-status { align-items: flex-end; }
-  main:fullscreen .arena-card {
-    width: min(100%, calc((100vh - 145px) * 5 / 3));
-  }
 }
 
 @media (max-width: 560px) {

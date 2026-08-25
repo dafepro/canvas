@@ -54,6 +54,7 @@ export class PixiScene {
   private readonly backgroundLayer = new Container();
   private readonly entityLayer = new Container();
   private readonly debugLayer = new Container();
+  private resizeObserver?: ResizeObserver;
   private readonly uiLayer = new Container();
   private readonly editOverlay = new Graphics();
   private readonly thumbstick = new Graphics();
@@ -97,6 +98,15 @@ export class PixiScene {
     this.app.stage.addChild(this.world, this.effects.layer, this.uiLayer);
     this.resize();
     this.app.renderer.on("resize", () => this.resize());
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(([entry]) => {
+        const width = entry?.contentRect.width ?? element.clientWidth;
+        const height = entry?.contentRect.height ?? element.clientHeight;
+        if (width <= 0 || height <= 0) return;
+        this.app.renderer.resize(Math.round(width), Math.round(height));
+      });
+      this.resizeObserver.observe(element);
+    }
     this.drawBackground();
   }
 
@@ -376,6 +386,8 @@ export class PixiScene {
   }
 
   destroy(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = undefined;
     this.effects.destroy();
     this.app.destroy(true, { children: true });
   }

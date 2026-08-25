@@ -42,7 +42,8 @@ team names or score rules. The overlay uses one centered number aperture for
 both teams, scales two- and three-character text, and displays scores above 99
 as `99+`; the authoritative score is never truncated. The speed-scaled avatar
 fire trail is likewise product configuration through `scene.motionTrails`, not
-basketball engine code.
+basketball engine code. This example keeps its maximum particles small and
+semi-transparent so only genuinely fast movement produces a noticeable trail.
 
 The fullscreen button uses `CanvasRuntime.toggleFullscreen()` with the product
 shell supplied as `fullscreenElement`. Consumers own the button and layout;
@@ -55,6 +56,12 @@ entire move. Release-flick thresholds live in runtime input configuration, while
 turning. `avatarController.directInteractionMaxSpeed` bounds only the contact
 velocity seen by behaviors; it does not cap how far the held avatar follows the
 pointer in a tick.
+
+An active direct grab continues listening on the canvas's owning window, so a
+pointer outside the court still moves the avatar along the nearest reachable
+edge. The fullscreen product shell centers the largest court that fits the
+dynamic viewport; the renderer observes the stage size and refits after mobile
+orientation changes.
 
 Basket frame and rim colliders set `blocks: { avatars: false, items: true }`.
 The mirrored ball geometry remains authoritative and symmetric, while players

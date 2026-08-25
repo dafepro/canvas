@@ -11,6 +11,7 @@ interface Particle {
   vy: number;
   lifeMs: number;
   totalMs: number;
+  initialAlpha: number;
 }
 
 interface Continuous {
@@ -30,6 +31,8 @@ export interface MotionTrailOptions {
   colors?: readonly number[];
   sizePx?: Readonly<{ min: number; max: number }>;
   lifeMs?: Readonly<{ min: number; max: number }>;
+  /** Starting opacity at threshold and full speed; particles still fade to zero. */
+  alpha?: Readonly<{ min: number; max: number }>;
 }
 
 interface MotionTrail {
@@ -59,6 +62,13 @@ export const motionTrailParticleScale = (
   variation: number,
 ): number => Math.max(0, Math.min(1, intensity)) *
   (0.55 + 0.45 * Math.max(0, Math.min(1, variation)));
+
+export const motionTrailInitialAlpha = (
+  particleScale: number,
+  range: Readonly<{ min: number; max: number }>,
+): number => Math.max(0, Math.min(1,
+  range.min + (range.max - range.min) * Math.max(0, Math.min(1, particleScale)),
+));
 
 interface Overlay {
   entityId: string;
@@ -194,6 +204,7 @@ export class EffectSystem {
       if (this.particles.length >= this.maxParticles) break;
       const display = this.pool.pop() ?? new Graphics();
       display.clear();
+      display.alpha = 1;
       display.circle(0, 0, 2 + Math.random() * 2).fill({ color });
       this.layer.addChild(display);
       const angle = Math.random() * Math.PI * 2;
@@ -206,6 +217,7 @@ export class EffectSystem {
         vy: Math.sin(angle) * speed,
         lifeMs: 400 + Math.random() * 300,
         totalMs: 700,
+        initialAlpha: 1,
       });
     }
   }
@@ -218,12 +230,15 @@ export class EffectSystem {
     const sideways = { x: -backward.y, y: backward.x };
     const size = trail.options.sizePx ?? { min: 2, max: 6 };
     const lifeRange = trail.options.lifeMs ?? { min: 180, max: 520 };
+    const alphaRange = trail.options.alpha ?? { min: 0.25, max: 0.85 };
     const colors = trail.options.colors?.length
       ? trail.options.colors
       : [0xfff3a1, 0xffa62b, 0xff4d1a];
     const display = this.pool.pop() ?? new Graphics();
     display.clear();
     const particleScale = motionTrailParticleScale(trail.intensity, Math.random());
+    const initialAlpha = motionTrailInitialAlpha(particleScale, alphaRange);
+    display.alpha = initialAlpha;
     display.circle(
       0,
       0,
@@ -241,6 +256,7 @@ export class EffectSystem {
       vy: backward.y * push + sideways.y * spread,
       lifeMs,
       totalMs: lifeMs,
+      initialAlpha,
     });
   }
 
@@ -269,7 +285,8 @@ export class EffectSystem {
       particle.y += particle.vy * seconds;
       particle.lifeMs -= deltaMs;
       particle.display.position.set(particle.x, particle.y);
-      particle.display.alpha = Math.max(0, particle.lifeMs / particle.totalMs);
+      particle.display.alpha = particle.initialAlpha *
+        Math.max(0, particle.lifeMs / particle.totalMs);
       if (particle.lifeMs > 0) continue;
       this.layer.removeChild(particle.display);
       this.pool.push(particle.display);

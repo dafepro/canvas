@@ -9,6 +9,7 @@ import {
 import { buildEntityDisplay } from "../src/render/entity-display.js";
 import {
   motionTrailIntensity,
+  motionTrailInitialAlpha,
   motionTrailParticleScale,
 } from "../src/render/effect-system.js";
 import { PixiScene, resolveSceneResolution } from "../src/render/pixi-scene.js";
@@ -72,6 +73,8 @@ describe("asset rendering", () => {
     expect(motionTrailParticleScale(0.1, 0)).toBeCloseTo(0.055);
     expect(motionTrailParticleScale(0.1, 1)).toBeCloseTo(0.1);
     expect(motionTrailParticleScale(1, 1)).toBe(1);
+    expect(motionTrailInitialAlpha(0.1, { min: 0.08, max: 0.48 })).toBeCloseTo(0.12);
+    expect(motionTrailInitialAlpha(1, { min: 0.08, max: 0.48 })).toBe(0.48);
   });
 
   it("uses a high-density backing buffer without changing canvas layout size", () => {

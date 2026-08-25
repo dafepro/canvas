@@ -171,4 +171,7 @@ public manifest. Product DOM projects the replicated behavior state at 60 Hz
 onto the two scoreboard item positions through the CSS-pixel-safe overlay seam.
 The rules message sits outside the playable frame, including in fullscreen.
 The avatar fire trail is `SceneOptions.motionTrails` configuration: it filters
-avatars and scales emission, size, and lifetime from their interpolated speed.
+avatars and scales emission, size, lifetime, and alpha from their interpolated
+speed. Fullscreen CSS gives the court the largest centered 5:3 rectangle in the
+dynamic mobile viewport; Canvas observes that resized mount after orientation
+changes and refits the camera and high-density backing buffer.
