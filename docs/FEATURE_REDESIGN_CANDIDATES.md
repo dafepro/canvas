@@ -316,23 +316,259 @@ facade or reintroduce writable room-authority fields.
 
 ### Acknowledged item-edit transactions
 
-**Evidence.** Live item editing now has a local presentation map, coalesced
-preview timer, durable commit, canonical transform matching, and a 1.5-second
-presentation timeout. Earlier failures included choppy local movement, frozen
-state not appearing durable, spawn/edit selection disagreement, and overlap
-dragging. The timeout hides an absent or rejected acknowledgement by eventually
-dropping the local pose.
+**Status:** implementation-ready plan; this is the next redesign slice.
 
-**Redesign.** Give each edit an `editSessionId` and each durable mutation a
-monotonic `mutationId`. Preview remains disposable and coalesced; commit returns
-an explicit accepted transform/revision or typed rejection. The local
-presentation ends on that acknowledgement, supersession, or cancellation—not
-on elapsed wall time. Freeze, collision, tint/config, transform, and delete use
-the same transaction envelope and authorization result.
+#### Evidence and current failure modes
 
-**Acceptance boundary.** Fault tests cover lost/reordered previews, delayed
-commit acknowledgement, rejection, owner disconnect, host migration during an
-edit, overlapping selected items, and two tabs attempting the same owned item.
+Live item editing currently crosses four owners without carrying one operation
+identity through them:
+
+- `ItemEditInteraction` emits anonymous preview and commit callbacks.
+- `DurableCommandSession` owns one global coalesced preview timer and constructs
+  `commandId`, but its public mutation methods return `void` and rejection is an
+  uncorrelated string.
+- The relay echoes `commandId` in `DurableCommandResult`, yet the client reduces
+  the message to generic accepted/rejected events. It does not retain an
+  in-flight mutation or protect the server from applying a retried command
+  twice.
+- `ItemEditPresentation` holds a committed local transform until canonical
+  state happens to match it or 1.5 seconds pass. A timeout therefore makes a
+  missing result, a rejected command, and slow canonical presentation look the
+  same.
+
+This has already surfaced as choppy local movement, frozen state not appearing
+durable, spawn/edit selection disagreement, overlap dragging, and example code
+that treats *any* scene-revision increase as acceptance of its latest edit. The
+current global preview slot also lets a preview for one item replace a queued
+preview for another.
+
+#### Design decisions
+
+1. **Separate edit sessions, previews, and durable mutations.** An edit session
+   is the bounded lifetime in which one client is presenting controls for one
+   item. Previews are disposable pose samples within that session. A mutation
+   is a reliable, server-authorized state change with exactly one terminal
+   outcome.
+2. **Keep the server authoritative.** Local presentation is immediate, but it
+   is never evidence that a mutation succeeded. The accepted result carries
+   the authoritative item (or deletion tombstone), item revision, and room
+   scene revision.
+3. **Use per-item concurrency, not the room scene revision.** Every accepted
+   item mutation increments `itemRevision`. A mutation submits the item
+   revision it was based on, so unrelated items can change concurrently while
+   stale edits to the same item receive a typed conflict.
+4. **Permit only one live preview session per item.** Beginning an edit obtains
+   a short server lease scoped to the authenticated user, logical client
+   session, edit session, and entity. The accepted result advertises its lease
+   duration and the client renews it while the controls remain open. A second
+   tab can still view the item, but its edit request receives
+   `item_edit_in_use` until the lease is released, disconnected, or expires.
+   This prevents two preview streams from making the host alternate poses. The
+   lease is an editing arbitration tool, not an ownership or persistence lock.
+5. **Serialize durable writes per item.** The client may present subsequent
+   button presses or drags immediately, but it sends the next mutation for an
+   item only after the preceding result supplies the new `itemRevision`.
+   Mutations for different items remain parallel.
+6. **Make reconnect retry idempotent.** A logical client-session ID survives
+   socket reconnects, and mutation IDs are monotonic within it. The server
+   persists a bounded receipt ledger keyed by authenticated user, logical
+   client session, and mutation ID. A duplicate returns the stored result and
+   never reapplies the mutation. A duplicate older than the retained window is
+   rejected as `mutation_receipt_expired`; it is never guessed or reapplied.
+7. **Replace the prerelease contract in place.** The `preview` boolean command,
+   anonymous rejection callbacks, and timeout fallback are removed. There is no
+   compatibility decoder, overload, or parallel protocol path.
+
+#### Public contract
+
+The runtime exposes one discriminated mutation request and keeps convenience
+methods as thin, typed wrappers:
+
+```ts
+type ItemMutationRequest =
+  | { kind: "spawn"; definitionId: string; transform: Transform }
+  | { kind: "transform"; entityId: string; transform: Transform }
+  | { kind: "config"; entityId: string; config: unknown }
+  | { kind: "isolation"; entityId: string; isolated: boolean }
+  | { kind: "collisions"; entityId: string; enabled: boolean }
+  | { kind: "delete"; entityId: string };
+
+interface ItemMutationReceipt {
+  readonly clientSessionId: string;
+  readonly mutationId: number;
+  readonly editSessionId?: string;
+  readonly settled: Promise<ItemMutationOutcome>;
+}
+
+type ItemMutationOutcome =
+  | {
+      status: "accepted";
+      mutationId: number;
+      sceneRevision: number;
+      itemRevision: number;
+      item?: SnapshotItem;
+      deletedEntityId?: string;
+    }
+  | {
+      status: "rejected";
+      mutationId: number;
+      code: ItemMutationRejectCode;
+      message?: string;
+      authoritativeItem?: SnapshotItem;
+    }
+  | {
+      status: "cancelled" | "superseded";
+      mutationId: number;
+      reason: string;
+    };
+```
+
+`spawnItem`, `moveItem`, `rotateItem`, `scaleItem`, `setItemConfig`,
+`setItemIsolation`, `setItemCollisionsEnabled`, and `deleteItem` return an
+`ItemMutationReceipt`; they no longer return `void`. Expected authorization or
+validation failures settle that receipt and publish a frozen mutation observer
+snapshot. They do not masquerade as transport errors through `onError`.
+
+Interactive editing additionally uses a handle equivalent to:
+
+```ts
+interface ItemEditHandle {
+  readonly editSessionId: string;
+  readonly entityId: string;
+  readonly state: "opening" | "active" | "ending" | "ended";
+  preview(transform: Transform): void;
+  mutate(request: ItemMutationRequest): ItemMutationReceipt;
+  end(): void;
+  cancel(): void;
+}
+```
+
+Selection and controls may appear optimistically while the edit lease opens,
+but network previews wait for the accepted begin result. Lease rejection ends
+the optimistic presentation and exposes the typed reason to the consumer.
+Finishing the UI ends the edit session but does not discard mutation receipts
+that are still awaiting their terminal result.
+
+#### Wire and persistence contract
+
+The current `DurableCommand.preview` shape is replaced by three explicit
+families:
+
+- Reliable `BeginItemEdit` / `ItemEditSessionResult` / `RenewItemEdit` /
+  `EndItemEdit` messages establish, renew, and release the edit lease. They
+  carry `clientSessionId`, `editSessionId`, `entityId`, and the observed
+  `itemRevision`; accepted begin/renew results include the authoritative lease
+  expiry.
+- Disposable `ItemEditPreview` messages carry `editSessionId`, `entityId`, a
+  monotonic `previewSequence`, and a transform. The relay and host ignore
+  unknown sessions and non-increasing sequences. The latest preview is retained
+  only long enough to replay to a newly elected host.
+- Reliable `ItemMutation` / `ItemMutationResult` messages carry
+  `clientSessionId`, `mutationId`, optional `editSessionId`, the expected item
+  revision, and a typed mutation union. Accepted results broadcast the
+  authoritative item or deletion tombstone; rejected results return only to
+  the requester with a stable enum code and optional diagnostic message.
+
+`SnapshotItem` gains `itemRevision`. The persisted room snapshot also stores a
+bounded mutation-receipt ledger and its per-client high-water marks so an
+accepted mutation cannot be duplicated after a relay restart. Because the
+project is prerelease, existing fixtures and generated TypeScript/Go protocol
+code move directly to the new shape; old snapshots and command envelopes are
+not migrated or decoded.
+
+Stable rejection codes cover at least malformed payload, not found,
+system-owned, not owner, edit in use, edit expired, stale item revision, bounds,
+scale, definition/config validation, capacity, receipt expired, and internal
+failure. Product text remains consumer-owned.
+
+#### Ownership and state transitions
+
+| Concern | Sole owner | Rule |
+| --- | --- | --- |
+| IDs, per-item send queues, pending receipts | `DurableCommandSession` | A receipt reaches one terminal state exactly once. |
+| Edit lease and preview sequence | Relay room | One active edit session per entity; cleanup always emits an authoritative revert to the host. |
+| Authorization, item revision, deduplication | Relay room | Validate and record a receipt before broadcasting one accepted result. |
+| Optimistic transform/config presentation | New transaction presentation helper owned by `DurableCommandSession` | Never expires on wall time; it transitions only from mutation/edit events and canonical evidence. |
+| Pointer gesture interpretation | `ItemEditInteraction` | Produces intent for an existing edit handle; owns no network timer or mutation result. |
+| Canonical physics application | Current host simulation | Applies only authoritative accepted mutations or validated previews fenced by host epoch. |
+| UI status and wording | Consumer | Observes handles/receipts; never infers success from a generic scene-revision change. |
+
+A transform drag follows this state path:
+
+1. Tap selects locally and opens an edit lease.
+2. Drag samples update local presentation every display frame. At most one
+   coalesced preview per edit session is emitted at the configured preview rate.
+3. Pointer release creates a durable transform mutation and holds its local
+   presentation in `awaiting-result`.
+4. Rejection removes the optimistic layer immediately and exposes the
+   authoritative item. Acceptance changes it to `awaiting-canonical`, anchored
+   to the returned authoritative item and `sceneRevision`.
+5. The presentation layer releases only when canonical state has reached that
+   revision and contains the accepted item state (or deletion tombstone). It
+   cannot snap back merely because a timer elapsed.
+
+Cancel, selection supersession, lease expiry, disconnect, and explicit end all
+stop preview production and cause the relay to send the committed transform to
+the current host. Socket reconnect cancels transient edit sessions but resends
+unacknowledged durable mutations with the same IDs. On host migration, the
+relay grants the canonical snapshot first and then replays each latest active
+preview with its sequence; stale-host events remain fenced by `hostEpoch`.
+
+#### Test-driven implementation slices
+
+Each slice is a separately verified commit. Tests are added before production
+code and only affected suites are run before committing.
+
+1. **Core and protocol model.** Add `itemRevision`, typed mutation unions,
+   edit-session messages, preview sequence, authoritative results, and reject
+   codes. Regenerate TypeScript and Go protocol code and update snapshot/protocol
+   round-trip tests and prerelease fixtures.
+2. **Relay transaction authority.** Add edit leases, per-item revision checks,
+   typed validation results, receipt deduplication, disconnect/expiry cleanup,
+   persisted receipt-window state, and accepted authoritative broadcasts. Cover
+   the room event loop and both memory/file store conformance.
+3. **Client transaction machine.** Replace anonymous command construction with
+   edit handles, per-item queues, mutation receipts, reconnect resend, and
+   frozen observers in `DurableCommandSession`. Remove the global preview slot,
+   `preview` boolean, and generic mutation rejection effect.
+4. **Presentation integration.** Replace the 1.5-second map with
+   transaction-keyed optimistic layers and canonical-revision release. Wire
+   `ItemEditInteraction` and `CanvasRuntime` to handles/receipts and keep local
+   pointer presentation at display cadence.
+5. **Consumer migration.** Convert item studio and every other example to
+   render pending/accepted/rejected state from the matching receipt. Remove
+   scene-revision inference and demonstrate conflict/edit-in-use feedback.
+6. **Fault and packed-consumer gate.** Exercise the built package through the
+   real relay under preview loss/reordering, delayed results, disconnect and
+   retry, host migration, and concurrent browser contexts.
+
+#### Acceptance boundary
+
+The redesign is complete only when deterministic unit, relay, real-WebSocket,
+and browser tests prove all of the following:
+
+- dropped and reordered previews never reorder the host pose, and a later
+  durable mutation converges every client;
+- an arbitrarily delayed result holds the correct local presentation without a
+  timeout, while a typed rejection restores authoritative state immediately;
+- duplicate delivery and reconnect resend return the same receipt without a
+  second revision increment or duplicate spawn/delete;
+- two tabs using the same user cannot interleave previews for one item, and a
+  stale same-item commit receives the authoritative conflict state;
+- different items continue mutating concurrently;
+- disconnect, edit-lease expiry, selection supersession, and explicit cancel
+  restore the committed host pose and leave no timer, lease, or pending promise;
+- host migration during a drag applies only the newest preview to the new host
+  and preserves the eventual accepted result;
+- overlapping selected items still route the pointer gesture to the selected
+  entity; and
+- no runtime or example waits for a magic duration or treats an unrelated scene
+  revision as mutation success.
+
+Out of scope for this slice: collaborative multi-user editing of one item,
+undo/redo history, offline edits across a page reload, and product-specific
+conflict resolution UI. The contracts above leave room for those features
+without weakening single-authority mutation semantics.
 
 ### Startup and presentation progress protocol
 
