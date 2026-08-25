@@ -22,7 +22,8 @@ export type CanvasErrorSource =
   | "initialization"
   | "simulation"
   | "durable-command"
-  | "assets";
+  | "assets"
+  | "input";
 
 export type CanvasErrorCode =
   | "invalid_lifecycle_state"
@@ -34,7 +35,8 @@ export type CanvasErrorCode =
   | "join_initialization_failed"
   | "simulation_failed"
   | "durable_command_rejected"
-  | "asset_preload_failed";
+  | "asset_preload_failed"
+  | "pointer_interaction_failed";
 
 export interface CanvasConsumerErrorOptions {
   code: CanvasErrorCode;

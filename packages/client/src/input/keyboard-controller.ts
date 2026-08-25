@@ -1,4 +1,4 @@
-import type { DragIntent } from "./pointer-drag-controller.js";
+import type { AvatarPointerIntent } from "./avatar-pointer-interaction.js";
 
 /** Keyboard intent for desktop testing. It produces the same intent shape. */
 export class KeyboardController {
@@ -20,7 +20,7 @@ export class KeyboardController {
     };
   }
 
-  get intent(): DragIntent {
+  get intent(): AvatarPointerIntent {
     let x = 0;
     let y = 0;
     if (this.pressed.has("arrowleft") || this.pressed.has("a")) x -= 1;

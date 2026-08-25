@@ -223,6 +223,35 @@ describe("PointerInteractionCoordinator", () => {
     coordinator.destroy();
   });
 
+  it("isolates a failing consumer strategy and lets the next strategy claim", () => {
+    const surface = new PointerSurface();
+    const errors: string[] = [];
+    const events: string[] = [];
+    const coordinator = new PointerInteractionCoordinator(
+      surface as unknown as HTMLElement,
+      {
+        strategies: [
+          {
+            id: "broken-consumer",
+            priority: 20,
+            claim: () => {
+              throw new Error("consumer exploded");
+            },
+          },
+          strategy("avatar", 10, recordingClaim, events),
+        ],
+        onError: (error, strategyId) => errors.push(`${strategyId}:${error.message}`),
+      },
+    );
+
+    surface.emit("pointerdown", 10, 10);
+    surface.emit("pointerup", 10, 10);
+
+    expect(errors).toEqual(["broken-consumer:consumer exploded"]);
+    expect(events).toEqual(["release"]);
+    coordinator.destroy();
+  });
+
   it.each([
     ["pointercancel", "cancelled"],
     ["manual", "strategy_disabled"],

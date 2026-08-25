@@ -5,7 +5,7 @@ import {
   ItemEditInteraction,
   findOwnedItemAt,
   type ItemEditInteractionOptions,
-} from "../src/input/item-edit-controller.js";
+} from "../src/input/item-edit-interaction.js";
 import { PointerInteractionCoordinator } from "../src/input/pointer-interaction-coordinator.js";
 import type { Vec2 } from "@canvas-physics/core";
 import type { RenderEntity } from "../src/simulation/messages.js";

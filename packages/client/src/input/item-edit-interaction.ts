@@ -132,7 +132,7 @@ export const findOwnedItemAt = (
 };
 
 /**
- * Spec 14.2. Owns the local edit gesture only. The session still rate-limits,
+ * Spec 14.2. Interprets the local edit gesture only. The session still rate-limits,
  * validates through the server, and applies accepted transforms on the host.
  */
 export class ItemEditInteraction implements PointerInteractionStrategy {

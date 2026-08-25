@@ -6,8 +6,8 @@ import type {
   Transform,
 } from "@canvas-physics/core";
 import type { RenderEntity } from "../simulation/messages.js";
-import type { DragGesture } from "../input/pointer-drag-controller.js";
-import type { ItemEditState } from "../input/item-edit-controller.js";
+import type { AvatarPointerGesture } from "../input/avatar-pointer-interaction.js";
+import type { ItemEditState } from "../input/item-edit-interaction.js";
 import { Camera } from "./camera.js";
 import { EffectSystem, type MotionTrailOptions } from "./effect-system.js";
 import { buildEntityDisplay } from "./entity-display.js";
@@ -354,7 +354,7 @@ export class PixiScene {
    * Spec 6.1. Draws the drag as a thumb stick: a ring at the point the player
    * pressed and a knob in the direction of the drag. Pass no gesture to hide it.
    */
-  setThumbstick(gesture?: DragGesture): void {
+  setThumbstick(gesture?: AvatarPointerGesture): void {
     this.thumbstick.clear();
     if (!gesture) return;
     const dx = gesture.point.x - gesture.origin.x;

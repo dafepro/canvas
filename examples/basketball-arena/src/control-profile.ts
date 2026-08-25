@@ -1,9 +1,9 @@
-import type { PointerDragOptions } from "@canvas-physics/client/runtime";
+import type { AvatarPointerOptions } from "@canvas-physics/client/runtime";
 
 export interface BasketballControlProfile {
   name: "direct-flick" | "direct-stop" | "thumbstick";
   description: string;
-  pointer: Omit<PointerDragOptions, "avatarPosition">;
+  pointer: Omit<AvatarPointerOptions, "avatarPosition">;
 }
 
 export const resolveBasketballControlProfile = (

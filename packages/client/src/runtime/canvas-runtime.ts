@@ -14,16 +14,20 @@ import {
   type FullscreenObserver,
 } from "../input/fullscreen-controller.js";
 import {
-  PointerDragController,
-  type PointerDragOptions,
-  type PointerDragDiagnostics,
-} from "../input/pointer-drag-controller.js";
+  AvatarPointerInteraction,
+  type AvatarPointerOptions,
+} from "../input/avatar-pointer-interaction.js";
+import {
+  PointerInteractionCoordinator,
+  type PointerInteractionDiagnostics,
+  type PointerInteractionStrategy,
+} from "../input/pointer-interaction-coordinator.js";
 import {
   ItemEditPresentation,
-  ItemEditController,
+  ItemEditInteraction,
   findOwnedItemAt,
   type ItemEditState,
-} from "../input/item-edit-controller.js";
+} from "../input/item-edit-interaction.js";
 import type { SimulationDriver } from "../simulation/driver.js";
 import type { RenderEntity } from "../simulation/messages.js";
 import {
@@ -77,7 +81,9 @@ export interface CanvasRuntimeOptions {
   rates?: RoomSessionRates;
   scene?: SceneOptions;
   /** Pointer/touch movement style. Defaults to a relative thumbstick. */
-  pointer?: Omit<PointerDragOptions, "avatarPosition">;
+  pointer?: Omit<AvatarPointerOptions, "avatarPosition">;
+  /** Product-local exclusive gestures. Higher priority claims pointer-down first. */
+  pointerInteractions?: readonly PointerInteractionStrategy[];
   /** Named room spawn used for this session, such as a linked-room arrival. */
   spawnPointId?: string;
   /** Consumer-owned art. Required sources preload before the room connection opens. */
@@ -108,7 +114,7 @@ export interface RuntimeDiagnostics extends SessionDiagnostics {
   renderLongFrames: number;
   backgroundResumes: number;
   lastBackgroundMs: number;
-  pointer?: Readonly<PointerDragDiagnostics>;
+  pointer?: Readonly<PointerInteractionDiagnostics>;
   pointerWorldTarget?: Readonly<Vec2>;
 }
 
@@ -127,8 +133,9 @@ export const runtimeDiagnosticsIntervalMs = (requestedHz = 4): number => {
 export class CanvasRuntime {
   readonly session: RoomSession;
   private scene?: PixiScene;
-  private pointer?: PointerDragController;
-  private editor?: ItemEditController;
+  private pointer?: AvatarPointerInteraction;
+  private pointerCoordinator?: PointerInteractionCoordinator;
+  private editor?: ItemEditInteraction;
   private keyboard?: KeyboardController;
   private renderFps = 0;
   private readonly frameProfiler = new FrameProfiler();
@@ -321,9 +328,11 @@ export class CanvasRuntime {
       window.removeEventListener("keydown", this.disableKeyListener);
       this.disableKeyListener = undefined;
     }
-    this.pointer?.destroy();
+    this.pointerCoordinator?.destroy();
+    this.pointerCoordinator = undefined;
+    this.pointer?.reset();
     this.pointer = undefined;
-    this.editor?.destroy();
+    this.editor?.clear();
     this.editor = undefined;
     this.keyboard?.destroy();
     this.keyboard = undefined;
@@ -359,57 +368,67 @@ export class CanvasRuntime {
       this.assetBundle,
     );
     await this.scene.mount(this.options.mount);
-    this.pointer = new PointerDragController(
-      this.scene.app.canvas as unknown as HTMLElement,
-      {
-        ...this.options.pointer,
-        avatarPosition: () => {
-          const scene = this.scene;
-          if (!scene) return undefined;
-          const avatar = this.latestEntities.find(
-            (entity) => entity.kind === "avatar" && entity.userId === this.session.userId,
-          );
-          if (!avatar) return undefined;
-          return this.projectWorldPoint({ x: avatar.x, y: avatar.y })?.screen;
-        },
-        allowStart: (point) =>
-          this.options.pointer?.allowStart?.(point) !== false &&
-          (!this.editMode ||
-            findOwnedItemAt(
-              this.latestEntities,
-              this.options.definitions,
-              this.scene!.camera.toWorld(point.x, point.y),
-              this.session.userId,
-            ) === undefined),
+    this.pointer = new AvatarPointerInteraction({
+      ...this.options.pointer,
+      avatarPosition: () => {
+        const avatar = this.latestEntities.find(
+          (entity) => entity.kind === "avatar" && entity.userId === this.session.userId,
+        );
+        if (!avatar) return undefined;
+        return this.projectWorldPoint({ x: avatar.x, y: avatar.y })?.screen;
       },
-    );
-    this.editor = new ItemEditController(
+    });
+    this.editor = new ItemEditInteraction({
+      enabled: () => this.editMode,
+      pick: (point, preferredEntityId) =>
+        findOwnedItemAt(
+          this.latestEntities,
+          this.options.definitions,
+          this.pointerLocalToWorld(point),
+          this.session.userId,
+          preferredEntityId,
+        ),
+      onPreview: (entityId, transform) => {
+        this.editPresentation.preview(entityId, transform);
+        this.moveItem(entityId, transform, true);
+      },
+      onCommit: (entityId, transform) => {
+        this.editPresentation.commit(entityId, transform);
+        this.moveItem(entityId, transform);
+      },
+      onChange: (state) => {
+        if (!state.ghost && state.selectedEntityId) {
+          this.editPresentation.cancelPreview(state.selectedEntityId);
+        }
+        this.scene?.setEditState(state);
+        this.options.onEditSelectionChange?.(state);
+      },
+    });
+    this.pointerCoordinator = new PointerInteractionCoordinator(
       this.scene.app.canvas as unknown as HTMLElement,
       {
-        enabled: () => this.editMode,
-        pick: (point, preferredEntityId) =>
-          findOwnedItemAt(
-            this.latestEntities,
-            this.options.definitions,
-            this.scene!.camera.toWorld(point.x, point.y),
-            this.session.userId,
-            preferredEntityId,
-          ),
-        toWorld: (point) => this.scene!.camera.toWorld(point.x, point.y),
-        onPreview: (entityId, transform) => {
-          this.editPresentation.preview(entityId, transform);
-          this.moveItem(entityId, transform, true);
-        },
-        onCommit: (entityId, transform) => {
-          this.editPresentation.commit(entityId, transform);
-          this.moveItem(entityId, transform);
-        },
-        onChange: (state) => {
-          if (!state.ghost && state.selectedEntityId) {
-            this.editPresentation.cancelPreview(state.selectedEntityId);
+        strategies: [
+          ...(this.options.pointerInteractions ?? []),
+          this.editor,
+          this.pointer,
+        ],
+        toWorld: (point) => this.pointerLocalToWorld(point),
+        onError: (cause, strategyId) => {
+          const error = lifecycleError(
+            "pointer_interaction_failed",
+            `Pointer interaction '${strategyId}' failed`,
+            {
+              source: "input",
+              recoverable: true,
+              cause,
+              details: { strategyId },
+            },
+          );
+          try {
+            this.options.onError?.(error);
+          } catch {
+            // Consumer reporting cannot corrupt pointer ownership.
           }
-          this.scene?.setEditState(state);
-          this.options.onEditSelectionChange?.(state);
         },
       },
     );
@@ -426,6 +445,17 @@ export class CanvasRuntime {
   setAvatarDisabled(disabled: boolean): void {
     if (this.avatarDisabled === disabled) return;
     this.avatarDisabled = disabled;
+    const coordinator = this.pointerCoordinator;
+    const pointer = this.pointer;
+    if (
+      disabled &&
+      coordinator &&
+      pointer &&
+      coordinator.diagnostics.strategyId === pointer.id
+    ) {
+      coordinator.cancel("avatar_disabled");
+      pointer.reset();
+    }
     this.options.onAvatarDisabledChange?.(disabled);
   }
 
@@ -459,6 +489,11 @@ export class CanvasRuntime {
 
   /** Clears private selection/presentation without disabling live editing. */
   clearItemEditSelection(): void {
+    const coordinator = this.pointerCoordinator;
+    const editor = this.editor;
+    if (coordinator && editor && coordinator.diagnostics.strategyId === editor.id) {
+      coordinator.cancel("selection_changed");
+    }
     this.editor?.clear();
     this.editPresentation.clear();
   }
@@ -474,6 +509,7 @@ export class CanvasRuntime {
         candidate.respawning !== true,
     );
     if (!entity) return false;
+    this.pointerCoordinator?.cancel("selection_changed");
     this.editor.select(entity);
     return true;
   }
@@ -507,6 +543,21 @@ export class CanvasRuntime {
     const keyboard = this.keyboard?.intent;
     if (keyboard && keyboard.intensity > 0) return keyboard;
     return { direction: { x: 0, y: 0 }, intensity: 0, held: false };
+  }
+
+  private pointerLocalToWorld(point: Readonly<Vec2>): Vec2 {
+    const scene = this.scene;
+    if (!scene) return { ...point };
+    const rect = scene.app.canvas.getBoundingClientRect();
+    const rendererPoint = cssPointToRenderer(
+      point,
+      {
+        width: scene.app.renderer.width,
+        height: scene.app.renderer.height,
+      },
+      { width: rect.width, height: rect.height },
+    );
+    return scene.camera.toWorld(rendererPoint.x, rendererPoint.y);
   }
 
   private startRenderLoop(): void {
@@ -651,7 +702,7 @@ export class CanvasRuntime {
       renderLongFrames: frames.longFrames,
       backgroundResumes: this.backgroundResumes,
       lastBackgroundMs: this.lastBackgroundMs,
-      pointer: this.pointer?.diagnostics,
+      pointer: this.pointerCoordinator?.diagnostics,
       pointerWorldTarget: this.pointerWorldTarget
         ? Object.freeze({ ...this.pointerWorldTarget })
         : undefined,

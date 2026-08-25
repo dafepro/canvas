@@ -95,7 +95,7 @@ class AvatarPointerHarness {
   }
 }
 
-describe("PointerDragController", () => {
+describe("AvatarPointerInteraction through the coordinator", () => {
   it("keeps thumbstick drag as the default input mode", () => {
     const surface = new PointerSurface();
     const controller = new AvatarPointerHarness(surface as unknown as HTMLElement, {

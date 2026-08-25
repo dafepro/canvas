@@ -22,11 +22,19 @@ export type {
   CanvasLifecycleState,
 } from "./lifecycle.js";
 export * from "../render/overlay-projection.js";
-export { defaultPointerFlickOptions } from "../input/pointer-drag-controller.js";
+export { defaultPointerFlickOptions } from "../input/avatar-pointer-interaction.js";
 export type {
-  PointerDragOptions,
+  AvatarPointerOptions,
   PointerFlickOptions,
-} from "../input/pointer-drag-controller.js";
+} from "../input/avatar-pointer-interaction.js";
+export type {
+  PointerInteractionClaim,
+  PointerInteractionDiagnostics,
+  PointerInteractionPhase,
+  PointerInteractionSample,
+  PointerInteractionStrategy,
+  PointerInteractionTerminalReason,
+} from "../input/pointer-interaction-coordinator.js";
 export { FullscreenController } from "../input/fullscreen-controller.js";
 export type { FullscreenObserver } from "../input/fullscreen-controller.js";
 export { SimulationDriver } from "../simulation/driver.js";
