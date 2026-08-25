@@ -606,7 +606,10 @@ export class RoomSession {
       this.buffer.reset();
       this.reconciler.reset();
       this.lastReconciledTick = undefined;
-      if (snapshot) this.rememberSnapshotAvatarPositions(snapshot);
+      // A migration checkpoint may trail the latest replicated state by up to
+      // one checkpoint interval. Keep positions already observed from the old
+      // host and use snapshot positions only as a cold-start fallback.
+      if (snapshot) this.rememberSnapshotAvatarPositions(snapshot, true);
       this.driver.send({
         type: "setHost",
         isHost: true,
@@ -968,8 +971,12 @@ export class RoomSession {
     return canonical ? { ...canonical } : this.spawnPosition(entityId);
   }
 
-  private rememberSnapshotAvatarPositions(snapshot: CanvasSnapshot): void {
+  private rememberSnapshotAvatarPositions(
+    snapshot: CanvasSnapshot,
+    preserveExisting = false,
+  ): void {
     for (const avatar of snapshot.avatars) {
+      if (preserveExisting && this.lastCanonicalAvatarPositions.has(avatar.entityId)) continue;
       this.lastCanonicalAvatarPositions.set(avatar.entityId, { ...avatar.position });
     }
   }

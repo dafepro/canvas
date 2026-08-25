@@ -28,7 +28,11 @@ const STILL: InputIntent = { direction: { x: 0, y: 0 }, intensity: 0, held: fals
 let server: Canvasd;
 const sessions: RoomSession[] = [];
 
-const session = (userId: string, intent: () => InputIntent = () => STILL): RoomSession => {
+const session = (
+  userId: string,
+  intent: () => InputIntent = () => STILL,
+  rates?: { checkpointHz?: number },
+): RoomSession => {
   const created = new RoomSession({
     roomId: "rocket-canvas",
     serverUrl: server.url,
@@ -36,6 +40,7 @@ const session = (userId: string, intent: () => InputIntent = () => STILL): RoomS
     definitions: rocketCanvasDefinitions,
     driver: SimulationDriver.local(),
     intent,
+    rates,
   });
   sessions.push(created);
   return created;
@@ -260,7 +265,9 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
 
   it("moves the peer avatar to an uncapped absolute target relayed through the host", async () => {
     let bobIntent: InputIntent = STILL;
-    const alice = session("alice");
+    // Keep the persisted checkpoint intentionally stale: promotion must prefer
+    // Bob's fresher replicated canonical position after the instant move.
+    const alice = session("alice", () => STILL, { checkpointHz: 0.1 });
     await alice.start();
     await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
 
