@@ -84,7 +84,7 @@ same simulation in the test process.
 | Region enter and exit events with smooth gradients | Done. |
 | Top-down elevation Z with shadows, scale, and landing events | The elevation channel and the landing event are done and tested. The renderer offsets the sprite by Z but draws no shadow. |
 | Per-edge wrap, respawn, solid, and open | Done and tested. |
-| Effect events for trails, particles, overlays, and one-shot animations | Done with pooled particles and a countdown overlay. A client that joins during a countdown restores the overlay from the behavior state. |
+| Effect events for trails, particles, overlays, and one-shot animations | Done with pooled particles, a countdown overlay, and configurable speed-derived motion trails. A client that joins during a countdown restores the overlay from the behavior state; motion trails remain local presentation derived from interpolated entities. |
 | Addendum A1: disable an avatar | Done. See `docs/ADDENDUM.md`. `RapierWorld.setAvatarDisabled` switches off the colliders, ends every open contact and region, and stops the drive. The flag rides on `PlayerInput` and returns on `EntityState`. The demo toggles it with the `P` key or a button. Tested in `host-simulation.test.ts` and end to end in `two-client-relay.test.ts`. |
 
 ## Phase 6 — Hardening and production budgets: in progress

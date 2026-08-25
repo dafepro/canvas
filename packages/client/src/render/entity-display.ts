@@ -50,6 +50,7 @@ export function buildEntityDisplay(
     });
     sprite.width = size.width * scale;
     sprite.height = size.height * scale;
+    applyVisualMirror(sprite, visual);
     if (tint !== undefined) sprite.tint = tint;
     container.addChild(sprite);
   } else {
@@ -59,6 +60,7 @@ export function buildEntityDisplay(
       const sprite = new Sprite({ texture, anchor: visual?.anchor ?? 0.5 });
       sprite.width = size.width * scale;
       sprite.height = size.height * scale;
+      applyVisualMirror(sprite, visual);
       if (tint !== undefined) sprite.tint = tint;
       container.addChild(sprite);
     } else {
@@ -70,6 +72,14 @@ export function buildEntityDisplay(
   container.zIndex = visual?.zIndex ?? 0;
   return container;
 }
+
+const applyVisualMirror = (
+  sprite: Sprite | AnimatedSprite,
+  visual: ItemDefinition["visual"] | undefined,
+): void => {
+  if (visual?.mirrorX) sprite.scale.x = -Math.abs(sprite.scale.x);
+  if (visual?.mirrorY) sprite.scale.y = -Math.abs(sprite.scale.y);
+};
 
 function drawPlaceholder(
   definition: ItemDefinition | undefined,

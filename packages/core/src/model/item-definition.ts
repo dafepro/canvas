@@ -38,6 +38,10 @@ export interface VisualDefinition {
   /** World-unit size. Sprite source pixels may be any size (spec 2.2). */
   size: { width: number; height: number };
   anchor?: Vec2;
+  /** Reflect source art horizontally while preserving world dimensions. */
+  mirrorX?: boolean;
+  /** Reflect source art vertically while preserving world dimensions. */
+  mirrorY?: boolean;
   zIndex?: number;
   variants?: Record<string, { spriteId?: string; color?: number }>;
   animations?: Record<string, AnimationDefinition>;

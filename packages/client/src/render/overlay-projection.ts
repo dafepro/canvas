@@ -66,6 +66,32 @@ export interface OverlayProjectionOptions {
   readonly definitionIds?: readonly string[];
 }
 
+/** Converts renderer backing coordinates into DOM/CSS coordinates. */
+export const cssOverlayViewport = (
+  viewport: Readonly<OverlayViewportProjection>,
+  cssSize: Readonly<{ width: number; height: number }>,
+): Readonly<OverlayViewportProjection> => {
+  const xRatio = viewport.width > 0 ? cssSize.width / viewport.width : 1;
+  const yRatio = viewport.height > 0 ? cssSize.height / viewport.height : xRatio;
+  return Object.freeze({
+    width: cssSize.width,
+    height: cssSize.height,
+    scale: viewport.scale * xRatio,
+    offsetX: viewport.offsetX * xRatio,
+    offsetY: viewport.offsetY * yRatio,
+  });
+};
+
+/** Converts a DOM pointer position into renderer backing coordinates. */
+export const cssPointToRenderer = (
+  point: Readonly<Vec2>,
+  rendererSize: Readonly<{ width: number; height: number }>,
+  cssSize: Readonly<{ width: number; height: number }>,
+): Readonly<Vec2> => Object.freeze({
+  x: point.x * (cssSize.width > 0 ? rendererSize.width / cssSize.width : 1),
+  y: point.y * (cssSize.height > 0 ? rendererSize.height / cssSize.height : 1),
+});
+
 export type OverlayProjectionObserver = (
   snapshot: Readonly<OverlayProjectionSnapshot>,
 ) => void;

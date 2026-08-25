@@ -1,5 +1,6 @@
 import { Container, Graphics, Text } from "pixi.js";
 import type { EffectEmission } from "@canvas-physics/core";
+import type { RenderEntity } from "../simulation/messages.js";
 import type { Camera } from "./camera.js";
 
 interface Particle {
@@ -18,6 +19,40 @@ interface Continuous {
   spawnAccumulatorMs: number;
 }
 
+export interface MotionTrailOptions {
+  effect: string;
+  kinds?: readonly RenderEntity["kind"][];
+  definitionIds?: readonly string[];
+  minSpeed: number;
+  fullSpeed: number;
+  /** Particles per second at threshold and full speed. */
+  emissionRate?: Readonly<{ min: number; max: number }>;
+  colors?: readonly number[];
+  sizePx?: Readonly<{ min: number; max: number }>;
+  lifeMs?: Readonly<{ min: number; max: number }>;
+}
+
+interface MotionTrail {
+  entityId: string;
+  effect: string;
+  vx: number;
+  vy: number;
+  intensity: number;
+  options: MotionTrailOptions;
+  spawnAccumulator: number;
+}
+
+export const motionTrailIntensity = (
+  vx: number,
+  vy: number,
+  minSpeed: number,
+  fullSpeed: number,
+): number => {
+  const speed = Math.hypot(vx, vy);
+  if (speed <= minSpeed) return 0;
+  return Math.min(1, (speed - minSpeed) / Math.max(0.001, fullSpeed - minSpeed));
+};
+
 interface Overlay {
   entityId: string;
   text: Text;
@@ -34,6 +69,7 @@ export class EffectSystem {
   private readonly particles: Particle[] = [];
   private readonly pool: Graphics[] = [];
   private readonly continuous = new Map<string, Continuous>();
+  private motionTrails = new Map<string, MotionTrail>();
   private readonly overlays = new Map<string, Overlay>();
   private positions = new Map<string, { x: number; y: number }>();
 
@@ -47,6 +83,39 @@ export class EffectSystem {
   /** Called each frame with the current screen positions of the entities. */
   setPositions(positions: Map<string, { x: number; y: number }>): void {
     this.positions = positions;
+  }
+
+  /** Reconciles renderer-derived trails from the same interpolated entities being drawn. */
+  setMotionTrails(
+    entities: readonly Readonly<RenderEntity>[],
+    options: readonly MotionTrailOptions[],
+  ): void {
+    const next = new Map<string, MotionTrail>();
+    for (const entity of entities) {
+      for (const configured of options) {
+        if (configured.kinds?.length && !configured.kinds.includes(entity.kind)) continue;
+        if (configured.definitionIds?.length &&
+            !configured.definitionIds.includes(entity.definitionId)) continue;
+        const intensity = motionTrailIntensity(
+          entity.vx,
+          entity.vy,
+          configured.minSpeed,
+          configured.fullSpeed,
+        );
+        if (intensity <= 0 || entity.disabled || entity.respawning) continue;
+        const key = `${entity.id}/${configured.effect}`;
+        next.set(key, {
+          entityId: entity.id,
+          effect: configured.effect,
+          vx: entity.vx,
+          vy: entity.vy,
+          intensity,
+          options: configured,
+          spawnAccumulator: this.motionTrails.get(key)?.spawnAccumulator ?? 0,
+        });
+      }
+    }
+    this.motionTrails = next;
   }
 
   apply(emission: EffectEmission): void {
@@ -134,12 +203,55 @@ export class EffectSystem {
     }
   }
 
+  private spawnMotionParticle(trail: MotionTrail): void {
+    const at = this.positions.get(trail.entityId);
+    if (!at || this.particles.length >= this.maxParticles) return;
+    const speed = Math.max(0.001, Math.hypot(trail.vx, trail.vy));
+    const backward = { x: -trail.vx / speed, y: -trail.vy / speed };
+    const sideways = { x: -backward.y, y: backward.x };
+    const size = trail.options.sizePx ?? { min: 2, max: 6 };
+    const lifeRange = trail.options.lifeMs ?? { min: 180, max: 520 };
+    const colors = trail.options.colors?.length
+      ? trail.options.colors
+      : [0xfff3a1, 0xffa62b, 0xff4d1a];
+    const display = this.pool.pop() ?? new Graphics();
+    display.clear();
+    display.circle(
+      0,
+      0,
+      size.min + (size.max - size.min) * trail.intensity * (0.55 + Math.random() * 0.45),
+    ).fill({ color: colors[Math.floor(Math.random() * colors.length)]! });
+    this.layer.addChild(display);
+    const spread = (Math.random() - 0.5) * 34;
+    const push = 20 + 52 * trail.intensity * (0.65 + Math.random() * 0.35);
+    const lifeMs = lifeRange.min + (lifeRange.max - lifeRange.min) * Math.random();
+    this.particles.push({
+      display,
+      x: at.x + backward.x * (5 + 7 * trail.intensity) + sideways.x * spread * 0.12,
+      y: at.y + backward.y * (5 + 7 * trail.intensity) + sideways.y * spread * 0.12,
+      vx: backward.x * push + sideways.x * spread,
+      vy: backward.y * push + sideways.y * spread,
+      lifeMs,
+      totalMs: lifeMs,
+    });
+  }
+
   update(deltaMs: number): void {
     for (const trail of this.continuous.values()) {
       trail.spawnAccumulatorMs += deltaMs;
       if (trail.spawnAccumulatorMs < 30) continue;
       trail.spawnAccumulatorMs = 0;
       this.burst(trail.entityId, trail.effect, 2);
+    }
+
+    for (const trail of this.motionTrails.values()) {
+      const rate = trail.options.emissionRate ?? { min: 8, max: 58 };
+      const perSecond = rate.min + (rate.max - rate.min) * trail.intensity;
+      trail.spawnAccumulator += deltaMs * perSecond / 1_000;
+      while (trail.spawnAccumulator >= 1) {
+        trail.spawnAccumulator -= 1;
+        this.spawnMotionParticle(trail);
+      }
     }
 
     for (let i = this.particles.length - 1; i >= 0; i--) {

@@ -32,6 +32,7 @@ export const validateCanvasDefinition = (
     "maxSpeed",
     "acceleration",
     "flickDeceleration",
+    "maxTurnSpeed",
   ] as const) {
     const value = canvas.avatarController?.[key];
     if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {

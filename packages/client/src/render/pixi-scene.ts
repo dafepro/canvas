@@ -9,7 +9,7 @@ import type { RenderEntity } from "../simulation/messages.js";
 import type { DragGesture } from "../input/pointer-drag-controller.js";
 import type { ItemEditState } from "../input/item-edit-controller.js";
 import { Camera } from "./camera.js";
-import { EffectSystem } from "./effect-system.js";
+import { EffectSystem, type MotionTrailOptions } from "./effect-system.js";
 import { buildEntityDisplay } from "./entity-display.js";
 import type { LoadedAssetBundle } from "../assets/index.js";
 
@@ -19,6 +19,8 @@ export interface SceneOptions {
   debug?: boolean;
   /** Backing pixels per CSS pixel. Defaults to device density, capped at 2. */
   resolution?: number;
+  /** Renderer-local, speed-scaled trails derived from interpolated entities. */
+  motionTrails?: readonly MotionTrailOptions[];
 }
 
 export const resolveSceneResolution = (
@@ -239,6 +241,7 @@ export class PixiScene {
     }
 
     this.effects.setPositions(this.screenPositions);
+    this.effects.setMotionTrails(entities, this.options.motionTrails ?? []);
     this.effects.update(deltaMs);
     this.drawEditOverlay(entities);
   }

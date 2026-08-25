@@ -50,6 +50,8 @@ import {
 } from "./lifecycle.js";
 import {
   OverlayProjectionStore,
+  cssPointToRenderer,
+  cssOverlayViewport,
   projectOverlayPoint,
   type OverlayPointProjection,
   type OverlayProjectionObserver,
@@ -354,10 +356,7 @@ export class CanvasRuntime {
             (entity) => entity.kind === "avatar" && entity.userId === this.session.userId,
           );
           if (!avatar) return undefined;
-          return {
-            x: scene.camera.toScreenX(avatar.x),
-            y: scene.camera.toScreenY(avatar.y),
-          };
+          return this.projectWorldPoint({ x: avatar.x, y: avatar.y })?.screen;
         },
         allowStart: (point) =>
           this.options.pointer?.allowStart?.(point) !== false &&
@@ -471,9 +470,19 @@ export class CanvasRuntime {
     }
     const pointer = this.pointer?.intent;
     if (pointer?.target && this.scene) {
+      const canvas = this.scene.app.canvas;
+      const rect = canvas.getBoundingClientRect();
+      const target = cssPointToRenderer(
+        pointer.target,
+        {
+          width: this.scene.app.renderer.width,
+          height: this.scene.app.renderer.height,
+        },
+        { width: rect.width, height: rect.height },
+      );
       return {
         ...pointer,
-        target: this.scene.camera.toWorld(pointer.target.x, pointer.target.y),
+        target: this.scene.camera.toWorld(target.x, target.y),
       };
     }
     if (pointer && pointer.intensity > 0) return pointer;
@@ -561,13 +570,15 @@ export class CanvasRuntime {
   private overlayViewport(): Readonly<OverlayViewportProjection> | undefined {
     const scene = this.scene;
     if (!scene) return undefined;
-    return Object.freeze({
+    const viewport = Object.freeze({
       width: scene.app.renderer.width,
       height: scene.app.renderer.height,
       scale: scene.camera.scale,
       offsetX: scene.camera.offsetX,
       offsetY: scene.camera.offsetY,
     });
+    const rect = scene.app.canvas.getBoundingClientRect();
+    return cssOverlayViewport(viewport, { width: rect.width, height: rect.height });
   }
 
   // ---------- durable mutations ----------

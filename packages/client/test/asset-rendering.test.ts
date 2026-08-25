@@ -7,6 +7,7 @@ import {
   type AssetManifest,
 } from "../src/assets/index.js";
 import { buildEntityDisplay } from "../src/render/entity-display.js";
+import { motionTrailIntensity } from "../src/render/effect-system.js";
 import { PixiScene, resolveSceneResolution } from "../src/render/pixi-scene.js";
 import type { CanvasDefinition } from "@canvas-physics/core";
 
@@ -58,6 +59,12 @@ const definition: ItemDefinition = {
 };
 
 describe("asset rendering", () => {
+  it("scales motion effects from a configured speed threshold to full intensity", () => {
+    expect(motionTrailIntensity(3, 4, 6, 16)).toBe(0);
+    expect(motionTrailIntensity(8, 6, 5, 15)).toBe(0.5);
+    expect(motionTrailIntensity(30, 40, 5, 15)).toBe(1);
+  });
+
   it("uses a high-density backing buffer without changing canvas layout size", () => {
     expect(resolveSceneResolution(undefined, 1)).toBe(1);
     expect(resolveSceneResolution(undefined, 1.25)).toBe(1.25);
@@ -148,6 +155,34 @@ describe("asset rendering", () => {
     expect((sprite as Sprite).height).toBe(30);
     expect((sprite as Sprite).anchor).toMatchObject({ x: 0.4, y: 0.6 });
     expect((sprite as Sprite).tint).toBe(0xff0000);
+  });
+
+  it("mirrors opted-in sprite art without changing its world size", () => {
+    const display = buildEntityDisplay(
+      {
+        id: "mirrored-ball",
+        kind: "item",
+        definitionId: "ball",
+        x: 0,
+        y: 0,
+        rotation: 0,
+        vx: 0,
+        vy: 0,
+        angularVelocity: 0,
+      },
+      {
+        ...definition,
+        visual: { ...definition.visual, mirrorX: true },
+      },
+      10,
+      assets,
+    );
+
+    const sprite = display.children[0] as Sprite;
+    expect(sprite.width).toBe(40);
+    expect(sprite.height).toBe(30);
+    expect(sprite.scale.x).toBeLessThan(0);
+    expect(sprite.scale.y).toBeGreaterThan(0);
   });
 
   it("renders avatars from the same consumer definition and asset pipeline", () => {

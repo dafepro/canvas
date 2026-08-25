@@ -15,6 +15,10 @@ contains the canonical tick, sample time, canvas size, and an immutable viewport
 projection (`width`, `height`, `scale`, `offsetX`, and `offsetY`). It contains no
 renderer objects.
 
+Screen coordinates are CSS pixels even when the Pixi backing buffer renders at
+a higher device-pixel density. DOM overlays therefore keep their alignment on
+high-DPI displays and through fullscreen resize transitions.
+
 Subscriptions are deliberately bounded:
 
 - `maxHz` defaults to 10 and cannot exceed 60. A 60 Hz subscription can track

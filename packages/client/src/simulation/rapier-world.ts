@@ -421,6 +421,7 @@ export class RapierWorld implements BehaviorHost {
         maxSpeed: spawn.maxSpeed ?? controller.maxSpeed,
         acceleration: spawn.acceleration ?? controller.acceleration,
         flickDeceleration: spawn.flickDeceleration ?? controller.flickDeceleration,
+        maxTurnSpeed: controller.maxTurnSpeed,
         flicking: false,
         lastProcessedInputSeq: 0,
         desiredDirection: { x: 0, y: 0 },
@@ -711,9 +712,7 @@ export class RapierWorld implements BehaviorHost {
       const moved = this.sweepDirectAvatarMovement(record, delta);
       record.body.setTranslation({ x: start.x + moved.x, y: start.y + moved.y }, true);
       record.body.setLinvel({ x: 0, y: 0 }, true);
-      if (moved.x !== 0 || moved.y !== 0) {
-        record.body.setRotation(Math.atan2(moved.y, moved.x), true);
-      }
+      this.turnAvatar(record, moved, dt);
       return;
     }
     // Spec 6.1. Intent accelerates the avatar toward a desired velocity.
@@ -733,7 +732,21 @@ export class RapierWorld implements BehaviorHost {
     if (avatar.flicking && Math.hypot(next.x, next.y) < 0.001) {
       avatar.flicking = false;
     }
-    record.body.setLinvel(this.clampAgainstGeometry(record, next, dt), true);
+    const movement = this.clampAgainstGeometry(record, next, dt);
+    record.body.setLinvel(movement, true);
+    this.turnAvatar(record, movement, dt);
+  }
+
+  private turnAvatar(record: BodyRecord, movement: Vec2, dt: number): void {
+    const avatar = record.entity.avatar;
+    const speed = Math.hypot(movement.x, movement.y);
+    if (!avatar || speed < 0.05) return;
+    const current = record.body.rotation();
+    const target = Math.atan2(movement.y, movement.x);
+    const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+    const limit = avatar.maxTurnSpeed * dt;
+    const change = Math.max(-limit, Math.min(limit, delta));
+    record.body.setRotation(current + change, true);
   }
 
   /**
@@ -817,13 +830,6 @@ export class RapierWorld implements BehaviorHost {
         entity.rigidBody.velocity.y = velocity.y;
         entity.rigidBody.angularVelocity = record.body.angvel();
         entity.rigidBody.awake = !record.body.isSleeping();
-      }
-      if (entity.avatar) {
-        const velocity = record.body.linvel();
-        entity.transform.rotation =
-          velocity.x === 0 && velocity.y === 0
-            ? entity.transform.rotation
-            : Math.atan2(velocity.y, velocity.x);
       }
     }
   }

@@ -41,6 +41,7 @@ export interface AvatarComponent {
   maxSpeed: number;
   acceleration: number;
   flickDeceleration: number;
+  maxTurnSpeed: number;
   /** True while a one-shot direct-control flick is coasting to rest. */
   flicking: boolean;
   /** Newest input sequence the host applied for this avatar. */

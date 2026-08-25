@@ -93,6 +93,8 @@ export interface AvatarControllerDefinition {
   acceleration?: number;
   /** Deceleration applied after a direct-control flick. */
   flickDeceleration?: number;
+  /** Maximum visual facing change in radians per second. */
+  maxTurnSpeed?: number;
 }
 
 export const defaultAvatarController: Required<AvatarControllerDefinition> = {
@@ -100,6 +102,7 @@ export const defaultAvatarController: Required<AvatarControllerDefinition> = {
   maxSpeed: 18,
   acceleration: 90,
   flickDeceleration: 24,
+  maxTurnSpeed: 10,
 };
 
 export const resolveAvatarController = (

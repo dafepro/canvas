@@ -574,6 +574,42 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("turns a directly dragged avatar at the canvas-owned rate instead of snapping", () => {
+    const simulation = new HostSimulation(
+      {
+        ...rocketCanvas,
+        staticGeometry: [],
+        avatarController: {
+          ...rocketCanvas.avatarController,
+          maxTurnSpeed: Math.PI,
+        },
+      },
+      rocketCanvasDefinitions,
+      registry(),
+      60,
+    );
+    simulation.addAvatar({
+      entityId: "avatar:turning",
+      clientId: "turning",
+      userId: "turning",
+      position: { x: 25, y: 35 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:turning",
+      { x: 0, y: 1 },
+      1,
+      1,
+      true,
+      { x: 25, y: 55 },
+    );
+    simulation.step();
+
+    expect(simulation.world.registry.require("avatar:turning").transform.rotation)
+      .toBeCloseTo(Math.PI / 60, 5);
+    simulation.free();
+  });
+
   it("still blocks an uncapped direct drag at solid geometry", () => {
     const simulation = build();
     simulation.addAvatar({

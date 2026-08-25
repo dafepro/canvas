@@ -109,6 +109,19 @@ bounded flick, while a release below the configured pixel-speed threshold emits
 no momentum. Gesture thresholds are client/runtime configuration. The canvas owns
 `avatarController.flickDeceleration`, so host simulation and local prediction
 agree on how the resulting slide comes to rest.
+`avatarController.maxTurnSpeed` independently bounds facing changes, including
+uncapped direct dragging, so a pointer correction cannot snap the avatar art
+through a large angle in one simulation tick.
+
+Consumer visuals may opt into `visual.mirrorX` or `visual.mirrorY`. Reflection
+is presentation-only: world dimensions, anchors, transforms, and colliders do
+not change. Definitions that omit the flags retain their source orientation.
+
+`SceneOptions.motionTrails` is the product-owned seam for speed-derived local
+particles. Filters select entity kinds or definitions; thresholds, emission
+rate, palette, size, and lifetime are data. Canvas samples the same interpolated
+velocity and position it draws, scales intensity between the configured speeds,
+and never persists or networks the resulting particles.
 
 Fullscreen presentation remains product-owned UI. A consumer may provide a
 `fullscreenElement` and drive `enterFullscreen`, `exitFullscreen`, or

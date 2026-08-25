@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   OverlayProjectionStore,
+  cssPointToRenderer,
+  cssOverlayViewport,
   projectOverlayPoint,
   type OverlayProjectionSource,
 } from "../src/render/overlay-projection.js";
@@ -57,6 +59,27 @@ const source = (sampledAtMs: number): OverlayProjectionSource => ({
 });
 
 describe("bounded overlay projection", () => {
+  it("converts a high-density renderer viewport back to CSS pixels", () => {
+    expect(cssOverlayViewport(
+      { width: 1_500, height: 900, scale: 20, offsetX: 50, offsetY: 30 },
+      { width: 1_200, height: 720 },
+    )).toEqual({
+      width: 1_200,
+      height: 720,
+      scale: 16,
+      offsetX: 40,
+      offsetY: 24,
+    });
+  });
+
+  it("converts CSS pointer coordinates into high-density renderer pixels", () => {
+    expect(cssPointToRenderer(
+      { x: 300, y: 200 },
+      { width: 1_500, height: 900 },
+      { width: 1_200, height: 720 },
+    )).toEqual({ x: 375, y: 250 });
+  });
+
   it("publishes immutable plain-data screen projections at a bounded rate", () => {
     const store = new OverlayProjectionStore();
     const observer = vi.fn();
