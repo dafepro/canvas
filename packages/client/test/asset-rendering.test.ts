@@ -7,7 +7,10 @@ import {
   type AssetManifest,
 } from "../src/assets/index.js";
 import { buildEntityDisplay } from "../src/render/entity-display.js";
-import { motionTrailIntensity } from "../src/render/effect-system.js";
+import {
+  motionTrailIntensity,
+  motionTrailParticleScale,
+} from "../src/render/effect-system.js";
 import { PixiScene, resolveSceneResolution } from "../src/render/pixi-scene.js";
 import type { CanvasDefinition } from "@canvas-physics/core";
 
@@ -63,6 +66,12 @@ describe("asset rendering", () => {
     expect(motionTrailIntensity(3, 4, 6, 16)).toBe(0);
     expect(motionTrailIntensity(8, 6, 5, 15)).toBe(0.5);
     expect(motionTrailIntensity(30, 40, 5, 15)).toBe(1);
+  });
+
+  it("keeps particle variation within the current motion intensity band", () => {
+    expect(motionTrailParticleScale(0.1, 0)).toBeCloseTo(0.055);
+    expect(motionTrailParticleScale(0.1, 1)).toBeCloseTo(0.1);
+    expect(motionTrailParticleScale(1, 1)).toBe(1);
   });
 
   it("uses a high-density backing buffer without changing canvas layout size", () => {

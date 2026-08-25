@@ -386,6 +386,50 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     expect(Math.max(...steps), motionDiagnostics).toBeLessThan(1.2);
   }, 90_000);
 
+  it("keeps peer direct-drag prediction smooth across periodic checkpoints", async () => {
+    let bobIntent: InputIntent = STILL;
+    const alice = session("alice");
+    await alice.start();
+    await waitFor("direct host lease", () => alice.client.isHost && alice.tick > 60);
+
+    const bob = session("bob", () => bobIntent);
+    await bob.start();
+    await waitFor("direct peer join", () => bob.client.clientId !== "");
+    const bobAvatar = avatarEntityId(bob.client.userId);
+    await waitFor("direct host avatar", () => entity(alice, bobAvatar) !== undefined);
+    await waitFor("direct peer canonical avatar", () => entity(bob, bobAvatar) !== undefined);
+    const start = entity(bob, bobAvatar)!;
+    let targetX = start.x;
+    const samples: Array<{ at: number; x: number }> = [];
+    const deadline = performance.now() + 2_400;
+    while (performance.now() < deadline) {
+      targetX = Math.min(start.x + 16, targetX + 0.12);
+      bobIntent = {
+        direction: { x: 1, y: 0 },
+        intensity: 1,
+        held: true,
+        target: { x: targetX, y: start.y },
+      };
+      const avatar = entity(bob, bobAvatar);
+      if (avatar) samples.push({ at: performance.now(), x: avatar.x });
+      await new Promise((resolve) => setTimeout(resolve, 16));
+    }
+    bobIntent = STILL;
+
+    const steps = samples.slice(1).map((sample, index) => sample.x - samples[index]!.x);
+    const backwards = Math.min(...steps);
+    const catchUp = Math.max(...steps);
+    const diagnostics = JSON.stringify({
+      backwards,
+      catchUp,
+      reconcile: bob.diagnostics().reconcileError,
+      samples: samples.length,
+    });
+    expect(samples.at(-1)!.x - samples[0]!.x, diagnostics).toBeGreaterThan(10);
+    expect(backwards, diagnostics).toBeGreaterThan(-0.08);
+    expect(catchUp, diagnostics).toBeLessThan(0.8);
+  }, 90_000);
+
   it("resumes a timer-driven workflow on the replacement host", async () => {
     const alice = session("alice");
     await alice.start();

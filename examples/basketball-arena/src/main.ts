@@ -127,6 +127,9 @@ const join = async (): Promise<void> => {
       mount: stage,
       fullscreenElement: gameShell,
       definitions: basketballDefinitions,
+      // Checkpoints protect crash recovery rather than live relay state. Keep
+      // their serialization away from the demo's one-second interaction path.
+      rates: { checkpointHz: 0.2 },
       assets: basketballAssets,
       driver: new SimulationDriver(worker),
       scene: {
@@ -135,12 +138,12 @@ const join = async (): Promise<void> => {
         motionTrails: [{
           effect: "avatarFireTrail",
           kinds: ["avatar"],
-          minSpeed: 0.35,
+          minSpeed: 1.25,
           fullSpeed: 12,
-          emissionRate: { min: 36, max: 170 },
+          emissionRate: { min: 3, max: 220 },
           colors: [0xffe45e, 0xffa31a, 0xff4b13, 0xe51b12],
-          sizePx: { min: 3.2, max: 10.5 },
-          lifeMs: { min: 320, max: 820 },
+          sizePx: { min: 1.1, max: 13.5 },
+          lifeMs: { min: 100, max: 900 },
         }],
       },
       pointer: controlProfile.pointer,

@@ -171,6 +171,65 @@ describe.skipIf(!goAvailable())("a room under network faults", () => {
     90_000,
   );
 
+  it("keeps a peer's direct drag smooth through LAN-like delay and reordering", async () => {
+    let peerIntent: InputIntent = STILL;
+    const host = session("direct-jitter-host");
+    await host.start();
+    await waitFor("the direct jitter host lease", () => host.client.isHost && host.tick > 60);
+
+    const faults = new FaultInjectingWebSocketTransport({
+      credentialProvider: async () => devRealtimeCredential("direct-jitter-peer"),
+      faults: {
+        inboundDelayMs: 45,
+        inboundJitterMs: 30,
+        // Fifteen realtime deltas is approximately one second at the default
+        // relay rate, matching the reported periodic LAN disturbance.
+        reorderEvery: 15,
+        reorderDelayMs: 180,
+      },
+    });
+    const peer = session("direct-jitter-peer", () => peerIntent, faults);
+    await peer.start();
+    await waitFor("the direct jitter peer join", () => peer.client.clientId !== "", 30_000);
+
+    const avatarId = avatarEntityId("direct-jitter-peer");
+    await waitFor(
+      "the direct jitter avatar",
+      () => entity(host, avatarId) !== undefined && entity(peer, avatarId) !== undefined,
+      30_000,
+    );
+    const start = entity(peer, avatarId)!;
+    let targetX = start.x;
+    const samples: number[] = [];
+    const deadline = performance.now() + 2_400;
+    while (performance.now() < deadline) {
+      targetX = Math.min(start.x + 16, targetX + 0.12);
+      peerIntent = {
+        direction: { x: 1, y: 0 },
+        intensity: 1,
+        held: true,
+        target: { x: targetX, y: start.y },
+      };
+      const avatar = entity(peer, avatarId);
+      if (avatar) samples.push(avatar.x);
+      await new Promise((resolve) => setTimeout(resolve, 16));
+    }
+    peerIntent = STILL;
+
+    const steps = samples.slice(1).map((x, index) => x - samples[index]!);
+    const diagnostics = JSON.stringify({
+      backwards: Math.min(...steps),
+      catchUp: Math.max(...steps),
+      delayed: faults.delayedIn,
+      reordered: faults.reorderedIn,
+      reconcile: peer.diagnostics().reconcileError,
+    });
+    expect(samples.at(-1)! - samples[0]!, diagnostics).toBeGreaterThan(10);
+    expect(Math.min(...steps), diagnostics).toBeGreaterThan(-0.08);
+    expect(Math.max(...steps), diagnostics).toBeLessThan(0.8);
+    expect(faults.reorderedIn).toBeGreaterThan(0);
+  }, 90_000);
+
   it("rejoins and converges while inbound state remains delayed and reordered", async () => {
     let hostIntent: InputIntent = STILL;
     let credentialCalls = 0;

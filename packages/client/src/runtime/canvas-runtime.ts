@@ -87,6 +87,8 @@ export interface CanvasRuntimeOptions {
   onAssetWarning?: (warning: Readonly<AssetWarning>) => void;
   /** Typed runtime, transport, protocol, simulation, and asset failures. */
   onError?: (error: CanvasConsumerError) => void;
+  /** Diagnostics callback frequency. Defaults to 4 Hz to stay off the render hot path. */
+  diagnosticsHz?: number;
   onDiagnostics?: (diagnostics: RuntimeDiagnostics) => void;
   /** Addendum A1. Runs after the local avatar changes its disabled state. */
   onAvatarDisabledChange?: (disabled: boolean) => void;
@@ -107,6 +109,13 @@ export interface RuntimeDiagnostics extends SessionDiagnostics {
   lastBackgroundMs: number;
 }
 
+export const runtimeDiagnosticsIntervalMs = (requestedHz = 4): number => {
+  const hz = Number.isFinite(requestedHz) && requestedHz > 0
+    ? Math.min(requestedHz, 60)
+    : 4;
+  return 1_000 / hz;
+};
+
 /**
  * The façade an application uses. It adds the renderer and the input
  * controllers to one `RoomSession`. Every network and simulation rule lives in
@@ -120,6 +129,7 @@ export class CanvasRuntime {
   private keyboard?: KeyboardController;
   private renderFps = 0;
   private readonly frameProfiler = new FrameProfiler();
+  private lastDiagnosticsAtMs = Number.NEGATIVE_INFINITY;
   private hiddenAtMs?: number;
   private backgroundResumes = 0;
   private lastBackgroundMs = 0;
@@ -528,7 +538,15 @@ export class CanvasRuntime {
         });
       }
       scene.setThumbstick(this.pointer?.gesture);
-      this.options.onDiagnostics?.(this.diagnostics());
+      if (
+        this.options.onDiagnostics &&
+        nowMs - this.lastDiagnosticsAtMs >= runtimeDiagnosticsIntervalMs(
+          this.options.diagnosticsHz,
+        )
+      ) {
+        this.lastDiagnosticsAtMs = nowMs;
+        this.options.onDiagnostics(this.diagnostics());
+      }
     });
   }
 

@@ -53,6 +53,13 @@ export const motionTrailIntensity = (
   return Math.min(1, (speed - minSpeed) / Math.max(0.001, fullSpeed - minSpeed));
 };
 
+/** Keeps random particle variation inside the current speed band. */
+export const motionTrailParticleScale = (
+  intensity: number,
+  variation: number,
+): number => Math.max(0, Math.min(1, intensity)) *
+  (0.55 + 0.45 * Math.max(0, Math.min(1, variation)));
+
 interface Overlay {
   entityId: string;
   text: Text;
@@ -216,15 +223,16 @@ export class EffectSystem {
       : [0xfff3a1, 0xffa62b, 0xff4d1a];
     const display = this.pool.pop() ?? new Graphics();
     display.clear();
+    const particleScale = motionTrailParticleScale(trail.intensity, Math.random());
     display.circle(
       0,
       0,
-      size.min + (size.max - size.min) * trail.intensity * (0.55 + Math.random() * 0.45),
+      size.min + (size.max - size.min) * particleScale,
     ).fill({ color: colors[Math.floor(Math.random() * colors.length)]! });
     this.layer.addChild(display);
     const spread = (Math.random() - 0.5) * 34;
     const push = 20 + 52 * trail.intensity * (0.65 + Math.random() * 0.35);
-    const lifeMs = lifeRange.min + (lifeRange.max - lifeRange.min) * Math.random();
+    const lifeMs = lifeRange.min + (lifeRange.max - lifeRange.min) * particleScale;
     this.particles.push({
       display,
       x: at.x + backward.x * (5 + 7 * trail.intensity) + sideways.x * spread * 0.12,

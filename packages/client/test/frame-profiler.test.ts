@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { FrameProfiler } from "../src/render/frame-profiler.js";
+import { runtimeDiagnosticsIntervalMs } from "../src/runtime/canvas-runtime.js";
 
 describe("FrameProfiler", () => {
+  it("bounds diagnostics work away from the render-frame hot path", () => {
+    expect(runtimeDiagnosticsIntervalMs()).toBe(250);
+    expect(runtimeDiagnosticsIntervalMs(2)).toBe(500);
+    expect(runtimeDiagnosticsIntervalMs(Number.NaN)).toBe(250);
+    expect(runtimeDiagnosticsIntervalMs(120)).toBeCloseTo(1000 / 60);
+  });
+
   it("reports stable rolling frame-time percentiles and long frames", () => {
     const profiler = new FrameProfiler({ maxSamples: 5, longFrameMs: 30 });
 
