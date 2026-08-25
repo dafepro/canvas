@@ -272,6 +272,12 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     await waitFor("alice to host", () => alice.client.isHost && alice.tick > 60);
 
     const bob = session("bob", () => bobIntent);
+    let latestCanonicalBob: RenderEntity | undefined;
+    bob.subscribeCanonicalState((snapshot) => {
+      latestCanonicalBob = snapshot.entities.find(
+        (candidate) => candidate.id === bob.avatarId,
+      );
+    });
     await bob.start();
     await waitFor("bob to join", () => bob.client.clientId !== "");
 
@@ -300,6 +306,16 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     const onHost = entity(alice, bobAvatar)!;
     // Spec 10.2. The host reports the input it consumed.
     expect(onHost.lastProcessedInputSequence ?? 0).toBeGreaterThan(0);
+
+    // Prediction may already draw the avatar at the target. Wait separately
+    // for the old host's canonical delta, which is the state a replacement
+    // host can legitimately preserve when its checkpoint is older.
+    await waitFor(
+      "the peer to receive the canonical target before migration",
+      () => latestCanonicalBob !== undefined &&
+        Math.hypot(latestCanonicalBob.x - target.x, latestCanonicalBob.y - target.y) < 0.2,
+      20_000,
+    );
 
     // The peer sees its own avatar close to the canonical position.
     await waitFor(
