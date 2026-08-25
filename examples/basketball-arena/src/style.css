@@ -167,6 +167,22 @@ main:fullscreen aside { display: none; }
   pointer-events: none;
 }
 
+.control-badge {
+  width: max-content;
+  max-width: 100%;
+  margin: -4px auto 8px;
+  padding: 5px 11px;
+  border: 1px solid rgba(86, 224, 216, 0.45);
+  border-radius: 999px;
+  background: rgba(3, 11, 24, 0.78);
+  color: #78f5eb;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
 .court-score {
   position: absolute;
   left: 0;

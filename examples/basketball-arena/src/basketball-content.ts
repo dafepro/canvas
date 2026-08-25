@@ -169,6 +169,7 @@ export const basketballCanvas: CanvasDefinition = {
       tags: ["basketFrame", "leftBasket"],
       restitution: 0.74,
       friction: 0.35,
+      blocks: { avatars: false, items: true },
     },
     {
       id: "right-backboard",
@@ -177,6 +178,7 @@ export const basketballCanvas: CanvasDefinition = {
       tags: ["basketFrame", "rightBasket"],
       restitution: 0.74,
       friction: 0.35,
+      blocks: { avatars: false, items: true },
     },
     ...[18.9, 23.1].flatMap((y) => [
       {
@@ -185,6 +187,7 @@ export const basketballCanvas: CanvasDefinition = {
         position: { x: 7.8, y },
         tags: ["rim", "leftBasket"],
         restitution: 0.9,
+        blocks: { avatars: false, items: true },
       },
       {
         id: `right-rim-${y}`,
@@ -192,6 +195,7 @@ export const basketballCanvas: CanvasDefinition = {
         position: { x: 62.2, y },
         tags: ["rim", "rightBasket"],
         restitution: 0.9,
+        blocks: { avatars: false, items: true },
       },
     ]),
   ],

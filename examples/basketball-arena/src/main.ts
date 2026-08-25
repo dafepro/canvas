@@ -37,6 +37,7 @@ const basketResetSeconds = document.querySelector<HTMLElement>("#basket-reset-se
 const gameResetSeconds = document.querySelector<HTMLElement>("#game-reset-seconds")!;
 const winningScore = document.querySelector<HTMLElement>("#winning-score")!;
 const controlMode = document.querySelector<HTMLElement>("#control-mode")!;
+const controlBadge = document.querySelector<HTMLElement>("#control-badge")!;
 
 const rulesMessage =
   `First to ${defaultBasketballConfig.winningScore} · baskets score ${defaultBasketballConfig.pointsPerBasket}`;
@@ -47,6 +48,11 @@ basketResetSeconds.textContent = String(defaultBasketballConfig.basketResetSecon
 gameResetSeconds.textContent = String(defaultBasketballConfig.gameResetSeconds);
 winningScore.textContent = String(defaultBasketballConfig.winningScore);
 controlMode.textContent = controlProfile.description;
+controlBadge.textContent = controlProfile.name === "direct-flick"
+  ? "Control · drag + coast"
+  : controlProfile.name === "direct-stop"
+    ? "Control · drag + stop"
+    : "Control · thumbstick";
 
 userInput.value =
   params.get("user") ?? `baller-${Math.random().toString(36).slice(2, 6)}`;
@@ -129,12 +135,12 @@ const join = async (): Promise<void> => {
         motionTrails: [{
           effect: "avatarFireTrail",
           kinds: ["avatar"],
-          minSpeed: 2.5,
-          fullSpeed: 19,
-          emissionRate: { min: 10, max: 105 },
+          minSpeed: 0.35,
+          fullSpeed: 12,
+          emissionRate: { min: 36, max: 170 },
           colors: [0xffe45e, 0xffa31a, 0xff4b13, 0xe51b12],
-          sizePx: { min: 2.4, max: 8.5 },
-          lifeMs: { min: 220, max: 620 },
+          sizePx: { min: 3.2, max: 10.5 },
+          lifeMs: { min: 320, max: 820 },
         }],
       },
       pointer: controlProfile.pointer,

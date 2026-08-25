@@ -22,7 +22,8 @@
       "position": { "x": 6.35, "y": 21 },
       "tags": ["basketFrame", "leftBasket"],
       "restitution": 0.74,
-      "friction": 0.35
+      "friction": 0.35,
+      "blocks": { "avatars": false, "items": true }
     },
     {
       "id": "right-backboard",
@@ -30,35 +31,40 @@
       "position": { "x": 63.65, "y": 21 },
       "tags": ["basketFrame", "rightBasket"],
       "restitution": 0.74,
-      "friction": 0.35
+      "friction": 0.35,
+      "blocks": { "avatars": false, "items": true }
     },
     {
       "id": "left-rim-18.9",
       "shape": { "type": "circle", "radius": 0.28 },
       "position": { "x": 7.8, "y": 18.9 },
       "tags": ["rim", "leftBasket"],
-      "restitution": 0.9
+      "restitution": 0.9,
+      "blocks": { "avatars": false, "items": true }
     },
     {
       "id": "right-rim-18.9",
       "shape": { "type": "circle", "radius": 0.28 },
       "position": { "x": 62.2, "y": 18.9 },
       "tags": ["rim", "rightBasket"],
-      "restitution": 0.9
+      "restitution": 0.9,
+      "blocks": { "avatars": false, "items": true }
     },
     {
       "id": "left-rim-23.1",
       "shape": { "type": "circle", "radius": 0.28 },
       "position": { "x": 7.8, "y": 23.1 },
       "tags": ["rim", "leftBasket"],
-      "restitution": 0.9
+      "restitution": 0.9,
+      "blocks": { "avatars": false, "items": true }
     },
     {
       "id": "right-rim-23.1",
       "shape": { "type": "circle", "radius": 0.28 },
       "position": { "x": 62.2, "y": 23.1 },
       "tags": ["rim", "rightBasket"],
-      "restitution": 0.9
+      "restitution": 0.9,
+      "blocks": { "avatars": false, "items": true }
     }
   ],
   "regions": [

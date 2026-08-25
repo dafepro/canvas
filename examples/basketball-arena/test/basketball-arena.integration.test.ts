@@ -115,6 +115,11 @@ describe("basketball arena integration", () => {
       "left-rim-18.9",
       "right-rim-23.1",
     ]));
+    for (const geometry of canvas.staticGeometry.filter(({ tags }) =>
+      tags?.includes("basketFrame") || tags?.includes("rim")
+    )) {
+      expect(geometry.blocks).toEqual({ avatars: false, items: true });
+    }
     expect(canvas.avatarController).toMatchObject({
       maxSpeed: 19,
       acceleration: 115,
@@ -131,6 +136,30 @@ describe("basketball arena integration", () => {
       expect.objectContaining({ entityId: "teal-scoreboard" }),
       expect.objectContaining({ entityId: "coral-scoreboard" }),
     ]));
+  });
+
+  it("lets avatars pass beneath basket art while hoop geometry remains item-only", () => {
+    const game = simulation();
+    game.addAvatar({
+      entityId: "avatar:under-hoop",
+      clientId: "under-hoop",
+      userId: "under-hoop",
+      position: { x: 59, y: 21 },
+    });
+
+    game.world.setAvatarInput(
+      "avatar:under-hoop",
+      { x: 1, y: 0 },
+      1,
+      1,
+      true,
+      { x: 67, y: 21 },
+    );
+    game.step();
+
+    expect(game.world.registry.require("avatar:under-hoop").transform.x)
+      .toBeCloseTo(67, 4);
+    game.free();
   });
 
   it("turns direct avatar movement into a bounded basketball kick", () => {
@@ -175,6 +204,8 @@ describe("basketball arena integration", () => {
 
   it("offers direct, no-flick, and continuous-velocity control trials", () => {
     expect(resolveBasketballControlProfile(new URLSearchParams()).name).toBe("direct-flick");
+    expect(resolveBasketballControlProfile(new URLSearchParams()).pointer.flick)
+      .toMatchObject({ minimumSpeedPxPerSecond: 120, fullSpeedPxPerSecond: 700 });
     expect(resolveBasketballControlProfile(new URLSearchParams("flick=0"))).toMatchObject({
       name: "direct-stop",
       pointer: { mode: "avatarDrag", flick: false },

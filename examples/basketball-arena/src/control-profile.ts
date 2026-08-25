@@ -36,8 +36,8 @@ export const resolveBasketballControlProfile = (
       flick: flick
         ? {
             sampleWindowMs: 100,
-            minimumSpeedPxPerSecond: 300,
-            fullSpeedPxPerSecond: 1_300,
+            minimumSpeedPxPerSecond: 120,
+            fullSpeedPxPerSecond: 700,
           }
         : false,
     },

@@ -21,6 +21,8 @@ the reusable game recipe:
 - court size, solid edges, player movement, spawn points, and system items;
 - direct avatar dragging, quick-flick thresholds, canvas-owned slide
   deceleration, fixed visual facing, and bounded contact speed for uncapped drag;
+- radius-aware edge clamping plus full-path collision sliding when the held
+  pointer leaves the court;
 - definition-level mirrored hoop art plus matching backboard and rim collision;
 - circular basket sensors and team-award tags;
 - localized net damping around each hoop;
@@ -54,8 +56,19 @@ turning. `avatarController.directInteractionMaxSpeed` bounds only the contact
 velocity seen by behaviors; it does not cap how far the held avatar follows the
 pointer in a tick.
 
+Basket frame and rim colliders set `blocks: { avatars: false, items: true }`.
+The mirrored ball geometry remains authoritative and symmetric, while players
+can pass beneath the perspective hoop art instead of catching on an invisible
+backboard. Effective direct-drag velocity is also published to presentation,
+so speed-scaled trails work for pointer motion even though exact placement does
+not use the kinematic body's linear velocity.
+
 Three client-side control trials use the same authoritative room physics:
 
 - default: direct pointer placement with release flick;
 - `?flick=0`: direct pointer placement that stops on release;
 - `?control=thumbstick`: continuous velocity control from an empty-court drag.
+
+The active profile is shown above the court. The reference integration uses a
+120 px/s flick threshold so a quick release produces an obvious coast; the stop
+profile has no release impulse at all.
