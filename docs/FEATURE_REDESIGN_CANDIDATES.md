@@ -1,7 +1,7 @@
 # Feature redesign candidates
 
 Internal engineering note, reviewed 2026-08-25 with repository evidence through
-`f67c07b`. This is intentionally
+`f85bfc9`. This is intentionally
 separate from `GAPS.md`: it records features whose history suggests that local
 fixes have accumulated around a missing state model or transaction boundary.
 It is not a promise that every listed feature must be rewritten.
@@ -21,6 +21,33 @@ major pre-1.0 correctness or public-contract risk. Priority 2 can be isolated
 and replaced after 1.0 without changing the core model.
 
 ## Completed redesigns
+
+### Room-session state ownership
+
+**Implemented.** `RoomSession` remains the public room handle and IO effect
+runner, while six internal owners now hold the state that previously crossed
+unrelated callbacks: `ConnectionSession`, `HostRoleSession`,
+`ReplicationTimeline`, `DurableCommandSession`, `ParticipantRoster`, and
+`PresentationGate`. Worker requests and responses are fenced by simulation
+generation. Connection/JOIN work is fenced by connection generation. Host-only
+schedules and graceful checkpoint settlement belong to the current immutable
+host lease. `RoomClient` publishes frozen connection, lease, and durable-
+revision tokens instead of independently writable authority fields.
+
+`RoomSession` fell from 1,932 to 1,038 lines. It owns no domain timer, role or
+lifecycle boolean, prediction/interpolation buffer, participant map, durable
+metadata map, host avatar set, or final-checkpoint callback.
+
+**Verification.** Direct machine tests cover preview timing, replication,
+participant projection, presentation arrival order, rapid host transitions,
+stale worker generations, final checkpoint timeout, initialization races,
+terminal scheduling, and every bounded five-event connection trace. The full
+client gate passes 199 tests, including duplicate-session supersession, all
+packet-loss/reordering cases, migration, graceful sleep, and the 20-client load
+budget. Packed external consumers and all four reference builds pass.
+
+Implemented in `76c1bb8`, `7c8aa9d`, `ec3cc0b`, `6d6fdfb`, `b18bf1d`,
+`cbb9e0b`, and `f85bfc9`.
 
 ### One pointer interaction coordinator
 
@@ -49,11 +76,11 @@ menu-to-private-controls selection through the public runtime.
 Implemented in `93994ed`, `ebd23a2`, `f31b07f`, and `d0331f5`. The public
 consumer contract is `POINTER_INTERACTIONS.md`.
 
-## Priority 0
+## Completed design record
 
-### Split the room-session orchestration state
+### Room-session state decomposition
 
-**Evidence.** `RoomSession` is now responsible for transport lifecycle, JOIN,
+**Original evidence.** `RoomSession` was responsible for transport lifecycle, JOIN,
 host migration, simulation-worker roles, canonical replication, prediction,
 durable item commands, edit preview coalescing, presentation readiness,
 participant projection, effects, traffic metrics, and graceful sleep. Its
@@ -61,21 +88,21 @@ history contains recurring fixes to reconnect/migration, room presentation,
 avatar position restore, and peer reconciliation. At 1,932 lines,
 unrelated transitions still mutate shared booleans, maps, buffers, and timers.
 
-The inventory found one additional race boundary: simulation responses are not
+The inventory found one additional race boundary: simulation responses were not
 tagged with the worker/role generation that produced them. A delayed `ready`,
 `render`, `effects`, or `snapshot` response can therefore arrive after a host
 promotion, demotion, reconnect, or stop and be interpreted as current. The
 `render.isHost` value exists but is not a sufficient fence and is currently not
 used by `RoomSession` when accepting the frame.
 
-**Redesign.** Keep `RoomSession` as the public facade, but move state into
+**Implemented design.** Keep `RoomSession` as the public facade, but move state into
 explicit collaborating machines: `ConnectionSession`, `HostRoleSession`,
 `ReplicationTimeline`, `DurableCommandSession`, and `PresentationGate`.
 Messages should be reduced through typed transitions with invariants, not
 handled as mutations scattered through one switch. Role change and reconnect
 must reset or retain each subsystem through a declared policy.
 
-**Acceptance boundary.** Model-based tests generate JOIN/reconnect/host-grant,
+**Verified boundary.** Deterministic and real-relay tests cross JOIN/reconnect/host-grant,
 late keyframe, checkpoint, background, supersession, and stop transitions. The
 test asserts one host role, monotonic epochs/ticks, bounded prediction history,
 no post-stop sends, and deterministic readiness/error outcomes.
@@ -113,9 +140,9 @@ hold duplicated subsystem state or decide transitions itself.
 | Owner | State it exclusively owns | Inputs | Effects/outputs |
 | --- | --- | --- | --- |
 | `ConnectionSession` | Single-use lifecycle, connection/join generation, page visibility, terminal error, ready waiters, and resource-close state | Public start/stop/visibility, transport status, JOIN initialization result, server error | Connect/close transport, host eligibility/yield requests, lifecycle snapshots, waiter settlement |
-| `HostRoleSession` | Current role, host epoch/generation, migration counters, simulation readiness for that generation, host entity source, host avatar membership, active host publishing/checkpoint schedules, and graceful-final-checkpoint transaction | JOIN initialized, host granted/changed, participant changes, simulation responses, scheduled host sends, graceful stop | Generation-tagged worker role/init/avatar messages, canonical state/effect/checkpoint sends, host diagnostics |
+| `HostRoleSession` | Current immutable lease, host epoch/generation, migration counters, simulation readiness for that generation, host avatar membership, active host publishing/checkpoint schedules, and graceful-final-checkpoint transaction | JOIN initialized, host granted/changed, participant changes, simulation responses, scheduled host sends, graceful stop | Generation-tagged worker role/init/avatar messages, canonical state/effect/checkpoint sends, host diagnostics |
 | `ParticipantRoster` | Stable participant tombstones, ephemeral connections, active/inactive/disconnected state, last canonical avatar positions, and applied projection state | Presence, avatar canonical state, player input state, JOIN snapshot | Frozen presence snapshot and host avatar add/lifecycle intents |
-| `ReplicationTimeline` | Host epoch/tick gate, interpolation buffer, local prediction, acknowledged input sequence, bounded prediction history, reconciliation, canonical/behavior snapshots, and host delta/keyframe baselines | Full state, delta, authoritative host frame, local prediction frame, render time, epoch reset | Draw frame, frozen observer snapshots, encoded changed/removed entities, replication diagnostics |
+| `ReplicationTimeline` | Host entity source, host epoch/tick gate, interpolation buffer, local prediction, acknowledged input sequence, bounded prediction history, reconciliation, canonical/behavior snapshots, and host delta/keyframe baselines | Full state, delta, authoritative host frame, local prediction frame, render time, epoch reset | Draw frame, frozen observer snapshots, encoded changed/removed entities, replication diagnostics |
 | `DurableCommandSession` | Command identity, item metadata, preview coalescing schedule, pending preview, rejection state, and current item count | Public mutation, JOIN metadata, accepted/rejected/preview result, connection generation change | Reliable commands and typed worker item mutations |
 | `PresentationGate` | Readiness facts and sticky public presentation outcome for the current room session | JOIN initialized, simulation generation ready, roster snapshot, canonical entity IDs, terminal failure | Resolve/reject `whenPresented`, internal authoritative-current diagnostics |
 
@@ -124,25 +151,21 @@ facade-level public ports, but the values come from the sole owner above. A
 small internal `SessionClock` port supplies interval/timeout registration so
 each owner can cancel only its own work and pure tests can use virtual time.
 
-`RoomClient` is narrowed during slice 0 so it cannot remain a competing source
+`RoomClient` was narrowed during the redesign so it cannot remain a competing source
 of session truth. It keeps transport ownership, protobuf encode/decode,
 heartbeat IO, traffic counters, and the minimum ingress epoch fence needed to
 drop invalid wire packets. JOIN, host control, and durable acceptance publish
 immutable versioned tokens (`ConnectionIdentity`, `HostLease`, and
 `DurableRevision`) instead of exposing mutable `clientId`, `isHost`,
 `hostEpoch`, or `sceneRevision` fields. The appropriate subsystem retains the
-latest token as its semantic state. Outbound effects carry the token they were
-created under, and `RoomClient` drops an effect whose token is no longer
-current. This preserves defense-in-depth without two independently mutable
-role models.
+latest token as its semantic state. Host-authority effects carry the lease they
+were created under, and `RoomClient` drops one whose lease is no longer current.
+This preserves defense-in-depth without two independently mutable role models.
 
-Subsystems communicate with typed events and effects rather than mutating each
-other. Each reducer has the form
-`reduce(state, event) -> { state, effects }`; only `RoomSession` may execute an
-effect against `RoomClient`, `SimulationDriver`, the clock, or a consumer
-observer. Reducers must not call each other recursively. Follow-up events from
-an executed effect return through the same dispatch queue, which makes ordering
-visible and prevents half-applied transitions.
+Subsystems communicate through typed events, effects, and immutable snapshots
+rather than mutating each other's state. `RoomSession` executes effects against
+`RoomClient` and `SimulationDriver`; each owner alone mutates its semantic
+state. Transition tests observe emitted effects so ordering remains explicit.
 
 #### Generation and epoch rules
 
@@ -186,13 +209,12 @@ whether the current connection generation has a complete authoritative frame.
 A reconnect before first presentation discards the stale generation's facts but
 keeps the original waiter pending for the new generation.
 
-#### Implementation slices
+#### Implementation slices (completed)
 
-Each numbered slice is a separately committed vertical change. It begins with
-the listed failing/characterization tests and ends by deleting the state and
-methods it replaced from `RoomSession`.
+Each numbered slice was committed as a verified vertical change and deleted the
+state and methods it replaced from `RoomSession`.
 
-0. **Characterize the facade and add generation fences.** Build an internal
+0. **Characterize the facade and add generation fences (`76c1bb8`).** Build an internal
    deterministic harness with a fake `RoomClient` port, fake
    `SimulationDriver`, and virtual `SessionClock`. Record normalized public
    traces for first join, reconnect before/after readiness, promotion,
@@ -200,27 +222,25 @@ methods it replaced from `RoomSession`.
    initialization is pending. Add `connectionGeneration` and
    `simulationGeneration` to the internal main-thread/worker contract and tests
    proving delayed old-generation `ready`, `render`, `effects`, `snapshot`, and
-   initialization completions are inert. Replace mutable `RoomClient` authority
-   fields with the immutable versioned tokens described above; do not retain a
-   property-based compatibility surface.
-1. **Extract `DurableCommandSession`.** Move command construction, IDs, item
+   initialization completions are inert.
+1. **Extract `DurableCommandSession` (`7c8aa9d`).** Move command construction, IDs, item
    metadata, preview coalescing, accepted-command translation, rejection, and
    item counts. Test preview timing with virtual time, reconnect cancellation,
    rejection isolation, and accepted results while host/peer. Delete all
    preview timers, command counters, and metadata maps from the facade.
-2. **Extract `ReplicationTimeline`.** Move packet decoding, epoch/tick gates,
+2. **Extract `ReplicationTimeline` (`ec3cc0b`).** Move packet decoding, epoch/tick gates,
    interpolation, prediction history, reconciliation, canonical/behavior
    snapshots, host change detection, and delta/keyframe baselines. Port the
    current direct-drag acknowledgement and one-Hz checkpoint regression tests
    to deterministic time. Delete buffers, reconcilers, prediction maps,
    `lastSent`, and behavior-byte tracking from the facade.
-3. **Extract `ParticipantRoster` and `PresentationGate`.** Move presence
+3. **Extract `ParticipantRoster` and `PresentationGate` (`6d6fdfb`).** Move presence
    tombstones, inactive/disconnected projection, validated avatar positions,
    readiness facts, and waiter outcomes. Cross JOIN/simulation/presence/
    canonical arrival in every order, including missing template items and a
    reconnect on each boundary. Delete participant maps, saved-position maps,
    presentation booleans, and presentation waiters from the facade.
-4. **Extract `HostRoleSession`.** Move promotion/demotion, generation-tagged
+4. **Extract `HostRoleSession` (`b18bf1d`).** Move promotion/demotion, generation-tagged
    worker role changes, avatar synchronization, incoming peer input, host
    delta/keyframe/effect/checkpoint schedules, migration diagnostics, and the
    graceful final checkpoint. Test late old-host frames, rapid
@@ -228,14 +248,16 @@ methods it replaced from `RoomSession`.
    response, and stop during final-checkpoint wait. Delete host flags, host
    entity storage, host timers, avatar sets, and final-checkpoint callbacks
    from the facade.
-5. **Extract `ConnectionSession` and collapse the facade.** Move start,
+5. **Extract `ConnectionSession` and collapse the facade (`cbb9e0b`).** Move start,
    reconnect, JOIN initialization, lifecycle transitions, visibility,
    terminal failure, teardown, and ready waiters. `RoomSession` becomes public
-   API delegation plus one queued event/effect router. Prove public traces from
+   API delegation plus typed effect execution. Prove public traces from
    slice 0 remain identical and that no subsystem can send after terminal
    transition.
-6. **Run the cross-product and real-relay gates.** Exercise the bounded model,
-   then the existing reconnect, migration, packet loss/reordering, late join,
+6. **Narrow room authority and run the release gates (`f85bfc9`).** Replace
+   mutable `RoomClient` authority fields with immutable versioned tokens and no
+   property-based compatibility surface. Exercise the bounded model, then the
+   existing reconnect, migration, packet loss/reordering, late join,
    graceful sleep, linked-room, basketball, and load-budget cases. Pack the
    client and build the external reference consumers. Remove the temporary
    normalized trace fixtures if the invariant/model tests fully supersede
@@ -243,12 +265,11 @@ methods it replaced from `RoomSession`.
 
 #### Verification model
 
-The pure-machine suite uses a bounded event-sequence generator rather than
-wall-clock sleeps. It generates valid and deliberately invalid combinations of
-transport status, JOIN generations, host epochs, worker generations, canonical
-ticks, visibility, preview timers, and stop. A small reference model compares
-the observable lifecycle, role, readiness, sends, and terminal effects after
-every event. A failing case prints its seed and minimal event trace.
+The machine suite uses virtual clocks and a bounded five-event connection
+sequence generator rather than wall-clock sleeps. Focused state-machine tables
+cross host epochs, worker generations, visibility, preview timers, canonical
+arrival orders, and stop. Real-process tests supply the transport ordering and
+multi-client cross-product that pure owners intentionally do not simulate.
 
 Invariants checked after every event:
 
@@ -278,15 +299,18 @@ structural redesign.
 
 #### Completion boundary
 
-The redesign is complete when `RoomSession` owns no domain timer, interpolation
+The redesign is complete because `RoomSession` owns no domain timer, interpolation
 buffer, prediction map, participant map, item metadata, host entity array, or
 role boolean; it delegates the existing public API to the sole owners above.
 Subsystem dependencies are acyclic and IO is executed only by the facade's
 effect runner. All generation/epoch invariants, focused suites, real-relay
-gates, packed artifacts, and reference builds pass. The completed section then
-records the implementation commits, and the Priority 1 transaction/timeline/
-startup candidates are updated to describe only the remaining algorithm or
-public-contract work.
+gates, packed artifacts, and reference builds pass. Priority 1 below now
+describes only remaining algorithm and public-contract work.
+
+## Priority 0
+
+No Priority 0 redesign remains open. New work should not add state back to the
+facade or reintroduce writable room-authority fields.
 
 ## Priority 1
 
@@ -333,19 +357,18 @@ invent timeouts.
 terminal outcome, verify stop aborts pending startup, and ensure progress never
 regresses after reconnect or role changes.
 
-### Replication and prediction timeline extraction
+### Replication and prediction timeline hardening
 
-**Evidence.** Peer rubber-banding recurred around periodic checkpoints and LAN
-delay. The current direct-avatar fix correctly records predictions by input
-sequence and reconciles against the acknowledged sequence (`57c0421`), but the
-history, interpolation buffer, reconciler, tick gate, and canonical publication
-still meet inside `RoomSession`.
+**Evidence.** `ReplicationTimeline` now solely owns history, interpolation,
+reconciliation, tick gates, canonical publication, and host baselines
+(`ec3cc0b`). Peer rubber-banding previously recurred around periodic
+checkpoints and LAN delay, so extraction alone does not prove every useful
+latency/jitter/rate combination.
 
-**Redesign.** Extract a `ReplicationTimeline` that accepts canonical packets,
-local input/prediction samples, host epochs, and render time. It owns delta
-repair, interpolation/extrapolation, sequence acknowledgement, bounded history,
-teleport/reset rules, and diagnostic samples. Rendering asks it for a frame;
-session orchestration does not apply presentation correction itself.
+**Redesign.** Expand the deterministic timeline matrix, then tune delta repair,
+interpolation/extrapolation, teleport/reset thresholds, and reconciliation only
+when a failing trace demonstrates a user-visible discontinuity. Session
+orchestration must remain outside those algorithms.
 
 **Acceptance boundary.** A deterministic virtual-time matrix varies state Hz,
 checkpoint Hz, input Hz, latency, jitter, reordering, loss, host migration, and
@@ -404,10 +427,8 @@ an existing authority path.
 
 ## Recommended order
 
-1. Decompose `RoomSession` behind its current public facade before expanding
-   networking or travel responsibilities.
-2. Add acknowledged item mutations and the replication timeline while doing
-   that decomposition; both become natural subsystem boundaries.
+1. Add acknowledged item mutations on top of `DurableCommandSession`.
+2. Expand replication/prediction fault coverage on `ReplicationTimeline`.
 3. Publish startup progress before asking external consumers to build polished
    loading/error UI.
 4. Treat overlay layout and transient item actions as isolated follow-ups.
