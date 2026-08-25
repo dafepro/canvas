@@ -825,6 +825,44 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("follows an out-of-bounds direct pointer along the nearest canvas edge", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:edge-follow",
+      clientId: "edge-follow",
+      userId: "edge-follow",
+      position: { x: 50, y: 35 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:edge-follow",
+      { x: 1, y: -1 },
+      1,
+      1,
+      true,
+      { x: 200, y: 18 },
+    );
+    simulation.step();
+    const first = { ...simulation.world.registry.require("avatar:edge-follow").transform };
+
+    simulation.world.setAvatarInput(
+      "avatar:edge-follow",
+      { x: 1, y: 1 },
+      1,
+      2,
+      true,
+      { x: 200, y: 52 },
+    );
+    simulation.step();
+    const second = simulation.world.registry.require("avatar:edge-follow").transform;
+
+    expect(first.x).toBeGreaterThan(98);
+    expect(first.y).toBeCloseTo(18, 3);
+    expect(second.x).toBeCloseTo(first.x, 3);
+    expect(second.y).toBeCloseTo(52, 3);
+    simulation.free();
+  });
+
   it("still blocks an uncapped direct drag at solid geometry", () => {
     const simulation = build();
     simulation.addAvatar({

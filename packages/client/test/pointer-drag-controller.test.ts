@@ -51,6 +51,13 @@ class PointerSurface {
   }
 }
 
+class WindowTrackedPointerSurface extends PointerSurface {
+  readonly windowTarget = new PointerSurface();
+  readonly ownerDocument = {
+    defaultView: this.windowTarget as unknown as Window,
+  };
+}
+
 describe("PointerDragController", () => {
   it("keeps thumbstick drag as the default input mode", () => {
     const surface = new PointerSurface();
@@ -172,6 +179,33 @@ describe("PointerDragController", () => {
     expect(controller.intent).toMatchObject({ held: true, target: { x: 80, y: 40 } });
 
     surface.emit("pointerup", 80, 40, 7, 100, 0);
+    expect(controller.intent.held).toBe(false);
+    controller.destroy();
+  });
+
+  it("tracks an active avatar drag through the owning window outside the canvas", () => {
+    const surface = new WindowTrackedPointerSurface();
+    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+      mode: "avatarDrag",
+      avatarPosition: () => ({ x: 50, y: 40 }),
+      grabRadiusPx: 24,
+      deadZonePx: 2,
+      fullRangePx: 20,
+    });
+
+    surface.emit("pointerdown", 50, 40);
+    surface.windowTarget.emit("pointermove", -30, 75);
+    expect(controller.intent).toMatchObject({
+      held: true,
+      target: { x: -30, y: 75 },
+    });
+
+    surface.windowTarget.emit("pointermove", 90, -25);
+    expect(controller.intent).toMatchObject({
+      held: true,
+      target: { x: 90, y: -25 },
+    });
+    surface.windowTarget.emit("pointerup", 90, -25, 7, 100, 0);
     expect(controller.intent.held).toBe(false);
     controller.destroy();
   });

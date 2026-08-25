@@ -203,15 +203,19 @@ export class PointerDragController {
       this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
     };
 
+    // Pointer capture is useful but not sufficient on every mobile/browser
+    // combination. Track active moves on the owning window so leaving the
+    // canvas still updates the nearest reachable world-edge target.
+    const dragTarget: EventTarget = this.element.ownerDocument?.defaultView ?? this.element;
     this.element.addEventListener("pointerdown", onDown);
-    this.element.addEventListener("pointermove", onMove);
-    this.element.addEventListener("pointerup", onUp);
-    this.element.addEventListener("pointercancel", onCancel);
+    dragTarget.addEventListener("pointermove", onMove as EventListener);
+    dragTarget.addEventListener("pointerup", onUp as EventListener);
+    dragTarget.addEventListener("pointercancel", onCancel as EventListener);
     this.detach = () => {
       this.element.removeEventListener("pointerdown", onDown);
-      this.element.removeEventListener("pointermove", onMove);
-      this.element.removeEventListener("pointerup", onUp);
-      this.element.removeEventListener("pointercancel", onCancel);
+      dragTarget.removeEventListener("pointermove", onMove as EventListener);
+      dragTarget.removeEventListener("pointerup", onUp as EventListener);
+      dragTarget.removeEventListener("pointercancel", onCancel as EventListener);
     };
   }
 
