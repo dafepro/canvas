@@ -58,6 +58,7 @@ export class SimulationKernel {
   private isHost = false;
   private initialized = false;
   private initializationGeneration = 0;
+  private generation = 0;
   private hostSnapshot?: Extract<SimulationRequest, { type: "setHost" }>;
   private localAvatarId?: string;
   private running = false;
@@ -76,6 +77,7 @@ export class SimulationKernel {
     } catch (error) {
       this.post({
         type: "error",
+        generation: this.generation,
         message: error instanceof Error ? error.message : String(error),
       });
     }
@@ -84,6 +86,8 @@ export class SimulationKernel {
   private dispatch(request: SimulationRequest): void {
     switch (request.type) {
       case "init": {
+        if (request.generation <= this.generation) return;
+        this.generation = request.generation;
         const generation = ++this.initializationGeneration;
         this.initialized = false;
         this.canvas = request.canvas;
@@ -93,6 +97,7 @@ export class SimulationKernel {
         this.hostSnapshot = request.isHost
           ? {
               type: "setHost",
+              generation: request.generation,
               isHost: true,
               snapshot: request.snapshot,
               wakeFromSleep: request.wakeFromSleep,
@@ -103,22 +108,27 @@ export class SimulationKernel {
           this.initialized = true;
           this.rebuild(this.isHost
             ? this.hostSnapshot
-            : { type: "setHost", isHost: false });
+            : { type: "setHost", generation: this.generation, isHost: false });
           if (request.localAvatar) {
             this.localAvatarId = request.localAvatar.entityId;
             this.simulation?.addAvatar(request.localAvatar);
           }
           this.running = true;
-          this.post({ type: "ready" });
+          this.post({ type: "ready", generation: this.generation });
           this.drive();
         });
         break;
       }
 
       case "setHost": {
+        if (request.generation <= this.generation) return;
+        this.generation = request.generation;
         this.isHost = request.isHost;
         this.hostSnapshot = request.isHost ? request : undefined;
-        if (this.initialized) this.rebuild(request);
+        if (this.initialized) {
+          this.rebuild(request);
+          this.post({ type: "ready", generation: this.generation });
+        }
         break;
       }
 
@@ -201,6 +211,7 @@ export class SimulationKernel {
         break;
 
       case "requestSnapshot": {
+        if (request.generation !== this.generation) break;
         if (!this.simulation) break;
         const metadata = {
           sceneRevision: request.sceneRevision,
@@ -209,7 +220,12 @@ export class SimulationKernel {
         const snapshot = request.final
           ? this.simulation.normalizeForSleep(metadata)
           : this.simulation.snapshot(false, metadata);
-        this.post({ type: "snapshot", snapshot, final: request.final });
+        this.post({
+          type: "snapshot",
+          generation: this.generation,
+          snapshot,
+          final: request.final,
+        });
         break;
       }
 
@@ -260,7 +276,12 @@ export class SimulationKernel {
     const result = this.simulation.step();
     this.lastStats.behaviorErrors = result.behaviorErrors;
     if (result.effects.length > 0) {
-      this.post({ type: "effects", tick: result.tick, effects: result.effects });
+      this.post({
+        type: "effects",
+        generation: this.generation,
+        tick: result.tick,
+        effects: result.effects,
+      });
     }
   }
 
@@ -291,6 +312,7 @@ export class SimulationKernel {
       }
       this.post({
         type: "render",
+        generation: this.generation,
         tick: this.simulation.tick,
         isHost: this.isHost,
         entities,

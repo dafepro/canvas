@@ -13,6 +13,8 @@ import type { AvatarSpawn } from "./rapier-world.js";
 export type SimulationRequest =
   | {
       type: "init";
+      /** Fences async work and responses to one main-thread role generation. */
+      generation: number;
       canvas: CanvasDefinition;
       definitions: ItemDefinition[];
       tickRate: number;
@@ -24,6 +26,7 @@ export type SimulationRequest =
     }
   | {
       type: "setHost";
+      generation: number;
       isHost: boolean;
       snapshot?: CanvasSnapshot;
       wakeFromSleep?: boolean;
@@ -57,6 +60,7 @@ export type SimulationRequest =
   | { type: "setItemCollisions"; entityId: string; enabled: boolean }
   | {
       type: "requestSnapshot";
+      generation: number;
       final: boolean;
       sceneRevision: number;
       hostEpoch: number;
@@ -110,14 +114,20 @@ export interface SimulationStats {
 
 /** Messages the simulation worker sends back to the main thread. */
 export type SimulationResponse =
-  | { type: "ready" }
+  | { type: "ready"; generation: number }
   | {
       type: "render";
+      generation: number;
       tick: number;
       isHost: boolean;
       entities: RenderEntity[];
       stats: SimulationStats;
     }
-  | { type: "effects"; tick: number; effects: EffectEmission[] }
-  | { type: "snapshot"; snapshot: CanvasSnapshot; final: boolean }
-  | { type: "error"; message: string };
+  | { type: "effects"; generation: number; tick: number; effects: EffectEmission[] }
+  | {
+      type: "snapshot";
+      generation: number;
+      snapshot: CanvasSnapshot;
+      final: boolean;
+    }
+  | { type: "error"; generation: number; message: string };

@@ -95,6 +95,7 @@ describe("custom simulation worker runtime", () => {
       },
       init: {
         type: "init",
+        generation: 1,
         canvas: rocketCanvas,
         definitions: [counterDefinition],
         tickRate: 60,
@@ -128,6 +129,7 @@ describe("custom simulation worker runtime", () => {
       }),
       init: {
         type: "init",
+        generation: 1,
         canvas: rocketCanvas,
         definitions: [],
         tickRate: 60,

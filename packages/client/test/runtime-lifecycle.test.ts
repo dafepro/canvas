@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { emptySnapshot } from "@canvas-physics/core";
-import { toJsonBytes, type RoomEnvelope } from "@canvas-physics/protocol";
+import {
+  HostControlKind,
+  toJsonBytes,
+  type RoomEnvelope,
+} from "@canvas-physics/protocol";
 import {
   CanvasConsumerError,
   RoomSession,
@@ -218,6 +222,121 @@ describe("RoomSession lifecycle", () => {
     expect(session.lifecycleState).toBe("joining");
     transport.deliver(accepted("second"));
     await vi.waitFor(() => expect(session.lifecycleState).toBe("active"));
+    session.stop();
+  });
+
+  it("does not reveal a reconnect while the one-time room initialization is pending", async () => {
+    let finishInitialization!: () => void;
+    const initialization = new Promise<void>((resolve) => {
+      finishInitialization = resolve;
+    });
+    const transport = new LifecycleTransport();
+    const { session, send } = build(transport, {
+      onJoined: () => initialization,
+    });
+
+    await session.start();
+    const ready = session.whenReady();
+    transport.deliver(accepted("first"));
+    transport.setStatus("reconnecting", "socket replaced during initialization");
+    transport.setStatus("open");
+    transport.deliver(accepted("second"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(session.lifecycleState).toBe("joining");
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "init" }));
+
+    finishInitialization();
+    await ready;
+    expect(session.lifecycleState).toBe("active");
+    expect(
+      send.mock.calls
+        .map(([message]) => message)
+        .filter((message) => message.type === "init"),
+    ).toHaveLength(1);
+    session.stop();
+  });
+
+  it("ignores simulation responses from an obsolete role generation", async () => {
+    const transport = new LifecycleTransport();
+    let postFromSimulation:
+      | ((message: Parameters<Parameters<SimulationDriver["onMessage"]>[0]>[0]) => void)
+      | undefined;
+    const requests: unknown[] = [];
+    const driver = new SimulationDriver((post) => {
+      postFromSimulation = post;
+      return {
+        send: (request) => requests.push(request),
+        terminate: () => {},
+      };
+    });
+    const session = new RoomSession({
+      roomId: "team-lounge",
+      serverUrl: "http://rooms.test",
+      definitions: rocketCanvasDefinitions,
+      transport,
+      driver,
+    });
+
+    await session.start();
+    transport.deliver(accepted("peer"));
+    await session.whenReady();
+    const initialGeneration = (requests.find(
+      (request) => (request as { type?: string }).type === "init",
+    ) as { generation?: number } | undefined)?.generation;
+    expect(initialGeneration).toBeTypeOf("number");
+
+    transport.deliver({
+      roomId: "team-lounge",
+      hostEpoch: 2,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      hostControl: {
+        kind: HostControlKind.HOST_CONTROL_GRANTED,
+        hostClientId: "peer",
+        hostEpoch: 2,
+        snapshotJson: toJsonBytes(emptySnapshot(rocketCanvas.id, rocketCanvas.version)),
+        reason: "host_timeout",
+        eligible: true,
+        leaseExpiresAtUnixMs: 0,
+      },
+    });
+    const promotedGeneration = (requests.findLast(
+      (request) => (request as { type?: string }).type === "setHost",
+    ) as { generation?: number } | undefined)?.generation;
+    expect(promotedGeneration).toBeTypeOf("number");
+    expect(promotedGeneration).not.toBe(initialGeneration);
+
+    const stats = {
+      hz: 60,
+      driftMs: 0,
+      worstStepMs: 0,
+      awakeBodies: 0,
+      behaviorErrors: 0,
+      activeColliders: 0,
+    };
+    postFromSimulation?.({
+      type: "render",
+      generation: initialGeneration,
+      tick: 999,
+      isHost: false,
+      entities: [],
+      stats,
+    } as Parameters<NonNullable<typeof postFromSimulation>>[0]);
+    expect(session.tick).toBe(0);
+
+    postFromSimulation?.({
+      type: "render",
+      generation: promotedGeneration,
+      tick: 12,
+      isHost: true,
+      entities: [],
+      stats,
+    } as Parameters<NonNullable<typeof postFromSimulation>>[0]);
+    expect(session.tick).toBe(12);
+    expect(session.diagnostics().staleSimulationResponses).toBe(1);
     session.stop();
   });
 

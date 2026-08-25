@@ -147,6 +147,7 @@ export const runSimulationWorkerConformance = async (
       const fromIndex = responses.length;
       channel.postMessage({
         type: "requestSnapshot",
+        generation: fixture.init.generation,
         final: false,
         sceneRevision: 73,
         hostEpoch: 11,

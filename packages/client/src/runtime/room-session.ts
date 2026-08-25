@@ -149,6 +149,13 @@ export interface BehaviorStateSnapshot {
 
 type Observer<T> = (value: T) => void;
 
+interface PendingJoin {
+  generation: number;
+  canvas: CanvasDefinition;
+  snapshot: CanvasSnapshot;
+  wasSleeping: boolean;
+}
+
 export interface SessionDiagnostics {
   status: string;
   isHost: boolean;
@@ -183,6 +190,8 @@ export interface SessionDiagnostics {
   hostMigrations: number;
   lastMigrationReason?: string;
   quarantined: number;
+  /** Worker messages ignored because they belong to an obsolete role generation. */
+  staleSimulationResponses: number;
 }
 
 /**
@@ -210,6 +219,13 @@ export class RoomSession {
   private acknowledgedInputSequence = 0;
   private currentTick = 0;
   private simulationReady = false;
+  private simulationGeneration = 0;
+  private staleSimulationResponses = 0;
+  private connectionGeneration = 0;
+  private pendingJoin?: PendingJoin;
+  private consumerInitialization?: Promise<void>;
+  private consumerInitialized = false;
+  private initializedCanvas?: Readonly<{ id: string; version: number }>;
   private latestPeers?: Peer[];
   private readonly participantsById = new Map<string, ParticipantPresence>();
   private latestPresenceSnapshot?: PresenceSnapshot;
@@ -473,6 +489,7 @@ export class RoomSession {
     });
     this.driver.send({
       type: "requestSnapshot",
+      generation: this.simulationGeneration,
       final: true,
       sceneRevision: this.client.sceneRevision,
       hostEpoch: this.client.hostEpoch,
@@ -568,9 +585,7 @@ export class RoomSession {
 
   private wireClient(): void {
     this.client.on("joined", (result) => {
-      this.rememberItemMetadata(result.snapshot);
-      this.rememberSnapshotAvatarPositions(result.snapshot);
-      void this.acceptJoin(result.canvas, result.snapshot, result.roomWasSleeping);
+      this.queueJoin(result.canvas, result.snapshot, result.roomWasSleeping);
     });
 
     this.client.on("status", (status, detail) => {
@@ -581,9 +596,12 @@ export class RoomSession {
           if (this.lifecycle === "idle") this.transition("starting", detail);
           break;
         case "open":
+          this.connectionGeneration++;
           this.transition("joining", detail);
           break;
         case "reconnecting":
+          this.connectionGeneration++;
+          this.pendingJoin = undefined;
           this.transition("reconnecting", detail);
           break;
         case "failed":
@@ -614,12 +632,15 @@ export class RoomSession {
       this.reconciler.reset();
       this.resetPredictionHistory();
       this.lastReconciledTick = undefined;
+      this.simulationReady = false;
+      const generation = ++this.simulationGeneration;
       // A migration checkpoint may trail the latest replicated state by up to
       // one checkpoint interval. Keep positions already observed from the old
       // host and use snapshot positions only as a cold-start fallback.
       if (snapshot) this.rememberSnapshotAvatarPositions(snapshot, true);
       this.driver.send({
         type: "setHost",
+        generation,
         isHost: true,
         snapshot,
         wakeFromSleep: false,
@@ -642,7 +663,9 @@ export class RoomSession {
       this.resetPredictionHistory();
       this.lastReconciledTick = undefined;
       if (hostClientId !== this.client.clientId) {
-        this.driver.send({ type: "setHost", isHost: false });
+        this.simulationReady = false;
+        const generation = ++this.simulationGeneration;
+        this.driver.send({ type: "setHost", generation, isHost: false });
         this.hostAvatarIds.clear();
         this.appliedParticipantStatus.clear();
         this.spawnLocalAvatar();
@@ -890,15 +913,77 @@ export class RoomSession {
     return { x: 10, y: 10 };
   }
 
-  private async acceptJoin(
+  private queueJoin(
     canvas: CanvasDefinition,
     snapshot: CanvasSnapshot,
     wasSleeping: boolean,
-  ): Promise<void> {
+  ): void {
     if (this.isTerminalOrStopping()) return;
+    const join: PendingJoin = {
+      generation: this.connectionGeneration,
+      canvas,
+      snapshot,
+      wasSleeping,
+    };
+    this.pendingJoin = join;
+    if (this.consumerInitialized) {
+      this.completeJoin(join);
+      return;
+    }
+    if (this.consumerInitialization) return;
+    this.consumerInitialization = this.initializeConsumer(join);
+  }
+
+  private async initializeConsumer(firstJoin: PendingJoin): Promise<void> {
     try {
-      await this.onJoined(canvas, snapshot, wasSleeping);
+      this.validateJoinCanvas(firstJoin.canvas);
+      await this.options.onJoined?.(
+        firstJoin.canvas,
+        firstJoin.snapshot,
+        firstJoin.wasSleeping,
+      );
       if (this.isTerminalOrStopping()) return;
+      this.consumerInitialized = true;
+      this.initializedCanvas = Object.freeze({
+        id: firstJoin.canvas.id,
+        version: firstJoin.canvas.version,
+      });
+      const pending = this.pendingJoin;
+      if (pending) this.completeJoin(pending);
+    } catch (cause) {
+      if (this.isTerminalOrStopping()) return;
+      this.fail(lifecycleError(
+        "join_initialization_failed",
+        cause instanceof Error ? cause.message : "Room initialization failed",
+        { source: "initialization", cause },
+      ));
+    }
+  }
+
+  private completeJoin(join: PendingJoin): void {
+    if (
+      this.isTerminalOrStopping() ||
+      join !== this.pendingJoin ||
+      join.generation !== this.connectionGeneration
+    ) {
+      return;
+    }
+    try {
+      this.validateJoinCanvas(join.canvas);
+      const initialized = this.initializedCanvas;
+      if (
+        initialized &&
+        (initialized.id !== join.canvas.id || initialized.version !== join.canvas.version)
+      ) {
+        throw new Error(
+          `rejoined canvas '${join.canvas.id}' v${join.canvas.version} after initializing ` +
+          `'${initialized.id}' v${initialized.version}`,
+        );
+      }
+      this.rememberItemMetadata(join.snapshot);
+      this.rememberSnapshotAvatarPositions(join.snapshot);
+      this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
+      this.pendingJoin = undefined;
       this.transition(this.pageVisible ? "active" : "backgrounded");
     } catch (cause) {
       this.fail(lifecycleError(
@@ -909,11 +994,22 @@ export class RoomSession {
     }
   }
 
-  private async onJoined(
+  private validateJoinCanvas(canvas: CanvasDefinition): void {
+    if (
+      this.options.spawnPointId &&
+      !canvas.spawnPoints.some((candidate) => candidate.id === this.options.spawnPointId)
+    ) {
+      throw new Error(
+        `canvas '${canvas.id}' has no spawn point '${this.options.spawnPointId}'`,
+      );
+    }
+  }
+
+  private installJoin(
     canvas: CanvasDefinition,
     snapshot: CanvasSnapshot,
     wasSleeping: boolean,
-  ): Promise<void> {
+  ): void {
     const nextAvatarId = avatarEntityId(this.client.userId);
     if (this.canvasDefinition) {
       if (this.localAvatarId !== nextAvatarId) {
@@ -925,22 +1021,13 @@ export class RoomSession {
       }
       return;
     }
-    if (
-      this.options.spawnPointId &&
-      !canvas.spawnPoints.some((candidate) => candidate.id === this.options.spawnPointId)
-    ) {
-      throw new Error(
-        `canvas '${canvas.id}' has no spawn point '${this.options.spawnPointId}'`,
-      );
-    }
     this.canvasDefinition = canvas;
     this.localAvatarId = nextAvatarId;
     this.itemCount = snapshot.items.length;
 
-    await this.options.onJoined?.(canvas, snapshot, wasSleeping);
-
     this.driver.send({
       type: "init",
+      generation: ++this.simulationGeneration,
       canvas,
       definitions: this.options.definitions,
       tickRate: this.client.tickRate,
@@ -1211,6 +1298,7 @@ export class RoomSession {
     if (!this.client.isHost) return;
     this.driver.send({
       type: "requestSnapshot",
+      generation: this.simulationGeneration,
       final: false,
       sceneRevision: this.client.sceneRevision,
       hostEpoch: this.client.hostEpoch,
@@ -1322,6 +1410,10 @@ export class RoomSession {
   // ---------- simulation messages ----------
 
   private onSimulation(message: SimulationResponse): void {
+    if (message.generation !== this.simulationGeneration || this.terminated) {
+      this.staleSimulationResponses++;
+      return;
+    }
     switch (message.type) {
       case "ready":
         this.simulationReady = true;
@@ -1742,6 +1834,7 @@ export class RoomSession {
       hostMigrations: this.hostMigrations,
       lastMigrationReason: this.lastMigrationReason,
       quarantined: this.quarantinedCount,
+      staleSimulationResponses: this.staleSimulationResponses,
     };
   }
 

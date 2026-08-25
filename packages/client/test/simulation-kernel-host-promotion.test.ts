@@ -14,6 +14,28 @@ beforeAll(async () => {
 }, 30_000);
 
 describe("SimulationKernel host promotion", () => {
+  it("acknowledges readiness for every rebuilt role generation", async () => {
+    const messages: SimulationResponse[] = [];
+    const kernel = new SimulationKernel((message) => messages.push(message));
+    kernel.handle({
+      type: "init",
+      generation: 1,
+      canvas: rocketCanvas,
+      definitions: rocketCanvasDefinitions,
+      tickRate: 60,
+      isHost: false,
+    });
+    await expect.poll(
+      () => messages.some((message) => message.type === "ready" && message.generation === 1),
+    ).toBe(true);
+
+    kernel.handle({ type: "setHost", generation: 2, isHost: true });
+    await expect.poll(
+      () => messages.some((message) => message.type === "ready" && message.generation === 2),
+    ).toBe(true);
+    kernel.stop();
+  });
+
   it("keeps the granted snapshot when promotion races asynchronous initialization", async () => {
     const messages: SimulationResponse[] = [];
     const kernel = new SimulationKernel((message) => messages.push(message));
@@ -40,16 +62,26 @@ describe("SimulationKernel host promotion", () => {
 
     kernel.handle({
       type: "init",
+      generation: 1,
       canvas: rocketCanvas,
       definitions: rocketCanvasDefinitions,
       tickRate: 60,
       isHost: false,
     });
-    kernel.handle({ type: "setHost", isHost: true, snapshot, wakeFromSleep: false });
+    kernel.handle({
+      type: "setHost",
+      generation: 2,
+      isHost: true,
+      snapshot,
+      wakeFromSleep: false,
+    });
 
     await expect.poll(() => messages.some((message) => message.type === "ready")).toBe(true);
+    expect(messages.find((message) => message.type === "ready")?.generation).toBe(2);
+    kernel.handle({ type: "setHost", generation: 1, isHost: false });
     kernel.handle({
       type: "requestSnapshot",
+      generation: 2,
       final: false,
       sceneRevision: 1,
       hostEpoch: 8,
@@ -60,6 +92,7 @@ describe("SimulationKernel host promotion", () => {
       (message): message is Extract<SimulationResponse, { type: "snapshot" }> =>
         message.type === "snapshot",
     )!.snapshot;
+    expect(messages.findLast((message) => message.type === "snapshot")?.generation).toBe(2);
     expect(result.checkpointRevision).toBe(42);
     expect(result.items.map((item) => item.entityId)).toEqual(["durable-crate"]);
     kernel.stop();

@@ -265,7 +265,7 @@ describe("RoomClient reconnect handshake", () => {
       senderClientId: "",
       presence: { peers: [peer("c-host", "alice", true), peer("c-peer", "bob", false)] },
     });
-    postFromSimulation?.({ type: "ready" });
+    postFromSimulation?.({ type: "ready", generation: 1 });
 
     expect(
       requests
@@ -326,6 +326,7 @@ describe("RoomClient reconnect handshake", () => {
           if (request.type !== "requestSnapshot" || !request.final) return;
           post({
             type: "snapshot",
+            generation: request.generation,
             final: true,
             snapshot: {
               ...snapshot,
@@ -387,7 +388,7 @@ describe("RoomClient reconnect handshake", () => {
       },
     });
     // The real worker reports readiness after it has rebuilt the host world.
-    postFromSimulation?.({ type: "ready" });
+    postFromSimulation?.({ type: "ready", generation: 1 });
 
     await session.stopGracefully(1_000);
 
