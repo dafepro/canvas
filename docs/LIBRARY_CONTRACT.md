@@ -117,7 +117,11 @@ Consumers whose art has a fixed upright perspective set
 directional facing. During direct dragging,
 `avatarController.directInteractionMaxSpeed` caps only the velocity exposed to
 contact behaviors. Absolute pointer placement remains uncapped, preventing a
-large pointer jump from becoming an unbounded authored kick or hit.
+large pointer jump from becoming an unbounded authored kick or hit. Direct
+targets are inset by the avatar radius, including on canvases with open edges.
+Long direct moves use iterative shape casts: they cannot tunnel through
+avatar-blocking terrain, and any remaining displacement slides along the hit
+surface instead of pinning the avatar at the first point of contact.
 
 Consumer visuals may opt into `visual.mirrorX` or `visual.mirrorY`. Reflection
 is presentation-only: world dimensions, anchors, transforms, and colliders do

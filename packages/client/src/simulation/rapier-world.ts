@@ -72,6 +72,10 @@ interface BodyRecord {
 
 /** Spec 20. Half a second at 60 Hz before a still, embedded body is freed. */
 const STUCK_TICKS = 30;
+const clampBodyCentre = (value: number, size: number, radius: number): number => {
+  const inset = Math.min(radius, size / 2);
+  return Math.max(inset, Math.min(size - inset, value));
+};
 /** Below this speed a body is treated as not moving. */
 const STUCK_SPEED = 0.2;
 
@@ -435,6 +439,14 @@ export class RapierWorld implements BehaviorHost {
         desiredIntensity: 0,
       },
       render: { definitionId: "avatar", zIndex: 10, size: { width: radius * 2, height: radius * 2 } },
+      rigidBody: {
+        mode: "kinematicVelocity",
+        velocity: { x: 0, y: 0 },
+        angularVelocity: 0,
+        gravityScale: 0,
+        mass: 1,
+        awake: true,
+      },
       tags: new Set(["avatar"]),
     };
     this.registry.add(entity);
@@ -596,8 +608,8 @@ export class RapierWorld implements BehaviorHost {
       entity.avatar.desiredIntensity = Math.max(0, Math.min(1, intensity));
       entity.avatar.desiredPosition = target && Number.isFinite(target.x) && Number.isFinite(target.y)
         ? {
-            x: Math.max(0, Math.min(this.canvas.size.width, target.x)),
-            y: Math.max(0, Math.min(this.canvas.size.height, target.y)),
+            x: clampBodyCentre(target.x, this.canvas.size.width, entity.avatar.radius),
+            y: clampBodyCentre(target.y, this.canvas.size.height, entity.avatar.radius),
           }
         : undefined;
       if (nextInput && entity.avatar.desiredPosition) {
@@ -797,27 +809,58 @@ export class RapierWorld implements BehaviorHost {
   private sweepDirectAvatarMovement(record: BodyRecord, movement: Vec2): Vec2 {
     const collider = record.colliders.get("body");
     if (!collider || (movement.x === 0 && movement.y === 0)) return movement;
-    let fraction = 1;
-    for (const candidate of this.bodies.values()) {
-      if (candidate === record || !candidate.body.isFixed()) continue;
-      for (const obstacle of candidate.colliders.values()) {
-        if (!obstacle.isEnabled() || obstacle.isSensor()) continue;
-        if (!this.collisionGroupsMatch(collider.collisionGroups(), obstacle.collisionGroups())) {
-          continue;
+    const moved = { x: 0, y: 0 };
+    let remaining = { ...movement };
+
+    for (let iteration = 0; iteration < 3; iteration++) {
+      if (Math.hypot(remaining.x, remaining.y) < 0.0001) break;
+      let hit: { time_of_impact: number; normal1: Vec2 } | null = null;
+      for (const candidate of this.bodies.values()) {
+        if (candidate === record || !candidate.body.isFixed()) continue;
+        for (const obstacle of candidate.colliders.values()) {
+          if (!obstacle.isEnabled() || obstacle.isSensor()) continue;
+          if (!this.collisionGroupsMatch(collider.collisionGroups(), obstacle.collisionGroups())) {
+            continue;
+          }
+          const obstaclePosition = obstacle.translation();
+          const candidateHit = collider.castShape(
+            remaining,
+            obstacle.shape,
+            {
+              x: obstaclePosition.x - moved.x,
+              y: obstaclePosition.y - moved.y,
+            },
+            obstacle.rotation(),
+            { x: 0, y: 0 },
+            0.02,
+            1,
+            true,
+          );
+          if (candidateHit && (!hit || candidateHit.time_of_impact < hit.time_of_impact)) {
+            hit = candidateHit;
+          }
         }
-        const hit = collider.castCollider(
-          movement,
-          obstacle,
-          { x: 0, y: 0 },
-          0.02,
-          1,
-          true,
-        );
-        if (hit) fraction = Math.min(fraction, hit.time_of_impact);
       }
+      if (!hit) {
+        moved.x += remaining.x;
+        moved.y += remaining.y;
+        break;
+      }
+
+      const fraction = Math.max(0, Math.min(1, hit.time_of_impact));
+      moved.x += remaining.x * fraction;
+      moved.y += remaining.y * fraction;
+      const leftover = {
+        x: remaining.x * (1 - fraction),
+        y: remaining.y * (1 - fraction),
+      };
+      const normalAmount = leftover.x * hit.normal1.x + leftover.y * hit.normal1.y;
+      remaining = {
+        x: leftover.x - hit.normal1.x * normalAmount,
+        y: leftover.y - hit.normal1.y * normalAmount,
+      };
     }
-    fraction = Math.max(0, Math.min(1, fraction));
-    return { x: movement.x * fraction, y: movement.y * fraction };
+    return moved;
   }
 
   private collisionGroupsMatch(first: number, second: number): boolean {
@@ -865,7 +908,7 @@ export class RapierWorld implements BehaviorHost {
       entity.transform.y = position.y;
       entity.transform.rotation = record.body.rotation();
       if (entity.rigidBody) {
-        const velocity = record.body.linvel();
+        const velocity = entity.avatar?.interactionVelocity ?? record.body.linvel();
         entity.rigidBody.velocity.x = velocity.x;
         entity.rigidBody.velocity.y = velocity.y;
         entity.rigidBody.angularVelocity = record.body.angvel();

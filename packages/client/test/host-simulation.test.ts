@@ -724,6 +724,68 @@ describe("HostSimulation with real physics", () => {
     simulation.step();
 
     expect(simulation.world.velocity("avatar:cadence")!.x).toBeCloseTo(15, 5);
+    expect(simulation.world.registry.require("avatar:cadence").rigidBody?.velocity.x)
+      .toBeCloseTo(15, 5);
+    simulation.free();
+  });
+
+  it("keeps direct targets inside the avatar radius and slides along solid edges", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:edge-slide",
+      clientId: "edge-slide",
+      userId: "edge-slide",
+      position: { x: 50, y: 55 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:edge-slide",
+      { x: 1, y: 1 },
+      1,
+      1,
+      true,
+      { x: 75, y: 100 },
+    );
+    simulation.step();
+
+    const avatar = simulation.world.registry.require("avatar:edge-slide");
+    expect(avatar.transform.x).toBeCloseTo(75, 3);
+    expect(avatar.transform.y).toBeGreaterThan(60);
+    expect(avatar.transform.y).toBeLessThan(66);
+    simulation.free();
+  });
+
+  it("clamps direct targets to the avatar body inside an open canvas", () => {
+    const simulation = new HostSimulation(
+      {
+        ...rocketCanvas,
+        edges: { top: "open", right: "open", bottom: "open", left: "open" },
+        staticGeometry: [],
+      },
+      rocketCanvasDefinitions,
+      registry(),
+      60,
+    );
+    simulation.addAvatar({
+      entityId: "avatar:inset",
+      clientId: "inset",
+      userId: "inset",
+      position: { x: 50, y: 35 },
+      radius: 2,
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:inset",
+      { x: -1, y: 1 },
+      1,
+      1,
+      true,
+      { x: -100, y: 100 },
+    );
+    simulation.step();
+
+    expect(simulation.world.registry.require("avatar:inset").transform)
+      .toMatchObject({ x: 2, y: 68 });
     simulation.free();
   });
 
