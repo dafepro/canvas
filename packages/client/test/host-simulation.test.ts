@@ -789,6 +789,42 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("releases an edge contact when direct control moves back inward", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:return-inward",
+      clientId: "return-inward",
+      userId: "return-inward",
+      position: { x: 50, y: 35 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:return-inward",
+      { x: 1, y: 0 },
+      1,
+      1,
+      true,
+      { x: 200, y: 35 },
+    );
+    simulation.step();
+    const atEdge = simulation.world.registry.require("avatar:return-inward").transform.x;
+
+    simulation.world.setAvatarInput(
+      "avatar:return-inward",
+      { x: -1, y: 0 },
+      1,
+      2,
+      true,
+      { x: 70, y: 35 },
+    );
+    simulation.step();
+
+    expect(atEdge).toBeGreaterThan(98);
+    expect(simulation.world.registry.require("avatar:return-inward").transform.x)
+      .toBeCloseTo(70, 3);
+    simulation.free();
+  });
+
   it("still blocks an uncapped direct drag at solid geometry", () => {
     const simulation = build();
     simulation.addAvatar({

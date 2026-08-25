@@ -88,6 +88,8 @@ export class PixiScene {
       resolution: resolveSceneResolution(this.options.resolution),
       preference: "webgl",
     });
+    // Native pan/zoom handling can cancel a drag as it crosses the canvas edge.
+    this.app.canvas.style.touchAction = "none";
     element.appendChild(this.app.canvas);
 
     this.world.addChild(this.backgroundLayer, this.entityLayer, this.debugLayer);

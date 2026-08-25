@@ -58,6 +58,7 @@ export interface PointerDragOptions {
  */
 export class PointerDragController {
   private activePointerId?: number;
+  private interruptedPointerId?: number;
   private origin?: { x: number; y: number };
   private originLocal?: Vec2;
   private pointLocal?: Vec2;
@@ -89,6 +90,7 @@ export class PointerDragController {
 
     const onDown = (event: PointerEvent) => {
       if (this.activePointerId !== undefined) return;
+      this.interruptedPointerId = undefined;
       const point = this.toLocal(event);
       if (this.allowStart?.(point) === false) return;
       if (this.mode === "avatarDrag") {
@@ -113,6 +115,36 @@ export class PointerDragController {
         : { direction: { x: 0, y: 0 }, intensity: 0, held: true };
     };
     const onMove = (event: PointerEvent) => {
+      if (
+        this.activePointerId === undefined &&
+        this.interruptedPointerId === event.pointerId
+      ) {
+        if ((event.buttons & 1) === 0) {
+          this.interruptedPointerId = undefined;
+          return;
+        }
+        event.preventDefault();
+        this.activePointerId = event.pointerId;
+        this.interruptedPointerId = undefined;
+        this.origin = { x: event.clientX, y: event.clientY };
+        this.originLocal = this.toLocal(event);
+        this.pointLocal = { ...this.originLocal };
+        this.samples = [{ point: { ...this.pointLocal }, atMs: event.timeStamp }];
+        this.releaseIntent = undefined;
+        this.current = {
+          direction: { x: 0, y: 0 },
+          intensity: 0,
+          held: true,
+          target: { ...this.pointLocal },
+        };
+        try {
+          this.element.setPointerCapture(event.pointerId);
+        } catch {
+          // Some browsers resume moves before they allow capture again.
+        }
+        this.updateAvatarDragIntent();
+        return;
+      }
       if (event.pointerId !== this.activePointerId || !this.origin) return;
       event.preventDefault();
       this.pointLocal = this.toLocal(event);
@@ -136,7 +168,12 @@ export class PointerDragController {
       };
     };
     const onUp = (event: PointerEvent) => {
-      if (event.pointerId !== this.activePointerId) return;
+      if (event.pointerId !== this.activePointerId) {
+        if (event.pointerId === this.interruptedPointerId) {
+          this.interruptedPointerId = undefined;
+        }
+        return;
+      }
       if (this.mode === "avatarDrag") {
         this.rememberSample(this.toLocal(event), event.timeStamp);
         this.releaseIntent = this.flickIntent();
@@ -151,16 +188,30 @@ export class PointerDragController {
       this.samples = [];
       this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
     };
+    const onCancel = (event: PointerEvent) => {
+      if (event.pointerId !== this.activePointerId) return;
+      if (this.element.hasPointerCapture(event.pointerId)) {
+        this.element.releasePointerCapture(event.pointerId);
+      }
+      this.interruptedPointerId = this.mode === "avatarDrag" ? event.pointerId : undefined;
+      this.activePointerId = undefined;
+      this.origin = undefined;
+      this.originLocal = undefined;
+      this.pointLocal = undefined;
+      this.samples = [];
+      this.releaseIntent = undefined;
+      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
+    };
 
     this.element.addEventListener("pointerdown", onDown);
     this.element.addEventListener("pointermove", onMove);
     this.element.addEventListener("pointerup", onUp);
-    this.element.addEventListener("pointercancel", onUp);
+    this.element.addEventListener("pointercancel", onCancel);
     this.detach = () => {
       this.element.removeEventListener("pointerdown", onDown);
       this.element.removeEventListener("pointermove", onMove);
       this.element.removeEventListener("pointerup", onUp);
-      this.element.removeEventListener("pointercancel", onUp);
+      this.element.removeEventListener("pointercancel", onCancel);
     };
   }
 
@@ -253,6 +304,7 @@ export class PointerDragController {
   }
 
   destroy(): void {
+    this.interruptedPointerId = undefined;
     this.releaseIntent = undefined;
     this.samples = [];
     this.detach();

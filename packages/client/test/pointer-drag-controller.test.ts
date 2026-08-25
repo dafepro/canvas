@@ -31,12 +31,20 @@ class PointerSurface {
     return { left: 10, top: 20 } as DOMRect;
   }
 
-  emit(type: string, x: number, y: number, pointerId = 7, timeStamp = 0): void {
+  emit(
+    type: string,
+    x: number,
+    y: number,
+    pointerId = 7,
+    timeStamp = 0,
+    buttons = type === "pointerup" || type === "pointercancel" ? 0 : 1,
+  ): void {
     const event = {
       pointerId,
       clientX: x + 10,
       clientY: y + 20,
       timeStamp,
+      buttons,
       preventDefault: () => {},
     } as PointerEvent;
     for (const listener of this.listeners.get(type) ?? []) listener(event);
@@ -138,6 +146,32 @@ describe("PointerDragController", () => {
     });
 
     surface.emit("pointerup", 66, 40);
+    expect(controller.intent.held).toBe(false);
+    controller.destroy();
+  });
+
+  it("recovers a held avatar drag after the browser cancels it out of bounds", () => {
+    const surface = new PointerSurface();
+    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+      mode: "avatarDrag",
+      avatarPosition: () => ({ x: 50, y: 40 }),
+      grabRadiusPx: 24,
+      deadZonePx: 2,
+      fullRangePx: 20,
+    });
+
+    surface.emit("pointerdown", 50, 40);
+    surface.emit("pointermove", 180, 40);
+    surface.emit("pointercancel", 180, 40);
+    expect(controller.intent.held).toBe(false);
+
+    // Browsers may resume the same mouse pointer when it re-enters while the
+    // primary button is still held. Preserve the interrupted grab instead of
+    // requiring an unlikely second hit on the avatar now parked at the edge.
+    surface.emit("pointermove", 80, 40, 7, 80, 1);
+    expect(controller.intent).toMatchObject({ held: true, target: { x: 80, y: 40 } });
+
+    surface.emit("pointerup", 80, 40, 7, 100, 0);
     expect(controller.intent.held).toBe(false);
     controller.destroy();
   });
