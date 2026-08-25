@@ -92,6 +92,23 @@ describe.skipIf(!goAvailable())("graceful room sleep through canvasd", () => {
         writer.entitiesToDraw(performance.now()).some((entity) => entity.kind === "item"),
       );
       await writer.stopGracefully(1_000);
+      // A final checkpoint is sent asynchronously to canvasd. Do not terminate
+      // the service merely because the client socket has closed: on a loaded
+      // Windows runner that can kill canvasd before the room's durable sleep
+      // flush reaches disk, making the restart assertion race persistence.
+      await waitFor(
+        "the first service to durably sleep with the crate",
+        async () => {
+          const response = await fetch(`${first.url}/v1/rooms/rocket-canvas`);
+          const stored = (await response.json()) as RoomResponse;
+          return stored.awake === false &&
+            stored.snapshot?.normalized === true &&
+            stored.snapshot.items?.some(
+              (item) => item.definitionId === crateDefinition.definitionId,
+            ) === true;
+        },
+        20_000,
+      );
       await first.stopAndWait();
 
       restarted = await startCanvasd({ dataDir });
