@@ -48,6 +48,11 @@ import {
   HostRoleSession,
   type HostRoleEffect,
 } from "./session/host-role-session.js";
+import {
+  ConnectionSession,
+  type ConnectionEffect,
+  type ConnectionJoin,
+} from "./session/connection-session.js";
 
 export type {
   BehaviorStateSnapshot,
@@ -128,13 +133,6 @@ export interface RoomSessionOptions {
 
 type Observer<T> = (value: T) => void;
 
-interface PendingJoin {
-  generation: number;
-  canvas: CanvasDefinition;
-  snapshot: CanvasSnapshot;
-  wasSleeping: boolean;
-}
-
 export interface SessionDiagnostics {
   status: string;
   isHost: boolean;
@@ -182,21 +180,15 @@ export class RoomSession {
   readonly client: RoomClient;
   readonly driver: SimulationDriver;
   private canvasDefinition?: CanvasDefinition;
-  private timers: ReturnType<typeof setInterval>[] = [];
   private readonly durable: DurableCommandSession;
   private readonly timeline: ReplicationTimeline;
   private readonly roster: ParticipantRoster;
   private readonly presentation = new PresentationGate();
   private readonly hostRole: HostRoleSession;
+  private readonly connection: ConnectionSession;
   private localAvatarId = "";
   private inputSequence = 0;
-  private connectionGeneration = 0;
-  private pendingJoin?: PendingJoin;
-  private consumerInitialization?: Promise<void>;
-  private consumerInitialized = false;
-  private initializedCanvas?: Readonly<{ id: string; version: number }>;
   private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
-  private terminated = false;
   private stats = {
     hz: 0,
     driftMs: 0,
@@ -206,17 +198,6 @@ export class RoomSession {
     activeColliders: 0,
   };
   private lastRejection?: string;
-  private running = false;
-  private lifecycle: CanvasLifecycleState = "idle";
-  private lifecycleSnapshot: CanvasLifecycleSnapshot = Object.freeze({ state: "idle" });
-  private readonly lifecycleObservers = new Set<Observer<CanvasLifecycleSnapshot>>();
-  private readonly readyWaiters = new Set<{
-    resolve: () => void;
-    reject: (error: CanvasConsumerError) => void;
-  }>();
-  private startPromise?: Promise<void>;
-  private terminalError?: CanvasConsumerError;
-  private pageVisible = true;
   private readonly countdowns = new Set<string>();
   /** Spec 22.1. One sample of the transport counters, taken every second. */
   private trafficMark = {
@@ -280,10 +261,16 @@ export class RoomSession {
         this.roster.observeCanonical(canonical);
         this.syncCountdowns(canonical, tick);
         this.presentation.markCanonical(
-          this.connectionGeneration,
+          this.connection.generation,
           canonical.map((entity) => entity.id),
         );
       },
+    });
+    this.connection = new ConnectionSession({
+      validateJoin: (canvas) => this.validateJoinCanvas(canvas),
+      initializeConsumer: options.onJoined,
+      installJoin: (join) => this.installAcceptedJoin(join),
+      emit: (effect) => this.applyConnectionEffect(effect),
     });
     this.wireClient();
     this.driver.onMessage((message) => this.onSimulation(message));
@@ -327,42 +314,25 @@ export class RoomSession {
   }
 
   get lifecycleState(): CanvasLifecycleState {
-    return this.lifecycle;
+    return this.connection.lifecycleState;
   }
 
   subscribeLifecycle(observer: Observer<CanvasLifecycleSnapshot>): () => void {
-    this.lifecycleObservers.add(observer);
-    observer(this.lifecycleSnapshot);
-    return () => this.lifecycleObservers.delete(observer);
+    return this.connection.subscribe(observer);
   }
 
   /** Resolves after JOIN and consumer initialization (including scene mount). */
   whenReady(): Promise<void> {
-    if (this.lifecycle === "active" || this.lifecycle === "backgrounded") {
-      return Promise.resolve();
-    }
-    if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
-        this.lifecycle === "stopped") {
-      return Promise.reject(
-        this.terminalError ?? lifecycleError(
-          "invalid_lifecycle_state",
-          `Room session cannot become ready after it is ${this.lifecycle}`,
-        ),
-      );
-    }
-    return new Promise<void>((resolve, reject) => {
-      this.readyWaiters.add({ resolve, reject });
-    });
+    return this.connection.whenReady();
   }
 
   /** Resolves after the first complete authoritative room frame is available. */
   whenPresented(): Promise<void> {
-    if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
-        this.lifecycle === "stopped") {
+    if (this.connection.isTerminalOrStopping) {
       return Promise.reject(
-        this.terminalError ?? lifecycleError(
+        this.connection.terminalError ?? lifecycleError(
           "invalid_lifecycle_state",
-          `Room session cannot become presentable after it is ${this.lifecycle}`,
+          `Room session cannot become presentable after it is ${this.lifecycleState}`,
         ),
       );
     }
@@ -371,54 +341,11 @@ export class RoomSession {
 
   /** Opens the transport and sends JOIN. Use whenReady() to await initialization. */
   start(): Promise<void> {
-    if (this.lifecycle === "failed" || this.lifecycle === "stopped" ||
-        this.lifecycle === "stopping") {
-      return Promise.reject(lifecycleError(
-        "invalid_lifecycle_state",
-        `Room session is single-use and cannot start after it is ${this.lifecycle}`,
-      ));
-    }
-    if (this.startPromise) return this.startPromise;
-
-    this.running = true;
-    this.transition("starting");
-    const operation = this.client.connect().then(() => {
-      if (this.lifecycle === "stopping" || this.lifecycle === "stopped") {
-        throw lifecycleError(
-          "start_cancelled",
-          "Room session start was cancelled by stop",
-        );
-      }
-      if (this.lifecycle === "starting") this.transition("joining");
-    }).catch((cause: unknown) => {
-      if (cause instanceof CanvasConsumerError && cause.code === "start_cancelled") {
-        throw cause;
-      }
-      if (this.lifecycle === "stopping" || this.lifecycle === "stopped") {
-        throw lifecycleError(
-          "start_cancelled",
-          "Room session start was cancelled by stop",
-          { cause },
-        );
-      }
-      const error = lifecycleError(
-        "transport_connection_failed",
-        cause instanceof Error ? cause.message : "Room transport failed to connect",
-        { source: "transport", cause },
-      );
-      this.fail(error);
-      throw error;
-    });
-    this.startPromise = operation;
-    return operation;
+    return this.connection.start(() => this.client.connect());
   }
 
   stop(): void {
-    if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
-        this.lifecycle === "stopped") return;
-    this.running = false;
-    this.transition("stopping");
-    this.clearTimers();
+    if (!this.connection.beginStop()) return;
     this.finishStop();
   }
 
@@ -428,10 +355,9 @@ export class RoomSession {
    * periodic checkpoint remains explicitly unnormalized on the server.
    */
   async stopGracefully(timeoutMs = 250): Promise<void> {
-    if (this.lifecycle === "failed" || this.lifecycle === "stopping" ||
-        this.lifecycle === "stopped") return;
+    if (this.connection.isTerminalOrStopping) return;
     const isLastHost =
-      this.running &&
+      this.connection.running &&
       this.hostRole.simulationReady &&
       this.hostRole.isHost &&
       this.client.peers.length === 1 &&
@@ -441,27 +367,22 @@ export class RoomSession {
       return;
     }
 
-    this.running = false;
-    this.transition("stopping");
-    this.clearTimers();
+    if (!this.connection.beginStop()) return;
     await this.hostRole.requestFinalCheckpoint(this.client.sceneRevision, timeoutMs);
     this.finishStop();
   }
 
-  private clearTimers(): void {
-    for (const timer of this.timers) clearInterval(timer);
-    this.timers = [];
-  }
-
   private finishStop(): void {
     this.terminateResources();
-    this.transition("stopped");
-    this.lifecycleObservers.clear();
+    this.connection.finishStop();
+    this.presentation.fail(lifecycleError(
+      "invalid_lifecycle_state",
+      "Room session cannot become presentable after it is stopped",
+    ));
   }
 
   private terminateResources(): void {
-    if (this.terminated) return;
-    this.terminated = true;
+    if (!this.connection.claimResourceClose()) return;
     this.durable.destroy();
     this.hostRole.destroy();
     this.driver.terminate();
@@ -469,27 +390,6 @@ export class RoomSession {
     this.roster.clearObservers();
     this.timeline.clearObservers();
     this.effectObservers.clear();
-  }
-
-  private transition(state: CanvasLifecycleState, detail?: string): void {
-    if (this.lifecycle === state && this.lifecycleSnapshot.detail === detail) return;
-    const previousState = this.lifecycle;
-    this.lifecycle = state;
-    this.lifecycleSnapshot = Object.freeze({ state, previousState, detail });
-    for (const observer of this.lifecycleObservers) observer(this.lifecycleSnapshot);
-
-    if (state === "active" || state === "backgrounded") {
-      for (const waiter of this.readyWaiters) waiter.resolve();
-      this.readyWaiters.clear();
-    } else if (state === "failed" || state === "stopped") {
-      const error = this.terminalError ?? lifecycleError(
-        "invalid_lifecycle_state",
-        `Room session cannot become ready after it is ${state}`,
-      );
-      for (const waiter of this.readyWaiters) waiter.reject(error);
-      this.readyWaiters.clear();
-      this.presentation.fail(error);
-    }
   }
 
   private reportError(error: CanvasConsumerError): void {
@@ -502,64 +402,25 @@ export class RoomSession {
     }
   }
 
-  private fail(error: CanvasConsumerError): void {
-    if (this.lifecycle === "failed" || this.lifecycle === "stopped") return;
-    this.running = false;
-    this.terminalError = error;
-    this.clearTimers();
-    this.transition("failed", error.message);
+  private handleConnectionFailure(error: CanvasConsumerError): void {
+    this.presentation.fail(error);
     this.terminateResources();
     this.reportError(error);
   }
 
   private isTerminalOrStopping(): boolean {
-    return this.lifecycle === "stopping" || this.lifecycle === "stopped" ||
-      this.lifecycle === "failed";
+    return this.connection.isTerminalOrStopping;
   }
 
   // ---------- coordination ----------
 
   private wireClient(): void {
     this.client.on("joined", (result) => {
-      this.queueJoin(result.canvas, result.snapshot, result.roomWasSleeping);
+      this.connection.joined(result.canvas, result.snapshot, result.roomWasSleeping);
     });
 
     this.client.on("status", (status, detail) => {
-      if (this.lifecycle === "stopping" || this.lifecycle === "stopped" ||
-          this.lifecycle === "failed") return;
-      switch (status) {
-        case "connecting":
-          if (this.lifecycle === "idle") this.transition("starting", detail);
-          break;
-        case "open":
-          this.connectionGeneration++;
-          this.presentation.resetConnection(this.connectionGeneration);
-          this.transition("joining", detail);
-          break;
-        case "reconnecting":
-          this.connectionGeneration++;
-          this.presentation.resetConnection(this.connectionGeneration);
-          this.pendingJoin = undefined;
-          this.durable.resetConnection();
-          this.transition("reconnecting", detail);
-          break;
-        case "failed":
-          this.fail(lifecycleError(
-            "transport_reconnect_exhausted",
-            detail || "Room transport exhausted its reconnect attempts",
-            { source: "transport" },
-          ));
-          break;
-        case "closed":
-          this.fail(lifecycleError(
-            "transport_closed",
-            detail || "Room transport closed unexpectedly",
-            { source: "transport" },
-          ));
-          break;
-        case "idle":
-          break;
-      }
+      this.connection.transportStatus(status, detail);
     });
 
     this.client.on("hostGranted", (epoch, snapshot, reason) => {
@@ -623,7 +484,7 @@ export class RoomSession {
     this.client.on("presence", (peers) => {
       this.roster.updatePresence(peers);
       this.presentation.markPresence(
-        this.connectionGeneration,
+        this.connection.generation,
         this.roster.connectedAvatarIds,
       );
       this.syncHostAvatars();
@@ -645,7 +506,7 @@ export class RoomSession {
     });
 
     this.client.on("error", (code, message) => {
-      this.fail(lifecycleError(
+      this.connection.fail(lifecycleError(
         "server_rejected",
         `${code}: ${message}`,
         { source: "protocol", details: { serverCode: code } },
@@ -676,90 +537,12 @@ export class RoomSession {
     return { x: 10, y: 10 };
   }
 
-  private queueJoin(
-    canvas: CanvasDefinition,
-    snapshot: CanvasSnapshot,
-    wasSleeping: boolean,
-  ): void {
-    if (this.isTerminalOrStopping()) return;
-    const join: PendingJoin = {
-      generation: this.connectionGeneration,
-      canvas,
-      snapshot,
-      wasSleeping,
-    };
-    this.pendingJoin = join;
-    if (this.consumerInitialized) {
-      this.completeJoin(join);
-      return;
-    }
-    if (this.consumerInitialization) return;
-    this.consumerInitialization = this.initializeConsumer(join);
-  }
-
-  private async initializeConsumer(firstJoin: PendingJoin): Promise<void> {
-    try {
-      this.validateJoinCanvas(firstJoin.canvas);
-      await this.options.onJoined?.(
-        firstJoin.canvas,
-        firstJoin.snapshot,
-        firstJoin.wasSleeping,
-      );
-      if (this.isTerminalOrStopping()) return;
-      this.consumerInitialized = true;
-      this.initializedCanvas = Object.freeze({
-        id: firstJoin.canvas.id,
-        version: firstJoin.canvas.version,
-      });
-      const pending = this.pendingJoin;
-      if (pending) this.completeJoin(pending);
-    } catch (cause) {
-      if (this.isTerminalOrStopping()) return;
-      this.fail(lifecycleError(
-        "join_initialization_failed",
-        cause instanceof Error ? cause.message : "Room initialization failed",
-        { source: "initialization", cause },
-      ));
-    }
-  }
-
-  private completeJoin(join: PendingJoin): void {
-    if (
-      this.isTerminalOrStopping() ||
-      join !== this.pendingJoin ||
-      join.generation !== this.connectionGeneration
-    ) {
-      return;
-    }
-    try {
-      this.validateJoinCanvas(join.canvas);
-      const initialized = this.initializedCanvas;
-      if (
-        initialized &&
-        (initialized.id !== join.canvas.id || initialized.version !== join.canvas.version)
-      ) {
-        throw new Error(
-          `rejoined canvas '${join.canvas.id}' v${join.canvas.version} after initializing ` +
-          `'${initialized.id}' v${initialized.version}`,
-        );
-      }
-      this.durable.loadSnapshot(join.snapshot);
-      this.timeline.resetEpoch(this.hostRole.hostEpoch || this.client.hostEpoch);
-      this.roster.loadSnapshotPositions(join.snapshot);
-      this.presentation.markItems(
-        join.generation,
-        this.durable.itemEntityIds,
-      );
-      this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
-      this.pendingJoin = undefined;
-      this.transition(this.pageVisible ? "active" : "backgrounded");
-    } catch (cause) {
-      this.fail(lifecycleError(
-        "join_initialization_failed",
-        cause instanceof Error ? cause.message : "Room initialization failed",
-        { source: "initialization", cause },
-      ));
-    }
+  private installAcceptedJoin(join: ConnectionJoin): void {
+    this.durable.loadSnapshot(join.snapshot);
+    this.timeline.resetEpoch(this.hostRole.hostEpoch || this.client.hostEpoch);
+    this.roster.loadSnapshotPositions(join.snapshot);
+    this.presentation.markItems(join.generation, this.durable.itemEntityIds);
+    this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
   }
 
   private validateJoinCanvas(canvas: CanvasDefinition): void {
@@ -873,10 +656,22 @@ export class RoomSession {
           this.roster.loadSnapshotPositions(effect.snapshot, true);
         }
         this.roster.resetHostProjection();
-        this.presentation.resetRole(this.connectionGeneration);
+        this.presentation.resetRole(this.connection.generation);
         this.driver.send(effect.request);
         this.spawnLocalAvatar();
         this.syncHostAvatars();
+        break;
+    }
+  }
+
+  private applyConnectionEffect(effect: ConnectionEffect): void {
+    switch (effect.type) {
+      case "connectionReset":
+        this.presentation.resetConnection(effect.generation);
+        if (effect.reason === "reconnecting") this.durable.resetConnection();
+        break;
+      case "failed":
+        this.handleConnectionFailure(effect.error);
         break;
     }
   }
@@ -886,7 +681,7 @@ export class RoomSession {
   private startSendLoops(): void {
     const rates = this.options.rates ?? {};
     const inputHz = rates.inputHz ?? 30;
-    this.timers.push(setInterval(() => this.sendInput(), 1000 / inputHz));
+    this.connection.schedule(() => this.sendInput(), 1000 / inputHz);
   }
 
   private sendInput(): void {
@@ -1001,24 +796,19 @@ export class RoomSession {
 
   /** Spec 11.4. The runtime reports page visibility; the session yields. */
   setPageVisible(visible: boolean): void {
-    this.pageVisible = visible;
     this.client.health.pageVisible = visible;
+    this.connection.setPageVisible(visible);
     this.hostRole.setPageVisible(visible);
     this.client.setHostEligible(visible);
-    if (!visible && this.lifecycle === "active") {
-      this.transition("backgrounded");
-    } else if (visible && this.lifecycle === "backgrounded") {
-      this.transition("active");
-    }
   }
 
   // ---------- simulation messages ----------
 
   private onSimulation(message: SimulationResponse): void {
-    if (this.terminated || !this.hostRole.acceptSimulation(message)) return;
+    if (!this.hostRole.acceptSimulation(message)) return;
     switch (message.type) {
       case "ready":
-        this.presentation.markSimulationReady(this.connectionGeneration);
+        this.presentation.markSimulationReady(this.connection.generation);
         this.syncHostAvatars();
         this.checkPresentationReady();
         break;
@@ -1084,7 +874,7 @@ export class RoomSession {
   }
 
   private checkPresentationReady(): void {
-    const generation = this.connectionGeneration;
+    const generation = this.connection.generation;
     if (this.hostRole.simulationReady) this.presentation.markSimulationReady(generation);
     if (this.roster.presenceKnown) {
       this.presentation.markPresence(generation, this.roster.connectedAvatarIds);
@@ -1218,7 +1008,7 @@ export class RoomSession {
   }
 
   get isRunning(): boolean {
-    return this.running;
+    return this.connection.running;
   }
 }
 
