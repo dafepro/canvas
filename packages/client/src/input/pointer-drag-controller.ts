@@ -51,6 +51,15 @@ export interface PointerDragOptions {
   allowStart?: (point: Readonly<Vec2>) => boolean;
 }
 
+export type PointerDragPhase = "idle" | "held" | "suspended";
+
+export interface PointerDragDiagnostics {
+  readonly phase: PointerDragPhase;
+  readonly pointerId?: number;
+  readonly point?: Readonly<Vec2>;
+  readonly captured: boolean;
+}
+
 /**
  * Spec 6.1. Thumbstick mode emits relative movement. Avatar-drag mode emits an
  * absolute target that host simulation reaches without a speed cap while its
@@ -58,7 +67,7 @@ export interface PointerDragOptions {
  */
 export class PointerDragController {
   private activePointerId?: number;
-  private interruptedPointerId?: number;
+  private phaseValue: PointerDragPhase = "idle";
   private origin?: { x: number; y: number };
   private originLocal?: Vec2;
   private pointLocal?: Vec2;
@@ -88,9 +97,35 @@ export class PointerDragController {
       : { ...defaultPointerFlickOptions, ...options.flick };
     this.allowStart = options.allowStart;
 
+    const clearGesture = (releaseCapture = true) => {
+      const pointerId = this.activePointerId;
+      this.phaseValue = "idle";
+      this.activePointerId = undefined;
+      this.origin = undefined;
+      this.originLocal = undefined;
+      this.pointLocal = undefined;
+      this.samples = [];
+      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
+      if (
+        releaseCapture &&
+        pointerId !== undefined &&
+        this.element.hasPointerCapture(pointerId)
+      ) {
+        this.element.releasePointerCapture(pointerId);
+      }
+    };
+
+    const suspendGesture = () => {
+      if (this.phaseValue !== "held") return;
+      this.phaseValue = "suspended";
+      this.releaseIntent = undefined;
+      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
+    };
+
     const onDown = (event: PointerEvent) => {
-      if (this.activePointerId !== undefined) return;
-      this.interruptedPointerId = undefined;
+      if (this.phaseValue === "held") return;
+      // A new down after lost capture proves any suspended gesture ended.
+      if (this.phaseValue === "suspended") clearGesture();
       const point = this.toLocal(event);
       if (this.allowStart?.(point) === false) return;
       if (this.mode === "avatarDrag") {
@@ -103,8 +138,13 @@ export class PointerDragController {
         }
       }
       event.preventDefault();
-      this.element.setPointerCapture(event.pointerId);
+      try {
+        this.element.setPointerCapture(event.pointerId);
+      } catch {
+        // Window-level tracking still owns the gesture if capture is refused.
+      }
       this.activePointerId = event.pointerId;
+      this.phaseValue = "held";
       this.origin = { x: event.clientX, y: event.clientY };
       this.originLocal = point;
       this.pointLocal = { ...this.originLocal };
@@ -115,37 +155,38 @@ export class PointerDragController {
         : { direction: { x: 0, y: 0 }, intensity: 0, held: true };
     };
     const onMove = (event: PointerEvent) => {
-      if (
-        this.activePointerId === undefined &&
-        this.interruptedPointerId === event.pointerId
-      ) {
-        if ((event.buttons & 1) === 0) {
-          this.interruptedPointerId = undefined;
-          return;
-        }
+      if (event.pointerId !== this.activePointerId) return;
+      const primaryHeld = event.pointerType === "touch" || (event.buttons & 1) !== 0;
+      if (!primaryHeld) {
+        this.releaseIntent = undefined;
+        clearGesture();
+        return;
+      }
+      if (this.phaseValue === "suspended") {
         event.preventDefault();
-        this.activePointerId = event.pointerId;
-        this.interruptedPointerId = undefined;
+        this.phaseValue = "held";
         this.origin = { x: event.clientX, y: event.clientY };
         this.originLocal = this.toLocal(event);
         this.pointLocal = { ...this.originLocal };
         this.samples = [{ point: { ...this.pointLocal }, atMs: event.timeStamp }];
         this.releaseIntent = undefined;
-        this.current = {
-          direction: { x: 0, y: 0 },
-          intensity: 0,
-          held: true,
-          target: { ...this.pointLocal },
-        };
+        this.current = this.mode === "avatarDrag"
+          ? {
+              direction: { x: 0, y: 0 },
+              intensity: 0,
+              held: true,
+              target: { ...this.pointLocal },
+            }
+          : { direction: { x: 0, y: 0 }, intensity: 0, held: true };
         try {
           this.element.setPointerCapture(event.pointerId);
         } catch {
           // Some browsers resume moves before they allow capture again.
         }
-        this.updateAvatarDragIntent();
+        if (this.mode === "avatarDrag") this.updateAvatarDragIntent();
         return;
       }
-      if (event.pointerId !== this.activePointerId || !this.origin) return;
+      if (this.phaseValue !== "held" || !this.origin) return;
       event.preventDefault();
       this.pointLocal = this.toLocal(event);
       if (this.mode === "avatarDrag") {
@@ -168,40 +209,27 @@ export class PointerDragController {
       };
     };
     const onUp = (event: PointerEvent) => {
-      if (event.pointerId !== this.activePointerId) {
-        if (event.pointerId === this.interruptedPointerId) {
-          this.interruptedPointerId = undefined;
-        }
-        return;
-      }
-      if (this.mode === "avatarDrag") {
+      if (event.pointerId !== this.activePointerId) return;
+      if (this.mode === "avatarDrag" && this.phaseValue === "held") {
         this.rememberSample(this.toLocal(event), event.timeStamp);
         this.releaseIntent = this.flickIntent();
       }
-      if (this.element.hasPointerCapture(event.pointerId)) {
-        this.element.releasePointerCapture(event.pointerId);
-      }
-      this.activePointerId = undefined;
-      this.origin = undefined;
-      this.originLocal = undefined;
-      this.pointLocal = undefined;
-      this.samples = [];
-      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
+      clearGesture();
     };
     const onCancel = (event: PointerEvent) => {
       if (event.pointerId !== this.activePointerId) return;
-      if (this.element.hasPointerCapture(event.pointerId)) {
-        this.element.releasePointerCapture(event.pointerId);
-      }
-      this.interruptedPointerId = this.mode === "avatarDrag" ? event.pointerId : undefined;
-      this.activePointerId = undefined;
-      this.origin = undefined;
-      this.originLocal = undefined;
-      this.pointLocal = undefined;
-      this.samples = [];
       this.releaseIntent = undefined;
-      this.current = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
+      clearGesture();
     };
+    const onLostCapture = (event: PointerEvent) => {
+      if (event.pointerId === this.activePointerId) suspendGesture();
+    };
+    const onWindowExit = (event: PointerEvent) => {
+      if (event.pointerId === this.activePointerId && event.relatedTarget === null) {
+        suspendGesture();
+      }
+    };
+    const onBlur = () => suspendGesture();
 
     // Pointer capture is useful but not sufficient on every mobile/browser
     // combination. Track active moves on the owning window so leaving the
@@ -211,12 +239,32 @@ export class PointerDragController {
     dragTarget.addEventListener("pointermove", onMove as EventListener);
     dragTarget.addEventListener("pointerup", onUp as EventListener);
     dragTarget.addEventListener("pointercancel", onCancel as EventListener);
+    dragTarget.addEventListener("pointerout", onWindowExit as EventListener);
+    dragTarget.addEventListener("blur", onBlur as EventListener);
+    this.element.addEventListener("lostpointercapture", onLostCapture);
     this.detach = () => {
       this.element.removeEventListener("pointerdown", onDown);
       dragTarget.removeEventListener("pointermove", onMove as EventListener);
       dragTarget.removeEventListener("pointerup", onUp as EventListener);
       dragTarget.removeEventListener("pointercancel", onCancel as EventListener);
+      dragTarget.removeEventListener("pointerout", onWindowExit as EventListener);
+      dragTarget.removeEventListener("blur", onBlur as EventListener);
+      this.element.removeEventListener("lostpointercapture", onLostCapture);
     };
+  }
+
+  get phase(): PointerDragPhase {
+    return this.phaseValue;
+  }
+
+  get diagnostics(): PointerDragDiagnostics {
+    const pointerId = this.activePointerId;
+    return Object.freeze({
+      phase: this.phaseValue,
+      pointerId,
+      point: this.pointLocal ? Object.freeze({ ...this.pointLocal }) : undefined,
+      captured: pointerId !== undefined && this.element.hasPointerCapture(pointerId),
+    });
   }
 
   get intent(): DragIntent {
@@ -308,7 +356,8 @@ export class PointerDragController {
   }
 
   destroy(): void {
-    this.interruptedPointerId = undefined;
+    this.phaseValue = "idle";
+    this.activePointerId = undefined;
     this.releaseIntent = undefined;
     this.samples = [];
     this.detach();

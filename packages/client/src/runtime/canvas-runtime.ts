@@ -16,6 +16,7 @@ import {
 import {
   PointerDragController,
   type PointerDragOptions,
+  type PointerDragDiagnostics,
 } from "../input/pointer-drag-controller.js";
 import {
   ItemEditPresentation,
@@ -107,6 +108,8 @@ export interface RuntimeDiagnostics extends SessionDiagnostics {
   renderLongFrames: number;
   backgroundResumes: number;
   lastBackgroundMs: number;
+  pointer?: Readonly<PointerDragDiagnostics>;
+  pointerWorldTarget?: Readonly<Vec2>;
 }
 
 export const runtimeDiagnosticsIntervalMs = (requestedHz = 4): number => {
@@ -147,6 +150,7 @@ export class CanvasRuntime {
   private startPromise?: Promise<void>;
   private readonly overlayProjections = new OverlayProjectionStore();
   private readonly fullscreen?: FullscreenController;
+  private pointerWorldTarget?: Vec2;
 
   constructor(private readonly options: CanvasRuntimeOptions) {
     if (typeof document !== "undefined") {
@@ -476,6 +480,7 @@ export class CanvasRuntime {
 
   private mergedIntent(): InputIntent {
     if (this.avatarDisabled) {
+      this.pointerWorldTarget = undefined;
       return { direction: { x: 0, y: 0 }, intensity: 0, held: false, disabled: true };
     }
     const pointer = this.pointer?.intent;
@@ -490,11 +495,14 @@ export class CanvasRuntime {
         },
         { width: rect.width, height: rect.height },
       );
+      const worldTarget = this.scene.camera.toWorld(target.x, target.y);
+      this.pointerWorldTarget = { ...worldTarget };
       return {
         ...pointer,
-        target: this.scene.camera.toWorld(target.x, target.y),
+        target: worldTarget,
       };
     }
+    this.pointerWorldTarget = undefined;
     if (pointer && pointer.intensity > 0) return pointer;
     const keyboard = this.keyboard?.intent;
     if (keyboard && keyboard.intensity > 0) return keyboard;
@@ -643,6 +651,10 @@ export class CanvasRuntime {
       renderLongFrames: frames.longFrames,
       backgroundResumes: this.backgroundResumes,
       lastBackgroundMs: this.lastBackgroundMs,
+      pointer: this.pointer?.diagnostics,
+      pointerWorldTarget: this.pointerWorldTarget
+        ? Object.freeze({ ...this.pointerWorldTarget })
+        : undefined,
     };
   }
 }

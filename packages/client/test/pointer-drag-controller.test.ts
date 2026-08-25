@@ -38,6 +38,7 @@ class PointerSurface {
     pointerId = 7,
     timeStamp = 0,
     buttons = type === "pointerup" || type === "pointercancel" ? 0 : 1,
+    init: Partial<PointerEvent> = {},
   ): void {
     const event = {
       pointerId,
@@ -45,7 +46,10 @@ class PointerSurface {
       clientY: y + 20,
       timeStamp,
       buttons,
+      pointerType: "mouse",
+      relatedTarget: this,
       preventDefault: () => {},
+      ...init,
     } as PointerEvent;
     for (const listener of this.listeners.get(type) ?? []) listener(event);
   }
@@ -157,7 +161,7 @@ describe("PointerDragController", () => {
     controller.destroy();
   });
 
-  it("recovers a held avatar drag after the browser cancels it out of bounds", () => {
+  it("ends a canceled gesture and allows the edge avatar to be grabbed again", () => {
     const surface = new PointerSurface();
     const controller = new PointerDragController(surface as unknown as HTMLElement, {
       mode: "avatarDrag",
@@ -171,13 +175,11 @@ describe("PointerDragController", () => {
     surface.emit("pointermove", 180, 40);
     surface.emit("pointercancel", 180, 40);
     expect(controller.intent.held).toBe(false);
+    expect(controller.phase).toBe("idle");
 
-    // Browsers may resume the same mouse pointer when it re-enters while the
-    // primary button is still held. Preserve the interrupted grab instead of
-    // requiring an unlikely second hit on the avatar now parked at the edge.
-    surface.emit("pointermove", 80, 40, 7, 80, 1);
+    surface.emit("pointerdown", 50, 40, 7, 80, 1);
+    surface.emit("pointermove", 80, 40, 7, 90, 1);
     expect(controller.intent).toMatchObject({ held: true, target: { x: 80, y: 40 } });
-
     surface.emit("pointerup", 80, 40, 7, 100, 0);
     expect(controller.intent.held).toBe(false);
     controller.destroy();
@@ -207,6 +209,51 @@ describe("PointerDragController", () => {
     });
     surface.windowTarget.emit("pointerup", 90, -25, 7, 100, 0);
     expect(controller.intent.held).toBe(false);
+    controller.destroy();
+  });
+
+  it("suspends on lost capture and resumes only while the primary button remains held", () => {
+    const surface = new WindowTrackedPointerSurface();
+    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+      mode: "avatarDrag",
+      avatarPosition: () => ({ x: 50, y: 40 }),
+      grabRadiusPx: 24,
+    });
+
+    surface.emit("pointerdown", 50, 40);
+    surface.emit("lostpointercapture", 60, 40, 7, 20, 1);
+    expect(controller.phase).toBe("suspended");
+    expect(controller.intent.held).toBe(false);
+
+    surface.windowTarget.emit("pointermove", 90, 40, 7, 40, 1);
+    expect(controller.phase).toBe("held");
+    expect(controller.intent).toMatchObject({ held: true, target: { x: 90, y: 40 } });
+
+    surface.emit("lostpointercapture", 90, 40, 7, 50, 1);
+    surface.windowTarget.emit("pointermove", 90, 40, 7, 60, 0);
+    expect(controller.phase).toBe("idle");
+    controller.destroy();
+  });
+
+  it("detects a release missed outside the browser and permits an immediate re-grab", () => {
+    const surface = new WindowTrackedPointerSurface();
+    const controller = new PointerDragController(surface as unknown as HTMLElement, {
+      mode: "avatarDrag",
+      avatarPosition: () => ({ x: 50, y: 40 }),
+      grabRadiusPx: 24,
+    });
+
+    surface.emit("pointerdown", 50, 40);
+    surface.windowTarget.emit("pointerout", -10, 40, 7, 20, 1, {
+      relatedTarget: null,
+    });
+    expect(controller.phase).toBe("suspended");
+    surface.windowTarget.emit("pointermove", 50, 40, 7, 40, 0);
+    expect(controller.phase).toBe("idle");
+
+    surface.emit("pointerdown", 50, 40, 7, 50, 1);
+    expect(controller.phase).toBe("held");
+    expect(controller.intent.held).toBe(true);
     controller.destroy();
   });
 
