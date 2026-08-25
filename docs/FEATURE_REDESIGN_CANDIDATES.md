@@ -1,7 +1,7 @@
 # Feature redesign candidates
 
 Internal engineering note, reviewed 2026-08-25 with repository evidence through
-`57c0421`. This is intentionally
+`d0331f5`. This is intentionally
 separate from `GAPS.md`: it records features whose history suggests that local
 fixes have accumulated around a missing state model or transaction boundary.
 It is not a promise that every listed feature must be rewritten.
@@ -20,7 +20,7 @@ Priority 0 changes the structure on which later work is built. Priority 1 is a
 major pre-1.0 correctness or public-contract risk. Priority 2 can be isolated
 and replaced after 1.0 without changing the core model.
 
-## Priority 0
+## Completed redesigns
 
 ### One pointer interaction coordinator
 
@@ -32,17 +32,24 @@ selected-item precedence, overlap selection, capture, and menu-selection fixes
 accumulated capture and out-of-bounds recovery fixes before receiving its own
 state machine (`4a9f47c`, `5651d7f`, `651aa28`).
 
-**Redesign.** Introduce one runtime-owned `PointerInteractionCoordinator` that
-owns each pointer from down through terminal release/cancel. Interaction
+**Implemented.** One runtime-owned `PointerInteractionCoordinator` now owns
+each pointer from down through terminal release/cancel. Interaction
 strategies—avatar drag, item select, selected-item manipulation, thumbstick,
 and consumer gestures—participate through ordered hit tests and explicit
 claims. The coordinator, not each feature, owns capture, window tracking,
 tap/drag thresholds, cancellation, and diagnostics.
 
-**Acceptance boundary.** A table-driven conformance suite must cross every
-strategy with overlap, canvas exit/re-entry, capture loss, cancellation,
-multi-touch rejection, edit enable/disable, and immediate re-grab. There must
-be one and only one terminal event for a claimed pointer.
+**Verification.** The table-driven coordinator and routing suites cross
+priority, overlap, canvas exit/re-entry, capture loss, cancellation, touch,
+secondary-pointer rejection, edit and avatar disablement, consumer callback
+failure, and immediate re-grab. Every claim receives one and only one terminal
+event. The independently running item studio verifies spawn-without-edit and
+menu-to-private-controls selection through the public runtime.
+
+Implemented in `93994ed`, `ebd23a2`, `f31b07f`, and `d0331f5`. The public
+consumer contract is `POINTER_INTERACTIONS.md`.
+
+## Priority 0
 
 ### Split the room-session orchestration state
 
@@ -182,12 +189,10 @@ an existing authority path.
 
 ## Recommended order
 
-1. Build the pointer interaction coordinator before adding another gesture or
-   editing tool.
-2. Decompose `RoomSession` behind its current public facade before expanding
+1. Decompose `RoomSession` behind its current public facade before expanding
    networking or travel responsibilities.
-3. Add acknowledged item mutations and the replication timeline while doing
+2. Add acknowledged item mutations and the replication timeline while doing
    that decomposition; both become natural subsystem boundaries.
-4. Publish startup progress before asking external consumers to build polished
+3. Publish startup progress before asking external consumers to build polished
    loading/error UI.
-5. Treat overlay layout and transient item actions as isolated follow-ups.
+4. Treat overlay layout and transient item actions as isolated follow-ups.

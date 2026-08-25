@@ -98,6 +98,11 @@ work below because they determine the public boundary every consumer will use.
 
 ## Consumer-library Priority 1 — major completeness gaps
 
+- [x] Replace competing avatar and item-edit DOM listeners with one exclusive
+  pointer interaction coordinator. Built-in and consumer strategies now use
+  explicit priority claims, one capture/window lifecycle, exactly-once
+  terminals, runtime-driven cancellation, diagnostics, and a public extension
+  contract with failure isolation.
 - [x] Complete asset manifests, preload gates, backgrounds, sprites, atlases,
   animations, deterministic asset versions, and failure fallbacks.
 - [x] Make the runtime and worker lazy-loadable so unrelated consumer routes do

@@ -9,7 +9,7 @@ what is verified, and what is not done.
 | --- | --- |
 | PixiJS scene with one canvas definition and a debug overlay | Done. `packages/client/src/render/pixi-scene.ts`. Add `?debug=1` for collider outlines. |
 | Rapier 2D in a Web Worker at a fixed step | Done. `simulation.worker.ts` plus `fixed-step-loop.ts`. |
-| Circular avatar movement from pointer or touch drag intent | Done. `pointer-drag-controller.ts` and `keyboard-controller.ts`. |
+| Circular avatar movement from pointer or touch drag intent | Done. `PointerInteractionCoordinator`, `AvatarPointerInteraction`, and `KeyboardController`. |
 | Static walls, a ramp or hill, one sensor, one dynamic kickable item | Done. The rocket canvas has a ground, a hill, a launch pad, a pad sensor, a ball, and a crate. |
 | Collider debug shapes with verified transform alignment | Partly done. The outlines draw, but I did not verify them visually in a browser. |
 | Environment sampling with a linear gravity and drag gradient | Done and unit tested. `environment/field.ts`. |
@@ -161,7 +161,7 @@ The user ran the demo and reported the following. The state of each item:
 | The avatar leaves the top of the canvas, appears at the bottom, and keeps falling past the bottom edge. | Fixed. `resolveEdges` wrapped a body to `height + radius`, which is *outside* the solid bottom edge, so the body fell out of the canvas. It now wraps to `height - radius`. `RapierWorld.clearOfGeometry` then moves the body along its direction of travel until it no longer overlaps solid geometry, because the bottom of the rocket canvas is filled with ground. Tested in `environment.test.ts` and `host-simulation.test.ts`. |
 | An item thrown up gets stuck at the bottom and loses all motion. | Fixed by the same change. |
 | WASD works. Consider other control schemes. | The arrow keys already work as well as WASD. No new scheme is added. |
-| The press and drag needs a visual, such as a thumb stick. | Done. `PointerDragController.gesture` reports the press point and the drag point in element pixels. `PixiScene.setThumbstick` draws a ring at the press point and a knob toward the drag. I did not watch it draw. |
+| The press and drag needs a visual, such as a thumb stick. | Done. `AvatarPointerInteraction.gesture` reports the press point and the drag point in element pixels. `PixiScene.setThumbstick` draws a ring at the press point and a knob toward the drag. |
 | The gravity gradient works, but the difference is small. | Tuned in data only. The band now spans y 0 to 50 rather than 0 to 40, and the gravity scale at the top is 0.04 rather than 0.1. Run `make export-canvases` after a change; the server reads the JSON file. |
 | The rocket needs touch and hold. One touch should be enough. | Changed in data only. The rocket item now sets `graceSeconds` to 3.5, which is longer than the 3 second countdown, so the countdown survives after the avatar steps away. The behavior code is unchanged. Tested in `rocket.test.ts`. |
 | The teal rectangle appears to have no collider. | Correct as designed. It is `pad-zone`, a `regionSensor`. It reports contact and never blocks a body. The renderer draws a sensor in teal. |

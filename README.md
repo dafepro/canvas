@@ -226,6 +226,9 @@ Applications can subscribe to authenticated presence, complete canonical
 entity and behavior state, and effects through `CanvasRuntime`. Snapshot streams
 replay their newest frozen value to late subscribers; see
 `docs/LIBRARY_CONTRACT.md` for the ownership and observation contract.
+Applications can also register ordered, local-only pointer interaction
+strategies without attaching competing listeners to the Canvas surface; see
+`docs/POINTER_INTERACTIONS.md`.
 
 ## Add a behavior
 

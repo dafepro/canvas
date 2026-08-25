@@ -131,7 +131,12 @@ velocity controller: arbitrary pointer jumps can be much longer than one
 physics step, including before the first world step. Up to eight simultaneous
 contacts are resolved so compound corners cannot pin or tunnel.
 
-Pointer ownership is an explicit `idle` / `held` / `suspended` state machine.
+Pointer ownership is an explicit `idle` / `pending` / `active` / `suspended`
+state machine owned by one runtime coordinator. Item editing, avatar movement,
+and consumer gestures compete through ordered claims instead of installing
+independent DOM listeners. Once one claim begins, no other strategy observes
+that pointer until exactly one terminal release or cancellation. See
+`docs/POINTER_INTERACTIONS.md` for the public strategy and priority contract.
 Once a direct grab begins, movement, release, cancellation, browser-window
 exit, focus loss, and lost pointer capture are observed on the canvas's owning
 window. Leaving the canvas while still held therefore keeps projecting the
@@ -198,5 +203,6 @@ host application explicitly reconciles that sleeping room with the policies in
 - `ROOM_TEMPLATES.md` defines product room and reusable template identity.
 - `RUNTIME_LIFECYCLE.md` defines readiness, reconnect, teardown, and typed errors.
 - `OVERLAY_PROJECTION.md` defines bounded DOM/UI projection observation.
+- `POINTER_INTERACTIONS.md` defines exclusive pointer ownership and consumer gestures.
 - `CONFORMANCE_KITS.md` tracks external extension and adapter verification.
 - `ARCHITECTURE.md` defines authority and dependency direction inside Canvas.

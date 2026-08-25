@@ -11,7 +11,7 @@ This file explains how the pieces fit together. The specification in
 | main thread             |            | main thread             |
 |  CanvasRuntime          |            |  CanvasRuntime          |
 |   PixiScene             |            |   PixiScene             |
-|   PointerDragController |            |  RoomSession            |
+|   PointerInteraction... |            |  RoomSession            |
 |  RoomSession            |            |   InterpolationBuffer   |
 |   RoomClient + transport|            |   AvatarReconciler      |
 +-----------+-------------+            +-----------+-------------+
@@ -183,9 +183,12 @@ without the current transform message.
 
 Direct dragging crosses three independently testable layers:
 
-1. `PointerDragController` owns one browser pointer through explicit `idle`,
-   `held`, and `suspended` phases. It tracks the owning window, not only the
-   canvas DOM element.
+1. `PointerInteractionCoordinator` is the runtime's only browser-pointer owner.
+   Ordered pure strategies give item editing precedence over avatar movement
+   and expose explicit `idle`, `pending`, `active`, and `suspended` phases. The
+   coordinator tracks the owning window, not only the canvas DOM element, and
+   guarantees exactly one terminal event. Applications add gestures through
+   the same public strategy seam; see `POINTER_INTERACTIONS.md`.
 2. `RapierWorld` shape-casts the complete absolute displacement against fixed,
    avatar-blocking geometry and projects the remainder along up to eight
    contacts. Solid boundaries include a contact skin; non-solid edge policies
@@ -212,3 +215,4 @@ thumbstick movement.
 | A real session check | Implement `roomsdk.Authenticator`. |
 | A new wire field | Edit `room.proto`, then run `make generate`. |
 | A headless client in a test | Build a `RoomSession` with `SimulationDriver.local()`. It needs no DOM. |
+| A product-local pointer gesture | Register a `PointerInteractionStrategy` on `CanvasRuntime`; do not add a DOM listener beside Canvas. |
