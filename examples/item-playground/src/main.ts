@@ -16,7 +16,6 @@ import {
 } from "./graffiti-behavior.js";
 import type { OrbTheme } from "./reactive-orb-behavior.js";
 import { clampFloatingRect } from "./overlay-geometry.js";
-import { formatStartupStatus } from "../../shared/startup-status.js";
 import "./style.css";
 
 const params = new URLSearchParams(location.search);
@@ -383,7 +382,12 @@ const join = async (): Promise<void> => {
   connectionStatus.textContent = "Joining…";
   let nextRuntime: CanvasRuntime | undefined;
   try {
-    const { CanvasRuntime, SimulationDriver, devRealtimeCredential } = await import(
+    const {
+      CanvasRuntime,
+      SimulationDriver,
+      devRealtimeCredential,
+      formatRuntimeStartupStatus,
+    } = await import(
       "@canvas-physics/client/runtime"
     );
     const worker = new Worker(new URL("./canvas.worker.ts", import.meta.url), {
@@ -419,7 +423,7 @@ const join = async (): Promise<void> => {
     });
     runtime = nextRuntime;
     unsubscribeStartup = nextRuntime.subscribeStartup((snapshot) => {
-      connectionStatus.textContent = formatStartupStatus(snapshot, {
+      connectionStatus.textContent = formatRuntimeStartupStatus(snapshot, {
         assetName: "studio art",
         readyMessage: "Studio ready",
       });

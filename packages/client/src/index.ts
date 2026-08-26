@@ -25,6 +25,7 @@ export * from "./runtime/session/item-mutation-session.js";
 export * from "./runtime/canvas-runtime.js";
 export * from "./runtime/linked-room-navigator.js";
 export * from "./runtime/lifecycle.js";
+export * from "./runtime/startup-status.js";
 export type {
   RuntimeStartupActivePhase,
   RuntimeStartupObserver,

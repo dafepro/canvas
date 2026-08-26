@@ -1,4 +1,6 @@
 export { CanvasRuntime } from "./canvas-runtime.js";
+export { formatRuntimeStartupStatus } from "./startup-status.js";
+export type { RuntimeStartupStatusOptions } from "./startup-status.js";
 export * from "./linked-room-navigator.js";
 export type { CanvasRuntimeOptions, RuntimeDiagnostics } from "./canvas-runtime.js";
 export { RoomSession } from "./room-session.js";

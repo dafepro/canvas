@@ -7,7 +7,6 @@ import {
 import { basketballDefinitions } from "./basketball-content.js";
 import { resolveBasketballControlProfile } from "./control-profile.js";
 import { formatScoreboardScore } from "./scoreboard-presentation.js";
-import { formatStartupStatus } from "../../shared/startup-status.js";
 import "./style.css";
 
 const params = new URLSearchParams(location.search);
@@ -94,7 +93,12 @@ const join = async (): Promise<void> => {
 
   let next: CanvasRuntime | undefined;
   try {
-    const { CanvasRuntime, SimulationDriver, devRealtimeCredential } = await import(
+    const {
+      CanvasRuntime,
+      SimulationDriver,
+      devRealtimeCredential,
+      formatRuntimeStartupStatus,
+    } = await import(
       "@canvas-physics/client/runtime"
     );
     const worker = new Worker(new URL("./canvas.worker.ts", import.meta.url), {
@@ -144,7 +148,7 @@ const join = async (): Promise<void> => {
     runtime = next;
     unsubscribers = [
       next.subscribeStartup((snapshot) => {
-        status.textContent = formatStartupStatus(snapshot, {
+        status.textContent = formatRuntimeStartupStatus(snapshot, {
           assetName: "arena art",
           readyMessage: "Arena ready",
         });

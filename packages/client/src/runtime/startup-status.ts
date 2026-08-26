@@ -1,14 +1,14 @@
-import type { RuntimeStartupSnapshot } from "@canvas-physics/client/runtime";
+import type { RuntimeStartupSnapshot } from "./startup-progress.js";
 
-export interface StartupStatusOptions {
+export interface RuntimeStartupStatusOptions {
   readonly assetName?: string;
   readonly readyMessage?: string;
 }
 
-/** Example-owned wording for the library's semantic startup phases. */
-export const formatStartupStatus = (
+/** Optional default wording; products may render the semantic snapshot directly. */
+export const formatRuntimeStartupStatus = (
   snapshot: Readonly<RuntimeStartupSnapshot>,
-  options: Readonly<StartupStatusOptions> = {},
+  options: Readonly<RuntimeStartupStatusOptions> = {},
 ): string => {
   switch (snapshot.phase) {
     case "assets": {

@@ -12,7 +12,6 @@ import {
   urlForLinkedRoom,
   type LinkedRoomId,
 } from "./route-state.js";
-import { formatStartupStatus } from "../../shared/startup-status.js";
 import "./style.css";
 
 const userInput = document.querySelector<HTMLInputElement>("#user")!;
@@ -54,6 +53,7 @@ const join = async (): Promise<void> => {
       LinkedRoomNavigator,
       SimulationDriver,
       devRealtimeCredential,
+      formatRuntimeStartupStatus,
     } = await import("@canvas-physics/client/runtime");
     const graph = new RoomLinkGraph(linkedRoomLinks);
     const openRoom = async (request: Readonly<RoomOpenRequest>): Promise<LinkedRoomHandle> => {
@@ -102,7 +102,7 @@ const join = async (): Promise<void> => {
       });
       const unsubscribeStartup = runtime.subscribeStartup((snapshot) => {
         mount.dataset.startupReady = String(snapshot.phase === "ready");
-        status.textContent = `${names[request.roomId] ?? request.roomId} · ${formatStartupStatus(
+        status.textContent = `${names[request.roomId] ?? request.roomId} · ${formatRuntimeStartupStatus(
           snapshot,
           { assetName: "room art" },
         )}`;

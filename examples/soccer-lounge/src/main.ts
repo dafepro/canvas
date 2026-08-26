@@ -9,7 +9,6 @@ import type { SoccerBallState } from "./soccer-ball-behavior.js";
 import { soccerAssets } from "./assets.js";
 import { projectSoccerParticipantAvatar } from "./participant-projection.js";
 import { playerOverlayGeometry, playerStarCount } from "./player-overlay.js";
-import { formatStartupStatus } from "../../shared/startup-status.js";
 import "./style.css";
 
 const searchParams = new URLSearchParams(location.search);
@@ -131,7 +130,12 @@ const join = async (): Promise<void> => {
 
   let nextRuntime: CanvasRuntime | undefined;
   try {
-    const { CanvasRuntime, SimulationDriver, devRealtimeCredential } = await import(
+    const {
+      CanvasRuntime,
+      SimulationDriver,
+      devRealtimeCredential,
+      formatRuntimeStartupStatus,
+    } = await import(
       "@canvas-physics/client/runtime"
     );
     const worker = new Worker(new URL("./canvas.worker.ts", import.meta.url), {
@@ -174,7 +178,7 @@ const join = async (): Promise<void> => {
     runtime = nextRuntime;
     unsubscribers = [
       nextRuntime.subscribeStartup((snapshot) => {
-        status.textContent = formatStartupStatus(snapshot, {
+        status.textContent = formatRuntimeStartupStatus(snapshot, {
           assetName: "lounge art",
           readyMessage: "Lounge ready",
         });
