@@ -27,7 +27,7 @@ and replaced after 1.0 without changing the core model.
 **Implemented.** `RoomSession` remains the public room handle and IO effect
 runner, while six internal owners now hold the state that previously crossed
 unrelated callbacks: `ConnectionSession`, `HostRoleSession`,
-`ReplicationTimeline`, `DurableCommandSession`, `ParticipantRoster`, and
+`ReplicationTimeline`, `ItemMutationSession`, `ParticipantRoster`, and
 `PresentationGate`. Worker requests and responses are fenced by simulation
 generation. Connection/JOIN work is fenced by connection generation. Host-only
 schedules and graceful checkpoint settlement belong to the current immutable
@@ -97,7 +97,7 @@ by `RoomSession` when accepting the frame.
 
 **Implemented design.** Keep `RoomSession` as the public facade, but move state into
 explicit collaborating machines: `ConnectionSession`, `HostRoleSession`,
-`ReplicationTimeline`, `DurableCommandSession`, and `PresentationGate`.
+`ReplicationTimeline`, `ItemMutationSession`, and `PresentationGate`.
 Messages should be reduced through typed transitions with invariants, not
 handled as mutations scattered through one switch. Role change and reconnect
 must reset or retain each subsystem through a declared policy.
@@ -120,9 +120,9 @@ the same verified slice that replaces it.
 This work creates the boundaries needed by three later candidates but does not
 silently implement them:
 
-- `DurableCommandSession` initially preserves the current command protocol and
-  preview semantics. Explicit mutation acknowledgements remain the next item-
-  transaction change.
+- `ItemMutationSession` subsequently gained acknowledged receipts, per-item
+  queues, edit handles, reconnect resend, and canonical presentation release
+  in the completed item-transaction redesign below.
 - `ReplicationTimeline` initially preserves the current interpolation and
   reconciliation algorithms. The larger latency/jitter algorithm matrix
   remains replication hardening after extraction.
@@ -143,7 +143,7 @@ hold duplicated subsystem state or decide transitions itself.
 | `HostRoleSession` | Current immutable lease, host epoch/generation, migration counters, simulation readiness for that generation, host avatar membership, active host publishing/checkpoint schedules, and graceful-final-checkpoint transaction | JOIN initialized, host granted/changed, participant changes, simulation responses, scheduled host sends, graceful stop | Generation-tagged worker role/init/avatar messages, canonical state/effect/checkpoint sends, host diagnostics |
 | `ParticipantRoster` | Stable participant tombstones, ephemeral connections, active/inactive/disconnected state, last canonical avatar positions, and applied projection state | Presence, avatar canonical state, player input state, JOIN snapshot | Frozen presence snapshot and host avatar add/lifecycle intents |
 | `ReplicationTimeline` | Host entity source, host epoch/tick gate, interpolation buffer, local prediction, acknowledged input sequence, bounded prediction history, reconciliation, canonical/behavior snapshots, and host delta/keyframe baselines | Full state, delta, authoritative host frame, local prediction frame, render time, epoch reset | Draw frame, frozen observer snapshots, encoded changed/removed entities, replication diagnostics |
-| `DurableCommandSession` | Command identity, item metadata, preview coalescing schedule, pending preview, rejection state, and current item count | Public mutation, JOIN metadata, accepted/rejected/preview result, connection generation change | Reliable commands and typed worker item mutations |
+| `ItemMutationSession` | Mutation identity, per-item queues, receipts, item metadata, edit handles, preview schedules, and optimistic presentation | Public mutation, JOIN metadata, mutation/edit/preview result, canonical revision, connection generation change | Reliable mutation/edit messages, disposable previews, typed worker item mutations, frozen receipt snapshots |
 | `PresentationGate` | Readiness facts and sticky public presentation outcome for the current room session | JOIN initialized, simulation generation ready, roster snapshot, canonical entity IDs, terminal failure | Resolve/reject `whenPresented`, internal authoritative-current diagnostics |
 
 Frozen canonical, behavior, presence, lifecycle, and effect observers remain
@@ -154,7 +154,7 @@ each owner can cancel only its own work and pure tests can use virtual time.
 `RoomClient` was narrowed during the redesign so it cannot remain a competing source
 of session truth. It keeps transport ownership, protobuf encode/decode,
 heartbeat IO, traffic counters, and the minimum ingress epoch fence needed to
-drop invalid wire packets. JOIN, host control, and durable acceptance publish
+drop invalid wire packets. JOIN, host control, and mutation acceptance publish
 immutable versioned tokens (`ConnectionIdentity`, `HostLease`, and
 `DurableRevision`) instead of exposing mutable `clientId`, `isHost`,
 `hostEpoch`, or `sceneRevision` fields. The appropriate subsystem retains the
@@ -200,7 +200,7 @@ removed when tagging lands; there is no dual decoder.
 | Host grant/promotion | Interpolation correction, prediction history, delta/behavior baselines, applied host-avatar projection, simulation generation | Newest already-observed avatar positions over an older checkpoint; durable item metadata reconciled with accepted snapshot |
 | Host loss/demotion | Host send/checkpoint schedules, final-checkpoint transaction, host entity source, simulation generation | Local avatar identity and a peer prediction seeded from the newest validated position |
 | Background | Host eligibility and, if hosting, lease ownership | Session identity, presentation, observers, and peer prediction; exactly one yield is emitted for the transition |
-| Durable rejection | Only the matching pending mutation/preview state | Canonical item metadata and unrelated commands; publish one recoverable typed error |
+| Mutation rejection | Only the matching receipt and optimistic presentation | Canonical item metadata and unrelated mutations; settle a typed outcome without raising a transport error |
 | Terminal server rejection, stop, or failed initialization | Every timer, pending effect, role, prediction, preview, and waiter | Terminal lifecycle/error snapshot only; driver and client close exactly once |
 
 After the room has once reached public `presented`, reconnect does not hide the
@@ -223,8 +223,8 @@ state and methods it replaced from `RoomSession`.
    `simulationGeneration` to the internal main-thread/worker contract and tests
    proving delayed old-generation `ready`, `render`, `effects`, `snapshot`, and
    initialization completions are inert.
-1. **Extract `DurableCommandSession` (`7c8aa9d`).** Move command construction, IDs, item
-   metadata, preview coalescing, accepted-command translation, rejection, and
+1. **Extract `ItemMutationSession` (`7c8aa9d`).** Move mutation construction, IDs, item
+   metadata, preview coalescing, accepted-mutation translation, rejection, and
    item counts. Test preview timing with virtual time, reconnect cancellation,
    rejection isolation, and accepted results while host/peer. Delete all
    preview timers, command counters, and metadata maps from the facade.
@@ -278,7 +278,7 @@ Invariants checked after every event:
 - at most one role, host schedule set, preview timer, and final-checkpoint
   transaction is active;
 - host epoch, canonical tick within an epoch, acknowledged input sequence, and
-  durable command identity are monotonic;
+  mutation identity are monotonic;
 - prediction history stays bounded and never reconciles canonical sequence N
   against a prediction newer than N;
 - participant identity maps to exactly one avatar and a disconnected
@@ -316,31 +316,19 @@ facade or reintroduce writable room-authority fields.
 
 ### Acknowledged item-edit transactions
 
-**Status:** implementation-ready plan; this is the next redesign slice.
+**Status:** completed in `edcec85`, `1d404fa`, `b369efb`, and `742c8a5`;
+consumer and fault-gate follow-through is included in the same redesign slice.
 
 #### Evidence and current failure modes
 
-Live item editing currently crosses four owners without carrying one operation
-identity through them:
-
-- `ItemEditInteraction` emits anonymous preview and commit callbacks.
-- `DurableCommandSession` owns one global coalesced preview timer and constructs
-  `commandId`, but its public mutation methods return `void` and rejection is an
-  uncorrelated string.
-- The relay echoes `commandId` in `DurableCommandResult`, yet the client reduces
-  the message to generic accepted/rejected events. It does not retain an
-  in-flight mutation or protect the server from applying a retried command
-  twice.
-- `ItemEditPresentation` holds a committed local transform until canonical
-  state happens to match it or 1.5 seconds pass. A timeout therefore makes a
-  missing result, a rejected command, and slow canonical presentation look the
-  same.
-
-This has already surfaced as choppy local movement, frozen state not appearing
-durable, spawn/edit selection disagreement, overlap dragging, and example code
-that treats *any* scene-revision increase as acceptance of its latest edit. The
-current global preview slot also lets a preview for one item replace a queued
-preview for another.
+The failure mode was an edit crossing pointer, presentation, relay, and host
+owners without one correlated operation identity. The completed design now
+uses edit-session IDs for disposable presentation and mutation IDs for durable
+state. `ItemMutationSession` owns per-item queues and receipts; the relay owns
+leases, revisions, authorization, and a persisted idempotency ledger; and
+`ItemEditPresentation` releases local state only on the matching result plus
+canonical revision. The item studio consumes the matching receipt instead of
+watching an unrelated room revision.
 
 #### Design decisions
 
@@ -451,7 +439,7 @@ that are still awaiting their terminal result.
 
 #### Wire and persistence contract
 
-The current `DurableCommand.preview` shape is replaced by three explicit
+The current `the old preview boolean` shape is replaced by three explicit
 families:
 
 - Reliable `BeginItemEdit` / `ItemEditSessionResult` / `RenewItemEdit` /
@@ -485,10 +473,10 @@ failure. Product text remains consumer-owned.
 
 | Concern | Sole owner | Rule |
 | --- | --- | --- |
-| IDs, per-item send queues, pending receipts | `DurableCommandSession` | A receipt reaches one terminal state exactly once. |
+| IDs, per-item send queues, pending receipts | `ItemMutationSession` | A receipt reaches one terminal state exactly once. |
 | Edit lease and preview sequence | Relay room | One active edit session per entity; cleanup always emits an authoritative revert to the host. |
 | Authorization, item revision, deduplication | Relay room | Validate and record a receipt before broadcasting one accepted result. |
-| Optimistic transform/config presentation | New transaction presentation helper owned by `DurableCommandSession` | Never expires on wall time; it transitions only from mutation/edit events and canonical evidence. |
+| Optimistic transform/config presentation | New transaction presentation helper owned by `ItemMutationSession` | Never expires on wall time; it transitions only from mutation/edit events and canonical evidence. |
 | Pointer gesture interpretation | `ItemEditInteraction` | Produces intent for an existing edit handle; owns no network timer or mutation result. |
 | Canonical physics application | Current host simulation | Applies only authoritative accepted mutations or validated previews fenced by host epoch. |
 | UI status and wording | Consumer | Observes handles/receipts; never infers success from a generic scene-revision change. |
@@ -527,9 +515,9 @@ code and only affected suites are run before committing.
    typed validation results, receipt deduplication, disconnect/expiry cleanup,
    persisted receipt-window state, and accepted authoritative broadcasts. Cover
    the room event loop and both memory/file store conformance.
-3. **Client transaction machine.** Replace anonymous command construction with
+3. **Client transaction machine.** Replace anonymous mutation construction with
    edit handles, per-item queues, mutation receipts, reconnect resend, and
-   frozen observers in `DurableCommandSession`. Remove the global preview slot,
+   frozen observers in `ItemMutationSession`. Remove the global preview slot,
    `preview` boolean, and generic mutation rejection effect.
 4. **Presentation integration.** Replace the 1.5-second map with
    transaction-keyed optimistic layers and canonical-revision release. Wire
@@ -640,7 +628,7 @@ in `GAPS.md`.
 **Redesign.** Define one authorized, non-durable action envelope with an action
 name, validated payload, request ID, behavior dispatch, and accepted/rejected
 result. Actions are never replayed from snapshots and do not mutate item
-configuration unless the behavior explicitly emits a durable command through
+configuration unless the behavior explicitly emits a durable mutation through
 an existing authority path.
 
 ## Reviewed, but not redesign candidates right now
@@ -663,7 +651,7 @@ an existing authority path.
 
 ## Recommended order
 
-1. Add acknowledged item mutations on top of `DurableCommandSession`.
+1. Add acknowledged item mutations on top of `ItemMutationSession`.
 2. Expand replication/prediction fault coverage on `ReplicationTimeline`.
 3. Publish startup progress before asking external consumers to build polished
    loading/error UI.

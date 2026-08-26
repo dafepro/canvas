@@ -50,18 +50,18 @@ Every application-facing failure is a `CanvasConsumerError` with:
 
 - `code`: stable machine-readable classification;
 - `source`: `lifecycle`, `transport`, `protocol`, `initialization`,
-  `simulation`, `durable-command`, or `assets`;
+  `simulation`, `item-mutation`, or `assets`;
 - `recoverable`: whether the current room instance can continue;
 - `message`: human-readable diagnostic text, not an application contract;
 - optional `details` and original `cause`.
 
 Fatal errors reject `start()`, `whenReady()`, or `whenPresented()`, enter `failed`, and release the
-worker and transport. Recoverable simulation and durable-command errors are
+worker and transport. Recoverable simulation and item-mutation errors are
 reported through `onError` without terminating the session. Required asset
 preload failures reject `CanvasRuntime.start()` before a room connection opens.
 
 The current stable codes are `invalid_lifecycle_state`, `start_cancelled`,
 `transport_connection_failed`, `transport_reconnect_exhausted`,
 `transport_closed`, `server_rejected`, `join_initialization_failed`,
-`simulation_failed`, `durable_command_rejected`, and `asset_preload_failed`.
+`simulation_failed`, `item_mutation_rejected`, and `asset_preload_failed`.
 Consumers should branch on `code` and `recoverable`, never parse `message`.

@@ -65,7 +65,7 @@ same simulation in the test process.
 
 | Item | State |
 | --- | --- |
-| Durable commands: spawn, delete, move, rotate, set config | Done in the protocol, the server, and the client API. |
+| Acknowledged item mutations: spawn, delete, transform, rotate, scale, config, isolation, collisions | Done in the protocol, relay, and client API. Each call returns a correlated typed receipt; same-item writes use item revisions and reconnect retries are idempotent. |
 | The server enforces the owner before broadcasting | Done and tested, including the reject reasons. |
 | Persist item instances and the scene revision | Done. The reference service atomically retains versioned snapshot records in `FileStore`; a real-process restart test verifies restoration from the same data directory. |
 | Accept 1 Hz host checkpoints | Done, with validation of bounds, item count, and revision order. |

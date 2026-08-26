@@ -36,7 +36,11 @@ import {
   type RoomSessionRates,
   type SessionDiagnostics,
 } from "./room-session.js";
-import type { ItemEditHandle } from "./session/item-mutation-session.js";
+import type {
+  ItemEditHandle,
+  ItemMutationReceipt,
+  ItemMutationSnapshot,
+} from "./session/item-mutation-session.js";
 import {
   pixiAssetLoader,
   preloadAssetManifest,
@@ -663,36 +667,40 @@ export class CanvasRuntime {
 
   // ---------- durable mutations ----------
 
-  spawnItem(definitionId: string, at: Vec2, rotation = 0, scale = 1): void {
-    this.session.spawnItem(definitionId, at, rotation, scale);
+  spawnItem(definitionId: string, at: Vec2, rotation = 0, scale = 1): ItemMutationReceipt {
+    return this.session.spawnItem(definitionId, at, rotation, scale);
   }
 
   moveItem(entityId: string, transform: Transform) {
     return this.session.moveItem(entityId, transform);
   }
 
-  rotateItem(entityId: string, rotation: number): void {
-    this.session.rotateItem(entityId, rotation);
+  rotateItem(entityId: string, rotation: number): ItemMutationReceipt {
+    return this.session.rotateItem(entityId, rotation);
   }
 
-  scaleItem(entityId: string, scale: number): void {
-    this.session.scaleItem(entityId, scale);
+  scaleItem(entityId: string, scale: number): ItemMutationReceipt {
+    return this.session.scaleItem(entityId, scale);
   }
 
-  setItemConfig(entityId: string, config: unknown): void {
-    this.session.setItemConfig(entityId, config);
+  setItemConfig(entityId: string, config: unknown): ItemMutationReceipt {
+    return this.session.setItemConfig(entityId, config);
   }
 
-  setItemIsolation(entityId: string, isolated: boolean): void {
-    this.session.setItemIsolation(entityId, isolated);
+  setItemIsolation(entityId: string, isolated: boolean): ItemMutationReceipt {
+    return this.session.setItemIsolation(entityId, isolated);
   }
 
-  setItemCollisionsEnabled(entityId: string, enabled: boolean): void {
-    this.session.setItemCollisionsEnabled(entityId, enabled);
+  setItemCollisionsEnabled(entityId: string, enabled: boolean): ItemMutationReceipt {
+    return this.session.setItemCollisionsEnabled(entityId, enabled);
   }
 
-  deleteItem(entityId: string): void {
-    this.session.deleteItem(entityId);
+  deleteItem(entityId: string): ItemMutationReceipt {
+    return this.session.deleteItem(entityId);
+  }
+
+  subscribeItemMutations(observer: (snapshot: ItemMutationSnapshot) => void): () => void {
+    return this.session.subscribeItemMutations(observer);
   }
 
   diagnostics(): RuntimeDiagnostics {

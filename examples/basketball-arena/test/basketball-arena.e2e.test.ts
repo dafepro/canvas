@@ -39,7 +39,7 @@ describe.skipIf(!goAvailable())("basketball arena through canvasd", () => {
 
   it("boots the centred game ball, mirrored hoops, and item scoreboards", async () => {
     session = new RoomSession({
-      roomId: "basketball-arena-v2",
+      roomId: "basketball-arena",
       serverUrl: server.url,
       credentialProvider: async () => devRealtimeCredential("e2e-baller", "E2E Baller"),
       definitions: basketballDefinitions,
@@ -63,7 +63,7 @@ describe.skipIf(!goAvailable())("basketball arena through canvasd", () => {
     );
 
     expect(session.canvas).toMatchObject({
-      id: "basketball-arena-v2",
+      id: "basketball-arena",
       backgroundAssetId: "basketball.court",
       systemItems: expect.any(Array),
     });

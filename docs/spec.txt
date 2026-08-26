@@ -366,7 +366,7 @@ interface RoomTransport {  connect(join: JoinDescriptor): Promise<void>;  sendRe
 [BodyText] For WebRTC, use separate logical channels: a reliable ordered channel for control/state transitions and an unordered or limited-retransmit channel for frequent transform snapshots. Old transform packets are usually less useful than newer ones.
 [Heading2] 12.3 Binary protocol
 [BodyText] Use Protocol Buffers for realtime envelopes shared by TypeScript and Go. Keep JSON for editable item/canvas definitions and administration. Binary state packets are smaller and faster to parse, while versioned .proto files make the Go/TypeScript contract explicit.
-message RoomEnvelope {  string room_id = 1;  uint64 host_epoch = 2;  uint32 sequence = 3;  uint64 tick = 4;  oneof payload {    PlayerInput player_input = 10;    StateDelta state_delta = 11;    FullState full_state = 12;    EffectEvent effect_event = 13;    HostControl host_control = 14;    DurableCommand durable_command = 15;    DurableCommandResult durable_result = 16;  }}
+message RoomEnvelope {  string room_id = 1;  uint64 host_epoch = 2;  uint32 sequence = 3;  uint64 tick = 4;  oneof payload {    PlayerInput player_input = 10;    StateDelta state_delta = 11;    FullState full_state = 12;    EffectEvent effect_event = 13;    HostControl host_control = 14;    ItemMutation item_mutation = 15;    ItemMutationResult item_mutation_result = 16;    ItemEditPreview item_edit_preview = 17;  }}
 
 [Heading2] 12.4 Message classes
 Class
@@ -418,7 +418,7 @@ Launch trail start, impact burst, portal flash, animation cue.
 [Heading1] 14. Ownership, editing, and integrity
 [Heading2] 14.1 Server-authoritative durable mutations
 [BodyText] The simulation host is authoritative for moment-to-moment physics, but it is not authoritative for ownership or durable edits. Every spawn, delete, move-in-edit-mode, rotate, or config change goes through the Go backend. The backend checks the authenticated user and item owner before accepting the command.
-owner client -> DURABLE_COMMAND(move item 123)Go backend:  authenticate user  load/check item owner  validate config / bounds / scene limits  increment sceneRevision  broadcast accepted commandsimulation host:  apply edit to canonical world  include result in next snapshot
+owner client -> ITEM_MUTATION(transform item 123)Go backend:  authenticate user  load/check item owner and itemRevision  validate config / bounds / scene limits  increment sceneRevision  broadcast accepted resultsimulation host:  apply accepted edit to canonical world  include result in next snapshot
 
 [Heading2] 14.2 Edit mode behavior
 [ListBullet] While the owner drags an item for editing, show a local ghost immediately.
@@ -466,7 +466,7 @@ Purpose
 GET /v1/rooms/{id}
 Resolved canvas definition, scene revision, static item metadata, current room snapshot descriptor.
 WSS /v1/realtime/rooms/{id}
-Presence, host lease, inputs, relayed state, durable commands, checkpoints.
+Presence, host lease, inputs, relayed state, acknowledged item mutations, checkpoints.
 GET /v1/item-definitions/{id}
 Definition metadata / asset manifest when not bundled with the client.
 

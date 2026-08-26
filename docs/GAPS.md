@@ -122,6 +122,11 @@ work below because they determine the public boundary every consumer will use.
 - [x] Define start, stop, reconnect, remount, background, and route-unmount
   lifecycle behavior with a typed consumer error model.
 - [x] Provide renderer-safe projection and bounded overlay observation helpers.
+- [x] Replace anonymous item edits with acknowledged mutation receipts,
+  per-item revisions and queues, server edit leases, idempotent reconnect
+  retries, sequenced previews, and canonical-revision presentation release.
+  The item studio consumes matching receipts and the superseded wire path was
+  deleted rather than retained as a compatibility branch.
 
 ## Consumer-library Priority 2 — proof and hardening
 
@@ -219,9 +224,9 @@ work below because they determine the public boundary every consumer will use.
   transforms, and apply accepted configuration to the live host behavior.
 - [x] Add authoritative uniform item scaling across durable transforms,
   protocol, persistence, interpolation, rendering, and collider geometry.
-- [x] Relay owner move previews to the host without persisting them, coalesce
-  preview bursts to a bounded reliable send rate, and send release commits
-  immediately.
+- [x] Relay leased, sequenced owner previews to the host without persisting
+  them, coalesce each edit stream to a bounded realtime send rate, and send an
+  acknowledged release mutation immediately.
 - [x] Add explicit edit mode with owner-only item selection, a local drag ghost,
   rate-limited preview moves, and a final release commit.
 - [x] Add a durable Store implementation for the reference service so process

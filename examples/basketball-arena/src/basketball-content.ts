@@ -145,7 +145,7 @@ export const basketballDefinitions: ItemDefinition[] = [
 ];
 
 export const basketballCanvas: CanvasDefinition = {
-  id: "basketball-arena-v2",
+  id: "basketball-arena",
   version: 2,
   size: { width: 70, height: 42 },
   orientation: "topDown",

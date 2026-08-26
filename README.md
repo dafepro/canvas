@@ -230,6 +230,10 @@ Applications can also register ordered, local-only pointer interaction
 strategies without attaching competing listeners to the Canvas surface; see
 `docs/POINTER_INTERACTIONS.md`.
 
+Every item mutation returns an acknowledged receipt. Consumers can display the
+matching accepted or typed-rejected outcome without inferring success from an
+unrelated scene update; see `docs/ITEM_MUTATIONS.md`.
+
 ## Add a behavior
 
 A behavior consumes normalized events and returns commands. It never touches
@@ -287,4 +291,6 @@ This writes the TypeScript bindings and the Go bindings from the same file.
   release candidate guarantees independent consumers.
 - `docs/NETWORK_FAULT_TESTING.md` — deterministic loss, latency, jitter, and
   reordering test support plus the verified fault matrix.
+- `docs/ITEM_MUTATIONS.md` — receipts, edit leases, conflicts, retries, and
+  canonical presentation reconciliation.
 - `docs/spec.txt` — the plain text of the specification, for searching.

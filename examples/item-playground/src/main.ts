@@ -1,6 +1,7 @@
 import type {
   CanvasRuntime,
   CanonicalStateSnapshot,
+  ItemMutationReceipt,
   OverlayProjectionSnapshot,
 } from "@canvas-physics/client/runtime";
 import type { RenderEntity } from "@canvas-physics/client";
@@ -71,7 +72,7 @@ let unsubscribeState: (() => void) | undefined;
 let unsubscribeOverlay: (() => void) | undefined;
 let entities: readonly Readonly<RenderEntity>[] = [];
 let selectedEntityId: string | undefined;
-let pendingAfterRevision: number | undefined;
+let latestAction: Pick<ItemMutationReceipt, "clientSessionId" | "mutationId"> | undefined;
 let spawnCursor = 0;
 let lastManageSignature = "";
 let graffitiDraft: GraffitiConfig = { ...defaultGraffitiConfig };
@@ -187,12 +188,29 @@ const togglePopover = (button: HTMLButtonElement, panel: HTMLElement): void => {
   button.setAttribute("aria-expanded", String(open));
 };
 
-const requestMutation = (message: string, action: () => void): void => {
+const requestMutation = (message: string, action: () => ItemMutationReceipt): void => {
   if (!runtime) return;
-  pendingAfterRevision = runtime.diagnostics().sceneRevision;
   actionStatus.textContent = message;
   actionStatus.dataset.kind = "pending";
-  action();
+  const receipt = action();
+  latestAction = receipt;
+  void receipt.settled.then((outcome) => {
+    if (
+      latestAction?.clientSessionId !== receipt.clientSessionId ||
+      latestAction.mutationId !== receipt.mutationId
+    ) return;
+    latestAction = undefined;
+    if (outcome.status === "accepted") {
+      actionStatus.textContent = `Accepted · revision ${outcome.sceneRevision}`;
+      actionStatus.dataset.kind = "accepted";
+      return;
+    }
+    const detail = outcome.status === "rejected"
+      ? outcome.message ?? outcome.code
+      : outcome.reason;
+    actionStatus.textContent = `${outcome.status === "rejected" ? "Rejected" : "Cancelled"} · ${detail.replaceAll("_", " ")}`;
+    actionStatus.dataset.kind = "rejected";
+  });
 };
 
 const renderOwnedList = (): void => {
@@ -230,11 +248,6 @@ const observeState = (snapshot: CanonicalStateSnapshot): void => {
   if (selectedEntityId && !entities.some(({ id }) => id === selectedEntityId)) {
     selectedEntityId = undefined;
     closeMoreMenu();
-  }
-  if (pendingAfterRevision !== undefined && snapshot.sceneRevision > pendingAfterRevision) {
-    pendingAfterRevision = undefined;
-    actionStatus.textContent = "Accepted · room updated";
-    actionStatus.dataset.kind = "accepted";
   }
   renderOwnedList();
 };
@@ -399,7 +412,6 @@ const join = async (): Promise<void> => {
           : `Loading assets… ${loaded}/${total}`;
       },
       onError: (error) => {
-        pendingAfterRevision = undefined;
         actionStatus.textContent = `Rejected · ${error.message.replaceAll("_", " ")}`;
         actionStatus.dataset.kind = "rejected";
       },
@@ -456,6 +468,7 @@ const leave = (): void => {
   });
   closePopovers();
   entities = [];
+  latestAction = undefined;
   selectedEntityId = undefined;
   closeMoreMenu();
   graffitiLayer.replaceChildren();
