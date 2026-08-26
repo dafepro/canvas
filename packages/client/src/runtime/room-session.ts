@@ -344,6 +344,10 @@ export class RoomSession {
     return this.startup.subscribe(observer);
   }
 
+  whenStartupReady(): Promise<void> {
+    return this.startup.waitUntilReady();
+  }
+
   /** Resolves after JOIN and consumer initialization (including scene mount). */
   whenReady(): Promise<void> {
     return this.connection.whenReady();

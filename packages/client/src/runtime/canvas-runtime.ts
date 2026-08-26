@@ -254,6 +254,11 @@ export class CanvasRuntime {
     return this.startup.subscribe(observer);
   }
 
+  /** Resolves only after assets, canonical state, and the first Pixi update. */
+  whenStartupReady(): Promise<void> {
+    return this.startup.waitUntilReady();
+  }
+
   /** Bounded plain-data samples for DOM labels, controls, and product overlays. */
   subscribeOverlayProjection(
     observer: OverlayProjectionObserver,

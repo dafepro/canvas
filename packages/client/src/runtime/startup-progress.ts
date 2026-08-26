@@ -83,6 +83,10 @@ export class StartupProgress {
   private assetsValue?: Readonly<AssetProgress>;
   private errorValue?: CanvasConsumerError;
   private snapshotValue: Readonly<RuntimeStartupSnapshot>;
+  private readonly readyWaiters = new Set<{
+    resolve: () => void;
+    reject: (error: CanvasConsumerError) => void;
+  }>();
 
   constructor(
     initialPhase: RuntimeStartupActivePhase,
@@ -104,6 +108,19 @@ export class StartupProgress {
     return () => this.observers.delete(observer);
   }
 
+  waitUntilReady(): Promise<void> {
+    if (this.phaseValue === "ready") return Promise.resolve();
+    if (this.isTerminal) {
+      return Promise.reject(this.errorValue ?? lifecycleError(
+        "invalid_lifecycle_state",
+        `Runtime startup ended as ${this.phaseValue}`,
+      ));
+    }
+    return new Promise<void>((resolve, reject) => {
+      this.readyWaiters.add({ resolve, reject });
+    });
+  }
+
   advance(phase: RuntimeStartupActivePhase): void {
     if (this.isTerminal || this.phaseValue === "ready") return;
     const current = this.phaseValue as RuntimeStartupActivePhase;
@@ -121,6 +138,10 @@ export class StartupProgress {
     this.phaseStartedAtMs = atMs;
     if (phase === "ready") this.completedAtMs = atMs;
     this.publish();
+    if (phase === "ready") {
+      for (const waiter of this.readyWaiters) waiter.resolve();
+      this.readyWaiters.clear();
+    }
   }
 
   updateAssets(progress: Readonly<AssetProgress>): void {
@@ -162,6 +183,8 @@ export class StartupProgress {
     this.completedAtMs = atMs;
     this.errorValue = error;
     this.publish();
+    for (const waiter of this.readyWaiters) waiter.reject(error);
+    this.readyWaiters.clear();
   }
 
   private publish(): void {
@@ -207,6 +230,10 @@ export class RuntimeStartupProgressCoordinator {
 
   subscribe(observer: RuntimeStartupObserver): () => void {
     return this.progress.subscribe(observer);
+  }
+
+  waitUntilReady(): Promise<void> {
+    return this.progress.waitUntilReady();
   }
 
   configureAssets(sources: readonly Readonly<{ id: string; required: boolean }>[]): void {

@@ -30,6 +30,13 @@ export type {
   CanvasLifecycleSnapshot,
   CanvasLifecycleState,
 } from "./lifecycle.js";
+export type {
+  RuntimeStartupActivePhase,
+  RuntimeStartupObserver,
+  RuntimeStartupPhase,
+  RuntimeStartupPhaseTiming,
+  RuntimeStartupSnapshot,
+} from "./startup-progress.js";
 export * from "../render/overlay-projection.js";
 export { defaultPointerFlickOptions } from "../input/avatar-pointer-interaction.js";
 export type {

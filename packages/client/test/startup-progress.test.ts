@@ -139,10 +139,27 @@ describe("StartupProgress", () => {
 
     expect(healthy).toHaveBeenCalledTimes(2);
   });
+
+  it("settles readiness waiters from the same terminal state machine", async () => {
+    const ready = new StartupProgress("presenting", () => 1);
+    const first = ready.waitUntilReady();
+    const second = ready.waitUntilReady();
+    ready.advance("ready");
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).resolves.toBeUndefined();
+    await expect(ready.waitUntilReady()).resolves.toBeUndefined();
+
+    const failed = new StartupProgress("canonical", () => 1);
+    const rejected = failed.waitUntilReady();
+    const error = lifecycleError("transport_closed", "gone", { source: "transport" });
+    failed.fail(error);
+    await expect(rejected).rejects.toBe(error);
+    await expect(failed.waitUntilReady()).rejects.toBe(error);
+  });
 });
 
 describe("RuntimeStartupProgressCoordinator", () => {
-  it("holds room progress behind assets and waits for an actual presented frame", () => {
+  it("holds room progress behind assets and waits for an actual presented frame", async () => {
     const runtime = new RuntimeStartupProgressCoordinator(() => 1);
     runtime.configureAssets([
       { id: "field", required: true },
@@ -171,7 +188,9 @@ describe("RuntimeStartupProgressCoordinator", () => {
 
     expect(runtime.snapshot.phase).toBe("presenting");
     expect(phases).not.toContain("ready");
+    const ready = runtime.waitUntilReady();
     runtime.markPresentedFrame();
+    await expect(ready).resolves.toBeUndefined();
     expect(runtime.snapshot.phase).toBe("ready");
   });
 
