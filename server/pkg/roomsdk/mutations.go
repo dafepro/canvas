@@ -72,7 +72,8 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 	}
 	if command.Kind == pb.DurableCommandKind_DURABLE_MOVE_ITEM ||
 		command.Kind == pb.DurableCommandKind_DURABLE_DELETE_ITEM ||
-		command.Kind == pb.DurableCommandKind_DURABLE_SCALE_ITEM {
+		command.Kind == pb.DurableCommandKind_DURABLE_SCALE_ITEM ||
+		command.Kind == pb.DurableCommandKind_DURABLE_ROTATE_ITEM {
 		delete(r.previews, command.EntityId)
 	}
 

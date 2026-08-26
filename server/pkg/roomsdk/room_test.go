@@ -1799,6 +1799,57 @@ func TestPreviewRevertsWhenTheEditingPeerDisconnects(t *testing.T) {
 	}
 }
 
+func TestCommittedRotationClearsTheTransientTransformPreview(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+	peer := h.dial("bob")
+	peer.join()
+
+	peer.send(spawnCommand("cmd-spawn", 20, 30))
+	spawned := peer.await(func(e *pb.RoomEnvelope) bool {
+		r := e.GetDurableResult()
+		return r != nil && r.CommandId == "cmd-spawn"
+	}).GetDurableResult()
+	entityID := spawned.Command.EntityId
+
+	peer.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-preview", Kind: pb.DurableCommandKind_DURABLE_MOVE_ITEM,
+			EntityId: entityID, Position: &pb.Vec2{X: 20, Y: 30},
+			Rotation: math.Pi / 12, Scale: 1, Preview: true,
+		}},
+	})
+	host.await(func(e *pb.RoomEnvelope) bool {
+		command := e.GetDurableCommand()
+		return command != nil && command.CommandId == "cmd-preview"
+	})
+
+	peer.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-rotate", Kind: pb.DurableCommandKind_DURABLE_ROTATE_ITEM,
+			EntityId: entityID, Rotation: math.Pi / 12,
+		}},
+	})
+	peer.await(func(e *pb.RoomEnvelope) bool {
+		result := e.GetDurableResult()
+		return result != nil && result.CommandId == "cmd-rotate" && result.Accepted
+	})
+
+	h.server.mu.Lock()
+	room := h.server.rooms["test-canvas"]
+	h.server.mu.Unlock()
+	if room == nil {
+		t.Fatal("room not found")
+	}
+	if _, previewing := room.previews[entityID]; previewing {
+		t.Fatal("durable rotation left a stale transform preview behind")
+	}
+}
+
 func TestCheckpointRejectsUnknownEntityIDs(t *testing.T) {
 	h := newHarness(t, nil)
 	host := h.dial("alice")

@@ -935,7 +935,11 @@ export class RoomSession {
   }
 
   moveItem(entityId: string, transform: Transform, preview = false): void {
-    this.durable.moveItem(entityId, transform, preview);
+    this.transformItem(entityId, transform, preview);
+  }
+
+  transformItem(entityId: string, transform: Transform, preview = false): void {
+    this.durable.transformItem(entityId, transform, preview);
   }
 
   rotateItem(entityId: string, rotation: number): void {

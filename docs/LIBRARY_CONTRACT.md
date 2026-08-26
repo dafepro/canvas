@@ -73,6 +73,13 @@ held after pointer-up until canonical state observes the commit or a bounded
 timeout expires. This presentation layer does not weaken server authorization
 or increase the network preview rate.
 
+Consumers that own rotation or scale controls use `transformItem` for bounded
+in-progress previews, then finish with the operation-specific durable command.
+The host applies each authorized preview to its simulation, so every viewer's
+ordinary state stream shows the manipulation before the durable commit. The
+relay discards transient preview ownership after a move, scale, or rotation
+commit and restores the last canonical transform if the editor disconnects.
+
 Behaviors may publish an optional RGB sprite tint with `setSpriteTint`. Tint is
 a generic render attribute, replicated with canonical entity state and stored
 in checkpoints. Consumers still own the meaning and selection of colors.

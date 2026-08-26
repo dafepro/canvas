@@ -688,7 +688,11 @@ export class CanvasRuntime {
   }
 
   moveItem(entityId: string, transform: Transform, preview = false): void {
-    this.session.moveItem(entityId, transform, preview);
+    this.transformItem(entityId, transform, preview);
+  }
+
+  transformItem(entityId: string, transform: Transform, preview = false): void {
+    this.session.transformItem(entityId, transform, preview);
   }
 
   rotateItem(entityId: string, rotation: number): void {

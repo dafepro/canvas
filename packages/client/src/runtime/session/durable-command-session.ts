@@ -136,6 +136,10 @@ export class DurableCommandSession {
   }
 
   moveItem(entityId: string, transform: Transform, preview = false): void {
+    this.transformItem(entityId, transform, preview);
+  }
+
+  transformItem(entityId: string, transform: Transform, preview = false): void {
     if (preview) {
       this.queuePreview(entityId, transform);
       return;

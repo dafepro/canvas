@@ -97,6 +97,36 @@ describe("DurableCommandSession", () => {
     expect(sent()).toHaveLength(3);
   });
 
+  it("exposes whole-transform previews without treating rotation as unbounded state", () => {
+    const { clock, session, sent } = build();
+    const preview = {
+      x: 12,
+      y: 24,
+      rotation: -Math.PI,
+      scale: 1.3,
+      z: 2,
+    };
+
+    session.transformItem("item-1", preview, true);
+    session.transformItem(
+      "item-1",
+      { ...preview, rotation: -Math.PI + Math.PI / 12 },
+      true,
+    );
+    clock.advance(100);
+
+    expect(sent()).toHaveLength(2);
+    expect(sent().at(-1)).toMatchObject({
+      kind: DurableCommandKind.DURABLE_MOVE_ITEM,
+      entityId: "item-1",
+      position: { x: 12, y: 24 },
+      rotation: -Math.PI + Math.PI / 12,
+      scale: 1.3,
+      z: 2,
+      preview: true,
+    });
+  });
+
   it("drops an unconfirmed preview when the connection generation changes", () => {
     const { clock, session, sent } = build();
     session.moveItem("item-1", transform(1), true);

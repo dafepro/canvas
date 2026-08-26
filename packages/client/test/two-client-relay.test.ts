@@ -106,6 +106,10 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     await waitFor("bob to join", () => bob.client.connectionIdentity.clientId !== "");
     await waitFor("bob to receive host state", () => view(bob).length > 0);
 
+    const charlie = session("charlie");
+    await charlie.start();
+    await waitFor("charlie to receive host state", () => view(charlie).length > 0);
+
     // Exactly one host, and both clients name the same one.
     expect(alice.client.hostLease.isHost).toBe(true);
     expect(bob.client.hostLease.isHost).toBe(false);
@@ -154,6 +158,10 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     await waitFor(
       "the host to apply the owner's preview move",
       () => Math.abs((entity(alice, crateId)?.x ?? 0) - previewTransform.x) < 0.5,
+    );
+    await waitFor(
+      "another viewer to see the owner's preview before commit",
+      () => Math.abs((entity(charlie, crateId)?.x ?? 0) - previewTransform.x) < 0.5,
     );
     expect(bob.client.durableRevision.sceneRevision).toBe(beforePreviewRevision);
 
