@@ -201,15 +201,21 @@ export const enterCanvasRoute = async () => {
     mount: document.querySelector("#stage")!,
     definitions: productCanvasDefinitions,
   });
+  const unsubscribeStartup = runtime.subscribeStartup((snapshot) => {
+    renderProductLoadingState(snapshot);
+  });
   await runtime.start();
-  await runtime.whenReady();
-  await runtime.whenPresented();
-  return runtime;
+  await runtime.whenStartupReady();
+  return { runtime, unsubscribeStartup };
 };
 ```
 
-`whenPresented()` is the reveal gate for staged UI: it waits until the room's
-durable items and connected avatars have appeared in canonical render state.
+`whenStartupReady()` is the browser reveal gate: it waits for required assets,
+room access, JOIN, simulation, complete canonical state, and the first renderer
+update. `subscribeStartup()` reports each of those waits as a frozen semantic
+snapshot, including per-source asset settlement and typed terminal failure.
+`RoomSession.whenPresented()` remains the lower-level headless gate for a
+complete authoritative entity set.
 
 The `@canvas-physics/client/runtime` subpath is deliberately loaded with
 `import()`. Product routes that never enter a canvas do not download Pixi,

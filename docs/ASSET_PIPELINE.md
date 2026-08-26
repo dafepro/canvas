@@ -48,6 +48,14 @@ also rejects atlas frames outside the decoded source texture.
 prevents a participant from appearing before required room art is usable.
 Applications can observe immutable progress and warning events.
 
+Browser applications observe loading through `CanvasRuntime.subscribeStartup`.
+During the `assets` phase, `snapshot.assets` reports `settled`, `total`, and an
+ordered source list whose status is `pending`, `loaded`, `warning`, or
+`failed`. Reaching N/N advances to `credentials` or publishes `failed` in the
+same startup machine, so N/N is never a misleading terminal loading message.
+The lower-level `preloadAssetManifest` function exposes the same source-aware
+`AssetProgress` to tooling that uses the asset package without a runtime.
+
 Invalid manifests throw `AssetManifestError`. Required load or atlas failures
 throw `AssetLoadError`. Optional failures use the existing definition
 placeholder (or the scene background color) and report an `AssetWarning`.

@@ -569,7 +569,7 @@ credential fetch, WebSocket handshake, JOIN, worker initialization, canonical
 state, and first render are separate phases but are not one observable progress
 protocol.
 
-**Planned contract.** Publish a replaying, frozen `RuntimeStartupSnapshot`
+**Implemented contract.** Publish a replaying, frozen `RuntimeStartupSnapshot`
 stream. A snapshot has exactly one phase: `assets`, `credentials`,
 `connecting`, `joining`, `simulation`, `canonical`, `presenting`, `ready`,
 `failed`, or `cancelled`. It also carries `startedAtMs`, `phaseStartedAtMs`, a
@@ -615,7 +615,7 @@ after a valid credential exists. `PresentationGate` publishes the first
 generation-consistent canonical completion instead of making callers infer it
 from a promise.
 
-#### Test-driven implementation slices
+#### Implemented test-driven slices
 
 1. Add a deterministic startup state machine and source-aware asset progress.
    Prove immutable replay, monotonic transitions, every phase stall/failure,
@@ -699,17 +699,18 @@ an existing authority path.
   pre-mortem matrix. Its remaining global-location and multi-process items are
   new infrastructure contracts, not evidence that the navigator should be
   rewritten.
-- **Asset loading** is not itself the redesign target. Manifest validation,
-  versioning, required/optional failure, and texture creation are cohesive. The
-  missing model is startup progress after asset settlement.
+- **Asset loading** is not itself a redesign target. Manifest validation,
+  versioning, required/optional failure, and texture creation remain cohesive;
+  the completed startup protocol now composes source settlement with every
+  later room and presentation milestone.
 - **Fullscreen resizing and motion trails** are presentation features with a
   narrow owner and focused tests. Their recent tuning does not currently show a
   missing authority or lifecycle model.
 
 ## Recommended order
 
-1. Add acknowledged item mutations on top of `ItemMutationSession`.
-2. Expand replication/prediction fault coverage on `ReplicationTimeline`.
-3. Publish startup progress before asking external consumers to build polished
-   loading/error UI.
-4. Treat overlay layout and transient item actions as isolated follow-ups.
+1. Expand replication/prediction fault coverage on `ReplicationTimeline`.
+2. Treat overlay layout and transient item actions as isolated follow-ups.
+
+Acknowledged item mutations and the startup/presentation progress protocol are
+complete prerequisites rather than remaining order items.

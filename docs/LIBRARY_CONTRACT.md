@@ -46,10 +46,12 @@ interpolated entities actually drawn. `projectWorldPoint` handles fixed product
 anchors. Neither exposes Pixi or mutable camera state. See
 `docs/OVERLAY_PROJECTION.md`.
 
-`subscribeLifecycle`, `start`, `whenReady`, `whenPresented`, `stop`, and
-`stopGracefully` define
-route ownership, backgrounding, reconnect, and terminal teardown. Consumer
-failures use `CanvasConsumerError`, not string parsing. See
+`subscribeLifecycle`, `subscribeStartup`, `startupSnapshot`, `start`,
+`whenReady`, `whenPresented`, `whenStartupReady`, `stop`, and `stopGracefully`
+define route ownership, first-presentation progress, backgrounding, reconnect,
+and terminal teardown. Startup snapshots are replaying, frozen, monotonic, and
+source-aware during asset loading. Consumer failures use `CanvasConsumerError`,
+not string parsing. See
 `docs/RUNTIME_LIFECYCLE.md`.
 
 `docs/PARTICIPANT_LIFECYCLE.md` defines identity lifetimes, reconnect
