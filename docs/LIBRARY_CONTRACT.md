@@ -67,11 +67,14 @@ motion and behavior continue, but the item's authored solid and sensor
 colliders are inactive. Both states are durable, server-authoritative,
 replicated, and restored during host migration.
 
-Direct manipulation may render an owner's current transform locally at display
-cadence while reliable preview commands remain coalesced. The local pose is
-held after pointer-up until canonical state observes the commit or a bounded
-timeout expires. This presentation layer does not weaken server authorization
-or increase the network preview rate.
+Direct manipulation and consumer-owned transform controls render an owner's
+current transform locally at display cadence while reliable preview commands
+remain coalesced. Public `transformItem` previews and operation-specific scale
+or rotation commits use the same presentation hold as pointer editing. The
+local pose is held until canonical state observes the commit or a bounded
+timeout expires. This prevents an older projection from briefly overwriting a
+new local pose without weakening server authorization or increasing the
+network preview rate.
 
 Consumers that own rotation or scale controls use `transformItem` for bounded
 in-progress previews, then finish with the operation-specific durable command.

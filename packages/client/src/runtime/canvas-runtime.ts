@@ -411,11 +411,9 @@ export class CanvasRuntime {
           preferredEntityId,
         ),
       onPreview: (entityId, transform) => {
-        this.editPresentation.preview(entityId, transform);
         this.moveItem(entityId, transform, true);
       },
       onCommit: (entityId, transform) => {
-        this.editPresentation.commit(entityId, transform);
         this.moveItem(entityId, transform);
       },
       onChange: (state) => {
@@ -695,15 +693,38 @@ export class CanvasRuntime {
   }
 
   transformItem(entityId: string, transform: Transform, preview = false): void {
+    if (preview) {
+      this.editPresentation.preview(entityId, transform);
+    } else {
+      this.editPresentation.commit(entityId, transform);
+    }
     this.session.transformItem(entityId, transform, preview);
   }
 
   rotateItem(entityId: string, rotation: number): void {
+    this.commitPartialItemTransform(entityId, { rotation });
     this.session.rotateItem(entityId, rotation);
   }
 
   scaleItem(entityId: string, scale: number): void {
+    this.commitPartialItemTransform(entityId, { scale });
     this.session.scaleItem(entityId, scale);
+  }
+
+  private commitPartialItemTransform(
+    entityId: string,
+    update: Partial<Pick<Transform, "rotation" | "scale">>,
+  ): void {
+    const entity = this.latestEntities.find(({ id }) => id === entityId);
+    if (!entity) return;
+    this.editPresentation.commit(entityId, {
+      x: entity.x,
+      y: entity.y,
+      rotation: entity.rotation,
+      scale: entity.scale ?? 1,
+      z: entity.z,
+      ...update,
+    });
   }
 
   setItemConfig(entityId: string, config: unknown): void {
