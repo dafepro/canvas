@@ -15,6 +15,7 @@ import {
   type CanvasLifecycleSnapshot,
   type JoinDescriptor,
   type RoomTransport,
+  type RuntimeStartupSnapshot,
   type TransportStatus,
 } from "../src/index.js";
 
@@ -112,6 +113,85 @@ const build = (
 };
 
 describe("RoomSession lifecycle", () => {
+  it("publishes truthful startup milestones through canonical presentation", async () => {
+    const transport = new LifecycleTransport();
+    let postFromSimulation:
+      | ((message: Parameters<Parameters<SimulationDriver["onMessage"]>[0]>[0]) => void)
+      | undefined;
+    const requests: unknown[] = [];
+    const driver = new SimulationDriver((post) => {
+      postFromSimulation = post;
+      return {
+        send: (request) => requests.push(request),
+        terminate: () => {},
+      };
+    });
+    const session = new RoomSession({
+      roomId: "team-lounge",
+      serverUrl: "http://rooms.test",
+      definitions: rocketCanvasDefinitions,
+      transport,
+      driver,
+    });
+    const startup: RuntimeStartupSnapshot[] = [];
+    session.subscribeStartup((snapshot) => startup.push(snapshot));
+
+    await session.start();
+    expect(startup.map(({ phase }) => phase)).toEqual([
+      "credentials",
+      "connecting",
+      "joining",
+    ]);
+
+    transport.deliver(accepted("peer"));
+    await session.whenReady();
+    expect(startup.at(-1)?.phase).toBe("simulation");
+    const generation = (requests.find(
+      (request) => (request as { type?: string }).type === "init",
+    ) as { generation: number }).generation;
+    postFromSimulation?.({ type: "ready", generation });
+    expect(startup.at(-1)?.phase).toBe("canonical");
+
+    transport.deliver({
+      roomId: "team-lounge",
+      hostEpoch: 1,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      presence: { peers: [] },
+    });
+    transport.deliver({
+      roomId: "team-lounge",
+      hostEpoch: 1,
+      sequence: 0,
+      tick: 1,
+      senderClientId: "",
+      fullState: {
+        entities: [],
+        avatars: [],
+        sceneRevision: 0,
+        tickRate: 60,
+      },
+    });
+    await session.whenPresented();
+    expect(startup.map(({ phase }) => phase)).toEqual([
+      "credentials",
+      "connecting",
+      "joining",
+      "simulation",
+      "canonical",
+      "presenting",
+      "ready",
+    ]);
+
+    transport.setStatus("reconnecting", "network changed");
+    transport.setStatus("open");
+    expect(startup.at(-1)?.phase).toBe("ready");
+    expect(startup).toHaveLength(7);
+    session.stop();
+    expect(startup.at(-1)?.phase).toBe("ready");
+  });
+
   it("publishes deterministic join, background, and terminal stop states", async () => {
     const transport = new LifecycleTransport();
     const { session, terminate } = build(transport);
@@ -164,6 +244,10 @@ describe("RoomSession lifecycle", () => {
 
     await expect(first).rejects.toMatchObject({ code: "start_cancelled" });
     expect(session.lifecycleState).toBe("stopped");
+    expect(session.startupSnapshot).toMatchObject({
+      phase: "cancelled",
+      error: { code: "start_cancelled" },
+    });
   });
 
   it("reports connection and server failures as typed consumer errors", async () => {
@@ -178,6 +262,10 @@ describe("RoomSession lifecycle", () => {
       recoverable: false,
     });
     expect(failed.session.lifecycleState).toBe("failed");
+    expect(failed.session.startupSnapshot).toMatchObject({
+      phase: "failed",
+      error: { code: "transport_connection_failed" },
+    });
     expect(connectionErrors).toHaveLength(1);
     failed.session.stop();
     expect(failed.session.lifecycleState).toBe("failed");

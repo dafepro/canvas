@@ -56,6 +56,11 @@ import {
   type ConnectionEffect,
   type ConnectionJoin,
 } from "./session/connection-session.js";
+import {
+  StartupProgress,
+  type RuntimeStartupObserver,
+  type RuntimeStartupSnapshot,
+} from "./startup-progress.js";
 
 export type {
   BehaviorStateSnapshot,
@@ -187,6 +192,7 @@ export class RoomSession {
   private readonly timeline: ReplicationTimeline;
   private readonly roster: ParticipantRoster;
   private readonly presentation = new PresentationGate();
+  private readonly startup = new StartupProgress("credentials");
   private readonly hostRole: HostRoleSession;
   private readonly connection: ConnectionSession;
   private localAvatarId = "";
@@ -276,6 +282,7 @@ export class RoomSession {
       installJoin: (join) => this.installAcceptedJoin(join),
       emit: (effect) => this.applyConnectionEffect(effect),
     });
+    this.connection.subscribe((snapshot) => this.observeConnectionStartup(snapshot));
     this.wireClient();
     this.driver.onMessage((message) => this.onSimulation(message));
   }
@@ -327,6 +334,14 @@ export class RoomSession {
 
   subscribeLifecycle(observer: Observer<CanvasLifecycleSnapshot>): () => void {
     return this.connection.subscribe(observer);
+  }
+
+  get startupSnapshot(): Readonly<RuntimeStartupSnapshot> {
+    return this.startup.snapshot;
+  }
+
+  subscribeStartup(observer: RuntimeStartupObserver): () => void {
+    return this.startup.subscribe(observer);
   }
 
   /** Resolves after JOIN and consumer initialization (including scene mount). */
@@ -431,6 +446,10 @@ export class RoomSession {
     });
 
     this.client.on("status", (status, detail) => {
+      if (status === "connecting" || status === "open") {
+        // An injected transport may omit the explicit connecting status.
+        this.startup.advance("connecting");
+      }
       this.connection.transportStatus(status, detail);
     });
 
@@ -821,6 +840,10 @@ export class RoomSession {
     if (!this.hostRole.acceptSimulation(message)) return;
     switch (message.type) {
       case "ready":
+        // A synchronous local driver may report ready before the JOIN
+        // transition publishes active, so explicitly preserve both milestones.
+        this.startup.advance("simulation");
+        this.startup.advance("canonical");
         this.presentation.markSimulationReady(this.connection.generation);
         this.syncHostAvatars();
         this.checkPresentationReady();
@@ -908,6 +931,36 @@ export class RoomSession {
       generation,
       authoritative.map((entity) => entity.id),
     );
+    if (this.presentation.authoritativeCurrent) {
+      this.startup.advance("presenting");
+      // A headless session has handed the complete set to its consumer. The
+      // browser facade delays its own ready milestone until Pixi updates it.
+      this.startup.advance("ready");
+    }
+  }
+
+  private observeConnectionStartup(snapshot: CanvasLifecycleSnapshot): void {
+    switch (snapshot.state) {
+      case "joining":
+        this.startup.advance("connecting");
+        this.startup.advance("joining");
+        break;
+      case "active":
+      case "backgrounded":
+        this.startup.advance("simulation");
+        break;
+      case "failed":
+        if (this.connection.terminalError) this.startup.fail(this.connection.terminalError);
+        break;
+      case "stopping":
+      case "stopped":
+        this.startup.cancel();
+        break;
+      case "idle":
+      case "starting":
+      case "reconnecting":
+        break;
+    }
   }
 
   beginItemEdit(entityId: string): ItemEditHandle {

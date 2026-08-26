@@ -171,6 +171,8 @@ export class ConnectionSession {
   transportStatus(status: TransportStatus, detail?: string): void {
     if (this.isTerminalOrStopping) return;
     switch (status) {
+      case "credentials":
+        break;
       case "connecting":
         if (this.lifecycleValue === "idle") this.transition("starting", detail);
         break;

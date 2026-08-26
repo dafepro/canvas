@@ -11,6 +11,7 @@ export type Unsubscribe = () => void;
 
 export type TransportStatus =
   | "idle"
+  | "credentials"
   | "connecting"
   | "open"
   | "reconnecting"

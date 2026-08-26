@@ -89,11 +89,12 @@ export class WebSocketRoomTransport implements RoomTransport {
     const join = this.join;
     if (!join) throw new Error("connect was not called");
 
-    this.setStatus(this.reconnects === 0 ? "connecting" : "reconnecting");
+    this.setStatus(this.reconnects === 0 ? "credentials" : "reconnecting");
     const credential = await this.credentialProvider();
     if (!credential || credential === REALTIME_SUBPROTOCOL || /[\s,]/u.test(credential)) {
       throw new Error("credential provider returned an invalid WebSocket subprotocol");
     }
+    this.setStatus("connecting");
     return new Promise<void>((resolve, reject) => {
       const socket = new WebSocket(this.url(join), [REALTIME_SUBPROTOCOL, credential]);
       socket.binaryType = "arraybuffer";

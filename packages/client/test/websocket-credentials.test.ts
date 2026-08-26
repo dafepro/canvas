@@ -47,6 +47,32 @@ afterEach(() => {
 });
 
 describe("WebSocketRoomTransport credentials", () => {
+  it("separates credential acquisition from the socket handshake", async () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    let releaseCredential!: (value: string) => void;
+    const credential = new Promise<string>((resolve) => { releaseCredential = resolve; });
+    const transport = new WebSocketRoomTransport({
+      credentialProvider: () => credential,
+    });
+    const statuses: string[] = [];
+    transport.onStatus((status) => statuses.push(status));
+
+    const opening = transport.connect({
+      roomId: "phased-room",
+      serverUrl: "http://rooms.example.test",
+    });
+    expect(statuses).toEqual(["credentials"]);
+    expect(FakeWebSocket.sockets).toHaveLength(0);
+
+    releaseCredential("ticket.phased");
+    await vi.waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+    expect(statuses).toEqual(["credentials", "connecting"]);
+    FakeWebSocket.sockets[0]!.open();
+    await opening;
+    expect(statuses).toEqual(["credentials", "connecting", "open"]);
+    transport.close();
+  });
+
   it("rejects when a socket closes before its opening handshake completes", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("WebSocket", FakeWebSocket);
