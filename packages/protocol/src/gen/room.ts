@@ -66,84 +66,9 @@ export function hostControlKindToJSON(object: HostControlKind): string {
   }
 }
 
-export enum DurableCommandKind {
-  DURABLE_UNSPECIFIED = 0,
-  DURABLE_SPAWN_ITEM = 1,
-  DURABLE_DELETE_ITEM = 2,
-  DURABLE_MOVE_ITEM = 3,
-  DURABLE_ROTATE_ITEM = 4,
-  DURABLE_SET_CONFIG = 5,
-  DURABLE_SCALE_ITEM = 6,
-  DURABLE_SET_ITEM_ISOLATION = 7,
-  DURABLE_SET_ITEM_COLLISIONS = 8,
-  UNRECOGNIZED = -1,
-}
-
-export function durableCommandKindFromJSON(object: any): DurableCommandKind {
-  switch (object) {
-    case 0:
-    case "DURABLE_UNSPECIFIED":
-      return DurableCommandKind.DURABLE_UNSPECIFIED;
-    case 1:
-    case "DURABLE_SPAWN_ITEM":
-      return DurableCommandKind.DURABLE_SPAWN_ITEM;
-    case 2:
-    case "DURABLE_DELETE_ITEM":
-      return DurableCommandKind.DURABLE_DELETE_ITEM;
-    case 3:
-    case "DURABLE_MOVE_ITEM":
-      return DurableCommandKind.DURABLE_MOVE_ITEM;
-    case 4:
-    case "DURABLE_ROTATE_ITEM":
-      return DurableCommandKind.DURABLE_ROTATE_ITEM;
-    case 5:
-    case "DURABLE_SET_CONFIG":
-      return DurableCommandKind.DURABLE_SET_CONFIG;
-    case 6:
-    case "DURABLE_SCALE_ITEM":
-      return DurableCommandKind.DURABLE_SCALE_ITEM;
-    case 7:
-    case "DURABLE_SET_ITEM_ISOLATION":
-      return DurableCommandKind.DURABLE_SET_ITEM_ISOLATION;
-    case 8:
-    case "DURABLE_SET_ITEM_COLLISIONS":
-      return DurableCommandKind.DURABLE_SET_ITEM_COLLISIONS;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return DurableCommandKind.UNRECOGNIZED;
-  }
-}
-
-export function durableCommandKindToJSON(object: DurableCommandKind): string {
-  switch (object) {
-    case DurableCommandKind.DURABLE_UNSPECIFIED:
-      return "DURABLE_UNSPECIFIED";
-    case DurableCommandKind.DURABLE_SPAWN_ITEM:
-      return "DURABLE_SPAWN_ITEM";
-    case DurableCommandKind.DURABLE_DELETE_ITEM:
-      return "DURABLE_DELETE_ITEM";
-    case DurableCommandKind.DURABLE_MOVE_ITEM:
-      return "DURABLE_MOVE_ITEM";
-    case DurableCommandKind.DURABLE_ROTATE_ITEM:
-      return "DURABLE_ROTATE_ITEM";
-    case DurableCommandKind.DURABLE_SET_CONFIG:
-      return "DURABLE_SET_CONFIG";
-    case DurableCommandKind.DURABLE_SCALE_ITEM:
-      return "DURABLE_SCALE_ITEM";
-    case DurableCommandKind.DURABLE_SET_ITEM_ISOLATION:
-      return "DURABLE_SET_ITEM_ISOLATION";
-    case DurableCommandKind.DURABLE_SET_ITEM_COLLISIONS:
-      return "DURABLE_SET_ITEM_COLLISIONS";
-    case DurableCommandKind.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
 /**
- * Prerelease replacement for DurableCommand. Preview is deliberately absent:
- * disposable presentation uses ItemEditPreview instead of a durable envelope.
+ * Disposable presentation is deliberately absent from durable mutations;
+ * ItemEditPreview has its own rate-limited realtime stream.
  */
 export enum ItemMutationKind {
   ITEM_MUTATION_UNSPECIFIED = 0,
@@ -413,8 +338,6 @@ export interface RoomEnvelope {
   fullState?: FullState | undefined;
   effectEvent?: EffectEvent | undefined;
   hostControl?: HostControl | undefined;
-  durableCommand?: DurableCommand | undefined;
-  durableResult?: DurableCommandResult | undefined;
   checkpoint?: Checkpoint | undefined;
   heartbeat?: Heartbeat | undefined;
   error?: ProtocolError | undefined;
@@ -590,33 +513,6 @@ export interface EffectEvent {
   paramsJson: Uint8Array;
 }
 
-export interface DurableCommand {
-  commandId: string;
-  kind: DurableCommandKind;
-  entityId: string;
-  definitionId: string;
-  definitionVersion: number;
-  position?: Vec2 | undefined;
-  rotation: number;
-  z: number;
-  configJson: Uint8Array;
-  /** True while an owner drags an item, so the host uses a kinematic reposition. */
-  preview: boolean;
-  scale: number;
-  isolated: boolean;
-  collisionsEnabled: boolean;
-}
-
-export interface DurableCommandResult {
-  commandId: string;
-  accepted: boolean;
-  rejectReason: string;
-  sceneRevision: number;
-  /** The accepted item instance as JSON, present on accept. */
-  itemInstanceJson: Uint8Array;
-  command?: DurableCommand | undefined;
-}
-
 export interface ItemMutation {
   clientSessionId: string;
   mutationId: number;
@@ -723,8 +619,6 @@ function createBaseRoomEnvelope(): RoomEnvelope {
     fullState: undefined,
     effectEvent: undefined,
     hostControl: undefined,
-    durableCommand: undefined,
-    durableResult: undefined,
     checkpoint: undefined,
     heartbeat: undefined,
     error: undefined,
@@ -778,12 +672,6 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     }
     if (message.hostControl !== undefined) {
       HostControl.encode(message.hostControl, writer.uint32(138).fork()).join();
-    }
-    if (message.durableCommand !== undefined) {
-      DurableCommand.encode(message.durableCommand, writer.uint32(146).fork()).join();
-    }
-    if (message.durableResult !== undefined) {
-      DurableCommandResult.encode(message.durableResult, writer.uint32(154).fork()).join();
     }
     if (message.checkpoint !== undefined) {
       Checkpoint.encode(message.checkpoint, writer.uint32(162).fork()).join();
@@ -935,22 +823,6 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
             message.hostControl = HostControl.decode(reader, reader.uint32());
             continue;
           }
-          case 18: {
-            if (tag !== 146) {
-              break;
-            }
-
-            message.durableCommand = DurableCommand.decode(reader, reader.uint32());
-            continue;
-          }
-          case 19: {
-            if (tag !== 154) {
-              break;
-            }
-
-            message.durableResult = DurableCommandResult.decode(reader, reader.uint32());
-            continue;
-          }
           case 20: {
             if (tag !== 162) {
               break;
@@ -1094,16 +966,6 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
         : isSet(object.host_control)
         ? HostControl.fromJSON(object.host_control)
         : undefined,
-      durableCommand: isSet(object.durableCommand)
-        ? DurableCommand.fromJSON(object.durableCommand)
-        : isSet(object.durable_command)
-        ? DurableCommand.fromJSON(object.durable_command)
-        : undefined,
-      durableResult: isSet(object.durableResult)
-        ? DurableCommandResult.fromJSON(object.durableResult)
-        : isSet(object.durable_result)
-        ? DurableCommandResult.fromJSON(object.durable_result)
-        : undefined,
       checkpoint: isSet(object.checkpoint) ? Checkpoint.fromJSON(object.checkpoint) : undefined,
       heartbeat: isSet(object.heartbeat) ? Heartbeat.fromJSON(object.heartbeat) : undefined,
       error: isSet(object.error) ? ProtocolError.fromJSON(object.error) : undefined,
@@ -1186,12 +1048,6 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     if (message.hostControl !== undefined) {
       obj.hostControl = HostControl.toJSON(message.hostControl);
     }
-    if (message.durableCommand !== undefined) {
-      obj.durableCommand = DurableCommand.toJSON(message.durableCommand);
-    }
-    if (message.durableResult !== undefined) {
-      obj.durableResult = DurableCommandResult.toJSON(message.durableResult);
-    }
     if (message.checkpoint !== undefined) {
       obj.checkpoint = Checkpoint.toJSON(message.checkpoint);
     }
@@ -1256,12 +1112,6 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
       : undefined;
     message.hostControl = (object.hostControl !== undefined && object.hostControl !== null)
       ? HostControl.fromPartial(object.hostControl)
-      : undefined;
-    message.durableCommand = (object.durableCommand !== undefined && object.durableCommand !== null)
-      ? DurableCommand.fromPartial(object.durableCommand)
-      : undefined;
-    message.durableResult = (object.durableResult !== undefined && object.durableResult !== null)
-      ? DurableCommandResult.fromPartial(object.durableResult)
       : undefined;
     message.checkpoint = (object.checkpoint !== undefined && object.checkpoint !== null)
       ? Checkpoint.fromPartial(object.checkpoint)
@@ -3698,481 +3548,6 @@ export const EffectEvent: MessageFns<EffectEvent> = {
     message.effect = object.effect ?? "";
     message.mode = object.mode ?? "";
     message.paramsJson = object.paramsJson ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseDurableCommand(): DurableCommand {
-  return {
-    commandId: "",
-    kind: 0,
-    entityId: "",
-    definitionId: "",
-    definitionVersion: 0,
-    position: undefined,
-    rotation: 0,
-    z: 0,
-    configJson: new Uint8Array(0),
-    preview: false,
-    scale: 0,
-    isolated: false,
-    collisionsEnabled: false,
-  };
-}
-
-export const DurableCommand: MessageFns<DurableCommand> = {
-  encode(message: DurableCommand, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.commandId !== "") {
-      writer.uint32(10).string(message.commandId);
-    }
-    if (message.kind !== 0) {
-      writer.uint32(16).int32(message.kind);
-    }
-    if (message.entityId !== "") {
-      writer.uint32(26).string(message.entityId);
-    }
-    if (message.definitionId !== "") {
-      writer.uint32(34).string(message.definitionId);
-    }
-    if (message.definitionVersion !== 0) {
-      writer.uint32(40).uint32(message.definitionVersion);
-    }
-    if (message.position !== undefined) {
-      Vec2.encode(message.position, writer.uint32(50).fork()).join();
-    }
-    if (message.rotation !== 0) {
-      writer.uint32(61).float(message.rotation);
-    }
-    if (message.z !== 0) {
-      writer.uint32(69).float(message.z);
-    }
-    if (message.configJson.length !== 0) {
-      writer.uint32(74).bytes(message.configJson);
-    }
-    if (message.preview !== false) {
-      writer.uint32(80).bool(message.preview);
-    }
-    if (message.scale !== 0) {
-      writer.uint32(93).float(message.scale);
-    }
-    if (message.isolated !== false) {
-      writer.uint32(96).bool(message.isolated);
-    }
-    if (message.collisionsEnabled !== false) {
-      writer.uint32(104).bool(message.collisionsEnabled);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): DurableCommand {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
-    if (previousRecursionDepth >= 100) {
-      throw new globalThis.Error("protobuf decode recursion limit exceeded");
-    }
-    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
-    try {
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseDurableCommand();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.commandId = reader.string();
-            continue;
-          }
-          case 2: {
-            if (tag !== 16) {
-              break;
-            }
-
-            message.kind = reader.int32() as any;
-            continue;
-          }
-          case 3: {
-            if (tag !== 26) {
-              break;
-            }
-
-            message.entityId = reader.string();
-            continue;
-          }
-          case 4: {
-            if (tag !== 34) {
-              break;
-            }
-
-            message.definitionId = reader.string();
-            continue;
-          }
-          case 5: {
-            if (tag !== 40) {
-              break;
-            }
-
-            message.definitionVersion = reader.uint32();
-            continue;
-          }
-          case 6: {
-            if (tag !== 50) {
-              break;
-            }
-
-            message.position = Vec2.decode(reader, reader.uint32());
-            continue;
-          }
-          case 7: {
-            if (tag !== 61) {
-              break;
-            }
-
-            message.rotation = reader.float();
-            continue;
-          }
-          case 8: {
-            if (tag !== 69) {
-              break;
-            }
-
-            message.z = reader.float();
-            continue;
-          }
-          case 9: {
-            if (tag !== 74) {
-              break;
-            }
-
-            message.configJson = reader.bytes();
-            continue;
-          }
-          case 10: {
-            if (tag !== 80) {
-              break;
-            }
-
-            message.preview = reader.bool();
-            continue;
-          }
-          case 11: {
-            if (tag !== 93) {
-              break;
-            }
-
-            message.scale = reader.float();
-            continue;
-          }
-          case 12: {
-            if (tag !== 96) {
-              break;
-            }
-
-            message.isolated = reader.bool();
-            continue;
-          }
-          case 13: {
-            if (tag !== 104) {
-              break;
-            }
-
-            message.collisionsEnabled = reader.bool();
-            continue;
-          }
-        }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
-      }
-      return message;
-    } finally {
-      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
-    }
-  },
-
-  fromJSON(object: any): DurableCommand {
-    return {
-      commandId: isSet(object.commandId)
-        ? globalThis.String(object.commandId)
-        : isSet(object.command_id)
-        ? globalThis.String(object.command_id)
-        : "",
-      kind: isSet(object.kind) ? durableCommandKindFromJSON(object.kind) : 0,
-      entityId: isSet(object.entityId)
-        ? globalThis.String(object.entityId)
-        : isSet(object.entity_id)
-        ? globalThis.String(object.entity_id)
-        : "",
-      definitionId: isSet(object.definitionId)
-        ? globalThis.String(object.definitionId)
-        : isSet(object.definition_id)
-        ? globalThis.String(object.definition_id)
-        : "",
-      definitionVersion: isSet(object.definitionVersion)
-        ? globalThis.Number(object.definitionVersion)
-        : isSet(object.definition_version)
-        ? globalThis.Number(object.definition_version)
-        : 0,
-      position: isSet(object.position) ? Vec2.fromJSON(object.position) : undefined,
-      rotation: isSet(object.rotation) ? globalThis.Number(object.rotation) : 0,
-      z: isSet(object.z) ? globalThis.Number(object.z) : 0,
-      configJson: isSet(object.configJson)
-        ? bytesFromBase64(object.configJson)
-        : isSet(object.config_json)
-        ? bytesFromBase64(object.config_json)
-        : new Uint8Array(0),
-      preview: isSet(object.preview) ? globalThis.Boolean(object.preview) : false,
-      scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
-      isolated: isSet(object.isolated) ? globalThis.Boolean(object.isolated) : false,
-      collisionsEnabled: isSet(object.collisionsEnabled)
-        ? globalThis.Boolean(object.collisionsEnabled)
-        : isSet(object.collisions_enabled)
-        ? globalThis.Boolean(object.collisions_enabled)
-        : false,
-    };
-  },
-
-  toJSON(message: DurableCommand): unknown {
-    const obj: any = {};
-    if (message.commandId !== "") {
-      obj.commandId = message.commandId;
-    }
-    if (message.kind !== 0) {
-      obj.kind = durableCommandKindToJSON(message.kind);
-    }
-    if (message.entityId !== "") {
-      obj.entityId = message.entityId;
-    }
-    if (message.definitionId !== "") {
-      obj.definitionId = message.definitionId;
-    }
-    if (message.definitionVersion !== 0) {
-      obj.definitionVersion = Math.round(message.definitionVersion);
-    }
-    if (message.position !== undefined) {
-      obj.position = Vec2.toJSON(message.position);
-    }
-    if (message.rotation !== 0) {
-      obj.rotation = message.rotation;
-    }
-    if (message.z !== 0) {
-      obj.z = message.z;
-    }
-    if (message.configJson.length !== 0) {
-      obj.configJson = base64FromBytes(message.configJson);
-    }
-    if (message.preview !== false) {
-      obj.preview = message.preview;
-    }
-    if (message.scale !== 0) {
-      obj.scale = message.scale;
-    }
-    if (message.isolated !== false) {
-      obj.isolated = message.isolated;
-    }
-    if (message.collisionsEnabled !== false) {
-      obj.collisionsEnabled = message.collisionsEnabled;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<DurableCommand>, I>>(base?: I): DurableCommand {
-    return DurableCommand.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<DurableCommand>, I>>(object: I): DurableCommand {
-    const message = createBaseDurableCommand();
-    message.commandId = object.commandId ?? "";
-    message.kind = object.kind ?? 0;
-    message.entityId = object.entityId ?? "";
-    message.definitionId = object.definitionId ?? "";
-    message.definitionVersion = object.definitionVersion ?? 0;
-    message.position = (object.position !== undefined && object.position !== null)
-      ? Vec2.fromPartial(object.position)
-      : undefined;
-    message.rotation = object.rotation ?? 0;
-    message.z = object.z ?? 0;
-    message.configJson = object.configJson ?? new Uint8Array(0);
-    message.preview = object.preview ?? false;
-    message.scale = object.scale ?? 0;
-    message.isolated = object.isolated ?? false;
-    message.collisionsEnabled = object.collisionsEnabled ?? false;
-    return message;
-  },
-};
-
-function createBaseDurableCommandResult(): DurableCommandResult {
-  return {
-    commandId: "",
-    accepted: false,
-    rejectReason: "",
-    sceneRevision: 0,
-    itemInstanceJson: new Uint8Array(0),
-    command: undefined,
-  };
-}
-
-export const DurableCommandResult: MessageFns<DurableCommandResult> = {
-  encode(message: DurableCommandResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.commandId !== "") {
-      writer.uint32(10).string(message.commandId);
-    }
-    if (message.accepted !== false) {
-      writer.uint32(16).bool(message.accepted);
-    }
-    if (message.rejectReason !== "") {
-      writer.uint32(26).string(message.rejectReason);
-    }
-    if (message.sceneRevision !== 0) {
-      writer.uint32(32).uint64(message.sceneRevision);
-    }
-    if (message.itemInstanceJson.length !== 0) {
-      writer.uint32(42).bytes(message.itemInstanceJson);
-    }
-    if (message.command !== undefined) {
-      DurableCommand.encode(message.command, writer.uint32(50).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): DurableCommandResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
-    if (previousRecursionDepth >= 100) {
-      throw new globalThis.Error("protobuf decode recursion limit exceeded");
-    }
-    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
-    try {
-      const end = length === undefined ? reader.len : reader.pos + length;
-      const message = createBaseDurableCommandResult();
-      while (reader.pos < end) {
-        const tag = reader.uint32();
-        switch (tag >>> 3) {
-          case 1: {
-            if (tag !== 10) {
-              break;
-            }
-
-            message.commandId = reader.string();
-            continue;
-          }
-          case 2: {
-            if (tag !== 16) {
-              break;
-            }
-
-            message.accepted = reader.bool();
-            continue;
-          }
-          case 3: {
-            if (tag !== 26) {
-              break;
-            }
-
-            message.rejectReason = reader.string();
-            continue;
-          }
-          case 4: {
-            if (tag !== 32) {
-              break;
-            }
-
-            message.sceneRevision = longToNumber(reader.uint64());
-            continue;
-          }
-          case 5: {
-            if (tag !== 42) {
-              break;
-            }
-
-            message.itemInstanceJson = reader.bytes();
-            continue;
-          }
-          case 6: {
-            if (tag !== 50) {
-              break;
-            }
-
-            message.command = DurableCommand.decode(reader, reader.uint32());
-            continue;
-          }
-        }
-        if ((tag & 7) === 4 || tag === 0) {
-          break;
-        }
-        reader.skip(tag & 7);
-      }
-      return message;
-    } finally {
-      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
-    }
-  },
-
-  fromJSON(object: any): DurableCommandResult {
-    return {
-      commandId: isSet(object.commandId)
-        ? globalThis.String(object.commandId)
-        : isSet(object.command_id)
-        ? globalThis.String(object.command_id)
-        : "",
-      accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false,
-      rejectReason: isSet(object.rejectReason)
-        ? globalThis.String(object.rejectReason)
-        : isSet(object.reject_reason)
-        ? globalThis.String(object.reject_reason)
-        : "",
-      sceneRevision: isSet(object.sceneRevision)
-        ? globalThis.Number(object.sceneRevision)
-        : isSet(object.scene_revision)
-        ? globalThis.Number(object.scene_revision)
-        : 0,
-      itemInstanceJson: isSet(object.itemInstanceJson)
-        ? bytesFromBase64(object.itemInstanceJson)
-        : isSet(object.item_instance_json)
-        ? bytesFromBase64(object.item_instance_json)
-        : new Uint8Array(0),
-      command: isSet(object.command) ? DurableCommand.fromJSON(object.command) : undefined,
-    };
-  },
-
-  toJSON(message: DurableCommandResult): unknown {
-    const obj: any = {};
-    if (message.commandId !== "") {
-      obj.commandId = message.commandId;
-    }
-    if (message.accepted !== false) {
-      obj.accepted = message.accepted;
-    }
-    if (message.rejectReason !== "") {
-      obj.rejectReason = message.rejectReason;
-    }
-    if (message.sceneRevision !== 0) {
-      obj.sceneRevision = Math.round(message.sceneRevision);
-    }
-    if (message.itemInstanceJson.length !== 0) {
-      obj.itemInstanceJson = base64FromBytes(message.itemInstanceJson);
-    }
-    if (message.command !== undefined) {
-      obj.command = DurableCommand.toJSON(message.command);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<DurableCommandResult>, I>>(base?: I): DurableCommandResult {
-    return DurableCommandResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<DurableCommandResult>, I>>(object: I): DurableCommandResult {
-    const message = createBaseDurableCommandResult();
-    message.commandId = object.commandId ?? "";
-    message.accepted = object.accepted ?? false;
-    message.rejectReason = object.rejectReason ?? "";
-    message.sceneRevision = object.sceneRevision ?? 0;
-    message.itemInstanceJson = object.itemInstanceJson ?? new Uint8Array(0);
-    message.command = (object.command !== undefined && object.command !== null)
-      ? DurableCommand.fromPartial(object.command)
-      : undefined;
     return message;
   },
 };

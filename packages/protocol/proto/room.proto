@@ -7,6 +7,7 @@ option go_package = "github.com/dafepro/canvas/server/gen/canvasphysicsv1;canvas
 // Spec 12.3. One envelope carries every realtime message. Peers drop an
 // envelope whose host_epoch is older than the epoch they know.
 message RoomEnvelope {
+  reserved 18, 19;
   string room_id = 1;
   uint64 host_epoch = 2;
   uint32 sequence = 3;
@@ -23,8 +24,6 @@ message RoomEnvelope {
     FullState full_state = 15;
     EffectEvent effect_event = 16;
     HostControl host_control = 17;
-    DurableCommand durable_command = 18;
-    DurableCommandResult durable_result = 19;
     Checkpoint checkpoint = 20;
     Heartbeat heartbeat = 21;
     ProtocolError error = 22;
@@ -210,47 +209,8 @@ message EffectEvent {
 
 // ---------- durable mutations ----------
 
-enum DurableCommandKind {
-  DURABLE_UNSPECIFIED = 0;
-  DURABLE_SPAWN_ITEM = 1;
-  DURABLE_DELETE_ITEM = 2;
-  DURABLE_MOVE_ITEM = 3;
-  DURABLE_ROTATE_ITEM = 4;
-  DURABLE_SET_CONFIG = 5;
-  DURABLE_SCALE_ITEM = 6;
-  DURABLE_SET_ITEM_ISOLATION = 7;
-  DURABLE_SET_ITEM_COLLISIONS = 8;
-}
-
-message DurableCommand {
-  string command_id = 1;
-  DurableCommandKind kind = 2;
-  string entity_id = 3;
-  string definition_id = 4;
-  uint32 definition_version = 5;
-  Vec2 position = 6;
-  float rotation = 7;
-  float z = 8;
-  bytes config_json = 9;
-  // True while an owner drags an item, so the host uses a kinematic reposition.
-  bool preview = 10;
-  float scale = 11;
-  bool isolated = 12;
-  bool collisions_enabled = 13;
-}
-
-message DurableCommandResult {
-  string command_id = 1;
-  bool accepted = 2;
-  string reject_reason = 3;
-  uint64 scene_revision = 4;
-  // The accepted item instance as JSON, present on accept.
-  bytes item_instance_json = 5;
-  DurableCommand command = 6;
-}
-
-// Prerelease replacement for DurableCommand. Preview is deliberately absent:
-// disposable presentation uses ItemEditPreview instead of a durable envelope.
+// Disposable presentation is deliberately absent from durable mutations;
+// ItemEditPreview has its own rate-limited realtime stream.
 enum ItemMutationKind {
   ITEM_MUTATION_UNSPECIFIED = 0;
   ITEM_MUTATION_SPAWN = 1;

@@ -28,7 +28,7 @@ import {
   type SessionTimeout,
 } from "./session-clock.js";
 
-export interface DurableCommandContext {
+export interface ItemMutationContext {
   readonly clientId: string;
   readonly userId: string;
   readonly sceneRevision: number;
@@ -36,7 +36,7 @@ export interface DurableCommandContext {
   readonly canvas?: CanvasDefinition;
 }
 
-export type DurableCommandEffect =
+export type ItemMutationEffect =
   | { readonly type: "sendMutation"; readonly mutation: ItemMutation }
   | { readonly type: "beginEdit"; readonly request: BeginItemEdit }
   | { readonly type: "renewEdit"; readonly request: RenewItemEdit }
@@ -44,13 +44,13 @@ export type DurableCommandEffect =
   | { readonly type: "sendPreview"; readonly preview: ItemEditPreview }
   | { readonly type: "simulate"; readonly request: SimulationRequest };
 
-export interface DurableCommandSessionOptions {
+export interface ItemMutationSessionOptions {
   readonly clientSessionId?: string;
   readonly definitions: readonly ItemDefinition[];
   readonly previewHz?: number;
   readonly clock?: SessionClock;
-  readonly context: () => DurableCommandContext;
-  readonly emit: (effect: DurableCommandEffect) => void;
+  readonly context: () => ItemMutationContext;
+  readonly emit: (effect: ItemMutationEffect) => void;
 }
 
 export type ItemMutationRejectCode =
@@ -182,14 +182,14 @@ const randomSessionId = (): string => {
  * Sole owner of durable mutation identities, per-item queues, edit leases,
  * preview timing, canonical item metadata, and terminal receipts.
  */
-export class DurableCommandSession {
+export class ItemMutationSession {
   readonly clientSessionId: string;
 
   private readonly definitions: readonly ItemDefinition[];
   private readonly previewIntervalMs: number;
   private readonly clock: SessionClock;
-  private readonly context: () => DurableCommandContext;
-  private readonly emit: (effect: DurableCommandEffect) => void;
+  private readonly context: () => ItemMutationContext;
+  private readonly emit: (effect: ItemMutationEffect) => void;
   private readonly metadataById = new Map<string, SnapshotItem>();
   private readonly pendingById = new Map<number, PendingMutation>();
   private readonly mutationQueues = new Map<string, PendingMutation[]>();
@@ -201,7 +201,7 @@ export class DurableCommandSession {
   private editCounter = 0;
   private lastOutcome?: ItemMutationOutcome;
 
-  constructor(options: DurableCommandSessionOptions) {
+  constructor(options: ItemMutationSessionOptions) {
     this.clientSessionId = options.clientSessionId ?? randomSessionId();
     this.definitions = options.definitions;
     this.previewIntervalMs = 1_000 / Math.max(1, options.previewHz ?? 15);

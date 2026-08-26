@@ -30,145 +30,28 @@ const (
 	maxItemScale = 4.0
 )
 
-// handleDurableCommand enforces ownership before the command reaches the
-// simulation host (spec 14.1). Client-host physics does not grant edit rights.
-func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) {
-	accepted, item, reason := r.validateDurable(client, command)
-	if !accepted {
-		r.cfg.Metrics.DurableRejected(r.roomID, reason)
-		r.sendTo(client, &pb.RoomEnvelope{
-			RoomId:    r.roomID,
-			HostEpoch: r.hostEpoch,
-			Payload: &pb.RoomEnvelope_DurableResult{DurableResult: &pb.DurableCommandResult{
-				CommandId:     command.CommandId,
-				Accepted:      false,
-				RejectReason:  reason,
-				SceneRevision: r.sceneRevision,
-				Command:       command,
-			}},
-		})
-		return
-	}
-
-	// A preview move is not durable. Relay it so the host can show the drag,
-	// but do not move the scene revision or persist it.
-	if command.Preview {
-		r.previews[command.EntityId] = client.ID
-		r.relayToHost(client, &pb.RoomEnvelope{
-			RoomId:         r.roomID,
-			HostEpoch:      r.hostEpoch,
-			SenderClientId: client.ID,
-			Payload:        &pb.RoomEnvelope_DurableCommand{DurableCommand: command},
-		})
-		return
-	}
-	if command.Kind == pb.DurableCommandKind_DURABLE_MOVE_ITEM ||
-		command.Kind == pb.DurableCommandKind_DURABLE_DELETE_ITEM ||
-		command.Kind == pb.DurableCommandKind_DURABLE_SCALE_ITEM {
-		delete(r.previews, command.EntityId)
-	}
-
-	r.applyDurable(command, item, client)
-	// Spec 20. A new item can use a definition a client does not hold.
-	r.checkAllDefinitions()
-	r.sceneRevision++
-	r.snapshot.SceneRevision = r.sceneRevision
-	// Only the simulation host can normalize behavior state. Any accepted edit
-	// makes a previously sleeping snapshot active again until a host sends a
-	// normalized final checkpoint.
-	r.snapshot.Normalized = false
-	if raw, err := json.Marshal(r.snapshot); err == nil {
-		r.snapshotRaw = raw
-	}
-
-	// After a spawn the created item is the one the server just indexed.
-	if item == nil {
-		item = r.items[command.EntityId]
-	}
-	var itemJSON []byte
-	if item != nil {
-		itemJSON, _ = json.Marshal(item)
-	}
-
-	// Every client learns the accepted mutation, including the host, which
-	// applies it to the canonical world.
-	r.broadcast(&pb.RoomEnvelope{
-		RoomId:         r.roomID,
-		HostEpoch:      r.hostEpoch,
-		SenderClientId: client.ID,
-		Payload: &pb.RoomEnvelope_DurableResult{DurableResult: &pb.DurableCommandResult{
-			CommandId:        command.CommandId,
-			Accepted:         true,
-			SceneRevision:    r.sceneRevision,
-			ItemInstanceJson: itemJSON,
-			Command:          command,
-		}},
-	})
-	r.persistAsync()
-}
-
-// Revert transient placements when their editing client leaves without a
-// release commit. A replacement host rebuilds from the committed snapshot; an
-// existing host receives the same committed transform as one last preview.
-func (r *Room) cancelPreviews(client *Client) {
-	for entityID, clientID := range r.previews {
-		if clientID != client.ID {
-			continue
-		}
-		delete(r.previews, entityID)
-		item := r.items[entityID]
-		host := r.clients[r.hostClientID]
-		if item == nil || host == nil {
-			continue
-		}
-		command := &pb.DurableCommand{
-			CommandId: fmt.Sprintf("preview-revert-%s", entityID),
-			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
-			EntityId:  entityID,
-			Position: &pb.Vec2{
-				X: float32(item.Transform.X),
-				Y: float32(item.Transform.Y),
-			},
-			Rotation: float32(item.Transform.Rotation),
-			Scale:    float32(item.Transform.Scale),
-			Preview:  true,
-		}
-		if item.Transform.Z != nil {
-			command.Z = float32(*item.Transform.Z)
-		}
-		r.sendTo(host, &pb.RoomEnvelope{
-			RoomId:         r.roomID,
-			HostEpoch:      r.hostEpoch,
-			SenderClientId: client.ID,
-			Payload:        &pb.RoomEnvelope_DurableCommand{DurableCommand: command},
-		})
-	}
-}
-
-// validateDurable returns the item the command targets, or nil for a spawn.
-func (r *Room) validateDurable(
+// validateItemMutation returns the item the mutation targets, or nil for a spawn.
+// Client-host physics never grants edit rights: ownership is enforced here.
+func (r *Room) validateItemMutation(
 	client *Client,
-	command *pb.DurableCommand,
+	mutation *pb.ItemMutation,
 ) (bool, *SnapshotItem, string) {
-	if command.Preview && command.Kind != pb.DurableCommandKind_DURABLE_MOVE_ITEM {
-		return false, nil, "invalid_preview_kind"
-	}
-	switch command.Kind {
-	case pb.DurableCommandKind_DURABLE_SPAWN_ITEM:
+	switch mutation.Kind {
+	case pb.ItemMutationKind_ITEM_MUTATION_SPAWN:
 		if len(r.snapshot.Items) >= r.canvasShape.Limits.MaxItems {
 			return false, nil, "item_limit_reached"
 		}
-		if command.DefinitionId == "" {
+		if mutation.DefinitionId == "" {
 			return false, nil, "missing_definition_id"
 		}
-		definition, err := r.itemDefinition(command.DefinitionId)
+		definition, err := r.itemDefinition(mutation.DefinitionId)
 		if err != nil {
 			return false, nil, "unknown_definition"
 		}
-		if command.DefinitionVersion != definition.Version {
+		if mutation.DefinitionVersion != definition.Version {
 			return false, nil, "definition_version_mismatch"
 		}
-		if err := validateConfigJSON(definition.ConfigSchema, command.ConfigJson); err != nil {
+		if err := validateConfigJSON(definition.ConfigSchema, mutation.ConfigJson); err != nil {
 			return false, nil, "config_schema_mismatch"
 		}
 		if definition.Complexity == ItemComplexityComplex &&
@@ -176,7 +59,7 @@ func (r *Room) validateDurable(
 			r.complexItemCount() >= r.canvasShape.Limits.MaxComplexPhysicsItems {
 			return false, nil, "complex_item_limit_reached"
 		}
-		transform := transformOf(command)
+		transform := transformFromMutation(mutation)
 		if !transform.finite() {
 			return false, nil, "non_finite_transform"
 		}
@@ -188,15 +71,15 @@ func (r *Room) validateDurable(
 		}
 		return true, nil, ""
 
-	case pb.DurableCommandKind_DURABLE_DELETE_ITEM,
-		pb.DurableCommandKind_DURABLE_MOVE_ITEM,
-		pb.DurableCommandKind_DURABLE_ROTATE_ITEM,
-		pb.DurableCommandKind_DURABLE_SCALE_ITEM,
-		pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION,
-		pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS,
-		pb.DurableCommandKind_DURABLE_SET_CONFIG:
+	case pb.ItemMutationKind_ITEM_MUTATION_DELETE,
+		pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM,
+		pb.ItemMutationKind_ITEM_MUTATION_ROTATION,
+		pb.ItemMutationKind_ITEM_MUTATION_SCALE,
+		pb.ItemMutationKind_ITEM_MUTATION_ISOLATION,
+		pb.ItemMutationKind_ITEM_MUTATION_COLLISIONS,
+		pb.ItemMutationKind_ITEM_MUTATION_CONFIG:
 
-		item, ok := r.items[command.EntityId]
+		item, ok := r.items[mutation.EntityId]
 		if !ok {
 			return false, nil, "unknown_entity"
 		}
@@ -206,9 +89,8 @@ func (r *Room) validateDurable(
 		if item.OwnerUserID != client.UserID {
 			return false, nil, "not_owner"
 		}
-		if command.Kind == pb.DurableCommandKind_DURABLE_MOVE_ITEM ||
-			command.Kind == pb.DurableCommandKind_DURABLE_ROTATE_ITEM {
-			transform := transformOf(command)
+		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM {
+			transform := transformFromMutation(mutation)
 			if !transform.finite() {
 				return false, nil, "non_finite_transform"
 			}
@@ -216,21 +98,24 @@ func (r *Room) validateDurable(
 				return false, nil, "outside_canvas"
 			}
 		}
-		if command.Kind == pb.DurableCommandKind_DURABLE_SCALE_ITEM &&
-			(float64(command.Scale) < minItemScale || float64(command.Scale) > maxItemScale) {
+		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_ROTATION &&
+			(math.IsNaN(float64(mutation.Rotation)) || math.IsInf(float64(mutation.Rotation), 0)) {
+			return false, nil, "non_finite_transform"
+		}
+		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_SCALE &&
+			(float64(mutation.Scale) < minItemScale || float64(mutation.Scale) > maxItemScale) {
 			return false, nil, "scale_out_of_range"
 		}
-		if command.Kind == pb.DurableCommandKind_DURABLE_SET_CONFIG &&
-			len(command.ConfigJson) > 0 &&
-			!json.Valid(command.ConfigJson) {
+		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_CONFIG &&
+			len(mutation.ConfigJson) > 0 && !json.Valid(mutation.ConfigJson) {
 			return false, nil, "invalid_config_json"
 		}
-		if command.Kind == pb.DurableCommandKind_DURABLE_SET_CONFIG && len(command.ConfigJson) > 0 {
+		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_CONFIG && len(mutation.ConfigJson) > 0 {
 			definition, err := r.itemDefinition(item.DefinitionID)
 			if err != nil {
 				return false, nil, "unknown_definition"
 			}
-			if err := validateConfigJSON(definition.ConfigSchema, command.ConfigJson); err != nil {
+			if err := validateConfigJSON(definition.ConfigSchema, mutation.ConfigJson); err != nil {
 				return false, nil, "config_schema_mismatch"
 			}
 		}
@@ -241,14 +126,14 @@ func (r *Room) validateDurable(
 	}
 }
 
-func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, client *Client) {
+func (r *Room) applyItemMutation(mutation *pb.ItemMutation, item *SnapshotItem, client *Client) {
 	if item != nil {
 		item.ItemRevision++
 	}
-	switch command.Kind {
-	case pb.DurableCommandKind_DURABLE_SPAWN_ITEM:
+	switch mutation.Kind {
+	case pb.ItemMutationKind_ITEM_MUTATION_SPAWN:
 		r.nextEntityNo++
-		entityID := command.EntityId
+		entityID := mutation.EntityId
 		if entityID == "" || r.items[entityID] != nil {
 			// Spec 19.3. The id repeats in every delta for every entity, so it
 			// stays short. The room already scopes it, so the canvas id would
@@ -257,65 +142,65 @@ func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, clie
 		}
 		created := SnapshotItem{
 			EntityID:          entityID,
-			DefinitionID:      command.DefinitionId,
-			DefinitionVersion: command.DefinitionVersion,
+			DefinitionID:      mutation.DefinitionId,
+			DefinitionVersion: mutation.DefinitionVersion,
 			// The server sets the owner from the authenticated session.
 			OwnerUserID:    client.UserID,
 			ItemRevision:   1,
-			Transform:      transformOf(command),
-			ResolvedConfig: json.RawMessage(command.ConfigJson),
+			Transform:      transformFromMutation(mutation),
+			ResolvedConfig: json.RawMessage(mutation.ConfigJson),
 		}
 		r.snapshot.Items = append(r.snapshot.Items, created)
 		r.indexItems()
-		command.EntityId = entityID
+		mutation.EntityId = entityID
 
-	case pb.DurableCommandKind_DURABLE_DELETE_ITEM:
+	case pb.ItemMutationKind_ITEM_MUTATION_DELETE:
 		kept := make([]SnapshotItem, 0, len(r.snapshot.Items))
 		for _, existing := range r.snapshot.Items {
-			if existing.EntityID != command.EntityId {
+			if existing.EntityID != mutation.EntityId {
 				kept = append(kept, existing)
 			}
 		}
 		r.snapshot.Items = kept
 		r.indexItems()
 
-	case pb.DurableCommandKind_DURABLE_MOVE_ITEM:
-		item.Transform = transformOf(command)
+	case pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM:
+		item.Transform = transformFromMutation(mutation)
 
-	case pb.DurableCommandKind_DURABLE_ROTATE_ITEM:
-		item.Transform.Rotation = float64(command.Rotation)
+	case pb.ItemMutationKind_ITEM_MUTATION_ROTATION:
+		item.Transform.Rotation = float64(mutation.Rotation)
 
-	case pb.DurableCommandKind_DURABLE_SCALE_ITEM:
-		item.Transform.Scale = float64(command.Scale)
+	case pb.ItemMutationKind_ITEM_MUTATION_SCALE:
+		item.Transform.Scale = float64(mutation.Scale)
 
-	case pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION:
-		item.Isolated = command.Isolated
+	case pb.ItemMutationKind_ITEM_MUTATION_ISOLATION:
+		item.Isolated = mutation.Isolated
 
-	case pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS:
-		item.CollisionsDisabled = !command.CollisionsEnabled
+	case pb.ItemMutationKind_ITEM_MUTATION_COLLISIONS:
+		item.CollisionsDisabled = !mutation.CollisionsEnabled
 
-	case pb.DurableCommandKind_DURABLE_SET_CONFIG:
-		if len(command.ConfigJson) > 0 {
-			item.ResolvedConfig = json.RawMessage(command.ConfigJson)
+	case pb.ItemMutationKind_ITEM_MUTATION_CONFIG:
+		if len(mutation.ConfigJson) > 0 {
+			item.ResolvedConfig = json.RawMessage(mutation.ConfigJson)
 		}
 	}
 }
 
-func transformOf(command *pb.DurableCommand) Transform {
-	scale := float64(command.Scale)
-	if scale == 0 && command.Kind != pb.DurableCommandKind_DURABLE_SCALE_ITEM {
+func transformFromMutation(mutation *pb.ItemMutation) Transform {
+	scale := float64(mutation.Scale)
+	if scale == 0 {
 		scale = 1
 	}
 	transform := Transform{
-		Rotation: float64(command.Rotation),
+		Rotation: float64(mutation.Rotation),
 		Scale:    scale,
 	}
-	if command.Position != nil {
-		transform.X = float64(command.Position.X)
-		transform.Y = float64(command.Position.Y)
+	if mutation.Position != nil {
+		transform.X = float64(mutation.Position.X)
+		transform.Y = float64(mutation.Position.Y)
 	}
-	if command.Z != 0 {
-		z := float64(command.Z)
+	if mutation.Z != 0 {
+		z := float64(mutation.Z)
 		transform.Z = &z
 	}
 	return transform

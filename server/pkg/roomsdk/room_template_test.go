@@ -60,7 +60,7 @@ func TestResolvedRoomsShareTemplateDataButNotCanonicalState(t *testing.T) {
 	red.await(func(envelope *pb.RoomEnvelope) bool { return envelope.GetHostControl() != nil })
 	red.send(spawnCommand("red-spawn", 20, 30))
 	red.await(func(envelope *pb.RoomEnvelope) bool {
-		result := envelope.GetDurableResult()
+		result := envelope.GetItemMutationResult()
 		return result != nil && result.Accepted
 	})
 

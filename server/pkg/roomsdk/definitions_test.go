@@ -22,10 +22,10 @@ func TestClientWithoutADefinitionLosesTheHostLease(t *testing.T) {
 
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	result := host.await(func(e *pb.RoomEnvelope) bool {
-		return e.GetDurableResult() != nil
-	}).GetDurableResult()
+		return e.GetItemMutationResult() != nil
+	}).GetItemMutationResult()
 	if !result.Accepted {
-		t.Fatalf("spawn rejected: %s", result.RejectReason)
+		t.Fatalf("spawn rejected: %s", result.Message)
 	}
 
 	failure := peer.await(func(e *pb.RoomEnvelope) bool {
@@ -73,9 +73,9 @@ func TestClientWithEveryDefinitionStaysEligible(t *testing.T) {
 			control.Kind == pb.HostControlKind_HOST_CONTROL_REVOKED {
 			t.Fatal("the host lost its lease although it holds every definition")
 		}
-		if result := envelope.GetDurableResult(); result != nil {
+		if result := envelope.GetItemMutationResult(); result != nil {
 			if !result.Accepted {
-				t.Fatalf("spawn rejected: %s", result.RejectReason)
+				t.Fatalf("spawn rejected: %s", result.Message)
 			}
 			return
 		}
@@ -88,7 +88,7 @@ func TestIncompatibleFirstClientNeverReceivesTheHostLease(t *testing.T) {
 	host.join(&pb.DefinitionVersion{DefinitionId: "rocket", Version: 1})
 	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
 	host.send(spawnCommand("cmd-spawn", 20, 30))
-	host.await(func(e *pb.RoomEnvelope) bool { return e.GetDurableResult() != nil })
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetItemMutationResult() != nil })
 	_ = host.conn.CloseNow()
 
 	deadline := time.Now().Add(3 * time.Second)

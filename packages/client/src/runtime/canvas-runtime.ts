@@ -36,7 +36,7 @@ import {
   type RoomSessionRates,
   type SessionDiagnostics,
 } from "./room-session.js";
-import type { ItemEditHandle } from "./session/durable-command-session.js";
+import type { ItemEditHandle } from "./session/item-mutation-session.js";
 import {
   pixiAssetLoader,
   preloadAssetManifest,

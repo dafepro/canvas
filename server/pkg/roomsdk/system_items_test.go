@@ -56,8 +56,8 @@ func TestRoomBootstrapsSystemOwnedItems(t *testing.T) {
 		t.Fatalf("resolved config = %s, error = %v", item.ResolvedConfig, err)
 	}
 
-	accepted, _, reason := room.validateDurable(&Client{UserID: "alice"}, &pb.DurableCommand{
-		Kind:     pb.DurableCommandKind_DURABLE_MOVE_ITEM,
+	accepted, _, reason := room.validateItemMutation(&Client{UserID: "alice"}, &pb.ItemMutation{
+		Kind:     pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM,
 		EntityId: "match-ball",
 		Position: &pb.Vec2{X: 40, Y: 35},
 	})

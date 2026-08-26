@@ -7,9 +7,9 @@ import {
   type ItemMutation,
 } from "@canvas-physics/protocol";
 import {
-  DurableCommandSession,
-  type DurableCommandEffect,
-} from "../src/runtime/session/durable-command-session.js";
+  ItemMutationSession,
+  type ItemMutationEffect,
+} from "../src/runtime/session/item-mutation-session.js";
 import type {
   SessionClock,
   SessionInterval,
@@ -74,8 +74,8 @@ const item = (revision = 1): SnapshotItem => ({
 
 const build = () => {
   const clock = new FakeClock();
-  const effects: DurableCommandEffect[] = [];
-  const session = new DurableCommandSession({
+  const effects: ItemMutationEffect[] = [];
+  const session = new ItemMutationSession({
     clientSessionId: "browser-session",
     definitions: rocketCanvasDefinitions,
     previewHz: 10,
@@ -94,13 +94,13 @@ const build = () => {
     items: [item()],
   });
   const sentMutations = (): ItemMutation[] => effects
-    .filter((effect): effect is Extract<DurableCommandEffect, { type: "sendMutation" }> =>
+    .filter((effect): effect is Extract<ItemMutationEffect, { type: "sendMutation" }> =>
       effect.type === "sendMutation")
     .map(({ mutation }) => mutation);
   return { clock, effects, session, sentMutations };
 };
 
-describe("DurableCommandSession", () => {
+describe("ItemMutationSession", () => {
   it("returns correlated receipts and serializes writes to one item", async () => {
     const { session, sentMutations } = build();
 
@@ -197,7 +197,7 @@ describe("DurableCommandSession", () => {
     edit.preview(transform(22));
     clock.advance(100);
     const previews = effects
-      .filter((effect): effect is Extract<DurableCommandEffect, { type: "sendPreview" }> =>
+      .filter((effect): effect is Extract<ItemMutationEffect, { type: "sendPreview" }> =>
         effect.type === "sendPreview")
       .map((effect) => effect.preview);
     expect(previews).toHaveLength(2);
@@ -264,7 +264,7 @@ describe("DurableCommandSession", () => {
     const edit = session.beginItemEdit("crate-1");
     const receipt = session.moveItem("crate-1", transform(30));
     const firstSend = effects.find(
-      (effect): effect is Extract<DurableCommandEffect, { type: "sendMutation" }> =>
+      (effect): effect is Extract<ItemMutationEffect, { type: "sendMutation" }> =>
         effect.type === "sendMutation",
     )!;
 
@@ -274,7 +274,7 @@ describe("DurableCommandSession", () => {
 
     session.connectionReady();
     const sends = effects.filter(
-      (effect): effect is Extract<DurableCommandEffect, { type: "sendMutation" }> =>
+      (effect): effect is Extract<ItemMutationEffect, { type: "sendMutation" }> =>
         effect.type === "sendMutation",
     );
     expect(sends).toHaveLength(2);

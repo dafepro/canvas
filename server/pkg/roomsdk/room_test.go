@@ -3,6 +3,7 @@ package roomsdk
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"math"
@@ -119,8 +120,9 @@ type testClient struct {
 	ctx    context.Context
 	roomID string
 	// ClientID from JoinAccepted.
-	clientID  string
-	hostEpoch uint64
+	clientID      string
+	hostEpoch     uint64
+	itemRevisions map[string]uint64
 }
 
 func (h *harness) dial(user string) *testClient {
@@ -140,11 +142,22 @@ func (h *harness) dialRoom(roomID, user string) *testClient {
 		h.t.Fatalf("dial: %v", err)
 	}
 	h.t.Cleanup(func() { _ = conn.CloseNow() })
-	return &testClient{t: h.t, conn: conn, ctx: ctx, roomID: roomID}
+	return &testClient{
+		t: h.t, conn: conn, ctx: ctx, roomID: roomID,
+		itemRevisions: make(map[string]uint64),
+	}
 }
 
 func (c *testClient) send(envelope *pb.RoomEnvelope) {
 	c.t.Helper()
+	if mutation := envelope.GetItemMutation(); mutation != nil {
+		if mutation.ClientSessionId == "" {
+			mutation.ClientSessionId = fmt.Sprintf("test:%s:%d", c.clientID, mutation.MutationId)
+		}
+		if mutation.EntityId != "" && mutation.ExpectedItemRevision == 0 {
+			mutation.ExpectedItemRevision = c.itemRevisions[mutation.EntityId]
+		}
+	}
 	data, err := proto.Marshal(envelope)
 	if err != nil {
 		c.t.Fatalf("marshal: %v", err)
@@ -166,7 +179,23 @@ func (c *testClient) read() *pb.RoomEnvelope {
 	if err := proto.Unmarshal(data, envelope); err != nil {
 		c.t.Fatalf("unmarshal: %v", err)
 	}
+	if result := envelope.GetItemMutationResult(); result != nil && result.EntityId != "" && result.ItemRevision > 0 {
+		c.itemRevisions[result.EntityId] = result.ItemRevision
+	}
 	return envelope
+}
+
+func mutationID(name string) uint64 {
+	// Stable FNV-1a IDs keep older descriptive test labels without weakening
+	// the production protocol's monotonic numeric mutation identity.
+	const offset64 = uint64(14695981039346656037)
+	const prime64 = uint64(1099511628211)
+	value := offset64
+	for i := 0; i < len(name); i++ {
+		value ^= uint64(name[i])
+		value *= prime64
+	}
+	return value
 }
 
 // await reads until a matching envelope arrives or the deadline passes.
@@ -515,12 +544,12 @@ func TestStateFromNonHostIsNotRelayed(t *testing.T) {
 			Entities: []*pb.EntityState{{EntityId: "fake"}},
 		}},
 	})
-	// A durable command from the same client proves the loop kept running and
+	// A durable mutation from the same client proves the loop kept running and
 	// that no state delta arrived before it.
 	peer.send(spawnCommand("cmd-1", 10, 10))
 
 	got := host.await(func(e *pb.RoomEnvelope) bool {
-		return e.GetStateDelta() != nil || e.GetDurableResult() != nil
+		return e.GetStateDelta() != nil || e.GetItemMutationResult() != nil
 	})
 	if got.GetStateDelta() != nil {
 		t.Fatal("the server relayed canonical state from a non-host client")
@@ -545,7 +574,7 @@ func TestStaleHostEpochIsDropped(t *testing.T) {
 	host.send(spawnCommand("cmd-1", 10, 10))
 
 	got := peer.await(func(e *pb.RoomEnvelope) bool {
-		return e.GetStateDelta() != nil || e.GetDurableResult() != nil
+		return e.GetStateDelta() != nil || e.GetItemMutationResult() != nil
 	})
 	if got.GetStateDelta() != nil {
 		t.Fatal("the server relayed a state delta with a stale host epoch")
@@ -555,9 +584,9 @@ func TestStaleHostEpochIsDropped(t *testing.T) {
 func spawnCommand(id string, x, y float32) *pb.RoomEnvelope {
 	return &pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId:         id,
-			Kind:              pb.DurableCommandKind_DURABLE_SPAWN_ITEM,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId:        mutationID(id),
+			Kind:              pb.ItemMutationKind_ITEM_MUTATION_SPAWN,
 			DefinitionId:      "rocket",
 			DefinitionVersion: 1,
 			Position:          &pb.Vec2{X: x, Y: y},
@@ -575,11 +604,11 @@ func TestOwnershipIsEnforced(t *testing.T) {
 	other.join()
 
 	owner.send(spawnCommand("cmd-spawn", 20, 30))
-	result := owner.await(func(e *pb.RoomEnvelope) bool { return e.GetDurableResult() != nil }).GetDurableResult()
+	result := owner.await(func(e *pb.RoomEnvelope) bool { return e.GetItemMutationResult() != nil }).GetItemMutationResult()
 	if !result.Accepted {
-		t.Fatalf("spawn rejected: %s", result.RejectReason)
+		t.Fatalf("spawn rejected: %s", result.Message)
 	}
-	entityID := result.Command.EntityId
+	entityID := result.EntityId
 	if entityID == "" {
 		t.Fatal("the server did not assign an entity id")
 	}
@@ -592,66 +621,43 @@ func TestOwnershipIsEnforced(t *testing.T) {
 		t.Errorf("owner = %q, want alice", instance.OwnerUserID)
 	}
 
-	// Only moves have a non-durable preview form. Other command kinds must not
-	// bypass persistence by setting the preview bit.
-	owner.send(&pb.RoomEnvelope{
-		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-preview-delete",
-			Kind:      pb.DurableCommandKind_DURABLE_DELETE_ITEM,
-			EntityId:  entityID,
-			Preview:   true,
-		}},
-	})
-	previewReject := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-preview-delete"
-	}).GetDurableResult()
-	if previewReject.Accepted || previewReject.RejectReason != "invalid_preview_kind" {
-		t.Errorf(
-			"preview delete: accepted=%v reason=%q, want invalid_preview_kind",
-			previewReject.Accepted,
-			previewReject.RejectReason,
-		)
-	}
-
 	// A non-owner may not move the item.
 	other.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-steal",
-			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
-			EntityId:  entityID,
-			Position:  &pb.Vec2{X: 1, Y: 1},
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-steal"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM,
+			EntityId:   entityID,
+			Position:   &pb.Vec2{X: 1, Y: 1},
 		}},
 	})
 	reject := other.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-steal"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-steal")
+	}).GetItemMutationResult()
 	if reject.Accepted {
 		t.Fatal("a non-owner moved another user's item")
 	}
-	if reject.RejectReason != "not_owner" {
-		t.Errorf("reject reason = %q, want not_owner", reject.RejectReason)
+	if reject.Message != "not_owner" {
+		t.Errorf("reject reason = %q, want not_owner", reject.Message)
 	}
 
 	// The owner may move it.
 	owner.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-move",
-			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
-			EntityId:  entityID,
-			Position:  &pb.Vec2{X: 40, Y: 50},
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-move"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM,
+			EntityId:   entityID,
+			Position:   &pb.Vec2{X: 40, Y: 50},
 		}},
 	})
 	accepted := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-move"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-move")
+	}).GetItemMutationResult()
 	if !accepted.Accepted {
-		t.Fatalf("owner move rejected: %s", accepted.RejectReason)
+		t.Fatalf("owner move rejected: %s", accepted.Message)
 	}
 	if accepted.SceneRevision <= result.SceneRevision {
 		t.Error("the scene revision did not increase")
@@ -659,19 +665,19 @@ func TestOwnershipIsEnforced(t *testing.T) {
 
 	owner.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-scale",
-			Kind:      pb.DurableCommandKind_DURABLE_SCALE_ITEM,
-			EntityId:  entityID,
-			Scale:     1.75,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-scale"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_SCALE,
+			EntityId:   entityID,
+			Scale:      1.75,
 		}},
 	})
 	scaled := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-scale"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-scale")
+	}).GetItemMutationResult()
 	if !scaled.Accepted {
-		t.Fatalf("owner scale rejected: %s", scaled.RejectReason)
+		t.Fatalf("owner scale rejected: %s", scaled.Message)
 	}
 	var scaledItem SnapshotItem
 	if err := json.Unmarshal(scaled.ItemInstanceJson, &scaledItem); err != nil {
@@ -683,19 +689,19 @@ func TestOwnershipIsEnforced(t *testing.T) {
 
 	owner.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-isolate",
-			Kind:      pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION,
-			EntityId:  entityID,
-			Isolated:  true,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-isolate"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_ISOLATION,
+			EntityId:   entityID,
+			Isolated:   true,
 		}},
 	})
 	isolated := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-isolate"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-isolate")
+	}).GetItemMutationResult()
 	if !isolated.Accepted {
-		t.Fatalf("owner isolation rejected: %s", isolated.RejectReason)
+		t.Fatalf("owner isolation rejected: %s", isolated.Message)
 	}
 	var isolatedItem SnapshotItem
 	if err := json.Unmarshal(isolated.ItemInstanceJson, &isolatedItem); err != nil {
@@ -707,35 +713,35 @@ func TestOwnershipIsEnforced(t *testing.T) {
 
 	other.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-steal-isolation",
-			Kind:      pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION,
-			EntityId:  entityID,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-steal-isolation"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_ISOLATION,
+			EntityId:   entityID,
 		}},
 	})
 	isolationReject := other.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-steal-isolation"
-	}).GetDurableResult()
-	if isolationReject.Accepted || isolationReject.RejectReason != "not_owner" {
-		t.Errorf("non-owner isolation accepted=%v reason=%q", isolationReject.Accepted, isolationReject.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-steal-isolation")
+	}).GetItemMutationResult()
+	if isolationReject.Accepted || isolationReject.Message != "not_owner" {
+		t.Errorf("non-owner isolation accepted=%v reason=%q", isolationReject.Accepted, isolationReject.Message)
 	}
 
 	owner.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId:         "cmd-disable-collisions",
-			Kind:              pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId:        mutationID("cmd-disable-collisions"),
+			Kind:              pb.ItemMutationKind_ITEM_MUTATION_COLLISIONS,
 			EntityId:          entityID,
 			CollisionsEnabled: false,
 		}},
 	})
 	collisions := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-disable-collisions"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-disable-collisions")
+	}).GetItemMutationResult()
 	if !collisions.Accepted {
-		t.Fatalf("owner collision change rejected: %s", collisions.RejectReason)
+		t.Fatalf("owner collision change rejected: %s", collisions.Message)
 	}
 	var collisionItem SnapshotItem
 	if err := json.Unmarshal(collisions.ItemInstanceJson, &collisionItem); err != nil {
@@ -747,36 +753,36 @@ func TestOwnershipIsEnforced(t *testing.T) {
 
 	other.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId:         "cmd-steal-collisions",
-			Kind:              pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId:        mutationID("cmd-steal-collisions"),
+			Kind:              pb.ItemMutationKind_ITEM_MUTATION_COLLISIONS,
 			EntityId:          entityID,
 			CollisionsEnabled: true,
 		}},
 	})
 	collisionReject := other.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-steal-collisions"
-	}).GetDurableResult()
-	if collisionReject.Accepted || collisionReject.RejectReason != "not_owner" {
-		t.Errorf("non-owner collision change accepted=%v reason=%q", collisionReject.Accepted, collisionReject.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-steal-collisions")
+	}).GetItemMutationResult()
+	if collisionReject.Accepted || collisionReject.Message != "not_owner" {
+		t.Errorf("non-owner collision change accepted=%v reason=%q", collisionReject.Accepted, collisionReject.Message)
 	}
 
 	owner.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-scale-too-large",
-			Kind:      pb.DurableCommandKind_DURABLE_SCALE_ITEM,
-			EntityId:  entityID,
-			Scale:     8,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-scale-too-large"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_SCALE,
+			EntityId:   entityID,
+			Scale:      8,
 		}},
 	})
 	scaleReject := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-scale-too-large"
-	}).GetDurableResult()
-	if scaleReject.Accepted || scaleReject.RejectReason != "scale_out_of_range" {
-		t.Errorf("large scale accepted=%v reason=%q", scaleReject.Accepted, scaleReject.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-scale-too-large")
+	}).GetItemMutationResult()
+	if scaleReject.Accepted || scaleReject.Message != "scale_out_of_range" {
+		t.Errorf("large scale accepted=%v reason=%q", scaleReject.Accepted, scaleReject.Message)
 	}
 }
 
@@ -789,31 +795,31 @@ func TestDurableLimitsAndBounds(t *testing.T) {
 	// Outside the canvas.
 	owner.send(spawnCommand("cmd-far", 500, 500))
 	reject := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-far"
-	}).GetDurableResult()
-	if reject.Accepted || reject.RejectReason != "outside_canvas" {
-		t.Errorf("got accepted=%v reason=%q, want outside_canvas", reject.Accepted, reject.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-far")
+	}).GetItemMutationResult()
+	if reject.Accepted || reject.Message != "outside_canvas" {
+		t.Errorf("got accepted=%v reason=%q, want outside_canvas", reject.Accepted, reject.Message)
 	}
 
 	// The canvas limit is two items.
 	for i, id := range []string{"cmd-a", "cmd-b"} {
 		owner.send(spawnCommand(id, float32(10+i), 10))
 		r := owner.await(func(e *pb.RoomEnvelope) bool {
-			r := e.GetDurableResult()
-			return r != nil && r.CommandId == id
-		}).GetDurableResult()
+			r := e.GetItemMutationResult()
+			return r != nil && r.MutationId == mutationID(id)
+		}).GetItemMutationResult()
 		if !r.Accepted {
-			t.Fatalf("spawn %s rejected: %s", id, r.RejectReason)
+			t.Fatalf("spawn %s rejected: %s", id, r.Message)
 		}
 	}
 	owner.send(spawnCommand("cmd-c", 12, 10))
 	limit := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-c"
-	}).GetDurableResult()
-	if limit.Accepted || limit.RejectReason != "item_limit_reached" {
-		t.Errorf("got accepted=%v reason=%q, want item_limit_reached", limit.Accepted, limit.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-c")
+	}).GetItemMutationResult()
+	if limit.Accepted || limit.Message != "item_limit_reached" {
+		t.Errorf("got accepted=%v reason=%q, want item_limit_reached", limit.Accepted, limit.Message)
 	}
 }
 
@@ -824,25 +830,25 @@ func TestSpawnRequiresAKnownDefinitionVersion(t *testing.T) {
 	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
 
 	unknown := spawnCommand("cmd-unknown", 10, 10)
-	unknown.GetDurableCommand().DefinitionId = "invented"
+	unknown.GetItemMutation().DefinitionId = "invented"
 	owner.send(unknown)
 	unknownResult := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-unknown"
-	}).GetDurableResult()
-	if unknownResult.Accepted || unknownResult.RejectReason != "unknown_definition" {
-		t.Errorf("unknown definition: accepted=%v reason=%q", unknownResult.Accepted, unknownResult.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-unknown")
+	}).GetItemMutationResult()
+	if unknownResult.Accepted || unknownResult.Message != "unknown_definition" {
+		t.Errorf("unknown definition: accepted=%v reason=%q", unknownResult.Accepted, unknownResult.Message)
 	}
 
 	wrongVersion := spawnCommand("cmd-version", 10, 10)
-	wrongVersion.GetDurableCommand().DefinitionVersion = 99
+	wrongVersion.GetItemMutation().DefinitionVersion = 99
 	owner.send(wrongVersion)
 	versionResult := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-version"
-	}).GetDurableResult()
-	if versionResult.Accepted || versionResult.RejectReason != "definition_version_mismatch" {
-		t.Errorf("wrong version: accepted=%v reason=%q", versionResult.Accepted, versionResult.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-version")
+	}).GetItemMutationResult()
+	if versionResult.Accepted || versionResult.Message != "definition_version_mismatch" {
+		t.Errorf("wrong version: accepted=%v reason=%q", versionResult.Accepted, versionResult.Message)
 	}
 }
 
@@ -853,25 +859,25 @@ func TestSpawnEnforcesTheComplexItemLimit(t *testing.T) {
 	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
 
 	first := spawnCommand("cmd-complex-1", 10, 10)
-	first.GetDurableCommand().DefinitionId = "complex-rocket"
+	first.GetItemMutation().DefinitionId = "complex-rocket"
 	owner.send(first)
 	firstResult := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-complex-1"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-complex-1")
+	}).GetItemMutationResult()
 	if !firstResult.Accepted {
-		t.Fatalf("first complex item rejected: %s", firstResult.RejectReason)
+		t.Fatalf("first complex item rejected: %s", firstResult.Message)
 	}
 
 	second := spawnCommand("cmd-complex-2", 20, 20)
-	second.GetDurableCommand().DefinitionId = "complex-rocket"
+	second.GetItemMutation().DefinitionId = "complex-rocket"
 	owner.send(second)
 	secondResult := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-complex-2"
-	}).GetDurableResult()
-	if secondResult.Accepted || secondResult.RejectReason != "complex_item_limit_reached" {
-		t.Errorf("second complex item: accepted=%v reason=%q", secondResult.Accepted, secondResult.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-complex-2")
+	}).GetItemMutationResult()
+	if secondResult.Accepted || secondResult.Message != "complex_item_limit_reached" {
+		t.Errorf("second complex item: accepted=%v reason=%q", secondResult.Accepted, secondResult.Message)
 	}
 }
 
@@ -882,40 +888,40 @@ func TestDurableConfigMustMatchTheDefinitionSchema(t *testing.T) {
 	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
 
 	badSpawn := spawnCommand("cmd-bad-spawn", 10, 10)
-	badSpawn.GetDurableCommand().ConfigJson = []byte(`{"thrust":"fast"}`)
+	badSpawn.GetItemMutation().ConfigJson = []byte(`{"thrust":"fast"}`)
 	owner.send(badSpawn)
 	badSpawnResult := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-bad-spawn"
-	}).GetDurableResult()
-	if badSpawnResult.Accepted || badSpawnResult.RejectReason != "config_schema_mismatch" {
-		t.Errorf("bad spawn config: accepted=%v reason=%q", badSpawnResult.Accepted, badSpawnResult.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-bad-spawn")
+	}).GetItemMutationResult()
+	if badSpawnResult.Accepted || badSpawnResult.Message != "config_schema_mismatch" {
+		t.Errorf("bad spawn config: accepted=%v reason=%q", badSpawnResult.Accepted, badSpawnResult.Message)
 	}
 
 	owner.send(spawnCommand("cmd-spawn", 20, 30))
 	spawned := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-spawn"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-spawn")
+	}).GetItemMutationResult()
 	if !spawned.Accepted {
-		t.Fatalf("valid spawn rejected: %s", spawned.RejectReason)
+		t.Fatalf("valid spawn rejected: %s", spawned.Message)
 	}
 
 	owner.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId:  "cmd-bad-config",
-			Kind:       pb.DurableCommandKind_DURABLE_SET_CONFIG,
-			EntityId:   spawned.Command.EntityId,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-bad-config"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_CONFIG,
+			EntityId:   spawned.EntityId,
 			ConfigJson: []byte(`{"thrust":30,"admin":true}`),
 		}},
 	})
 	badConfigResult := owner.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-bad-config"
-	}).GetDurableResult()
-	if badConfigResult.Accepted || badConfigResult.RejectReason != "config_schema_mismatch" {
-		t.Errorf("bad config mutation: accepted=%v reason=%q", badConfigResult.Accepted, badConfigResult.RejectReason)
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-bad-config")
+	}).GetItemMutationResult()
+	if badConfigResult.Accepted || badConfigResult.Message != "config_schema_mismatch" {
+		t.Errorf("bad config mutation: accepted=%v reason=%q", badConfigResult.Accepted, badConfigResult.Message)
 	}
 }
 
@@ -989,11 +995,11 @@ func TestSoleHostKeepsTheLeaseOnYield(t *testing.T) {
 	})
 	host.send(spawnCommand("cmd-after-yield", 10, 10))
 	result := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-after-yield"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-after-yield")
+	}).GetItemMutationResult()
 	if !result.Accepted {
-		t.Fatalf("command after yield rejected: %s", result.RejectReason)
+		t.Fatalf("command after yield rejected: %s", result.Message)
 	}
 	if len(h.server.Rooms()) != 1 {
 		t.Error("the room should still be awake")
@@ -1009,7 +1015,7 @@ func TestAbruptlyClosedRoomSleepsWithoutClaimingNormalization(t *testing.T) {
 		return control != nil && control.Kind == pb.HostControlKind_HOST_CONTROL_GRANTED
 	}).GetHostControl()
 	owner.send(spawnCommand("cmd-spawn", 20, 30))
-	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetDurableResult() != nil })
+	owner.await(func(e *pb.RoomEnvelope) bool { return e.GetItemMutationResult() != nil })
 
 	_ = owner.conn.CloseNow()
 
@@ -1070,9 +1076,9 @@ func TestRoomPreservesAHostNormalizedFinalCheckpointOnSleep(t *testing.T) {
 
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	result := host.await(func(e *pb.RoomEnvelope) bool {
-		return e.GetDurableResult() != nil
-	}).GetDurableResult()
-	entityID := result.Command.EntityId
+		return e.GetItemMutationResult() != nil
+	}).GetItemMutationResult()
+	entityID := result.EntityId
 
 	finalSnapshot := CanvasSnapshot{
 		SchemaVersion:      1,
@@ -1209,8 +1215,8 @@ func TestFinalCheckpointRequiresANormalizedSnapshot(t *testing.T) {
 	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	result := host.await(func(e *pb.RoomEnvelope) bool {
-		return e.GetDurableResult() != nil
-	}).GetDurableResult()
+		return e.GetItemMutationResult() != nil
+	}).GetItemMutationResult()
 
 	bad, err := json.Marshal(CanvasSnapshot{
 		SchemaVersion:      1,
@@ -1222,7 +1228,7 @@ func TestFinalCheckpointRequiresANormalizedSnapshot(t *testing.T) {
 		CapturedAt:         time.Now().UTC().Format(time.RFC3339Nano),
 		Normalized:         false,
 		Items: []SnapshotItem{{
-			EntityID:  result.Command.EntityId,
+			EntityID:  result.EntityId,
 			Transform: Transform{X: 20, Y: 30},
 		}},
 	})
@@ -1248,7 +1254,7 @@ func TestFinalCheckpointRequiresANormalizedSnapshot(t *testing.T) {
 		CapturedAt:         time.Now().UTC().Format(time.RFC3339Nano),
 		Normalized:         true,
 		Items: []SnapshotItem{{
-			EntityID:  result.Command.EntityId,
+			EntityID:  result.EntityId,
 			Transform: Transform{X: 20, Y: 30},
 			BehaviorTimers: []BehaviorTimer{{
 				Key:            "countdown",
@@ -1268,11 +1274,11 @@ func TestFinalCheckpointRequiresANormalizedSnapshot(t *testing.T) {
 			Final:              true,
 		}},
 	})
-	// A later durable result proves the room processed the checkpoint first.
+	// A later mutation result proves the room processed the checkpoint first.
 	host.send(spawnCommand("cmd-after-checkpoint", 40, 30))
 	host.await(func(e *pb.RoomEnvelope) bool {
-		result := e.GetDurableResult()
-		return result != nil && result.CommandId == "cmd-after-checkpoint"
+		result := e.GetItemMutationResult()
+		return result != nil && result.MutationId == mutationID("cmd-after-checkpoint")
 	})
 
 	stored, err := h.store.LoadSnapshot(context.Background(), "test-canvas")
@@ -1320,8 +1326,8 @@ func TestCheckpointOnlyFromHost(t *testing.T) {
 	})
 	host.send(spawnCommand("cmd-sync", 10, 10))
 	host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-sync"
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-sync")
 	})
 
 	stored, err := h.store.LoadSnapshot(context.Background(), "test-canvas")
@@ -1347,10 +1353,10 @@ func TestCheckpointCannotRewriteDurableItemMetadata(t *testing.T) {
 
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	spawned := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-spawn"
-	}).GetDurableResult()
-	entityID := spawned.Command.EntityId
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-spawn")
+	}).GetItemMutationResult()
+	entityID := spawned.EntityId
 
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
 		SchemaVersion: 1,
@@ -1389,19 +1395,19 @@ func TestCheckpointCannotRewriteDurableItemMetadata(t *testing.T) {
 	// the host checkpoint is accepted.
 	host.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-move-after-checkpoint",
-			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
-			EntityId:  entityID,
-			Position:  &pb.Vec2{X: 45, Y: 50},
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-move-after-checkpoint"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM,
+			EntityId:   entityID,
+			Position:   &pb.Vec2{X: 45, Y: 50},
 		}},
 	})
 	moved := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-move-after-checkpoint"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-move-after-checkpoint")
+	}).GetItemMutationResult()
 	if !moved.Accepted {
-		t.Fatalf("owner move rejected after checkpoint: %s", moved.RejectReason)
+		t.Fatalf("owner move rejected after checkpoint: %s", moved.Message)
 	}
 
 	var item SnapshotItem
@@ -1436,24 +1442,24 @@ func TestCheckpointDoesNotPersistAnUncommittedPreviewTransform(t *testing.T) {
 
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	spawned := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-spawn"
-	}).GetDurableResult()
-	entityID := spawned.Command.EntityId
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-spawn")
+	}).GetItemMutationResult()
+	entityID := spawned.EntityId
 
 	host.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-preview",
-			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
-			EntityId:  entityID,
-			Position:  &pb.Vec2{X: 40, Y: 50},
-			Preview:   true,
+		Payload: &pb.RoomEnvelope_BeginItemEdit{BeginItemEdit: &pb.BeginItemEdit{
+			ClientSessionId:      "checkpoint-preview-session",
+			EditSessionId:        "checkpoint-preview-edit",
+			EntityId:             entityID,
+			ObservedItemRevision: spawned.ItemRevision,
 		}},
 	})
 	host.await(func(e *pb.RoomEnvelope) bool {
-		command := e.GetDurableCommand()
-		return command != nil && command.CommandId == "cmd-preview"
+		result := e.GetItemEditSessionResult()
+		return result != nil && result.EditSessionId == "checkpoint-preview-edit" &&
+			result.Status == pb.ItemEditSessionStatus_ITEM_EDIT_SESSION_ACTIVE
 	})
 
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
@@ -1482,17 +1488,17 @@ func TestCheckpointDoesNotPersistAnUncommittedPreviewTransform(t *testing.T) {
 
 	host.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId:  "cmd-config",
-			Kind:       pb.DurableCommandKind_DURABLE_SET_CONFIG,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-config"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_CONFIG,
 			EntityId:   entityID,
 			ConfigJson: []byte(`{"thrust":30}`),
 		}},
 	})
 	configured := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-config"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-config")
+	}).GetItemMutationResult()
 	var item SnapshotItem
 	if err := json.Unmarshal(configured.ItemInstanceJson, &item); err != nil {
 		t.Fatalf("item instance json: %v", err)
@@ -1516,31 +1522,46 @@ func TestPreviewRevertsWhenTheEditingPeerDisconnects(t *testing.T) {
 
 	peer.send(spawnCommand("cmd-spawn", 20, 30))
 	spawned := peer.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-spawn"
-	}).GetDurableResult()
-	entityID := spawned.Command.EntityId
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-spawn")
+	}).GetItemMutationResult()
+	entityID := spawned.EntityId
 
 	peer.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-preview",
-			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
-			EntityId:  entityID,
-			Position:  &pb.Vec2{X: 40, Y: 50},
-			Preview:   true,
+		Payload: &pb.RoomEnvelope_BeginItemEdit{BeginItemEdit: &pb.BeginItemEdit{
+			ClientSessionId:      "disconnect-preview-session",
+			EditSessionId:        "disconnect-preview-edit",
+			EntityId:             entityID,
+			ObservedItemRevision: spawned.ItemRevision,
+		}},
+	})
+	peer.await(func(e *pb.RoomEnvelope) bool {
+		result := e.GetItemEditSessionResult()
+		return result != nil && result.EditSessionId == "disconnect-preview-edit" &&
+			result.Status == pb.ItemEditSessionStatus_ITEM_EDIT_SESSION_ACTIVE
+	})
+	peer.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_ItemEditPreview{ItemEditPreview: &pb.ItemEditPreview{
+			ClientSessionId: "disconnect-preview-session",
+			EditSessionId:   "disconnect-preview-edit",
+			EntityId:        entityID,
+			PreviewSequence: 1,
+			Position:        &pb.Vec2{X: 40, Y: 50},
+			Scale:           1,
 		}},
 	})
 	host.await(func(e *pb.RoomEnvelope) bool {
-		command := e.GetDurableCommand()
-		return command != nil && command.CommandId == "cmd-preview"
+		preview := e.GetItemEditPreview()
+		return preview != nil && preview.EditSessionId == "disconnect-preview-edit" && !preview.Revert
 	})
 
 	_ = peer.conn.CloseNow()
 	revert := host.await(func(e *pb.RoomEnvelope) bool {
-		command := e.GetDurableCommand()
-		return command != nil && command.CommandId == "preview-revert-"+entityID
-	}).GetDurableCommand()
+		preview := e.GetItemEditPreview()
+		return preview != nil && preview.EditSessionId == "disconnect-preview-edit" && preview.Revert
+	}).GetItemEditPreview()
 	if revert.Position == nil || revert.Position.X != 20 || revert.Position.Y != 30 {
 		t.Fatalf("revert position = %+v, want (20,30)", revert.Position)
 	}
@@ -1576,12 +1597,12 @@ func TestCheckpointRejectsUnknownEntityIDs(t *testing.T) {
 		}},
 	})
 
-	// A following accepted durable command gives the room loop an ordered
+	// A following accepted durable mutation gives the room loop an ordered
 	// synchronization point and persists its current snapshot.
 	host.send(spawnCommand("cmd-sync", 10, 10))
 	host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-sync"
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-sync")
 	})
 
 	stored, err := h.store.LoadSnapshot(context.Background(), "test-canvas")
@@ -1607,23 +1628,23 @@ func TestCheckpointRejectsAStaleSceneRevision(t *testing.T) {
 
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	spawned := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-spawn"
-	}).GetDurableResult()
-	entityID := spawned.Command.EntityId
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-spawn")
+	}).GetItemMutationResult()
+	entityID := spawned.EntityId
 
 	host.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId: "cmd-move",
-			Kind:      pb.DurableCommandKind_DURABLE_MOVE_ITEM,
-			EntityId:  entityID,
-			Position:  &pb.Vec2{X: 40, Y: 50},
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-move"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM,
+			EntityId:   entityID,
+			Position:   &pb.Vec2{X: 40, Y: 50},
 		}},
 	})
 	host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-move"
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-move")
 	})
 
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
@@ -1653,17 +1674,17 @@ func TestCheckpointRejectsAStaleSceneRevision(t *testing.T) {
 	// Synchronize and inspect the server-owned item after the stale checkpoint.
 	host.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId:  "cmd-config",
-			Kind:       pb.DurableCommandKind_DURABLE_SET_CONFIG,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-config"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_CONFIG,
 			EntityId:   entityID,
 			ConfigJson: []byte(`{"thrust":30}`),
 		}},
 	})
 	configured := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-config"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-config")
+	}).GetItemMutationResult()
 	var item SnapshotItem
 	if err := json.Unmarshal(configured.ItemInstanceJson, &item); err != nil {
 		t.Fatalf("item instance json: %v", err)
@@ -1681,10 +1702,10 @@ func TestCheckpointRejectsAStaleHostEpoch(t *testing.T) {
 
 	host.send(spawnCommand("cmd-spawn", 20, 30))
 	spawned := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-spawn"
-	}).GetDurableResult()
-	entityID := spawned.Command.EntityId
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-spawn")
+	}).GetItemMutationResult()
+	entityID := spawned.EntityId
 
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
 		SchemaVersion: 1,
@@ -1712,17 +1733,17 @@ func TestCheckpointRejectsAStaleHostEpoch(t *testing.T) {
 
 	host.send(&pb.RoomEnvelope{
 		RoomId: "test-canvas",
-		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-			CommandId:  "cmd-config",
-			Kind:       pb.DurableCommandKind_DURABLE_SET_CONFIG,
+		Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+			MutationId: mutationID("cmd-config"),
+			Kind:       pb.ItemMutationKind_ITEM_MUTATION_CONFIG,
 			EntityId:   entityID,
 			ConfigJson: []byte(`{"thrust":30}`),
 		}},
 	})
 	configured := host.await(func(e *pb.RoomEnvelope) bool {
-		r := e.GetDurableResult()
-		return r != nil && r.CommandId == "cmd-config"
-	}).GetDurableResult()
+		r := e.GetItemMutationResult()
+		return r != nil && r.MutationId == mutationID("cmd-config")
+	}).GetItemMutationResult()
 	var item SnapshotItem
 	if err := json.Unmarshal(configured.ItemInstanceJson, &item); err != nil {
 		t.Fatalf("item instance json: %v", err)
@@ -1803,36 +1824,36 @@ func TestCanonicalStateValidation(t *testing.T) {
 
 			host.send(spawnCommand("cmd-spawn", 20, 30))
 			spawned := host.await(func(e *pb.RoomEnvelope) bool {
-				r := e.GetDurableResult()
-				return r != nil && r.CommandId == "cmd-spawn"
-			}).GetDurableResult()
+				r := e.GetItemMutationResult()
+				return r != nil && r.MutationId == mutationID("cmd-spawn")
+			}).GetItemMutationResult()
 			// Consume the accepted mutation on the peer before testing relay order.
 			peer.await(func(e *pb.RoomEnvelope) bool {
-				r := e.GetDurableResult()
-				return r != nil && r.CommandId == "cmd-spawn"
+				r := e.GetItemMutationResult()
+				return r != nil && r.MutationId == mutationID("cmd-spawn")
 			})
 
 			host.send(&pb.RoomEnvelope{
 				RoomId:    "test-canvas",
 				HostEpoch: host.hostEpoch,
 				Payload: &pb.RoomEnvelope_StateDelta{StateDelta: tt.state(
-					spawned.Command.EntityId,
+					spawned.EntityId,
 					spawned.SceneRevision,
 				)},
 			})
 			host.send(&pb.RoomEnvelope{
 				RoomId: "test-canvas",
-				Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
-					CommandId:  "cmd-sync",
-					Kind:       pb.DurableCommandKind_DURABLE_SET_CONFIG,
-					EntityId:   spawned.Command.EntityId,
+				Payload: &pb.RoomEnvelope_ItemMutation{ItemMutation: &pb.ItemMutation{
+					MutationId: mutationID("cmd-sync"),
+					Kind:       pb.ItemMutationKind_ITEM_MUTATION_CONFIG,
+					EntityId:   spawned.EntityId,
 					ConfigJson: []byte(`{"thrust":30}`),
 				}},
 			})
 
 			got := peer.await(func(e *pb.RoomEnvelope) bool {
 				return e.GetStateDelta() != nil ||
-					(e.GetDurableResult() != nil && e.GetDurableResult().CommandId == "cmd-sync")
+					(e.GetItemMutationResult() != nil && e.GetItemMutationResult().MutationId == mutationID("cmd-sync"))
 			})
 			if tt.wantRelayed && got.GetStateDelta() == nil {
 				t.Fatal("valid canonical state was not relayed")

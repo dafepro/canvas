@@ -137,8 +137,7 @@ func (r *Room) handleItemMutation(client *Client, mutation *pb.ItemMutation) {
 		return
 	}
 
-	legacy := durableCommandFromMutation(mutation)
-	accepted, item, reason := r.validateDurable(client, legacy)
+	accepted, item, reason := r.validateItemMutation(client, mutation)
 	if !accepted {
 		r.sendItemMutationRejection(client, mutation, rejectCodeForReason(reason), reason, item)
 		return
@@ -160,8 +159,7 @@ func (r *Room) handleItemMutation(client *Client, mutation *pb.ItemMutation) {
 		}
 	}
 
-	r.applyDurable(legacy, item, client)
-	mutation.EntityId = legacy.EntityId
+	r.applyItemMutation(mutation, item, client)
 	r.checkAllDefinitions()
 	r.sceneRevision++
 	r.snapshot.SceneRevision = r.sceneRevision
@@ -178,7 +176,7 @@ func (r *Room) handleItemMutation(client *Client, mutation *pb.ItemMutation) {
 	deletedEntityID := ""
 	if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_DELETE {
 		deletedEntityID = mutation.EntityId
-		// applyDurable increments the pointed-to tombstone before removing it.
+		// applyItemMutation increments the pointed-to tombstone before removing it.
 		if item != nil {
 			itemRevision = item.ItemRevision
 		}
@@ -250,41 +248,6 @@ func (r *Room) sendItemMutationRejection(
 			ItemMutationResult: result,
 		},
 	})
-}
-
-func durableCommandFromMutation(mutation *pb.ItemMutation) *pb.DurableCommand {
-	kind := pb.DurableCommandKind_DURABLE_UNSPECIFIED
-	switch mutation.Kind {
-	case pb.ItemMutationKind_ITEM_MUTATION_SPAWN:
-		kind = pb.DurableCommandKind_DURABLE_SPAWN_ITEM
-	case pb.ItemMutationKind_ITEM_MUTATION_DELETE:
-		kind = pb.DurableCommandKind_DURABLE_DELETE_ITEM
-	case pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM:
-		kind = pb.DurableCommandKind_DURABLE_MOVE_ITEM
-	case pb.ItemMutationKind_ITEM_MUTATION_ROTATION:
-		kind = pb.DurableCommandKind_DURABLE_ROTATE_ITEM
-	case pb.ItemMutationKind_ITEM_MUTATION_SCALE:
-		kind = pb.DurableCommandKind_DURABLE_SCALE_ITEM
-	case pb.ItemMutationKind_ITEM_MUTATION_CONFIG:
-		kind = pb.DurableCommandKind_DURABLE_SET_CONFIG
-	case pb.ItemMutationKind_ITEM_MUTATION_ISOLATION:
-		kind = pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION
-	case pb.ItemMutationKind_ITEM_MUTATION_COLLISIONS:
-		kind = pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS
-	}
-	return &pb.DurableCommand{
-		Kind:              kind,
-		EntityId:          mutation.EntityId,
-		DefinitionId:      mutation.DefinitionId,
-		DefinitionVersion: mutation.DefinitionVersion,
-		Position:          mutation.Position,
-		Rotation:          mutation.Rotation,
-		Z:                 mutation.Z,
-		ConfigJson:        mutation.ConfigJson,
-		Scale:             mutation.Scale,
-		Isolated:          mutation.Isolated,
-		CollisionsEnabled: mutation.CollisionsEnabled,
-	}
 }
 
 func rejectCodeForReason(reason string) pb.ItemMutationRejectCode {

@@ -4,7 +4,6 @@ import {
   fromJsonBytes,
   toJsonBytes,
   HostControlKind,
-  type DurableCommand,
   type BeginItemEdit,
   type EndItemEdit,
   type FullState,
@@ -72,9 +71,6 @@ export interface RoomClientEvents {
   stateDelta(delta: StateDelta, epoch: number, tick: number): void;
   effect(event: EffectEvent, tick: number): void;
   playerInput(input: PlayerInput, fromClientId: string): void;
-  durablePreview(command: DurableCommand, fromClientId: string): void;
-  durableAccepted(command: DurableCommand, revision: DurableRevision, itemJson?: unknown): void;
-  durableRejected(command: DurableCommand, reason: string): void;
   itemEditPreview(preview: ItemEditPreview, fromClientId: string): void;
   itemEditSessionResult(result: ItemEditSessionResult, itemJson?: unknown): void;
   itemMutationResult(result: ItemMutationResult, itemJson?: unknown): void;
@@ -319,15 +315,6 @@ export class RoomClient {
     );
   }
 
-  sendDurableCommand(command: DurableCommand): void {
-    this.transport.sendReliable(
-      newEnvelope(this.joinDescriptor.roomId, {
-        hostEpoch: this.leaseValue.epoch,
-        durableCommand: command,
-      }),
-    );
-  }
-
   sendItemMutation(mutation: ItemMutation): void {
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
@@ -500,27 +487,6 @@ export class RoomClient {
     if (message.playerInput) {
       this.emit("playerInput", message.playerInput, message.senderClientId);
       return;
-    }
-    if (message.durableCommand) {
-      if (message.hostEpoch !== this.leaseValue.epoch || !message.durableCommand.preview) return;
-      this.emit("durablePreview", message.durableCommand, message.senderClientId);
-      return;
-    }
-    if (message.durableResult) {
-      const result = message.durableResult;
-      const command = result.command;
-      if (!command) return;
-      if (result.accepted) {
-        this.revisionValue = Object.freeze({ sceneRevision: result.sceneRevision });
-        this.emit(
-          "durableAccepted",
-          command,
-          this.revisionValue,
-          fromJsonBytes(result.itemInstanceJson),
-        );
-      } else {
-        this.emit("durableRejected", command, result.rejectReason);
-      }
     }
     if (message.itemEditPreview) {
       if (message.hostEpoch !== this.leaseValue.epoch) return;

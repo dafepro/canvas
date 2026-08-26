@@ -80,7 +80,7 @@ type Vec2 struct {
 
 // SystemItemTemplate is an item owned by the room rather than a participant.
 // An empty OwnerUserID in the materialized snapshot makes it immutable through
-// participant durable commands.
+// participant durable mutations.
 type SystemItemTemplate struct {
 	EntityID          string          `json:"entityId"`
 	DefinitionID      string          `json:"definitionId"`

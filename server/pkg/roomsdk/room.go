@@ -48,14 +48,11 @@ type Room struct {
 	// joinOrder keeps election deterministic.
 	joinOrder []string
 
-	snapshot        CanvasSnapshot
-	snapshotRaw     json.RawMessage
-	checkpointNo    uint64
-	items           map[string]*SnapshotItem
-	avatarPositions map[string]SnapshotAvatar
-	// previews records transforms shown by the host but not yet committed.
-	// Checkpoints must not turn these transient edits into durable placement.
-	previews             map[string]string
+	snapshot             CanvasSnapshot
+	snapshotRaw          json.RawMessage
+	checkpointNo         uint64
+	items                map[string]*SnapshotItem
+	avatarPositions      map[string]SnapshotAvatar
 	editSessions         map[string]*itemEditSession
 	editByEntity         map[string]string
 	mutationReceipts     map[string]*storedMutationReceipt
@@ -94,7 +91,6 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 		participants:      make(map[string]struct{}),
 		items:             make(map[string]*SnapshotItem),
 		avatarPositions:   make(map[string]SnapshotAvatar),
-		previews:          make(map[string]string),
 		editSessions:      make(map[string]*itemEditSession),
 		editByEntity:      make(map[string]string),
 		mutationReceipts:  make(map[string]*storedMutationReceipt),
@@ -363,7 +359,6 @@ func (r *Room) removeClient(client *Client, reason string) bool {
 	}
 	client.close()
 	r.cfg.Metrics.ClientLeft(r.roomID, reason)
-	r.cancelPreviews(client)
 	r.cancelItemEdits(client)
 
 	if r.hostClientID == client.ID {
@@ -399,9 +394,6 @@ func (r *Room) handleMessage(msg inbound) {
 
 	case *pb.RoomEnvelope_HostControl:
 		r.handleHostControl(client, payload.HostControl)
-
-	case *pb.RoomEnvelope_DurableCommand:
-		r.handleDurableCommand(client, payload.DurableCommand)
 
 	case *pb.RoomEnvelope_ItemMutation:
 		r.handleItemMutation(client, payload.ItemMutation)
@@ -720,7 +712,7 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 	for i := range incoming.Items {
 		item := &incoming.Items[i]
 		stored := r.items[item.EntityID]
-		if _, previewing := r.previews[item.EntityID]; !previewing {
+		if _, previewing := r.editByEntity[item.EntityID]; !previewing {
 			stored.Transform = item.Transform
 		}
 		stored.BehaviorState = item.BehaviorState

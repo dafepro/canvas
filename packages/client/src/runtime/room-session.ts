@@ -26,12 +26,12 @@ import {
   type CanvasLifecycleState,
 } from "./lifecycle.js";
 import {
-  DurableCommandSession,
-  type DurableCommandEffect,
+  ItemMutationSession,
+  type ItemMutationEffect,
   type ItemEditHandle,
   type ItemMutationReceipt,
   type ItemMutationSnapshot,
-} from "./session/durable-command-session.js";
+} from "./session/item-mutation-session.js";
 import {
   ReplicationTimeline,
   type BehaviorStateSnapshot,
@@ -183,7 +183,7 @@ export class RoomSession {
   readonly client: RoomClient;
   readonly driver: SimulationDriver;
   private canvasDefinition?: CanvasDefinition;
-  private readonly durable: DurableCommandSession;
+  private readonly mutations: ItemMutationSession;
   private readonly timeline: ReplicationTimeline;
   private readonly roster: ParticipantRoster;
   private readonly presentation = new PresentationGate();
@@ -241,7 +241,7 @@ export class RoomSession {
       sceneRevision: () => this.client.durableRevision.sceneRevision,
       emit: (effect) => this.applyHostRoleEffect(effect),
     });
-    this.durable = new DurableCommandSession({
+    this.mutations = new ItemMutationSession({
       definitions: options.definitions,
       previewHz: options.rates?.previewHz,
       context: () => ({
@@ -251,17 +251,17 @@ export class RoomSession {
         isHost: this.hostRole.isHost,
         canvas: this.canvasDefinition,
       }),
-      emit: (effect) => this.applyDurableEffect(effect),
+      emit: (effect) => this.applyItemMutationEffect(effect),
     });
     this.roster = new ParticipantRoster({
       projectAvatar: options.projectParticipantAvatar,
     });
     this.timeline = new ReplicationTimeline({
       sceneRevision: () => this.client.durableRevision.sceneRevision,
-      decorate: (entity) => this.durable.decorate(entity),
+      decorate: (entity) => this.mutations.decorate(entity),
       onCanonical: (tick, entities) => {
         const canonical = [...entities];
-        this.durable.observeCanonical(this.client.durableRevision.sceneRevision, canonical);
+        this.mutations.observeCanonical(this.client.durableRevision.sceneRevision, canonical);
         this.roster.observeCanonical(canonical);
         this.syncCountdowns(canonical, tick);
         this.presentation.markCanonical(
@@ -318,7 +318,7 @@ export class RoomSession {
   }
 
   subscribeItemMutations(observer: Observer<ItemMutationSnapshot>): () => void {
-    return this.durable.subscribeMutations(observer);
+    return this.mutations.subscribeMutations(observer);
   }
 
   get lifecycleState(): CanvasLifecycleState {
@@ -394,7 +394,7 @@ export class RoomSession {
 
   private terminateResources(): void {
     if (!this.connection.claimResourceClose()) return;
-    this.durable.destroy();
+    this.mutations.destroy();
     this.hostRole.destroy();
     this.driver.terminate();
     this.client.close();
@@ -499,16 +499,16 @@ export class RoomSession {
     });
 
     this.client.on("itemMutationResult", (result, itemJson) => {
-      this.durable.acceptMutation(result, itemJson as SnapshotItem | undefined);
+      this.mutations.acceptMutation(result, itemJson as SnapshotItem | undefined);
       this.checkPresentationReady();
     });
 
     this.client.on("itemEditPreview", (preview) => {
-      this.durable.acceptPreview(preview);
+      this.mutations.acceptPreview(preview);
     });
 
     this.client.on("itemEditSessionResult", (result, itemJson) => {
-      this.durable.acceptEditSession(result, itemJson as SnapshotItem | undefined);
+      this.mutations.acceptEditSession(result, itemJson as SnapshotItem | undefined);
     });
 
     this.client.on("error", (code, message) => {
@@ -544,11 +544,11 @@ export class RoomSession {
   }
 
   private installAcceptedJoin(join: ConnectionJoin): void {
-    this.durable.loadSnapshot(join.snapshot);
-    this.durable.connectionReady();
+    this.mutations.loadSnapshot(join.snapshot);
+    this.mutations.connectionReady();
     this.timeline.resetEpoch(this.hostRole.hostEpoch || this.client.hostLease.epoch);
     this.roster.loadSnapshotPositions(join.snapshot);
-    this.presentation.markItems(join.generation, this.durable.itemEntityIds);
+    this.presentation.markItems(join.generation, this.mutations.itemEntityIds);
     this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
   }
 
@@ -674,7 +674,7 @@ export class RoomSession {
     switch (effect.type) {
       case "connectionReset":
         this.presentation.resetConnection(effect.generation);
-        if (effect.reason === "reconnecting") this.durable.resetConnection();
+        if (effect.reason === "reconnecting") this.mutations.resetConnection();
         break;
       case "failed":
         this.handleConnectionFailure(effect.error);
@@ -765,7 +765,7 @@ export class RoomSession {
    * the interpolated remote state plus its reconciled local avatar.
    */
   entitiesToDraw(nowMs: number): RenderEntity[] {
-    return this.durable.present(
+    return this.mutations.present(
       this.timeline.frame(nowMs, this.localAvatarId, this.hostRole.isHost),
     );
   }
@@ -890,7 +890,7 @@ export class RoomSession {
     rotation = 0,
     scale = 1,
   ): ItemMutationReceipt {
-    return this.durable.spawnItem(definitionId, at, rotation, scale);
+    return this.mutations.spawnItem(definitionId, at, rotation, scale);
   }
 
   private checkPresentationReady(): void {
@@ -899,7 +899,7 @@ export class RoomSession {
     if (this.roster.presenceKnown) {
       this.presentation.markPresence(generation, this.roster.connectedAvatarIds);
     }
-    this.presentation.markItems(generation, this.durable.itemEntityIds);
+    this.presentation.markItems(generation, this.mutations.itemEntityIds);
     const authoritative = this.hostRole.isHost
       ? this.timeline.hostEntities
       : this.timeline.latestEntities;
@@ -911,38 +911,38 @@ export class RoomSession {
   }
 
   beginItemEdit(entityId: string): ItemEditHandle {
-    return this.durable.beginItemEdit(entityId);
+    return this.mutations.beginItemEdit(entityId);
   }
 
   moveItem(entityId: string, transform: Transform): ItemMutationReceipt {
-    return this.durable.moveItem(entityId, transform);
+    return this.mutations.moveItem(entityId, transform);
   }
 
   rotateItem(entityId: string, rotation: number): ItemMutationReceipt {
-    return this.durable.rotateItem(entityId, rotation);
+    return this.mutations.rotateItem(entityId, rotation);
   }
 
   scaleItem(entityId: string, scale: number): ItemMutationReceipt {
-    return this.durable.scaleItem(entityId, scale);
+    return this.mutations.scaleItem(entityId, scale);
   }
 
   setItemConfig(entityId: string, config: unknown): ItemMutationReceipt {
-    return this.durable.setItemConfig(entityId, config);
+    return this.mutations.setItemConfig(entityId, config);
   }
 
   setItemIsolation(entityId: string, isolated: boolean): ItemMutationReceipt {
-    return this.durable.setItemIsolation(entityId, isolated);
+    return this.mutations.setItemIsolation(entityId, isolated);
   }
 
   setItemCollisionsEnabled(entityId: string, enabled: boolean): ItemMutationReceipt {
-    return this.durable.setItemCollisionsEnabled(entityId, enabled);
+    return this.mutations.setItemCollisionsEnabled(entityId, enabled);
   }
 
   deleteItem(entityId: string): ItemMutationReceipt {
-    return this.durable.deleteItem(entityId);
+    return this.mutations.deleteItem(entityId);
   }
 
-  private applyDurableEffect(effect: DurableCommandEffect): void {
+  private applyItemMutationEffect(effect: ItemMutationEffect): void {
     switch (effect.type) {
       case "sendMutation":
         this.client.sendItemMutation(effect.mutation);
@@ -1025,7 +1025,7 @@ export class RoomSession {
         ? Object.freeze({ x: canonicalAvatar.x, y: canonicalAvatar.y })
         : undefined,
       sceneRevision: this.client.durableRevision.sceneRevision,
-      itemCount: this.durable.itemCount,
+      itemCount: this.mutations.itemCount,
       lastRejection: this.lastRejection,
       ...this.trafficRates(),
       droppedOutbound: this.client.traffic.droppedOutbound,

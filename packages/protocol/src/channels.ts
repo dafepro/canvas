@@ -20,8 +20,6 @@ export type PayloadCase =
   | "fullState"
   | "effectEvent"
   | "hostControl"
-  | "durableCommand"
-  | "durableResult"
   | "itemMutation"
   | "itemMutationResult"
   | "beginItemEdit"
@@ -42,8 +40,6 @@ const payloadCases: PayloadCase[] = [
   "fullState",
   "effectEvent",
   "hostControl",
-  "durableCommand",
-  "durableResult",
   "itemMutation",
   "itemMutationResult",
   "beginItemEdit",
@@ -72,8 +68,6 @@ export const messageClassOf = (envelope: RoomEnvelope): MessageClass => {
       return "effect";
     case "itemEditPreview":
       return "input";
-    case "durableCommand":
-    case "durableResult":
     case "itemMutation":
     case "itemMutationResult":
       return "durableMutation";

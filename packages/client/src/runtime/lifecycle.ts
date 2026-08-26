@@ -21,7 +21,7 @@ export type CanvasErrorSource =
   | "protocol"
   | "initialization"
   | "simulation"
-  | "durable-command"
+  | "item-mutation"
   | "assets"
   | "input";
 
@@ -34,7 +34,7 @@ export type CanvasErrorCode =
   | "server_rejected"
   | "join_initialization_failed"
   | "simulation_failed"
-  | "durable_command_rejected"
+  | "item_mutation_rejected"
   | "asset_preload_failed"
   | "pointer_interaction_failed";
 
