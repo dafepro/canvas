@@ -7,6 +7,7 @@ import {
 import { basketballDefinitions } from "./basketball-content.js";
 import { resolveBasketballControlProfile } from "./control-profile.js";
 import { formatScoreboardScore } from "./scoreboard-presentation.js";
+import { formatStartupStatus } from "../../shared/startup-status.js";
 import "./style.css";
 
 const params = new URLSearchParams(location.search);
@@ -60,25 +61,6 @@ userInput.value =
 let runtime: CanvasRuntime | undefined;
 let joining = false;
 let unsubscribers: (() => void)[] = [];
-const presentationTimeoutMs = 12_000;
-
-const waitForPresentation = async (next: CanvasRuntime): Promise<void> => {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      next.whenPresented(),
-      new Promise<never>((_, reject) => {
-        timeout = setTimeout(
-          () => reject(new Error("arena did not receive its initial room state")),
-          presentationTimeoutMs,
-        );
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-};
-
 const renderScore = (state: Readonly<BasketballState>): void => {
   for (const [element, score] of [
     [tealScore, state.tealScore],
@@ -148,15 +130,11 @@ const join = async (): Promise<void> => {
         }],
       },
       pointer: controlProfile.pointer,
-      onAssetProgress: ({ loaded, total }) => {
-        status.textContent = loaded === total
-          ? "Arena art ready · connecting…"
-          : `Loading arena art… ${loaded}/${total}`;
-      },
       onAssetWarning: (warning) => {
         console.warn(`[basketball assets] ${warning.message}`, warning.cause);
       },
       onDiagnostics: ({ isHost, tick }) => {
+        if (next?.startupSnapshot.phase !== "ready") return;
         status.textContent = `${isHost ? "Simulation host" : "Peer"} · tick ${tick}`;
       },
       onError: (error) => {
@@ -165,12 +143,14 @@ const join = async (): Promise<void> => {
     });
     runtime = next;
     unsubscribers = [
+      next.subscribeStartup((snapshot) => {
+        status.textContent = formatStartupStatus(snapshot, {
+          assetName: "arena art",
+          readyMessage: "Arena ready",
+        });
+      }),
       next.subscribeLifecycle(({ state }) => {
-        if (state === "starting") {
-          status.textContent = "Arena art ready · connecting…";
-        } else if (state === "joining") {
-          status.textContent = "Connected · syncing arena…";
-        } else if (state === "reconnecting") {
+        if (state === "reconnecting") {
           status.textContent = "Connection interrupted · retrying…";
         }
       }),
@@ -216,7 +196,7 @@ const join = async (): Promise<void> => {
       }),
     ];
     await next.start();
-    await waitForPresentation(next);
+    await next.whenStartupReady();
     leaveButton.disabled = false;
     fullscreenButton.disabled = false;
   } catch (error) {

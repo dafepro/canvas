@@ -9,6 +9,7 @@ import type { SoccerBallState } from "./soccer-ball-behavior.js";
 import { soccerAssets } from "./assets.js";
 import { projectSoccerParticipantAvatar } from "./participant-projection.js";
 import { playerOverlayGeometry, playerStarCount } from "./player-overlay.js";
+import { formatStartupStatus } from "../../shared/startup-status.js";
 import "./style.css";
 
 const searchParams = new URLSearchParams(location.search);
@@ -156,9 +157,6 @@ const join = async (): Promise<void> => {
         deadZonePx: 4,
         fullRangePx: 64,
       },
-      onAssetProgress: ({ loaded, total }) => {
-        status.textContent = `Loading lounge art… ${loaded}/${total}`;
-      },
       onAssetWarning: (warning) => {
         console.warn(`[soccer assets] ${warning.message}`, warning.cause);
       },
@@ -167,6 +165,7 @@ const join = async (): Promise<void> => {
         benchButton.classList.toggle("active", disabled);
       },
       onDiagnostics: (diagnostics) => {
+        if (nextRuntime?.startupSnapshot.phase !== "ready") return;
         status.textContent = diagnostics.isHost
           ? `Simulation host · tick ${diagnostics.tick}`
           : `Peer · tick ${diagnostics.tick}`;
@@ -174,6 +173,12 @@ const join = async (): Promise<void> => {
     });
     runtime = nextRuntime;
     unsubscribers = [
+      nextRuntime.subscribeStartup((snapshot) => {
+        status.textContent = formatStartupStatus(snapshot, {
+          assetName: "lounge art",
+          readyMessage: "Lounge ready",
+        });
+      }),
       nextRuntime.subscribeCanonicalState(observeEntities),
       nextRuntime.subscribeBehaviorState((snapshot) => {
         const score = snapshot.states.find((entry) => ballIds.has(entry.entityId));
@@ -215,7 +220,7 @@ const join = async (): Promise<void> => {
         : []),
     ];
     await nextRuntime.start();
-    await nextRuntime.whenReady();
+    await nextRuntime.whenStartupReady();
     leaveButton.disabled = false;
     benchButton.disabled = false;
   } catch (error) {

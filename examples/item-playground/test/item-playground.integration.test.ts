@@ -154,7 +154,9 @@ describe("compact item playground", () => {
     expect(main).toContain("subscribeOverlayProjection(renderOverlays");
     expect(main).toContain("text.textContent = render.text");
     expect(main).toContain("import.meta.env.VITE_SERVER_URL ?? location.origin");
-    expect(main).toContain("Assets ready · connecting to room…");
+    expect(main).toContain("subscribeStartup");
+    expect(main).toContain("whenStartupReady");
+    expect(main).toContain("formatStartupStatus");
     expect(vite).toContain('target: "http://127.0.0.1:8083"');
     expect(vite).toContain("ws: true");
   });

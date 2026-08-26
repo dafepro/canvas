@@ -16,6 +16,7 @@ import {
 } from "./graffiti-behavior.js";
 import type { OrbTheme } from "./reactive-orb-behavior.js";
 import { clampFloatingRect } from "./overlay-geometry.js";
+import { formatStartupStatus } from "../../shared/startup-status.js";
 import "./style.css";
 
 const params = new URLSearchParams(location.search);
@@ -70,6 +71,7 @@ let runtime: CanvasRuntime | undefined;
 let joining = false;
 let unsubscribeState: (() => void) | undefined;
 let unsubscribeOverlay: (() => void) | undefined;
+let unsubscribeStartup: (() => void) | undefined;
 let entities: readonly Readonly<RenderEntity>[] = [];
 let selectedEntityId: string | undefined;
 let latestAction: Pick<ItemMutationReceipt, "clientSessionId" | "mutationId"> | undefined;
@@ -406,27 +408,29 @@ const join = async (): Promise<void> => {
         lastManageSignature = "";
         renderOwnedList();
       },
-      onAssetProgress: ({ loaded, total }) => {
-        connectionStatus.textContent = loaded === total
-          ? "Assets ready · connecting to room…"
-          : `Loading assets… ${loaded}/${total}`;
-      },
       onError: (error) => {
         actionStatus.textContent = `Rejected · ${error.message.replaceAll("_", " ")}`;
         actionStatus.dataset.kind = "rejected";
       },
       onDiagnostics: ({ isHost, tick }) => {
+        if (nextRuntime?.startupSnapshot.phase !== "ready") return;
         connectionStatus.textContent = `${isHost ? "Host" : "Peer"} · tick ${tick}`;
       },
     });
     runtime = nextRuntime;
+    unsubscribeStartup = nextRuntime.subscribeStartup((snapshot) => {
+      connectionStatus.textContent = formatStartupStatus(snapshot, {
+        assetName: "studio art",
+        readyMessage: "Studio ready",
+      });
+    });
     unsubscribeState = nextRuntime.subscribeCanonicalState(observeState);
     unsubscribeOverlay = nextRuntime.subscribeOverlayProjection(renderOverlays, {
       maxHz: 60,
       kinds: ["item"],
     });
     await nextRuntime.start();
-    await nextRuntime.whenReady();
+    await nextRuntime.whenStartupReady();
     nextRuntime.setEditMode(true);
     leaveButton.disabled = false;
     spawnToggle.disabled = false;
@@ -440,8 +444,10 @@ const join = async (): Promise<void> => {
     nextRuntime?.stop();
     unsubscribeState?.();
     unsubscribeOverlay?.();
+    unsubscribeStartup?.();
     unsubscribeState = undefined;
     unsubscribeOverlay = undefined;
+    unsubscribeStartup = undefined;
     joinButton.disabled = false;
     connectionStatus.textContent = `Join failed: ${String(error)}`;
   } finally {
@@ -454,8 +460,10 @@ const leave = (): void => {
   runtime = undefined;
   unsubscribeState?.();
   unsubscribeOverlay?.();
+  unsubscribeStartup?.();
   unsubscribeState = undefined;
   unsubscribeOverlay = undefined;
+  unsubscribeStartup = undefined;
   void (leaving?.stopGracefully() ?? Promise.resolve()).finally(() => {
     stage.querySelectorAll("canvas").forEach((canvas) => canvas.remove());
     joinButton.disabled = false;

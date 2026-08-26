@@ -12,6 +12,7 @@ import {
   urlForLinkedRoom,
   type LinkedRoomId,
 } from "./route-state.js";
+import { formatStartupStatus } from "../../shared/startup-status.js";
 import "./style.css";
 
 const userInput = document.querySelector<HTMLInputElement>("#user")!;
@@ -80,11 +81,11 @@ const join = async (): Promise<void> => {
         pointer: { mode: "thumbstick", deadZonePx: 4, fullRangePx: 55 },
         hideDisabledAvatars: true,
         spawnPointId: request.arrivalSpawnPointId,
-        onAssetProgress: ({ loaded, total }) => {
-          status.textContent = `Preparing ${names[request.roomId] ?? request.roomId} · assets ${loaded}/${total}`;
-        },
         onDiagnostics: ({ isHost, tick }) => {
-          if (!mount.classList.contains("staged")) {
+          if (
+            mount.dataset.startupReady === "true" &&
+            !mount.classList.contains("staged")
+          ) {
             status.textContent = `${isHost ? "Host" : "Peer"} · tick ${tick} · walk into the glowing door`;
           }
         },
@@ -99,11 +100,18 @@ const join = async (): Promise<void> => {
           }
         },
       });
+      const unsubscribeStartup = runtime.subscribeStartup((snapshot) => {
+        mount.dataset.startupReady = String(snapshot.phase === "ready");
+        status.textContent = `${names[request.roomId] ?? request.roomId} · ${formatStartupStatus(
+          snapshot,
+          { assetName: "room art" },
+        )}`;
+      });
       try {
         await runtime.start();
-        await runtime.whenReady();
-        await runtime.whenPresented();
+        await runtime.whenStartupReady();
       } catch (error) {
+        unsubscribeStartup();
         runtime.stop();
         mount.remove();
         throw error;
@@ -124,6 +132,7 @@ const join = async (): Promise<void> => {
           runtime.setAvatarDisabled(pending);
         },
         close: async () => {
+          unsubscribeStartup();
           await runtime.stopGracefully();
           mount.remove();
         },
