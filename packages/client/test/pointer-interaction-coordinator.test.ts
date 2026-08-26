@@ -94,6 +94,38 @@ const recordingClaim = (events: string[]): PointerInteractionClaim => ({
 });
 
 describe("PointerInteractionCoordinator", () => {
+  it("lets consumers exclude projected DOM controls from Canvas pointer routing", () => {
+    const surface = new PointerSurface();
+    const toolbar = { kind: "toolbar" };
+    let claims = 0;
+    const coordinator = new PointerInteractionCoordinator(
+      surface as unknown as HTMLElement,
+      {
+        strategies: [{
+          id: "room",
+          priority: 1,
+          claim: () => {
+            claims++;
+            return {};
+          },
+        }],
+        ignorePointerTarget: (target) => target === toolbar,
+      },
+    );
+
+    surface.emit("pointerdown", 20, 30, 7, 1, {
+      target: toolbar as unknown as EventTarget,
+    });
+    expect(claims).toBe(0);
+    expect(coordinator.diagnostics.phase).toBe("idle");
+
+    surface.emit("pointerdown", 20, 30, 7, 1, {
+      target: surface as unknown as EventTarget,
+    });
+    expect(claims).toBe(1);
+    coordinator.destroy();
+  });
+
   it("rejects ambiguous or invalid strategy registrations", () => {
     const surface = new PointerSurface();
     const duplicate = { id: "same", priority: 1, claim: () => undefined };

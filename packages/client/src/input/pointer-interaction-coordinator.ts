@@ -54,6 +54,8 @@ export interface PointerInteractionStrategy {
 export interface PointerInteractionCoordinatorOptions {
   readonly strategies: readonly PointerInteractionStrategy[];
   readonly toWorld?: (local: Readonly<Vec2>) => Vec2 | undefined;
+  /** Consumer-owned DOM controls that must remain outside Canvas gesture routing. */
+  readonly ignorePointerTarget?: (target: EventTarget | null) => boolean;
   readonly onError?: (error: Error, strategyId: string) => void;
 }
 
@@ -130,6 +132,7 @@ export class PointerInteractionCoordinator {
 
     const onDown = (event: PointerEvent) => {
       if (this.destroyed) return;
+      if (this.options.ignorePointerTarget?.(event.target)) return;
       if (this.active) {
         if (this.active.suspended) {
           this.terminateCancel("superseded", this.sample(event));

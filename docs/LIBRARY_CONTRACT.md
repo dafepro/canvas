@@ -144,6 +144,8 @@ and consumer gestures compete through ordered claims instead of installing
 independent DOM listeners. Once one claim begins, no other strategy observes
 that pointer until exactly one terminal release or cancellation. See
 `docs/POINTER_INTERACTIONS.md` for the public strategy and priority contract.
+Consumers may use `ignorePointerTarget` to keep projected DOM toolbars inside a
+shared pointer surface without routing those controls through Canvas gestures.
 Once a direct grab begins, movement, release, cancellation, browser-window
 exit, focus loss, and lost pointer capture are observed on the canvas's owning
 window. Leaving the canvas while still held therefore keeps projecting the

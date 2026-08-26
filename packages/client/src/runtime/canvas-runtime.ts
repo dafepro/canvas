@@ -76,6 +76,8 @@ export interface CanvasRuntimeOptions {
    * hit targets should own gestures while empty Canvas space keeps scrolling.
    */
   pointerElement?: HTMLElement;
+  /** Excludes consumer-owned projected DOM controls from Canvas pointer routing. */
+  ignorePointerTarget?: (target: EventTarget | null) => boolean;
   /** Element promoted to fullscreen. Defaults to the renderer mount. */
   fullscreenElement?: HTMLElement;
   /** Item definitions the client knows. Bundled for now (spec 26). */
@@ -436,6 +438,7 @@ export class CanvasRuntime {
           this.pointer,
         ],
         toWorld: (point) => this.pointerLocalToWorld(point),
+        ignorePointerTarget: this.options.ignorePointerTarget,
         onError: (cause, strategyId) => {
           const error = lifecycleError(
             "pointer_interaction_failed",
