@@ -47,7 +47,6 @@ import {
   validateAssetReferences,
   type AssetManifest,
   type AssetLoaderAdapter,
-  type AssetProgress,
   type AssetWarning,
   type LoadedAssetBundle,
 } from "../assets/index.js";
@@ -57,6 +56,11 @@ import {
   lifecycleError,
   type CanvasLifecycleState,
 } from "./lifecycle.js";
+import {
+  RuntimeStartupProgressCoordinator,
+  type RuntimeStartupObserver,
+  type RuntimeStartupSnapshot,
+} from "./startup-progress.js";
 import {
   OverlayProjectionStore,
   cssPointToRenderer,
@@ -94,7 +98,6 @@ export interface CanvasRuntimeOptions {
   assets?: AssetManifest;
   /** Advanced override for tests or a consumer-specific texture loader. */
   assetLoader?: AssetLoaderAdapter<Texture>;
-  onAssetProgress?: (progress: Readonly<AssetProgress>) => void;
   onAssetWarning?: (warning: Readonly<AssetWarning>) => void;
   /** Typed runtime, transport, protocol, simulation, and asset failures. */
   onError?: (error: CanvasConsumerError) => void;
@@ -162,8 +165,10 @@ export class CanvasRuntime {
   private readonly overlayProjections = new OverlayProjectionStore();
   private readonly fullscreen?: FullscreenController;
   private pointerWorldTarget?: Vec2;
+  private readonly startup = new RuntimeStartupProgressCoordinator();
 
   constructor(private readonly options: CanvasRuntimeOptions) {
+    this.startup.configureAssets(options.assets?.sources ?? []);
     if (typeof document !== "undefined") {
       this.fullscreen = new FullscreenController(
         options.fullscreenElement ?? options.mount,
@@ -183,6 +188,7 @@ export class CanvasRuntime {
       onJoined: (canvas) => this.mountScene(canvas),
       onError: options.onError,
     });
+    this.session.subscribeStartup((snapshot) => this.startup.acceptSession(snapshot));
     this.session.subscribeEffects((emission) => this.scene?.effects.apply(emission));
   }
 
@@ -240,6 +246,14 @@ export class CanvasRuntime {
     return this.session.subscribeLifecycle(...args);
   }
 
+  get startupSnapshot(): Readonly<RuntimeStartupSnapshot> {
+    return this.startup.snapshot;
+  }
+
+  subscribeStartup(observer: RuntimeStartupObserver): () => void {
+    return this.startup.subscribe(observer);
+  }
+
   /** Bounded plain-data samples for DOM labels, controls, and product overlays. */
   subscribeOverlayProjection(
     observer: OverlayProjectionObserver,
@@ -280,10 +294,17 @@ export class CanvasRuntime {
         if (this.options.assets) {
           this.assetBundle = await preloadAssetManifest(this.options.assets, {
             adapter: this.options.assetLoader ?? pixiAssetLoader,
-            onProgress: this.options.onAssetProgress,
+            onProgress: (progress) => this.startup.updateAssets(progress),
             onWarning: this.options.onAssetWarning,
           });
         }
+        if (!this.running) {
+          throw lifecycleError(
+            "start_cancelled",
+            "Runtime startup was cancelled by stop",
+          );
+        }
+        this.startup.completeAssets();
         await this.session.start();
       } catch (cause) {
         this.running = false;
@@ -293,6 +314,7 @@ export class CanvasRuntime {
           cause instanceof Error ? cause.message : "Required assets failed to preload",
           { source: "assets", cause },
         );
+        this.startup.fail(error);
         this.session.stop();
         try {
           this.options.onError?.(error);
@@ -320,6 +342,7 @@ export class CanvasRuntime {
 
   private prepareStop(): void {
     this.running = false;
+    this.startup.cancel();
     if (this.visibilityListener) {
       document.removeEventListener("visibilitychange", this.visibilityListener);
       this.visibilityListener = undefined;
@@ -594,6 +617,7 @@ export class CanvasRuntime {
       }
       this.latestEntities = entities;
       scene.update(entities, deltaMs);
+      this.startup.markPresentedFrame();
       if (this.overlayProjections.hasObservers && this.session.canvas) {
         this.overlayProjections.publish({
           sampledAtMs: nowMs,

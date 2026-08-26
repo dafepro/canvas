@@ -61,6 +61,17 @@ const freezeAssets = (progress: Readonly<AssetProgress>): Readonly<AssetProgress
     sources: Object.freeze(progress.sources.map((source) => Object.freeze({ ...source }))),
   });
 
+const sameAssets = (
+  left: Readonly<AssetProgress> | undefined,
+  right: Readonly<AssetProgress>,
+): boolean => left?.settled === right.settled && left.total === right.total &&
+  left.ratio === right.ratio && left.sources.length === right.sources.length &&
+  left.sources.every((source, index) => {
+    const candidate = right.sources[index];
+    return source.sourceId === candidate?.sourceId &&
+      source.required === candidate.required && source.status === candidate.status;
+  });
+
 /** Internal monotonic state machine behind the public startup snapshot stream. */
 export class StartupProgress {
   private readonly observers = new Set<RuntimeStartupObserver>();
@@ -114,6 +125,7 @@ export class StartupProgress {
 
   updateAssets(progress: Readonly<AssetProgress>): void {
     if (this.phaseValue !== "assets") return;
+    if (sameAssets(this.assetsValue, progress)) return;
     this.assetsValue = freezeAssets(progress);
     this.publish();
   }
@@ -175,5 +187,95 @@ export class StartupProgress {
       assets: this.assetsValue,
       error: this.errorValue,
     });
+  }
+}
+
+/** Composes browser-owned assets and first render with a headless room stream. */
+export class RuntimeStartupProgressCoordinator {
+  private readonly progress: StartupProgress;
+  private assetsComplete = false;
+  private pendingSession?: Readonly<RuntimeStartupSnapshot>;
+  private awaitingPresentedFrame = false;
+
+  constructor(now: () => number = () => Date.now()) {
+    this.progress = new StartupProgress("assets", now);
+  }
+
+  get snapshot(): Readonly<RuntimeStartupSnapshot> {
+    return this.progress.snapshot;
+  }
+
+  subscribe(observer: RuntimeStartupObserver): () => void {
+    return this.progress.subscribe(observer);
+  }
+
+  configureAssets(sources: readonly Readonly<{ id: string; required: boolean }>[]): void {
+    this.updateAssets({
+      settled: 0,
+      total: sources.length,
+      ratio: sources.length === 0 ? 1 : 0,
+      sources: sources.map((source) => ({
+        sourceId: source.id,
+        required: source.required,
+        status: "pending",
+      })),
+    });
+  }
+
+  updateAssets(assets: Readonly<AssetProgress>): void {
+    this.progress.updateAssets(assets);
+  }
+
+  completeAssets(): void {
+    if (this.assetsComplete) return;
+    this.assetsComplete = true;
+    if (this.pendingSession) this.applySession(this.pendingSession);
+    else this.progress.advance("credentials");
+  }
+
+  acceptSession(snapshot: Readonly<RuntimeStartupSnapshot>): void {
+    this.pendingSession = snapshot;
+    if (this.assetsComplete) this.applySession(snapshot);
+  }
+
+  markPresentedFrame(): void {
+    if (!this.awaitingPresentedFrame) return;
+    this.awaitingPresentedFrame = false;
+    this.progress.advance("ready");
+  }
+
+  fail(error: CanvasConsumerError): void {
+    this.progress.fail(error);
+  }
+
+  cancel(): void {
+    this.progress.cancel();
+  }
+
+  private applySession(snapshot: Readonly<RuntimeStartupSnapshot>): void {
+    switch (snapshot.phase) {
+      case "assets":
+        return;
+      case "ready":
+        this.progress.advance("presenting");
+        this.awaitingPresentedFrame = true;
+        return;
+      case "failed":
+        if (snapshot.error) this.progress.fail(snapshot.error);
+        return;
+      case "cancelled":
+        this.progress.cancel();
+        return;
+      case "presenting":
+        this.progress.advance("presenting");
+        return;
+      case "credentials":
+      case "connecting":
+      case "joining":
+      case "simulation":
+      case "canonical":
+        this.progress.advance(snapshot.phase);
+        return;
+    }
   }
 }

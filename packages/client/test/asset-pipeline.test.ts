@@ -170,14 +170,27 @@ describe("asset manifest", () => {
       },
       assetLoader: adapter as AssetLoaderAdapter<import("pixi.js").Texture>,
     });
+    const phases: string[] = [];
+    runtime.subscribeStartup((snapshot) => phases.push(snapshot.phase));
 
     const started = runtime.start();
     await Promise.resolve();
     expect(connect).not.toHaveBeenCalled();
+    expect(runtime.startupSnapshot).toMatchObject({
+      phase: "assets",
+      assets: {
+        settled: 0,
+        total: 1,
+        sources: [{ sourceId: "required", required: true, status: "pending" }],
+      },
+    });
     finishLoad("texture");
     await started;
     expect(connect).toHaveBeenCalledOnce();
+    expect(phases).toContain("credentials");
+    expect(runtime.startupSnapshot.phase).toBe("joining");
     runtime.stop();
+    expect(runtime.startupSnapshot.phase).toBe("cancelled");
   });
 
   it("reports required preload failures through the typed consumer error model", async () => {
@@ -219,6 +232,61 @@ describe("asset manifest", () => {
     expect(onError.mock.calls[0][0]).toBeInstanceOf(CanvasConsumerError);
     expect(connect).not.toHaveBeenCalled();
     expect(runtime.lifecycleState).toBe("stopped");
+    expect(runtime.startupSnapshot).toMatchObject({
+      phase: "failed",
+      error: { code: "asset_preload_failed", source: "assets" },
+      assets: {
+        settled: 1,
+        total: 1,
+        sources: [{ sourceId: "required", required: true, status: "failed" }],
+      },
+    });
+  });
+
+  it("publishes cancellation immediately when stopped during asset loading", async () => {
+    let finishLoad!: (texture: string) => void;
+    const connect = vi.fn(async () => undefined);
+    const runtime = new CanvasRuntime({
+      roomId: "cancel-assets",
+      serverUrl: "http://unused.test",
+      mount: {} as HTMLElement,
+      definitions: [],
+      transport: {
+        connect,
+        sendReliable: vi.fn(),
+        sendRealtime: vi.fn(),
+        onMessage: () => () => undefined,
+        onStatus: () => () => undefined,
+        status: "idle",
+        traffic: emptyTraffic(),
+        close: vi.fn(),
+      },
+      driver: SimulationDriver.local(),
+      assets: {
+        schemaVersion: 1,
+        id: "cancel",
+        revision: "1",
+        sources: [{ id: "slow", src: "/slow.png", required: true }],
+        textures: [{ id: "slow", sourceId: "slow" }],
+      },
+      assetLoader: {
+        load: () => new Promise((resolve) => { finishLoad = resolve; }),
+        frame: (source) => source,
+      } as AssetLoaderAdapter<import("pixi.js").Texture>,
+    });
+
+    const started = runtime.start();
+    await Promise.resolve();
+    runtime.stop();
+    expect(runtime.startupSnapshot).toMatchObject({
+      phase: "cancelled",
+      error: { code: "start_cancelled" },
+    });
+    expect(connect).not.toHaveBeenCalled();
+
+    finishLoad({} as import("pixi.js").Texture);
+    await expect(started).rejects.toMatchObject({ code: "start_cancelled" });
+    expect(connect).not.toHaveBeenCalled();
   });
 });
 

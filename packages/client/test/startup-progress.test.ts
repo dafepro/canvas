@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { lifecycleError } from "../src/runtime/lifecycle.js";
 import {
+  RuntimeStartupProgressCoordinator,
   StartupProgress,
   type RuntimeStartupActivePhase,
   type RuntimeStartupSnapshot,
@@ -137,5 +138,63 @@ describe("StartupProgress", () => {
     progress.advance("joining");
 
     expect(healthy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("RuntimeStartupProgressCoordinator", () => {
+  it("holds room progress behind assets and waits for an actual presented frame", () => {
+    const runtime = new RuntimeStartupProgressCoordinator(() => 1);
+    runtime.configureAssets([
+      { id: "field", required: true },
+      { id: "music", required: false },
+    ]);
+    const room = new StartupProgress("credentials", () => 1);
+    const phases: string[] = [];
+    runtime.subscribe((snapshot) => phases.push(snapshot.phase));
+    room.subscribe((snapshot) => runtime.acceptSession(snapshot));
+
+    expect(runtime.snapshot).toMatchObject({
+      phase: "assets",
+      assets: { settled: 0, total: 2, ratio: 0 },
+    });
+    runtime.completeAssets();
+    expect(runtime.snapshot.phase).toBe("credentials");
+
+    for (const phase of [
+      "connecting",
+      "joining",
+      "simulation",
+      "canonical",
+      "presenting",
+      "ready",
+    ] as const) room.advance(phase);
+
+    expect(runtime.snapshot.phase).toBe("presenting");
+    expect(phases).not.toContain("ready");
+    runtime.markPresentedFrame();
+    expect(runtime.snapshot.phase).toBe("ready");
+  });
+
+  it("forwards room failure and cancels pending browser startup exactly once", () => {
+    const failed = new RuntimeStartupProgressCoordinator(() => 2);
+    failed.completeAssets();
+    const error = lifecycleError("transport_connection_failed", "offline", {
+      source: "transport",
+    });
+    failed.acceptSession(Object.freeze({
+      phase: "failed",
+      startedAtMs: 1,
+      phaseStartedAtMs: 2,
+      completedAtMs: 2,
+      completedPhases: Object.freeze([]),
+      error,
+    }));
+    expect(failed.snapshot).toMatchObject({ phase: "failed", error });
+
+    const cancelled = new RuntimeStartupProgressCoordinator(() => 3);
+    cancelled.cancel();
+    cancelled.completeAssets();
+    cancelled.markPresentedFrame();
+    expect(cancelled.snapshot.phase).toBe("cancelled");
   });
 });
