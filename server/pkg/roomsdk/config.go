@@ -1,6 +1,7 @@
 package roomsdk
 
 import (
+	"context"
 	"log/slog"
 	"time"
 )
@@ -27,6 +28,10 @@ type Config struct {
 	// ParticipantSignals enables a bounded, non-durable consumer signal channel.
 	// An empty allowlist keeps the channel disabled.
 	ParticipantSignals ParticipantSignalPolicy
+	// DurableAuthorizer lets the embedding product apply inventory and placement
+	// policy after Canvas validates a command and before it changes room state.
+	// Nil preserves Canvas' generic owner-only behavior.
+	DurableAuthorizer DurableAuthorizer
 	// ProtocolVersion refuses a client that does not match.
 	ProtocolVersion uint32
 	// Logger receives coordination events. Defaults to slog.Default().
@@ -38,6 +43,59 @@ type Config struct {
 	AllowedOrigins []string
 	// Metrics receives counters listed in spec 22.2. Optional.
 	Metrics Metrics
+}
+
+type DurableOperation string
+
+const (
+	DurableSpawn     DurableOperation = "spawn"
+	DurableDelete    DurableOperation = "delete"
+	DurableMove      DurableOperation = "move"
+	DurableRotate    DurableOperation = "rotate"
+	DurableScale     DurableOperation = "scale"
+	DurableConfigure DurableOperation = "configure"
+	DurableIsolate   DurableOperation = "isolate"
+	DurableCollide   DurableOperation = "collide"
+
+	DurableRejectedByApplication = "application_denied"
+)
+
+type DurablePosition struct {
+	X float64
+	Y float64
+}
+
+type DurableAuthorizationItem struct {
+	EntityID     string
+	DefinitionID string
+	OwnerUserID  string
+}
+
+type DurableAuthorizationRequest struct {
+	RoomID        string
+	UserID        string
+	Operation     DurableOperation
+	CommandID     string
+	EntityID      string
+	DefinitionID  string
+	Position      DurablePosition
+	Preview       bool
+	ExistingItems []DurableAuthorizationItem
+}
+
+type DurableAuthorizationResult struct {
+	Allowed bool
+	Reason  string
+}
+
+type DurableAuthorizer interface {
+	AuthorizeDurable(context.Context, DurableAuthorizationRequest) DurableAuthorizationResult
+}
+
+type DurableAuthorizerFunc func(context.Context, DurableAuthorizationRequest) DurableAuthorizationResult
+
+func (function DurableAuthorizerFunc) AuthorizeDurable(ctx context.Context, request DurableAuthorizationRequest) DurableAuthorizationResult {
+	return function(ctx, request)
 }
 
 type ParticipantSignalPolicy struct {
@@ -104,6 +162,7 @@ type Metrics interface {
 	RelayBytes(canvasID string, bytes int)
 	HostLeaseChanged(canvasID string, epoch uint64, reason string)
 	CheckpointStored(canvasID string, bytes int)
+	DurableAccepted(canvasID string, operation string)
 	DurableRejected(canvasID string, reason string)
 	ProtocolMismatch(canvasID string)
 	ParticipantSignal(canvasID string, result string)
@@ -119,6 +178,7 @@ func (NopMetrics) ClientLeft(string, string)               {}
 func (NopMetrics) RelayBytes(string, int)                  {}
 func (NopMetrics) HostLeaseChanged(string, uint64, string) {}
 func (NopMetrics) CheckpointStored(string, int)            {}
+func (NopMetrics) DurableAccepted(string, string)          {}
 func (NopMetrics) DurableRejected(string, string)          {}
 func (NopMetrics) ProtocolMismatch(string)                 {}
 func (NopMetrics) ParticipantSignal(string, string)        {}

@@ -79,6 +79,10 @@ func (m *CountingMetrics) CheckpointStored(canvasID string, bytes int) {
 	m.mu.Unlock()
 }
 
+func (m *CountingMetrics) DurableAccepted(canvasID, operation string) {
+	m.add("canvas_durable_accepts_total", canvasID, operation, 1)
+}
+
 func (m *CountingMetrics) DurableRejected(canvasID, reason string) {
 	m.add("canvas_durable_rejects_total", canvasID, reason, 1)
 }
@@ -177,6 +181,12 @@ func (t TeeMetrics) HostLeaseChanged(canvasID string, epoch uint64, reason strin
 func (t TeeMetrics) CheckpointStored(canvasID string, bytes int) {
 	for _, m := range t {
 		m.CheckpointStored(canvasID, bytes)
+	}
+}
+
+func (t TeeMetrics) DurableAccepted(canvasID, operation string) {
+	for _, m := range t {
+		m.DurableAccepted(canvasID, operation)
 	}
 }
 

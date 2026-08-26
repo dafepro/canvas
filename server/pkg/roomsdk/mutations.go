@@ -1,10 +1,13 @@
 package roomsdk
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
+	"time"
 
 	pb "github.com/dafepro/canvas/server/gen/canvasphysicsv1"
 )
@@ -30,12 +33,17 @@ const (
 	maxItemScale = 4.0
 )
 
+var durableRejectReason = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+
 // handleDurableCommand enforces ownership before the command reaches the
 // simulation host (spec 14.1). Client-host physics does not grant edit rights.
 func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) {
 	accepted, item, reason := r.validateDurable(client, command)
+	if accepted {
+		accepted, reason = r.authorizeDurable(client, command)
+	}
 	if !accepted {
-		r.cfg.Metrics.DurableRejected(r.roomID, reason)
+		r.cfg.Metrics.DurableRejected(r.canvasID, reason)
 		r.sendTo(client, &pb.RoomEnvelope{
 			RoomId:    r.roomID,
 			HostEpoch: r.hostEpoch,
@@ -69,6 +77,8 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 	}
 
 	r.applyDurable(command, item, client)
+	operation, _ := durableOperation(command.Kind)
+	r.cfg.Metrics.DurableAccepted(r.canvasID, string(operation))
 	// Spec 20. A new item can use a definition a client does not hold.
 	r.checkAllDefinitions()
 	r.sceneRevision++
@@ -105,6 +115,61 @@ func (r *Room) handleDurableCommand(client *Client, command *pb.DurableCommand) 
 		}},
 	})
 	r.persistAsync()
+}
+
+func (r *Room) authorizeDurable(client *Client, command *pb.DurableCommand) (bool, string) {
+	if r.cfg.DurableAuthorizer == nil {
+		return true, ""
+	}
+	operation, ok := durableOperation(command.Kind)
+	if !ok {
+		return false, DurableRejectedByApplication
+	}
+	items := make([]DurableAuthorizationItem, 0, len(r.snapshot.Items))
+	for _, item := range r.snapshot.Items {
+		items = append(items, DurableAuthorizationItem{
+			EntityID: item.EntityID, DefinitionID: item.DefinitionID, OwnerUserID: item.OwnerUserID,
+		})
+	}
+	position := transformOf(command)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	result := r.cfg.DurableAuthorizer.AuthorizeDurable(ctx, DurableAuthorizationRequest{
+		RoomID: r.roomID, UserID: client.UserID, Operation: operation,
+		CommandID: command.CommandId, EntityID: command.EntityId, DefinitionID: command.DefinitionId,
+		Position: DurablePosition{X: position.X, Y: position.Y}, Preview: command.Preview,
+		ExistingItems: items,
+	})
+	if result.Allowed {
+		return true, ""
+	}
+	if !durableRejectReason.MatchString(result.Reason) {
+		return false, DurableRejectedByApplication
+	}
+	return false, result.Reason
+}
+
+func durableOperation(kind pb.DurableCommandKind) (DurableOperation, bool) {
+	switch kind {
+	case pb.DurableCommandKind_DURABLE_SPAWN_ITEM:
+		return DurableSpawn, true
+	case pb.DurableCommandKind_DURABLE_DELETE_ITEM:
+		return DurableDelete, true
+	case pb.DurableCommandKind_DURABLE_MOVE_ITEM:
+		return DurableMove, true
+	case pb.DurableCommandKind_DURABLE_ROTATE_ITEM:
+		return DurableRotate, true
+	case pb.DurableCommandKind_DURABLE_SCALE_ITEM:
+		return DurableScale, true
+	case pb.DurableCommandKind_DURABLE_SET_CONFIG:
+		return DurableConfigure, true
+	case pb.DurableCommandKind_DURABLE_SET_ITEM_ISOLATION:
+		return DurableIsolate, true
+	case pb.DurableCommandKind_DURABLE_SET_ITEM_COLLISIONS:
+		return DurableCollide, true
+	default:
+		return "", false
+	}
 }
 
 // Revert transient placements when their editing client leaves without a

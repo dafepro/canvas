@@ -29,6 +29,9 @@ func (m *LogMetrics) HostLeaseChanged(canvasID string, epoch uint64, reason stri
 func (m *LogMetrics) CheckpointStored(canvasID string, bytes int) {
 	m.log.Debug("metric checkpoint_stored", "canvas", canvasID, "bytes", bytes)
 }
+func (m *LogMetrics) DurableAccepted(canvasID, operation string) {
+	m.log.Debug("metric durable_accepted", "canvas", canvasID, "operation", operation)
+}
 func (m *LogMetrics) DurableRejected(canvasID, reason string) {
 	m.log.Warn("metric durable_rejected", "canvas", canvasID, "reason", reason)
 }

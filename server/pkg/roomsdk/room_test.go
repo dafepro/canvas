@@ -780,6 +780,49 @@ func TestOwnershipIsEnforced(t *testing.T) {
 	}
 }
 
+func TestHostDurableAuthorizerCanEnforceProductInventoryBeforeSpawn(t *testing.T) {
+	var requests []DurableAuthorizationRequest
+	h := newHarness(t, func(cfg *Config) {
+		cfg.DurableAuthorizer = DurableAuthorizerFunc(func(_ context.Context, request DurableAuthorizationRequest) DurableAuthorizationResult {
+			requests = append(requests, request)
+			if request.UserID != "alice" || request.Operation != DurableSpawn || request.DefinitionID != "rocket" {
+				return DurableAuthorizationResult{Reason: DurableRejectedByApplication}
+			}
+			if len(request.ExistingItems) > 0 {
+				return DurableAuthorizationResult{Reason: "one_per_room"}
+			}
+			return DurableAuthorizationResult{Allowed: true}
+		})
+	})
+	owner := h.dial("alice")
+	owner.join()
+
+	owner.send(spawnCommand("cmd-authorized", 12, 18))
+	accepted := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetDurableResult()
+		return result != nil && result.CommandId == "cmd-authorized"
+	}).GetDurableResult()
+	if !accepted.Accepted {
+		t.Fatalf("authorized spawn rejected: %s", accepted.RejectReason)
+	}
+
+	owner.send(spawnCommand("cmd-duplicate", 22, 28))
+	rejected := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetDurableResult()
+		return result != nil && result.CommandId == "cmd-duplicate"
+	}).GetDurableResult()
+	if rejected.Accepted || rejected.RejectReason != "one_per_room" {
+		t.Fatalf("duplicate result = accepted %v reason %q", rejected.Accepted, rejected.RejectReason)
+	}
+	if len(requests) != 2 || len(requests[1].ExistingItems) != 1 {
+		t.Fatalf("authorization requests = %+v", requests)
+	}
+	item := requests[1].ExistingItems[0]
+	if item.OwnerUserID != "alice" || item.DefinitionID != "rocket" || requests[1].Position.X != 22 || requests[1].Position.Y != 28 {
+		t.Fatalf("authorization request did not preserve safe command context: %+v", requests[1])
+	}
+}
+
 func TestDurableLimitsAndBounds(t *testing.T) {
 	h := newHarness(t, nil)
 	owner := h.dial("alice")

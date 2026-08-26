@@ -23,6 +23,7 @@ const source = (sampledAtMs: number): OverlayProjectionSource => ({
       id: "ball",
       kind: "item",
       definitionId: "soccer-ball",
+      ownerUserId: "alice",
       x: 50,
       y: 30,
       z: 2,
@@ -94,6 +95,7 @@ describe("bounded overlay projection", () => {
     expect(snapshot.entities).toEqual([
       expect.objectContaining({
         entityId: "ball",
+        ownerUserId: "alice",
         world: { x: 50, y: 30, z: 2 },
         screen: { x: 500, y: 330 },
         inViewport: true,
