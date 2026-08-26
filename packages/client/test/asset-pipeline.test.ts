@@ -71,7 +71,15 @@ describe("asset manifest", () => {
       "source:/atlas.png?canvasAssetRevision=rev%202@[0,0,64,64]",
     );
     expect(bundle.warnings).toEqual([]);
-    expect(progress).toHaveBeenLastCalledWith({ loaded: 2, total: 2, ratio: 1 });
+    expect(progress).toHaveBeenLastCalledWith({
+      settled: 2,
+      total: 2,
+      ratio: 1,
+      sources: [
+        { sourceId: "field", required: true, status: "loaded" },
+        { sourceId: "atlas", required: true, status: "loaded" },
+      ],
+    });
   });
 
   it("warns and falls back for optional failures but rejects required failures", async () => {

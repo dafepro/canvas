@@ -10,10 +10,19 @@ export interface AssetLoaderAdapter<Texture> {
   frame(source: Texture, frame: AssetFrame, id: string): Texture;
 }
 
+export type AssetSourceStatus = "pending" | "loaded" | "warning" | "failed";
+
+export interface AssetSourceProgress {
+  sourceId: string;
+  required: boolean;
+  status: AssetSourceStatus;
+}
+
 export interface AssetProgress {
-  loaded: number;
+  settled: number;
   total: number;
   ratio: number;
+  sources: readonly Readonly<AssetSourceProgress>[];
 }
 
 export interface AssetWarning {
@@ -79,24 +88,34 @@ export async function preloadAssetManifest<Texture>(
   const sources = new Map<string, Texture>();
   const failures: AssetFailure[] = [];
   const warnings: AssetWarning[] = [];
-  let loaded = 0;
+  let settled = 0;
+  const sourceProgress: AssetSourceProgress[] = manifest.sources.map((source) => ({
+    sourceId: source.id,
+    required: source.required,
+    status: "pending",
+  }));
+  const publishProgress = () => options.onProgress?.(Object.freeze({
+    settled,
+    total: manifest.sources.length,
+    ratio: manifest.sources.length === 0 ? 1 : settled / manifest.sources.length,
+    sources: Object.freeze(sourceProgress.map((source) => Object.freeze({ ...source }))),
+  }));
+  publishProgress();
 
   const results = await Promise.all(
-    manifest.sources.map(async (source) => {
+    manifest.sources.map(async (source, index) => {
       try {
         const value = (await options.adapter.load(
           versionAssetUrl(source.src, manifest.revision),
         )) as Texture;
+        sourceProgress[index]!.status = "loaded";
         return { ok: true, source, value } as const;
       } catch (cause) {
+        sourceProgress[index]!.status = source.required ? "failed" : "warning";
         return { ok: false, source, cause } as const;
       } finally {
-        loaded += 1;
-        options.onProgress?.(Object.freeze({
-          loaded,
-          total: manifest.sources.length,
-          ratio: manifest.sources.length === 0 ? 1 : loaded / manifest.sources.length,
-        }));
+        settled += 1;
+        publishProgress();
       }
     }),
   );

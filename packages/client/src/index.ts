@@ -25,5 +25,12 @@ export * from "./runtime/session/item-mutation-session.js";
 export * from "./runtime/canvas-runtime.js";
 export * from "./runtime/linked-room-navigator.js";
 export * from "./runtime/lifecycle.js";
+export type {
+  RuntimeStartupActivePhase,
+  RuntimeStartupObserver,
+  RuntimeStartupPhase,
+  RuntimeStartupPhaseTiming,
+  RuntimeStartupSnapshot,
+} from "./runtime/startup-progress.js";
 export * from "./definitions/rocket-canvas.js";
 export * from "./assets/index.js";

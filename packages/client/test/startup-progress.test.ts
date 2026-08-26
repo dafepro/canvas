@@ -1,0 +1,141 @@
+import { describe, expect, it, vi } from "vitest";
+import { lifecycleError } from "../src/runtime/lifecycle.js";
+import {
+  StartupProgress,
+  type RuntimeStartupActivePhase,
+  type RuntimeStartupSnapshot,
+} from "../src/runtime/startup-progress.js";
+
+const phases: RuntimeStartupActivePhase[] = [
+  "assets",
+  "credentials",
+  "connecting",
+  "joining",
+  "simulation",
+  "canonical",
+  "presenting",
+  "ready",
+];
+
+describe("StartupProgress", () => {
+  it("replays immutable snapshots and records a monotonic phase timeline", () => {
+    let now = 10;
+    const progress = new StartupProgress("assets", () => now);
+    const observed: RuntimeStartupSnapshot[] = [];
+    progress.subscribe((snapshot) => observed.push(snapshot));
+
+    now = 20;
+    progress.advance("credentials");
+    now = 35;
+    progress.advance("connecting");
+    now = 40;
+    progress.advance("credentials");
+
+    expect(observed.map(({ phase }) => phase)).toEqual([
+      "assets",
+      "credentials",
+      "connecting",
+    ]);
+    expect(progress.snapshot).toMatchObject({
+      phase: "connecting",
+      startedAtMs: 10,
+      phaseStartedAtMs: 35,
+      completedPhases: [
+        { phase: "assets", startedAtMs: 10, completedAtMs: 20 },
+        { phase: "credentials", startedAtMs: 20, completedAtMs: 35 },
+      ],
+    });
+    expect(Object.isFrozen(progress.snapshot)).toBe(true);
+    expect(Object.isFrozen(progress.snapshot.completedPhases)).toBe(true);
+    expect(Object.isFrozen(progress.snapshot.completedPhases[0])).toBe(true);
+  });
+
+  it.each(phases.slice(0, -1))(
+    "can fail while %s is stalled and settles only once",
+    (phase) => {
+      const progress = new StartupProgress(phase, () => 100);
+      const snapshots: RuntimeStartupSnapshot[] = [];
+      progress.subscribe((snapshot) => snapshots.push(snapshot));
+      const error = lifecycleError(
+        phase === "assets" ? "asset_preload_failed" : "transport_connection_failed",
+        `${phase} failed`,
+        { source: phase === "assets" ? "assets" : "transport" },
+      );
+
+      progress.fail(error);
+      progress.fail(lifecycleError("transport_closed", "late"));
+      progress.advance("ready");
+
+      expect(progress.snapshot.phase).toBe("failed");
+      expect(progress.snapshot.error).toBe(error);
+      expect(progress.snapshot.completedAtMs).toBe(100);
+      expect(snapshots.map(({ phase: value }) => value)).toEqual([phase, "failed"]);
+    },
+  );
+
+  it("publishes typed cancellation before readiness but keeps readiness sticky", () => {
+    let now = 5;
+    const cancelled = new StartupProgress("joining", () => now);
+    now = 8;
+    cancelled.cancel("consumer stopped startup");
+
+    expect(cancelled.snapshot).toMatchObject({
+      phase: "cancelled",
+      completedAtMs: 8,
+      error: {
+        code: "start_cancelled",
+        source: "lifecycle",
+        recoverable: false,
+        message: "consumer stopped startup",
+      },
+    });
+
+    const ready = new StartupProgress("presenting", () => now);
+    ready.advance("ready");
+    ready.cancel("late stop");
+    ready.fail(lifecycleError("transport_closed", "late failure"));
+    expect(ready.snapshot.phase).toBe("ready");
+  });
+
+  it("publishes source-aware asset settlement without allowing late asset updates", () => {
+    const progress = new StartupProgress("assets", () => 1);
+    progress.updateAssets({
+      settled: 1,
+      total: 2,
+      ratio: 0.5,
+      sources: [
+        { sourceId: "field", required: true, status: "loaded" },
+        { sourceId: "music", required: false, status: "pending" },
+      ],
+    });
+
+    expect(progress.snapshot.assets).toEqual({
+      settled: 1,
+      total: 2,
+      ratio: 0.5,
+      sources: [
+        { sourceId: "field", required: true, status: "loaded" },
+        { sourceId: "music", required: false, status: "pending" },
+      ],
+    });
+    expect(Object.isFrozen(progress.snapshot.assets)).toBe(true);
+    expect(Object.isFrozen(progress.snapshot.assets?.sources)).toBe(true);
+
+    progress.advance("credentials");
+    progress.updateAssets({ settled: 2, total: 2, ratio: 1, sources: [] });
+    expect(progress.snapshot.assets?.settled).toBe(1);
+  });
+
+  it("unsubscribes cleanly and isolates throwing observers", () => {
+    const progress = new StartupProgress("credentials", () => 1);
+    const healthy = vi.fn();
+    progress.subscribe(() => { throw new Error("consumer bug"); });
+    const unsubscribe = progress.subscribe(healthy);
+
+    progress.advance("connecting");
+    unsubscribe();
+    progress.advance("joining");
+
+    expect(healthy).toHaveBeenCalledTimes(2);
+  });
+});
