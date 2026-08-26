@@ -84,45 +84,45 @@ func (r *Room) validateItemMutation(
 			return false, nil, "unknown_entity"
 		}
 		if item.OwnerUserID == "" {
-			return false, nil, "system_owned"
+			return false, item, "system_owned"
 		}
 		if item.OwnerUserID != client.UserID {
-			return false, nil, "not_owner"
+			return false, item, "not_owner"
 		}
 		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM {
 			transform := transformFromMutation(mutation)
 			if !transform.finite() {
-				return false, nil, "non_finite_transform"
+				return false, item, "non_finite_transform"
 			}
 			if !r.insideCanvas(transform) {
-				return false, nil, "outside_canvas"
+				return false, item, "outside_canvas"
 			}
 		}
 		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_ROTATION &&
 			(math.IsNaN(float64(mutation.Rotation)) || math.IsInf(float64(mutation.Rotation), 0)) {
-			return false, nil, "non_finite_transform"
+			return false, item, "non_finite_transform"
 		}
 		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_SCALE &&
 			(float64(mutation.Scale) < minItemScale || float64(mutation.Scale) > maxItemScale) {
-			return false, nil, "scale_out_of_range"
+			return false, item, "scale_out_of_range"
 		}
 		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_CONFIG &&
 			len(mutation.ConfigJson) > 0 && !json.Valid(mutation.ConfigJson) {
-			return false, nil, "invalid_config_json"
+			return false, item, "invalid_config_json"
 		}
 		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_CONFIG && len(mutation.ConfigJson) > 0 {
 			definition, err := r.itemDefinition(item.DefinitionID)
 			if err != nil {
-				return false, nil, "unknown_definition"
+				return false, item, "unknown_definition"
 			}
 			if err := validateConfigJSON(definition.ConfigSchema, mutation.ConfigJson); err != nil {
-				return false, nil, "config_schema_mismatch"
+				return false, item, "config_schema_mismatch"
 			}
 		}
 		return true, item, ""
 
 	default:
-		return false, nil, "unknown_command_kind"
+		return false, nil, "unknown_mutation_kind"
 	}
 }
 

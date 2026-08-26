@@ -144,6 +144,23 @@ describe("ItemMutationSession", () => {
     });
   });
 
+  it("sends mutations for different items concurrently", () => {
+    const { session, sentMutations } = build();
+    session.loadSnapshot({
+      ...emptySnapshot(rocketCanvas.id, rocketCanvas.version),
+      items: [
+        item(),
+        { ...item(), entityId: "crate-2", transform: transform(24) },
+      ],
+    });
+
+    session.moveItem("crate-1", transform(20));
+    session.moveItem("crate-2", transform(30));
+
+    expect(sentMutations()).toHaveLength(2);
+    expect(sentMutations().map(({ entityId }) => entityId)).toEqual(["crate-1", "crate-2"]);
+  });
+
   it("settles a typed rejection without emitting a generic error", async () => {
     const { effects, session } = build();
     const receipt = session.deleteItem("crate-1");

@@ -2,6 +2,7 @@ package roomsdk
 
 import (
 	"encoding/json"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -242,5 +243,119 @@ func TestItemEditSessionSequencesPreviewAndArbitratesOneEditor(t *testing.T) {
 	}).GetItemEditSessionResult()
 	if ended.ItemRevision != 1 {
 		t.Fatalf("ended edit result = %#v", ended)
+	}
+}
+
+func TestActiveItemPreviewReplaysAfterHostMigration(t *testing.T) {
+	h := newHarness(t, nil)
+	host := h.dial("alice")
+	host.join()
+	host.await(func(envelope *pb.RoomEnvelope) bool {
+		control := envelope.GetHostControl()
+		return control != nil && control.Kind == pb.HostControlKind_HOST_CONTROL_GRANTED
+	})
+
+	owner := h.dial("bob")
+	owner.join()
+	owner.heartbeat()
+	owner.send(spawnMutation("browser-b", 1, 20, 30))
+	spawned := awaitMutationResult(owner, 1)
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_BeginItemEdit{BeginItemEdit: &pb.BeginItemEdit{
+			ClientSessionId:      "browser-b",
+			EditSessionId:        "edit-b",
+			EntityId:             spawned.EntityId,
+			ObservedItemRevision: spawned.ItemRevision,
+		}},
+	})
+	owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetItemEditSessionResult()
+		return result != nil && result.EditSessionId == "edit-b" &&
+			result.Status == pb.ItemEditSessionStatus_ITEM_EDIT_SESSION_ACTIVE
+	})
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_ItemEditPreview{ItemEditPreview: &pb.ItemEditPreview{
+			ClientSessionId: "browser-b",
+			EditSessionId:   "edit-b",
+			EntityId:        spawned.EntityId,
+			PreviewSequence: 7,
+			Position:        &pb.Vec2{X: 44, Y: 31},
+			Scale:           1,
+		}},
+	})
+	host.await(func(envelope *pb.RoomEnvelope) bool {
+		preview := envelope.GetItemEditPreview()
+		return preview != nil && preview.EditSessionId == "edit-b" &&
+			preview.PreviewSequence == 7
+	})
+
+	_ = host.conn.CloseNow()
+	owner.await(func(envelope *pb.RoomEnvelope) bool {
+		control := envelope.GetHostControl()
+		return control != nil && control.Kind == pb.HostControlKind_HOST_CONTROL_GRANTED
+	})
+	replayed := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		preview := envelope.GetItemEditPreview()
+		return preview != nil && preview.EditSessionId == "edit-b"
+	}).GetItemEditPreview()
+	if replayed.PreviewSequence != 7 || replayed.Position.GetX() != 44 || replayed.Revert {
+		t.Fatalf("replayed preview = %#v", replayed)
+	}
+}
+
+func TestExpiredItemEditLeaseRevertsAndReleasesTheItem(t *testing.T) {
+	var nowMillis atomic.Int64
+	nowMillis.Store(time.Now().UnixMilli())
+	h := newHarness(t, func(cfg *Config) {
+		cfg.Now = func() time.Time { return time.UnixMilli(nowMillis.Load()) }
+		cfg.ItemEditLeaseTTL = 100 * time.Millisecond
+		cfg.HeartbeatInterval = 10 * time.Millisecond
+		cfg.HostLeaseTTL = time.Hour
+	})
+	owner := h.dial("alice")
+	owner.join()
+	owner.await(func(envelope *pb.RoomEnvelope) bool {
+		return envelope.GetHostControl() != nil
+	})
+	owner.send(spawnMutation("expiry-browser", 1, 20, 30))
+	spawned := awaitMutationResult(owner, 1)
+
+	begin := func(editSessionID string) {
+		owner.send(&pb.RoomEnvelope{
+			RoomId: "test-canvas",
+			Payload: &pb.RoomEnvelope_BeginItemEdit{BeginItemEdit: &pb.BeginItemEdit{
+				ClientSessionId:      "expiry-browser",
+				EditSessionId:        editSessionID,
+				EntityId:             spawned.EntityId,
+				ObservedItemRevision: spawned.ItemRevision,
+			}},
+		})
+	}
+	begin("expiring-edit")
+	owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetItemEditSessionResult()
+		return result != nil && result.EditSessionId == "expiring-edit" &&
+			result.Status == pb.ItemEditSessionStatus_ITEM_EDIT_SESSION_ACTIVE
+	})
+
+	nowMillis.Add(101)
+	expired := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetItemEditSessionResult()
+		return result != nil && result.EditSessionId == "expiring-edit" &&
+			result.Status == pb.ItemEditSessionStatus_ITEM_EDIT_SESSION_EXPIRED
+	}).GetItemEditSessionResult()
+	if expired.RejectCode != pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_EDIT_EXPIRED {
+		t.Fatalf("expired result = %#v", expired)
+	}
+
+	begin("replacement-edit")
+	replacement := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetItemEditSessionResult()
+		return result != nil && result.EditSessionId == "replacement-edit"
+	}).GetItemEditSessionResult()
+	if replacement.Status != pb.ItemEditSessionStatus_ITEM_EDIT_SESSION_ACTIVE {
+		t.Fatalf("replacement edit result = %#v", replacement)
 	}
 }

@@ -113,7 +113,8 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     expect(bob.client.hostLease.epoch).toBe(alice.client.hostLease.epoch);
 
     // The peer asks the server for a durable spawn. The host simulates it.
-    bob.spawnItem(crateDefinition.definitionId, { x: 40, y: 20 });
+    const spawnReceipt = bob.spawnItem(crateDefinition.definitionId, { x: 40, y: 20 });
+    await expect(spawnReceipt.settled).resolves.toMatchObject({ status: "accepted" });
     await waitFor("the host to hold the crate", () => items(alice).length === 1);
     const crateId = items(alice)[0]!.id;
     await waitFor("the crate to reach the peer", () => entity(bob, crateId) !== undefined);
@@ -150,47 +151,63 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
       y: hostCrate.y,
       rotation: hostCrate.rotation,
     };
-    bob.moveItem(crateId, previewTransform, true);
+    const edit = bob.beginItemEdit(crateId);
+    await waitFor("the item edit lease to open", () => edit.state === "active");
+    edit.preview(previewTransform);
     await waitFor(
       "the host to apply the owner's preview move",
       () => Math.abs((entity(alice, crateId)?.x ?? 0) - previewTransform.x) < 0.5,
     );
     expect(bob.client.durableRevision.sceneRevision).toBe(beforePreviewRevision);
 
-    bob.moveItem(crateId, previewTransform);
-    await waitFor(
-      "the final move to advance the scene revision",
-      () => bob.client.durableRevision.sceneRevision > beforePreviewRevision,
-    );
+    const moveReceipt = edit.mutate({
+      kind: "transform",
+      entityId: crateId,
+      transform: previewTransform,
+    });
+    await expect(moveReceipt.settled).resolves.toMatchObject({
+      status: "accepted",
+      sceneRevision: expect.any(Number),
+      itemRevision: 2,
+    });
+    edit.end();
 
-    bob.rotateItem(crateId, Math.PI / 4);
+    const rotateReceipt = bob.rotateItem(crateId, Math.PI / 4);
+    await expect(rotateReceipt.settled).resolves.toMatchObject({ status: "accepted" });
     await waitFor(
       "the host to apply the owner's durable rotation",
       () => Math.abs((entity(alice, crateId)?.rotation ?? 0) - Math.PI / 4) < 0.1,
     );
 
-    bob.setItemIsolation(crateId, true);
+    await expect(bob.setItemIsolation(crateId, true).settled).resolves.toMatchObject({
+      status: "accepted",
+    });
     await waitFor(
       "live-edit isolation to reach the host and peer",
       () => entity(alice, crateId)?.isolated === true && entity(bob, crateId)?.isolated === true,
     );
 
     const revisionBeforeUnauthorizedEdit = alice.client.durableRevision.sceneRevision;
-    alice.setItemIsolation(crateId, false);
-    await waitFor(
-      "the server to reject another player's isolation edit",
-      () => alice.diagnostics().lastRejection !== undefined,
-    );
+    const unauthorized = alice.setItemIsolation(crateId, false);
+    await expect(unauthorized.settled).resolves.toMatchObject({
+      status: "rejected",
+      code: "not_owner",
+      authoritativeItem: expect.objectContaining({ entityId: crateId }),
+    });
     expect(alice.client.durableRevision.sceneRevision).toBe(revisionBeforeUnauthorizedEdit);
     expect(entity(alice, crateId)?.isolated).toBe(true);
 
-    bob.setItemIsolation(crateId, false);
+    await expect(bob.setItemIsolation(crateId, false).settled).resolves.toMatchObject({
+      status: "accepted",
+    });
     await waitFor(
       "the owner to return the item to live simulation",
       () => entity(alice, crateId)?.isolated === false && entity(bob, crateId)?.isolated === false,
     );
 
-    bob.setItemCollisionsEnabled(crateId, false);
+    await expect(bob.setItemCollisionsEnabled(crateId, false).settled).resolves.toMatchObject({
+      status: "accepted",
+    });
     await waitFor(
       "the collision override to reach the host and peer",
       () =>
@@ -198,7 +215,9 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
         entity(bob, crateId)?.collisionsDisabled === true,
     );
 
-    bob.setItemCollisionsEnabled(crateId, true);
+    await expect(bob.setItemCollisionsEnabled(crateId, true).settled).resolves.toMatchObject({
+      status: "accepted",
+    });
     await waitFor(
       "the owner to restore collisions",
       () =>
@@ -216,21 +235,19 @@ describe.skipIf(!goAvailable())("two clients through canvasd", () => {
     await bob.start();
     await waitFor("bob to receive host state", () => view(bob).length > 0);
 
-    bob.spawnItem(rocketDefinition.definitionId, { x: 70, y: 62 });
+    await expect(
+      bob.spawnItem(rocketDefinition.definitionId, { x: 70, y: 62 }).settled,
+    ).resolves.toMatchObject({ status: "accepted" });
     await waitFor("the host to add the rocket", () => items(alice).length === 1);
     const rocketId = items(alice)[0]!.id;
-    bob.setItemConfig(rocketId, {
+    const configReceipt = bob.setItemConfig(rocketId, {
       ...defaultRocketConfig,
       countdownSeconds: 0.25,
       graceSeconds: 1,
     });
-    bob.moveItem(rocketId, { x: 50, y: 62, rotation: 0 });
-
-    await waitFor(
-      "both durable edits to settle",
-      () => bob.client.durableRevision.sceneRevision >= 3 || bob.diagnostics().lastRejection !== undefined,
-    );
-    expect(bob.diagnostics().lastRejection).toBeUndefined();
+    const moveReceipt = bob.moveItem(rocketId, { x: 50, y: 62, rotation: 0 });
+    await expect(configReceipt.settled).resolves.toMatchObject({ status: "accepted" });
+    await expect(moveReceipt.settled).resolves.toMatchObject({ status: "accepted" });
 
     await waitFor(
       "the moved rocket to arm",
