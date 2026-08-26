@@ -21,7 +21,13 @@ export interface SceneOptions {
   resolution?: number;
   /** Renderer-local, speed-scaled trails derived from interpolated entities. */
   motionTrails?: readonly MotionTrailOptions[];
+  /** Browser gesture policy for the renderer. Defaults to exclusive Canvas input. */
+  touchAction?: "none" | "pan-x" | "pan-y" | "auto" | "manipulation";
 }
+
+export const resolveSceneTouchAction = (
+  requested: SceneOptions["touchAction"],
+): NonNullable<SceneOptions["touchAction"]> => requested ?? "none";
 
 export const resolveSceneResolution = (
   requested: number | undefined,
@@ -90,7 +96,9 @@ export class PixiScene {
       preference: "webgl",
     });
     // Native pan/zoom handling can cancel a drag as it crosses the canvas edge.
-    this.app.canvas.style.touchAction = "none";
+    this.app.canvas.style.touchAction = resolveSceneTouchAction(
+      this.options.touchAction,
+    );
     element.appendChild(this.app.canvas);
 
     this.world.addChild(this.backgroundLayer, this.entityLayer, this.debugLayer);

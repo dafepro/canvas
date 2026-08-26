@@ -6,6 +6,7 @@ import {
 } from "../src/input/item-edit-interaction.js";
 import { PointerInteractionCoordinator } from "../src/input/pointer-interaction-coordinator.js";
 import type { RenderEntity } from "../src/simulation/messages.js";
+import { resolvePointerSurface } from "../src/runtime/canvas-runtime.js";
 
 class PointerSurface {
   private readonly listeners = new Map<string, Set<(event: PointerEvent) => void>>();
@@ -60,6 +61,15 @@ class PointerSurface {
     for (const listener of this.listeners.get(type) ?? []) listener(event);
   }
 }
+
+describe("consumer pointer surface", () => {
+  it("uses the renderer by default and an aligned consumer surface when supplied", () => {
+    const renderer = {} as HTMLElement;
+    const consumer = {} as HTMLElement;
+    expect(resolvePointerSurface(renderer)).toBe(renderer);
+    expect(resolvePointerSurface(renderer, consumer)).toBe(consumer);
+  });
+});
 
 const ownedItem = (): RenderEntity => ({
   id: "owned-item",

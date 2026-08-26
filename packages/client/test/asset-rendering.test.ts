@@ -12,7 +12,11 @@ import {
   motionTrailInitialAlpha,
   motionTrailParticleScale,
 } from "../src/render/effect-system.js";
-import { PixiScene, resolveSceneResolution } from "../src/render/pixi-scene.js";
+import {
+  PixiScene,
+  resolveSceneResolution,
+  resolveSceneTouchAction,
+} from "../src/render/pixi-scene.js";
 import type { CanvasDefinition } from "@canvas-physics/core";
 
 vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
@@ -63,6 +67,10 @@ const definition: ItemDefinition = {
 };
 
 describe("asset rendering", () => {
+  it("lets a consumer preserve vertical page scrolling without changing the default", () => {
+    expect(resolveSceneTouchAction(undefined)).toBe("none");
+    expect(resolveSceneTouchAction("pan-y")).toBe("pan-y");
+  });
   it("scales motion effects from a configured speed threshold to full intensity", () => {
     expect(motionTrailIntensity(3, 4, 6, 16)).toBe(0);
     expect(motionTrailIntensity(8, 6, 5, 15)).toBe(0.5);

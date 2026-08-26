@@ -852,6 +852,46 @@ func TestHostDurableAuthorizerCanEnforceProductInventoryBeforeSpawn(t *testing.T
 	}
 }
 
+func TestHostDurableAuthorizerReceivesTheRequestedScale(t *testing.T) {
+	var requests []DurableAuthorizationRequest
+	h := newHarness(t, func(cfg *Config) {
+		cfg.DurableAuthorizer = DurableAuthorizerFunc(func(_ context.Context, request DurableAuthorizationRequest) DurableAuthorizationResult {
+			requests = append(requests, request)
+			return DurableAuthorizationResult{Allowed: true}
+		})
+	})
+	owner := h.dial("alice")
+	owner.join()
+	owner.send(spawnCommand("cmd-scale-source", 12, 18))
+	spawned := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetDurableResult()
+		return result != nil && result.CommandId == "cmd-scale-source"
+	}).GetDurableResult()
+	if !spawned.Accepted {
+		t.Fatalf("spawn rejected: %s", spawned.RejectReason)
+	}
+
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-scale-authorized",
+			Kind:      pb.DurableCommandKind_DURABLE_SCALE_ITEM,
+			EntityId:  spawned.Command.EntityId,
+			Scale:     1.25,
+		}},
+	})
+	result := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		candidate := envelope.GetDurableResult()
+		return candidate != nil && candidate.CommandId == "cmd-scale-authorized"
+	}).GetDurableResult()
+	if !result.Accepted {
+		t.Fatalf("scale rejected: %s", result.RejectReason)
+	}
+	if len(requests) != 2 || requests[1].Operation != DurableScale || requests[1].Scale != 1.25 {
+		t.Fatalf("scale authorization request = %+v", requests)
+	}
+}
+
 func TestDurableLimitsAndBounds(t *testing.T) {
 	h := newHarness(t, nil)
 	owner := h.dial("alice")

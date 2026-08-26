@@ -79,6 +79,7 @@ type DurableAuthorizationRequest struct {
 	EntityID      string
 	DefinitionID  string
 	Position      DurablePosition
+	Scale         float64
 	Preview       bool
 	ExistingItems []DurableAuthorizationItem
 }

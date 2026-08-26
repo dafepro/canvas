@@ -71,6 +71,11 @@ export interface CanvasRuntimeOptions {
   /** Required when transport is omitted. Called for every WebSocket attempt. */
   credentialProvider?: RealtimeCredentialProvider;
   mount: HTMLElement;
+  /**
+   * Optional event surface aligned to the renderer. Useful when projected DOM
+   * hit targets should own gestures while empty Canvas space keeps scrolling.
+   */
+  pointerElement?: HTMLElement;
   /** Element promoted to fullscreen. Defaults to the renderer mount. */
   fullscreenElement?: HTMLElement;
   /** Item definitions the client knows. Bundled for now (spec 26). */
@@ -124,6 +129,11 @@ export const runtimeDiagnosticsIntervalMs = (requestedHz = 4): number => {
     : 4;
   return 1_000 / hz;
 };
+
+export const resolvePointerSurface = (
+  renderer: HTMLElement,
+  consumer?: HTMLElement,
+): HTMLElement => consumer ?? renderer;
 
 /**
  * The façade an application uses. It adds the renderer and the input
@@ -415,7 +425,10 @@ export class CanvasRuntime {
       },
     });
     this.pointerCoordinator = new PointerInteractionCoordinator(
-      this.scene.app.canvas as unknown as HTMLElement,
+      resolvePointerSurface(
+        this.scene.app.canvas as unknown as HTMLElement,
+        this.options.pointerElement,
+      ),
       {
         strategies: [
           ...(this.options.pointerInteractions ?? []),

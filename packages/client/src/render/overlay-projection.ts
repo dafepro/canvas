@@ -31,6 +31,7 @@ export interface OverlayEntityProjection {
   readonly world: Readonly<{ x: number; y: number; z: number }>;
   readonly screen: Readonly<Vec2>;
   readonly rotation: number;
+  readonly scale: number;
   readonly visible: boolean;
   readonly inCanvas: boolean;
   readonly inViewport: boolean;
@@ -203,6 +204,7 @@ const projectEntity = (
     world: point.world,
     screen: point.screen,
     rotation: entity.rotation,
+    scale: entity.scale ?? 1,
     visible: entity.respawning !== true,
     inCanvas: point.inCanvas,
     inViewport: point.inViewport,
