@@ -328,13 +328,12 @@ func (r *Room) validateDurable(
 func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, client *Client) {
 	switch command.Kind {
 	case pb.DurableCommandKind_DURABLE_SPAWN_ITEM:
-		r.nextEntityNo++
 		entityID := command.EntityId
 		if entityID == "" || r.items[entityID] != nil {
 			// Spec 19.3. The id repeats in every delta for every entity, so it
 			// stays short. The room already scopes it, so the canvas id would
 			// only repeat bytes on the wire.
-			entityID = fmt.Sprintf("i%d", r.nextEntityNo)
+			entityID = r.nextItemEntityID()
 		}
 		created := SnapshotItem{
 			EntityID:          entityID,
@@ -377,6 +376,16 @@ func (r *Room) applyDurable(command *pb.DurableCommand, item *SnapshotItem, clie
 	case pb.DurableCommandKind_DURABLE_SET_CONFIG:
 		if len(command.ConfigJson) > 0 {
 			item.ResolvedConfig = json.RawMessage(command.ConfigJson)
+		}
+	}
+}
+
+func (r *Room) nextItemEntityID() string {
+	for {
+		r.nextEntityNo++
+		entityID := fmt.Sprintf("i%d", r.nextEntityNo)
+		if r.items[entityID] == nil {
+			return entityID
 		}
 	}
 }
