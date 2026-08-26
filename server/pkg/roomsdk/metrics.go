@@ -35,3 +35,6 @@ func (m *LogMetrics) DurableRejected(canvasID, reason string) {
 func (m *LogMetrics) ProtocolMismatch(canvasID string) {
 	m.log.Warn("metric protocol_mismatch", "canvas", canvasID)
 }
+func (m *LogMetrics) ParticipantSignal(canvasID, result string) {
+	m.log.Debug("metric participant_signal", "canvas", canvasID, "result", result)
+}

@@ -28,6 +28,7 @@ message RoomEnvelope {
     Checkpoint checkpoint = 20;
     Heartbeat heartbeat = 21;
     ProtocolError error = 22;
+    ParticipantSignal participant_signal = 30;
   }
 }
 
@@ -199,6 +200,13 @@ message EffectEvent {
   // "oneShot", "start", or "stop".
   string mode = 3;
   bytes params_json = 4;
+}
+
+// A small, non-durable consumer signal. The room server allowlists kinds,
+// applies its rate and payload policy, and stamps sender_client_id on relay.
+message ParticipantSignal {
+  string kind = 1;
+  bytes params_json = 2;
 }
 
 // ---------- durable mutations ----------

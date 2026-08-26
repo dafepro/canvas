@@ -178,6 +178,25 @@ ports. The resolver maps product room instances to exact reusable canvas
 templates; a production integration can implement it against product data.
 The store holds authoritative canvas, item-definition, schema, and snapshot
 records.
+
+### Transient participant signals
+
+Consumers can opt into small, non-durable signals for predefined reactions or
+other presentation-only events. The room server owns the allowlist, payload
+limit, and per-participant cooldown:
+
+```go
+ParticipantSignals: roomsdk.ParticipantSignalPolicy{
+    AllowedKinds: map[string]struct{}{"product.reaction.wave": {}},
+    MaxPayloadBytes: 0,
+    MinInterval: 2 * time.Second,
+},
+```
+
+Clients call `runtime.sendParticipantSignal(kind)` and subscribe with
+`runtime.subscribeParticipantSignals(...)`. The server stamps the sender from
+authenticated room presence. Signals stay in the current room, are never
+checkpointed, and are not replayed after join or reconnect.
 The reference `canvasd` uses `FileStore` and writes restart-safe snapshots to
 `CANVASD_DATA_DIR` (or `./data`); Docker Compose mounts that directory as the
 named `canvasd-data` volume. Embedded services can use `FileStore` directly or

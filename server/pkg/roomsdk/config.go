@@ -24,6 +24,9 @@ type Config struct {
 	// MaxClientsPerRoom refuses a join above the limit. 0 means use the canvas
 	// limit from the definition, falling back to 20.
 	MaxClientsPerRoom int
+	// ParticipantSignals enables a bounded, non-durable consumer signal channel.
+	// An empty allowlist keeps the channel disabled.
+	ParticipantSignals ParticipantSignalPolicy
 	// ProtocolVersion refuses a client that does not match.
 	ProtocolVersion uint32
 	// Logger receives coordination events. Defaults to slog.Default().
@@ -35,6 +38,12 @@ type Config struct {
 	AllowedOrigins []string
 	// Metrics receives counters listed in spec 22.2. Optional.
 	Metrics Metrics
+}
+
+type ParticipantSignalPolicy struct {
+	AllowedKinds    map[string]struct{}
+	MaxPayloadBytes int
+	MinInterval     time.Duration
 }
 
 const (
@@ -74,6 +83,16 @@ func (c *Config) applyDefaults() {
 	if c.Metrics == nil {
 		c.Metrics = NopMetrics{}
 	}
+	if len(c.ParticipantSignals.AllowedKinds) > 0 {
+		allowed := make(map[string]struct{}, len(c.ParticipantSignals.AllowedKinds))
+		for kind := range c.ParticipantSignals.AllowedKinds {
+			allowed[kind] = struct{}{}
+		}
+		c.ParticipantSignals.AllowedKinds = allowed
+		if c.ParticipantSignals.MinInterval <= 0 {
+			c.ParticipantSignals.MinInterval = time.Second
+		}
+	}
 }
 
 // Metrics reports the backend counters from spec 22.2.
@@ -87,6 +106,7 @@ type Metrics interface {
 	CheckpointStored(canvasID string, bytes int)
 	DurableRejected(canvasID string, reason string)
 	ProtocolMismatch(canvasID string)
+	ParticipantSignal(canvasID string, result string)
 }
 
 // NopMetrics discards every counter.
@@ -101,3 +121,4 @@ func (NopMetrics) HostLeaseChanged(string, uint64, string) {}
 func (NopMetrics) CheckpointStored(string, int)            {}
 func (NopMetrics) DurableRejected(string, string)          {}
 func (NopMetrics) ProtocolMismatch(string)                 {}
+func (NopMetrics) ParticipantSignal(string, string)        {}

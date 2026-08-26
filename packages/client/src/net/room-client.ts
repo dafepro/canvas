@@ -7,6 +7,7 @@ import {
   type DurableCommand,
   type FullState,
   type Peer,
+  type ParticipantSignal,
   type PlayerInput,
   type RoomEnvelope,
   type StateDelta,
@@ -64,6 +65,7 @@ export interface RoomClientEvents {
   fullState(state: FullState, epoch: number, tick: number): void;
   stateDelta(delta: StateDelta, epoch: number, tick: number): void;
   effect(event: EffectEvent, tick: number): void;
+  participantSignal(signal: ParticipantSignal, fromClientId: string): void;
   playerInput(input: PlayerInput, fromClientId: string): void;
   durablePreview(command: DurableCommand, fromClientId: string): void;
   durableAccepted(command: DurableCommand, revision: DurableRevision, itemJson?: unknown): void;
@@ -318,6 +320,16 @@ export class RoomClient {
     );
   }
 
+  sendParticipantSignal(signal: ParticipantSignal): void {
+    this.transport.sendReliable(
+      newEnvelope(this.joinDescriptor.roomId, {
+        hostEpoch: this.leaseValue.epoch,
+        sequence: ++this.sequence,
+        participantSignal: signal,
+      }),
+    );
+  }
+
   /** Spec 11.2. Yield the lease when the page is hidden or the loop is late. */
   yieldHost(reason: string, lease: HostLease): void {
     if (!this.holdsLease(lease)) return;
@@ -439,6 +451,14 @@ export class RoomClient {
     }
     if (message.effectEvent) {
       this.emit("effect", message.effectEvent, message.tick);
+      return;
+    }
+    if (message.participantSignal) {
+      this.emit(
+        "participantSignal",
+        message.participantSignal,
+        message.senderClientId,
+      );
       return;
     }
     if (message.playerInput) {

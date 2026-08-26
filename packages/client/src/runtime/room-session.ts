@@ -103,6 +103,12 @@ export interface RoomSessionRates {
   previewHz?: number;
 }
 
+export interface ParticipantSignalEmission {
+  readonly participantId: string;
+  readonly kind: string;
+  readonly params?: unknown;
+}
+
 export interface RoomSessionOptions {
   /** Product-owned room instance id. The server resolves its canvas template. */
   roomId: string;
@@ -189,6 +195,9 @@ export class RoomSession {
   private localAvatarId = "";
   private inputSequence = 0;
   private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
+  private readonly participantSignalObservers = new Set<
+    Observer<Readonly<ParticipantSignalEmission>>
+  >();
   private stats = {
     hz: 0,
     driftMs: 0,
@@ -313,6 +322,24 @@ export class RoomSession {
     return () => this.effectObservers.delete(observer);
   }
 
+  subscribeParticipantSignals(
+    observer: Observer<Readonly<ParticipantSignalEmission>>,
+  ): () => void {
+    this.participantSignalObservers.add(observer);
+    return () => this.participantSignalObservers.delete(observer);
+  }
+
+  sendParticipantSignal(kind: string, params?: unknown): void {
+    const normalizedKind = kind.trim();
+    if (!normalizedKind || normalizedKind.length > 64) {
+      throw new TypeError("Participant signal kind must be 1 to 64 characters.");
+    }
+    this.client.sendParticipantSignal({
+      kind: normalizedKind,
+      paramsJson: params === undefined ? new Uint8Array() : toJsonBytes(params),
+    });
+  }
+
   get lifecycleState(): CanvasLifecycleState {
     return this.connection.lifecycleState;
   }
@@ -393,6 +420,7 @@ export class RoomSession {
     this.roster.clearObservers();
     this.timeline.clearObservers();
     this.effectObservers.clear();
+    this.participantSignalObservers.clear();
   }
 
   private reportError(error: CanvasConsumerError): void {
@@ -478,6 +506,17 @@ export class RoomSession {
         participant.userId,
         input.avatarDisabled ? "inactive" : "active",
       )) this.syncHostAvatars();
+    });
+
+    this.client.on("participantSignal", (signal, fromClientId) => {
+      const participant = this.roster.peerForConnection(fromClientId);
+      if (!participant) return;
+      const emission = Object.freeze({
+        participantId: participant.userId,
+        kind: signal.kind,
+        params: immutableValue(fromJsonBytes<unknown>(signal.paramsJson)),
+      });
+      for (const observer of this.participantSignalObservers) observer(emission);
     });
 
     this.client.on("presence", (peers) => {
