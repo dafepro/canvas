@@ -569,17 +569,74 @@ credential fetch, WebSocket handshake, JOIN, worker initialization, canonical
 state, and first render are separate phases but are not one observable progress
 protocol.
 
-**Redesign.** Publish a frozen `RuntimeStartupSnapshot` with one discriminated
-phase, phase timestamps, terminal typed error, and cancellation. Suggested
-phases are `assets`, `credentials`, `connecting`, `joining`, `simulation`,
-`canonical`, `presenting`, and `ready`. Required assets report per-source
-settlement inside `assets`; reaching N/N advances or fails in the same state
-machine. Consumers render status but do not compose readiness promises or
-invent timeouts.
+**Planned contract.** Publish a replaying, frozen `RuntimeStartupSnapshot`
+stream. A snapshot has exactly one phase: `assets`, `credentials`,
+`connecting`, `joining`, `simulation`, `canonical`, `presenting`, `ready`,
+`failed`, or `cancelled`. It also carries `startedAtMs`, `phaseStartedAtMs`, a
+completed phase timeline, and either asset settlement detail or a terminal
+`CanvasConsumerError` where applicable. Consumers subscribe to the stream and
+own wording and styling; they do not combine `onAssetProgress`, lifecycle
+events, and readiness promises themselves.
 
-**Acceptance boundary.** Conformance tests stall and fail every phase, assert a
-terminal outcome, verify stop aborts pending startup, and ensure progress never
-regresses after reconnect or role changes.
+The active phases have these precise meanings:
+
+| Phase | Completion boundary |
+| --- | --- |
+| `assets` | Every manifest source settled and every required source loaded. A missing manifest is an immediate 0/0 completion. |
+| `credentials` | A fresh realtime credential was obtained, or an injected transport began its connection attempt. |
+| `connecting` | The transport handshake opened. |
+| `joining` | JOIN was accepted and consumer initialization completed. |
+| `simulation` | The current role generation's simulation reported ready. |
+| `canonical` | Presence, durable item IDs, and one generation-consistent authoritative entity set agree. |
+| `presenting` | A complete authoritative draw set is available to the presentation layer. |
+| `ready` | A browser runtime completed a render update with that set; a headless session handed that set to its consumer. |
+
+`ready` is sticky. A reconnect or host-role change after it may make the
+separate lifecycle or authoritative-current diagnostics non-current, but
+startup never regresses and the already visible room is not hidden. Before
+first readiness, reconnect may advance only the underlying generation facts;
+it cannot move the public phase backwards. A terminal failure or explicit
+stop before readiness completes the current timeline entry and publishes
+exactly one `failed` or `cancelled` snapshot. Stop after `ready` leaves startup
+at `ready`.
+
+Asset progress is source-aware rather than only N/N. Each manifest source is
+`pending`, `loaded`, `warning` (an optional failure), or `failed` (a required
+failure). The aggregate uses `settled` and `total`, so N/N always means that
+the asset phase will advance or fail in the same turn. The old aggregate-only
+callback shape and demo-specific status composition are replaced in place;
+this prerelease package keeps no compatibility path.
+
+`RoomSession` owns credential through canonical progress because it observes
+those semantic boundaries without a DOM. `CanvasRuntime` composes that stream
+with its asset phase and its first actual Pixi update. The transport emits a
+credential phase before awaiting the provider and a connecting phase only
+after a valid credential exists. `PresentationGate` publishes the first
+generation-consistent canonical completion instead of making callers infer it
+from a promise.
+
+#### Test-driven implementation slices
+
+1. Add a deterministic startup state machine and source-aware asset progress.
+   Prove immutable replay, monotonic transitions, every phase stall/failure,
+   cancellation, and sticky readiness with a virtual clock.
+2. Wire transport credentials, connection/JOIN, role-generation simulation,
+   and canonical presentation into `RoomSession`. Prove reconnect and role
+   changes cannot regress public startup or combine stale-generation facts.
+3. Compose assets and first-render completion in `CanvasRuntime`. Prove a
+   required asset failure never connects, stop cancels pending assets, and an
+   N/N asset snapshot is immediately followed by `credentials` or `failed`.
+4. Migrate every runnable example to one shared phase-label helper and delete
+   manual asset/ready timeout composition. Update lifecycle and consumer docs,
+   then exercise the packed client and real-relay examples.
+
+**Acceptance boundary.** Deterministic conformance tests can stall and fail at
+each phase and always observe one truthful terminal outcome. Required and
+optional asset settlement is explicit; stop aborts pending startup observers;
+the browser does not say ready before its first complete canonical update; and
+progress never regresses after reconnect, role change, backgrounding, or
+post-ready stop. No example can display “assets N/N” while secretly waiting on
+an unreported phase.
 
 ### Replication and prediction timeline hardening
 
