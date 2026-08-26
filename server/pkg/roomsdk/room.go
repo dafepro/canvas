@@ -824,8 +824,26 @@ func (r *Room) persistenceLoop() {
 func (r *Room) saveSnapshot(record SnapshotRecord) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := r.cfg.Store.SaveSnapshot(ctx, record); err != nil {
-		r.cfg.Logger.Error("save snapshot failed", "canvas", r.roomID, "error", err)
+	const maxAttempts = 3
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err := r.cfg.Store.SaveSnapshot(ctx, record)
+		if err == nil {
+			if attempt > 1 {
+				r.cfg.Logger.Info("save snapshot recovered", "canvas", r.roomID, "attempts", attempt)
+			}
+			return
+		}
+		if attempt == maxAttempts || ctx.Err() != nil {
+			r.cfg.Logger.Error("save snapshot failed", "canvas", r.roomID, "attempts", attempt, "error", err)
+			return
+		}
+		r.cfg.Logger.Warn("save snapshot retrying", "canvas", r.roomID, "attempt", attempt, "error", err)
+		select {
+		case <-time.After(time.Duration(attempt) * 25 * time.Millisecond):
+		case <-ctx.Done():
+			r.cfg.Logger.Error("save snapshot failed", "canvas", r.roomID, "attempts", attempt, "error", ctx.Err())
+			return
+		}
 	}
 }
 

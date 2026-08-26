@@ -3,6 +3,7 @@ package roomsdk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"math"
@@ -43,6 +44,34 @@ type blockingSnapshotStore struct {
 	started chan struct{}
 	release chan struct{}
 	once    sync.Once
+}
+
+type flakySnapshotStore struct {
+	Store
+	mu                sync.Mutex
+	failuresRemaining int
+	attempts          int
+}
+
+func (s *flakySnapshotStore) SaveSnapshot(
+	ctx context.Context,
+	snapshot SnapshotRecord,
+) error {
+	s.mu.Lock()
+	s.attempts++
+	if s.failuresRemaining > 0 {
+		s.failuresRemaining--
+		s.mu.Unlock()
+		return errors.New("temporary snapshot failure")
+	}
+	s.mu.Unlock()
+	return s.Store.SaveSnapshot(ctx, snapshot)
+}
+
+func (s *flakySnapshotStore) attemptCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.attempts
 }
 
 func (s *blockingSnapshotStore) SaveSnapshot(
@@ -1243,6 +1272,44 @@ func TestPeriodicCheckpointPersistenceDoesNotBlockRealtimeRelay(t *testing.T) {
 	if relayed.Tick != 61 {
 		t.Fatalf("relayed tick = %d, want 61", relayed.Tick)
 	}
+}
+
+func TestDurableMutationRetriesATransientSnapshotFailure(t *testing.T) {
+	var flaky *flakySnapshotStore
+	h := newHarness(t, func(cfg *Config) {
+		flaky = &flakySnapshotStore{Store: cfg.Store, failuresRemaining: 1}
+		cfg.Store = flaky
+	})
+	host := h.dial("alice")
+	host.join()
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	host.send(spawnCommand("cmd-retry-persistence", 20, 30))
+	result := host.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetDurableResult() != nil
+	}).GetDurableResult()
+	if !result.Accepted {
+		t.Fatalf("spawn rejected: %s", result.RejectReason)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		record, err := h.store.LoadSnapshot(context.Background(), "test-canvas")
+		if err == nil {
+			var snapshot CanvasSnapshot
+			if unmarshalErr := json.Unmarshal(record.SnapshotRaw, &snapshot); unmarshalErr != nil {
+				t.Fatal(unmarshalErr)
+			}
+			if len(snapshot.Items) == 1 {
+				if flaky.attemptCount() != 2 {
+					t.Fatalf("save attempts = %d, want 2", flaky.attemptCount())
+				}
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("durable snapshot was not stored after %d attempts", flaky.attemptCount())
 }
 
 func TestFinalCheckpointRequiresANormalizedSnapshot(t *testing.T) {
