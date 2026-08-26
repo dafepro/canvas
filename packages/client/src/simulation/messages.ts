@@ -58,6 +58,7 @@ export type SimulationRequest =
   | { type: "setItemConfig"; entityId: string; config: unknown }
   | { type: "setItemIsolation"; entityId: string; isolated: boolean }
   | { type: "setItemCollisions"; entityId: string; enabled: boolean }
+  | { type: "setItemRevision"; entityId: string; itemRevision: number }
   | {
       type: "requestSnapshot";
       generation: number;
@@ -85,6 +86,7 @@ export interface RenderEntity {
   animationEpoch?: number;
   userId?: string;
   ownerUserId?: string;
+  itemRevision?: number;
   lastProcessedInputSequence?: number;
   behaviorState?: unknown;
   quarantined?: boolean;

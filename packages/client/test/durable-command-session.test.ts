@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { emptySnapshot, type SnapshotItem, type Transform } from "@canvas-physics/core";
-import { DurableCommandKind, type DurableCommand } from "@canvas-physics/protocol";
+import {
+  ItemEditSessionStatus,
+  ItemMutationKind,
+  ItemMutationRejectCode,
+  type ItemMutation,
+} from "@canvas-physics/protocol";
 import {
   DurableCommandSession,
   type DurableCommandEffect,
@@ -21,9 +26,7 @@ class FakeClock implements SessionClock {
   private nextId = 0;
   private readonly scheduled = new Map<number, { at: number; callback: () => void }>();
 
-  now(): number {
-    return this.time;
-  }
+  now(): number { return this.time; }
 
   setTimeout(callback: () => void, delayMs: number): SessionTimeout {
     const id = ++this.nextId;
@@ -36,27 +39,44 @@ class FakeClock implements SessionClock {
   }
 
   setInterval(_callback: () => void, _everyMs: number): SessionInterval {
-    throw new Error("durable command tests do not schedule intervals");
+    throw new Error("transaction tests use timeout scheduling only");
   }
 
   clearInterval(_interval: SessionInterval): void {}
 
   advance(ms: number): void {
     this.time += ms;
-    for (const [id, task] of [...this.scheduled].sort((a, b) => a[1].at - b[1].at)) {
-      if (task.at > this.time) continue;
-      this.scheduled.delete(id);
-      task.callback();
+    let runnable = true;
+    while (runnable) {
+      runnable = false;
+      for (const [id, task] of [...this.scheduled].sort((a, b) => a[1].at - b[1].at)) {
+        if (task.at > this.time) continue;
+        this.scheduled.delete(id);
+        task.callback();
+        runnable = true;
+        break;
+      }
     }
   }
 }
 
 const transform = (x: number): Transform => ({ x, y: 20, rotation: 0, scale: 1 });
 
+const item = (revision = 1): SnapshotItem => ({
+  entityId: "crate-1",
+  definitionId: crateDefinition.definitionId,
+  definitionVersion: crateDefinition.version,
+  ownerUserId: "alice",
+  itemRevision: revision,
+  transform: transform(12),
+  resolvedConfig: {},
+});
+
 const build = () => {
   const clock = new FakeClock();
   const effects: DurableCommandEffect[] = [];
   const session = new DurableCommandSession({
+    clientSessionId: "browser-session",
     definitions: rocketCanvasDefinitions,
     previewHz: 10,
     clock,
@@ -69,60 +89,216 @@ const build = () => {
     }),
     emit: (effect) => effects.push(effect),
   });
-  const sent = (): DurableCommand[] => effects
-    .filter((effect): effect is Extract<DurableCommandEffect, { type: "send" }> =>
-      effect.type === "send")
-    .map(({ command }) => command);
-  return { clock, effects, session, sent };
+  session.loadSnapshot({
+    ...emptySnapshot(rocketCanvas.id, rocketCanvas.version),
+    items: [item()],
+  });
+  const sentMutations = (): ItemMutation[] => effects
+    .filter((effect): effect is Extract<DurableCommandEffect, { type: "sendMutation" }> =>
+      effect.type === "sendMutation")
+    .map(({ mutation }) => mutation);
+  return { clock, effects, session, sentMutations };
 };
 
 describe("DurableCommandSession", () => {
-  it("coalesces previews with virtual time and sends a commit immediately", () => {
-    const { clock, session, sent } = build();
+  it("returns correlated receipts and serializes writes to one item", async () => {
+    const { session, sentMutations } = build();
 
-    session.moveItem("item-1", transform(1), true);
-    session.moveItem("item-1", transform(2), true);
-    session.moveItem("item-1", transform(3), true);
-    expect(sent()).toHaveLength(1);
+    const first = session.moveItem("crate-1", transform(20));
+    const second = session.setItemConfig("crate-1", { color: "gold" });
 
-    clock.advance(100);
-    expect(sent()).toHaveLength(2);
-    expect(sent()[1]).toMatchObject({ preview: true, position: { x: 3 } });
+    expect(first).toMatchObject({ clientSessionId: "browser-session", mutationId: 1 });
+    expect(second.mutationId).toBe(2);
+    expect(sentMutations()).toHaveLength(1);
+    expect(sentMutations()[0]).toMatchObject({
+      mutationId: 1,
+      expectedItemRevision: 1,
+      kind: ItemMutationKind.ITEM_MUTATION_TRANSFORM,
+    });
 
-    session.moveItem("item-1", transform(4), true);
-    session.moveItem("item-1", transform(5));
-    expect(sent()).toHaveLength(3);
-    expect(sent().at(-1)).toMatchObject({ preview: false, position: { x: 5 } });
-    clock.advance(100);
-    expect(sent()).toHaveLength(3);
+    session.acceptMutation({
+      clientSessionId: "browser-session",
+      mutationId: 1,
+      editSessionId: "",
+      accepted: true,
+      rejectCode: ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED,
+      message: "",
+      sceneRevision: 5,
+      itemRevision: 2,
+      itemInstanceJson: new Uint8Array(),
+      deletedEntityId: "",
+      kind: ItemMutationKind.ITEM_MUTATION_TRANSFORM,
+      entityId: "crate-1",
+    }, item(2));
+
+    await expect(first.settled).resolves.toMatchObject({
+      status: "accepted",
+      mutationId: 1,
+      itemRevision: 2,
+    });
+    expect(sentMutations()).toHaveLength(2);
+    expect(sentMutations()[1]).toMatchObject({
+      mutationId: 2,
+      expectedItemRevision: 2,
+      kind: ItemMutationKind.ITEM_MUTATION_CONFIG,
+    });
   });
 
-  it("drops an unconfirmed preview when the connection generation changes", () => {
-    const { clock, session, sent } = build();
-    session.moveItem("item-1", transform(1), true);
-    session.moveItem("item-1", transform(2), true);
+  it("settles a typed rejection without emitting a generic error", async () => {
+    const { effects, session } = build();
+    const receipt = session.deleteItem("crate-1");
+
+    session.acceptMutation({
+      clientSessionId: "browser-session",
+      mutationId: receipt.mutationId,
+      editSessionId: "",
+      accepted: false,
+      rejectCode: ItemMutationRejectCode.ITEM_MUTATION_REJECT_NOT_OWNER,
+      message: "not_owner",
+      sceneRevision: 4,
+      itemRevision: 1,
+      itemInstanceJson: new Uint8Array(),
+      deletedEntityId: "",
+      kind: ItemMutationKind.ITEM_MUTATION_DELETE,
+      entityId: "crate-1",
+    }, item());
+
+    await expect(receipt.settled).resolves.toMatchObject({
+      status: "rejected",
+      code: "not_owner",
+      authoritativeItem: expect.objectContaining({ entityId: "crate-1" }),
+    });
+    expect(effects.some((effect) => effect.type === "rejected")).toBe(false);
+  });
+
+  it("opens one edit handle and coalesces a sequenced preview stream", () => {
+    const { clock, effects, session } = build();
+    const edit = session.beginItemEdit("crate-1");
+    edit.preview(transform(20));
+
+    expect(edit.state).toBe("opening");
+    expect(effects.filter((effect) => effect.type === "sendPreview")).toHaveLength(0);
+
+    session.acceptEditSession({
+      clientSessionId: "browser-session",
+      editSessionId: edit.editSessionId,
+      entityId: "crate-1",
+      status: ItemEditSessionStatus.ITEM_EDIT_SESSION_ACTIVE,
+      rejectCode: ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED,
+      message: "",
+      itemRevision: 1,
+      leaseExpiresAtUnixMs: 2_000,
+      itemInstanceJson: new Uint8Array(),
+    }, item());
+    expect(edit.state).toBe("active");
+    expect(effects.filter((effect) => effect.type === "sendPreview")).toHaveLength(1);
+
+    edit.preview(transform(21));
+    edit.preview(transform(22));
+    clock.advance(100);
+    const previews = effects
+      .filter((effect): effect is Extract<DurableCommandEffect, { type: "sendPreview" }> =>
+        effect.type === "sendPreview")
+      .map((effect) => effect.preview);
+    expect(previews).toHaveLength(2);
+    expect(previews[1]).toMatchObject({ previewSequence: 2, position: { x: 22 } });
+  });
+
+  it("holds an edit at display cadence until its accepted revision is canonical", async () => {
+    const { session } = build();
+    const canonical = {
+      id: "crate-1",
+      kind: "item" as const,
+      definitionId: crateDefinition.definitionId,
+      x: 12,
+      y: 20,
+      rotation: 0,
+      vx: 0,
+      vy: 0,
+      angularVelocity: 0,
+    };
+    const edit = session.beginItemEdit("crate-1");
+    session.acceptEditSession({
+      clientSessionId: "browser-session",
+      editSessionId: edit.editSessionId,
+      entityId: "crate-1",
+      status: ItemEditSessionStatus.ITEM_EDIT_SESSION_ACTIVE,
+      rejectCode: ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED,
+      message: "",
+      itemRevision: 1,
+      leaseExpiresAtUnixMs: 2_000,
+      itemInstanceJson: new Uint8Array(),
+    }, item());
+
+    edit.preview(transform(30));
+    expect(session.present([canonical])[0]).toMatchObject({ x: 30 });
+    const receipt = edit.mutate({
+      kind: "transform",
+      entityId: "crate-1",
+      transform: transform(30),
+    });
+    session.acceptMutation({
+      clientSessionId: "browser-session",
+      mutationId: receipt.mutationId,
+      editSessionId: edit.editSessionId,
+      accepted: true,
+      rejectCode: ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED,
+      message: "",
+      sceneRevision: 5,
+      itemRevision: 2,
+      itemInstanceJson: new Uint8Array(),
+      deletedEntityId: "",
+      kind: ItemMutationKind.ITEM_MUTATION_TRANSFORM,
+      entityId: "crate-1",
+    }, { ...item(2), transform: transform(30) });
+    await receipt.settled;
+
+    session.observeCanonical(4, [{ ...canonical, x: 30 }]);
+    expect(session.present([canonical])[0]).toMatchObject({ x: 30 });
+    session.observeCanonical(5, [{ ...canonical, x: 30 }]);
+    expect(session.present([canonical])[0]).toMatchObject({ x: 12 });
+  });
+
+  it("cancels transient edits and resends durable mutations after reconnect", async () => {
+    const { effects, session } = build();
+    const edit = session.beginItemEdit("crate-1");
+    const receipt = session.moveItem("crate-1", transform(30));
+    const firstSend = effects.find(
+      (effect): effect is Extract<DurableCommandEffect, { type: "sendMutation" }> =>
+        effect.type === "sendMutation",
+    )!;
 
     session.resetConnection();
-    clock.advance(100);
+    expect(edit.state).toBe("ended");
+    await expect(edit.ended).resolves.toMatchObject({ status: "superseded" });
 
-    expect(sent()).toHaveLength(1);
+    session.connectionReady();
+    const sends = effects.filter(
+      (effect): effect is Extract<DurableCommandEffect, { type: "sendMutation" }> =>
+        effect.type === "sendMutation",
+    );
+    expect(sends).toHaveLength(2);
+    expect(sends[1]!.mutation).toEqual(firstSend.mutation);
+
+    session.acceptMutation({
+      clientSessionId: "browser-session",
+      mutationId: receipt.mutationId,
+      editSessionId: "",
+      accepted: true,
+      rejectCode: ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED,
+      message: "",
+      sceneRevision: 5,
+      itemRevision: 2,
+      itemInstanceJson: new Uint8Array(),
+      deletedEntityId: "",
+      kind: ItemMutationKind.ITEM_MUTATION_TRANSFORM,
+      entityId: "crate-1",
+    }, item(2));
+    await expect(receipt.settled).resolves.toMatchObject({ status: "accepted" });
   });
 
-  it("owns canonical item metadata and translates accepted host commands", () => {
+  it("owns canonical item metadata and translates accepted host mutations", () => {
     const { effects, session } = build();
-    const item: SnapshotItem = {
-      entityId: "crate-1",
-      definitionId: crateDefinition.definitionId,
-      definitionVersion: crateDefinition.version,
-      ownerUserId: "alice",
-      transform: transform(12),
-      resolvedConfig: {},
-    };
-    session.loadSnapshot({
-      ...emptySnapshot(rocketCanvas.id, rocketCanvas.version),
-      items: [item],
-    });
-    expect(session.itemCount).toBe(1);
     expect(session.decorate({
       id: "crate-1",
       kind: "item",
@@ -138,54 +314,24 @@ describe("DurableCommandSession", () => {
       ownerUserId: "alice",
     });
 
-    session.accept({
-      commandId: "client-1-1",
-      kind: DurableCommandKind.DURABLE_DELETE_ITEM,
+    session.acceptMutation({
+      clientSessionId: "another-browser",
+      mutationId: 9,
+      editSessionId: "",
+      accepted: true,
+      rejectCode: ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED,
+      message: "",
+      sceneRevision: 5,
+      itemRevision: 2,
+      itemInstanceJson: new Uint8Array(),
+      deletedEntityId: "crate-1",
+      kind: ItemMutationKind.ITEM_MUTATION_DELETE,
       entityId: "crate-1",
-      definitionId: "",
-      definitionVersion: 0,
-      rotation: 0,
-      scale: 0,
-      z: 0,
-      configJson: new Uint8Array(),
-      preview: false,
-      isolated: false,
-      collisionsEnabled: false,
     });
     expect(effects).toContainEqual({
       type: "simulate",
       request: { type: "removeItem", entityId: "crate-1" },
     });
-    expect(session.decorate({
-      id: "crate-1",
-      kind: "item",
-      definitionId: "",
-      x: 12,
-      y: 20,
-      rotation: 0,
-      vx: 0,
-      vy: 0,
-      angularVelocity: 0,
-    }).ownerUserId).toBeUndefined();
-  });
-
-  it("emits a typed rejection effect without disturbing unrelated metadata", () => {
-    const { effects, session } = build();
-    session.loadSnapshot({
-      ...emptySnapshot(rocketCanvas.id, rocketCanvas.version),
-      items: [{
-        entityId: "crate-1",
-        definitionId: crateDefinition.definitionId,
-        definitionVersion: crateDefinition.version,
-        ownerUserId: "alice",
-        transform: transform(12),
-        resolvedConfig: {},
-      }],
-    });
-
-    session.reject("not_owner");
-
-    expect(effects.at(-1)).toEqual({ type: "rejected", reason: "not_owner" });
-    expect(session.itemCount).toBe(1);
+    expect(session.itemCount).toBe(0);
   });
 });

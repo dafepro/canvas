@@ -157,6 +157,13 @@ export class HostSimulation {
     return this.world.setItemCollisionsEnabled(entityId, enabled);
   }
 
+  setItemRevision(entityId: string, itemRevision: number): boolean {
+    const ownership = this.world.registry.get(entityId)?.ownership;
+    if (!ownership) return false;
+    ownership.itemRevision = itemRevision;
+    return true;
+  }
+
   addAvatar(spawn: AvatarSpawn): Entity {
     return this.world.addAvatar(spawn);
   }

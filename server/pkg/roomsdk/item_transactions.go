@@ -261,6 +261,10 @@ func durableCommandFromMutation(mutation *pb.ItemMutation) *pb.DurableCommand {
 		kind = pb.DurableCommandKind_DURABLE_DELETE_ITEM
 	case pb.ItemMutationKind_ITEM_MUTATION_TRANSFORM:
 		kind = pb.DurableCommandKind_DURABLE_MOVE_ITEM
+	case pb.ItemMutationKind_ITEM_MUTATION_ROTATION:
+		kind = pb.DurableCommandKind_DURABLE_ROTATE_ITEM
+	case pb.ItemMutationKind_ITEM_MUTATION_SCALE:
+		kind = pb.DurableCommandKind_DURABLE_SCALE_ITEM
 	case pb.ItemMutationKind_ITEM_MUTATION_CONFIG:
 		kind = pb.DurableCommandKind_DURABLE_SET_CONFIG
 	case pb.ItemMutationKind_ITEM_MUTATION_ISOLATION:

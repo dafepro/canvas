@@ -5,9 +5,16 @@ import {
   toJsonBytes,
   HostControlKind,
   type DurableCommand,
+  type BeginItemEdit,
+  type EndItemEdit,
   type FullState,
+  type ItemEditPreview,
+  type ItemEditSessionResult,
+  type ItemMutation,
+  type ItemMutationResult,
   type Peer,
   type PlayerInput,
+  type RenewItemEdit,
   type RoomEnvelope,
   type StateDelta,
   type EffectEvent,
@@ -68,6 +75,9 @@ export interface RoomClientEvents {
   durablePreview(command: DurableCommand, fromClientId: string): void;
   durableAccepted(command: DurableCommand, revision: DurableRevision, itemJson?: unknown): void;
   durableRejected(command: DurableCommand, reason: string): void;
+  itemEditPreview(preview: ItemEditPreview, fromClientId: string): void;
+  itemEditSessionResult(result: ItemEditSessionResult, itemJson?: unknown): void;
+  itemMutationResult(result: ItemMutationResult, itemJson?: unknown): void;
   status(status: TransportStatus, detail?: string): void;
   error(code: string, message: string): void;
 }
@@ -318,6 +328,52 @@ export class RoomClient {
     );
   }
 
+  sendItemMutation(mutation: ItemMutation): void {
+    this.transport.sendReliable(
+      newEnvelope(this.joinDescriptor.roomId, {
+        hostEpoch: this.leaseValue.epoch,
+        itemMutation: mutation,
+      }),
+    );
+  }
+
+  beginItemEdit(request: BeginItemEdit): void {
+    this.transport.sendReliable(
+      newEnvelope(this.joinDescriptor.roomId, {
+        hostEpoch: this.leaseValue.epoch,
+        beginItemEdit: request,
+      }),
+    );
+  }
+
+  renewItemEdit(request: RenewItemEdit): void {
+    this.transport.sendReliable(
+      newEnvelope(this.joinDescriptor.roomId, {
+        hostEpoch: this.leaseValue.epoch,
+        renewItemEdit: request,
+      }),
+    );
+  }
+
+  endItemEdit(request: EndItemEdit): void {
+    this.transport.sendReliable(
+      newEnvelope(this.joinDescriptor.roomId, {
+        hostEpoch: this.leaseValue.epoch,
+        endItemEdit: request,
+      }),
+    );
+  }
+
+  sendItemEditPreview(preview: ItemEditPreview): void {
+    this.transport.sendRealtime(
+      newEnvelope(this.joinDescriptor.roomId, {
+        hostEpoch: this.leaseValue.epoch,
+        sequence: ++this.sequence,
+        itemEditPreview: preview,
+      }),
+    );
+  }
+
   /** Spec 11.2. Yield the lease when the page is hidden or the loop is late. */
   yieldHost(reason: string, lease: HostLease): void {
     if (!this.holdsLease(lease)) return;
@@ -465,6 +521,33 @@ export class RoomClient {
       } else {
         this.emit("durableRejected", command, result.rejectReason);
       }
+    }
+    if (message.itemEditPreview) {
+      if (message.hostEpoch !== this.leaseValue.epoch) return;
+      this.emit("itemEditPreview", message.itemEditPreview, message.senderClientId);
+      return;
+    }
+    if (message.itemEditSessionResult) {
+      const result = message.itemEditSessionResult;
+      this.emit(
+        "itemEditSessionResult",
+        result,
+        fromJsonBytes(result.itemInstanceJson),
+      );
+      return;
+    }
+    if (message.itemMutationResult) {
+      const result = message.itemMutationResult;
+      if (result.accepted) {
+        this.revisionValue = Object.freeze({
+          sceneRevision: Math.max(this.revisionValue.sceneRevision, result.sceneRevision),
+        });
+      }
+      this.emit(
+        "itemMutationResult",
+        result,
+        fromJsonBytes(result.itemInstanceJson),
+      );
     }
   }
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { emptySnapshot, type CanvasSnapshot } from "@canvas-physics/core";
 import {
-  DurableCommandKind,
   fromJsonBytes,
+  ItemEditSessionStatus,
+  ItemMutationKind,
+  ItemMutationRejectCode,
   toJsonBytes,
   type Peer,
   type RoomEnvelope,
@@ -81,27 +83,84 @@ describe("RoomClient reconnect handshake", () => {
       rates: { previewHz: 10 },
     });
     const transform = (x: number) => ({ x, y: 20, rotation: 0 });
-    const sentMoves = () =>
-      transport.sent
-        .map((message) => message.durableCommand)
-        .filter(
-          (command) => command?.kind === DurableCommandKind.DURABLE_MOVE_ITEM,
-        );
+    await session.start();
+    const snapshot = emptySnapshot(rocketCanvas.id, rocketCanvas.version);
+    snapshot.items = [{
+      entityId: "item-1",
+      definitionId: "crate",
+      definitionVersion: 1,
+      ownerUserId: "alice",
+      itemRevision: 1,
+      transform: transform(0),
+      resolvedConfig: {},
+    }];
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 1,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      joinAccepted: {
+        clientId: "c-owner",
+        userId: "alice",
+        displayName: "Alice",
+        sceneRevision: 1,
+        hostEpoch: 1,
+        hostClientId: "c-host",
+        canvasDefinitionJson: toJsonBytes(rocketCanvas),
+        snapshotJson: toJsonBytes(snapshot),
+        roomWasSleeping: false,
+        tickRate: 60,
+        canvasId: rocketCanvas.id,
+      },
+    });
+    await Promise.resolve();
 
-    session.moveItem("item-1", transform(1), true);
-    session.moveItem("item-1", transform(2), true);
-    session.moveItem("item-1", transform(3), true);
+    const edit = session.beginItemEdit("item-1");
+    const begin = transport.sent.at(-1)!.beginItemEdit!;
+    expect(begin).toMatchObject({
+      editSessionId: edit.editSessionId,
+      entityId: "item-1",
+      observedItemRevision: 1,
+    });
+    transport.deliver({
+      roomId: rocketCanvas.id,
+      hostEpoch: 1,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      itemEditSessionResult: {
+        clientSessionId: begin.clientSessionId,
+        editSessionId: edit.editSessionId,
+        entityId: "item-1",
+        status: ItemEditSessionStatus.ITEM_EDIT_SESSION_ACTIVE,
+        rejectCode: ItemMutationRejectCode.ITEM_MUTATION_REJECT_UNSPECIFIED,
+        message: "",
+        itemRevision: 1,
+        leaseExpiresAtUnixMs: Date.now() + 5_000,
+        itemInstanceJson: new Uint8Array(),
+      },
+    });
 
-    expect(sentMoves()).toHaveLength(1);
+    const sentPreviews = () => transport.sent.flatMap((message) =>
+      message.itemEditPreview ? [message.itemEditPreview] : []);
+    edit.preview(transform(1));
+    edit.preview(transform(2));
+    edit.preview(transform(3));
+
+    expect(sentPreviews()).toHaveLength(1);
     await new Promise((resolve) => setTimeout(resolve, 130));
-    expect(sentMoves()).toHaveLength(2);
-    expect(sentMoves()[1]?.position?.x).toBe(3);
+    expect(sentPreviews()).toHaveLength(2);
+    expect(sentPreviews()[1]?.position?.x).toBe(3);
 
-    session.moveItem("item-1", transform(4), true);
-    session.moveItem("item-1", transform(5));
-    expect(sentMoves().at(-1)).toMatchObject({ preview: false, position: { x: 5 } });
+    edit.preview(transform(4));
+    edit.mutate({ kind: "transform", entityId: "item-1", transform: transform(5) });
+    expect(transport.sent.at(-1)?.itemMutation).toMatchObject({
+      kind: ItemMutationKind.ITEM_MUTATION_TRANSFORM,
+      position: { x: 5 },
+    });
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(sentMoves()).toHaveLength(3);
+    expect(sentPreviews()).toHaveLength(2);
     session.stop();
   });
 

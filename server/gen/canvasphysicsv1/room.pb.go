@@ -158,6 +158,8 @@ const (
 	ItemMutationKind_ITEM_MUTATION_CONFIG      ItemMutationKind = 4
 	ItemMutationKind_ITEM_MUTATION_ISOLATION   ItemMutationKind = 5
 	ItemMutationKind_ITEM_MUTATION_COLLISIONS  ItemMutationKind = 6
+	ItemMutationKind_ITEM_MUTATION_ROTATION    ItemMutationKind = 7
+	ItemMutationKind_ITEM_MUTATION_SCALE       ItemMutationKind = 8
 )
 
 // Enum value maps for ItemMutationKind.
@@ -170,6 +172,8 @@ var (
 		4: "ITEM_MUTATION_CONFIG",
 		5: "ITEM_MUTATION_ISOLATION",
 		6: "ITEM_MUTATION_COLLISIONS",
+		7: "ITEM_MUTATION_ROTATION",
+		8: "ITEM_MUTATION_SCALE",
 	}
 	ItemMutationKind_value = map[string]int32{
 		"ITEM_MUTATION_UNSPECIFIED": 0,
@@ -179,6 +183,8 @@ var (
 		"ITEM_MUTATION_CONFIG":      4,
 		"ITEM_MUTATION_ISOLATION":   5,
 		"ITEM_MUTATION_COLLISIONS":  6,
+		"ITEM_MUTATION_ROTATION":    7,
+		"ITEM_MUTATION_SCALE":       8,
 	}
 )
 
@@ -3323,7 +3329,7 @@ const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"\x12DURABLE_SET_CONFIG\x10\x05\x12\x16\n" +
 	"\x12DURABLE_SCALE_ITEM\x10\x06\x12\x1e\n" +
 	"\x1aDURABLE_SET_ITEM_ISOLATION\x10\a\x12\x1f\n" +
-	"\x1bDURABLE_SET_ITEM_COLLISIONS\x10\b*\xd6\x01\n" +
+	"\x1bDURABLE_SET_ITEM_COLLISIONS\x10\b*\x8b\x02\n" +
 	"\x10ItemMutationKind\x12\x1d\n" +
 	"\x19ITEM_MUTATION_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ITEM_MUTATION_SPAWN\x10\x01\x12\x18\n" +
@@ -3331,7 +3337,9 @@ const file_packages_protocol_proto_room_proto_rawDesc = "" +
 	"\x17ITEM_MUTATION_TRANSFORM\x10\x03\x12\x18\n" +
 	"\x14ITEM_MUTATION_CONFIG\x10\x04\x12\x1b\n" +
 	"\x17ITEM_MUTATION_ISOLATION\x10\x05\x12\x1c\n" +
-	"\x18ITEM_MUTATION_COLLISIONS\x10\x06*\xd8\x04\n" +
+	"\x18ITEM_MUTATION_COLLISIONS\x10\x06\x12\x1a\n" +
+	"\x16ITEM_MUTATION_ROTATION\x10\a\x12\x17\n" +
+	"\x13ITEM_MUTATION_SCALE\x10\b*\xd8\x04\n" +
 	"\x16ItemMutationRejectCode\x12$\n" +
 	" ITEM_MUTATION_REJECT_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eITEM_MUTATION_REJECT_MALFORMED\x10\x01\x12\"\n" +

@@ -23,7 +23,6 @@ import {
   type PointerInteractionStrategy,
 } from "../input/pointer-interaction-coordinator.js";
 import {
-  ItemEditPresentation,
   ItemEditInteraction,
   findOwnedItemAt,
   type ItemEditState,
@@ -37,6 +36,7 @@ import {
   type RoomSessionRates,
   type SessionDiagnostics,
 } from "./room-session.js";
+import type { ItemEditHandle } from "./session/durable-command-session.js";
 import {
   pixiAssetLoader,
   preloadAssetManifest,
@@ -150,7 +150,7 @@ export class CanvasRuntime {
   private avatarDisabled = false;
   private localAvatarPresentationHidden = false;
   private editMode = false;
-  private readonly editPresentation = new ItemEditPresentation();
+  private activeItemEdit?: ItemEditHandle;
   private latestEntities: RenderEntity[] = [];
   private disableKeyListener?: (event: KeyboardEvent) => void;
   private assetBundle?: LoadedAssetBundle<Texture>;
@@ -389,16 +389,23 @@ export class CanvasRuntime {
           preferredEntityId,
         ),
       onPreview: (entityId, transform) => {
-        this.editPresentation.preview(entityId, transform);
-        this.moveItem(entityId, transform, true);
+        if (this.activeItemEdit?.entityId === entityId) {
+          this.activeItemEdit.preview(transform);
+        }
       },
       onCommit: (entityId, transform) => {
-        this.editPresentation.commit(entityId, transform);
-        this.moveItem(entityId, transform);
+        if (this.activeItemEdit?.entityId === entityId) {
+          this.activeItemEdit.mutate({ kind: "transform", entityId, transform });
+        } else {
+          this.moveItem(entityId, transform);
+        }
       },
       onChange: (state) => {
-        if (!state.ghost && state.selectedEntityId) {
-          this.editPresentation.cancelPreview(state.selectedEntityId);
+        if (state.selectedEntityId !== this.activeItemEdit?.entityId) {
+          this.activeItemEdit?.end();
+          this.activeItemEdit = state.selectedEntityId
+            ? this.session.beginItemEdit(state.selectedEntityId)
+            : undefined;
         }
         this.scene?.setEditState(state);
         this.options.onEditSelectionChange?.(state);
@@ -495,7 +502,6 @@ export class CanvasRuntime {
       coordinator.cancel("selection_changed");
     }
     this.editor?.clear();
-    this.editPresentation.clear();
   }
 
   /** Selects an owned item through product UI using the same state as pointer editing. */
@@ -573,10 +579,7 @@ export class CanvasRuntime {
       } else {
         this.frameProfiler.sample(deltaMs);
       }
-      let entities = this.editPresentation.apply(
-        this.session.entitiesToDraw(nowMs),
-        nowMs,
-      );
+      let entities = this.session.entitiesToDraw(nowMs);
       if (this.localAvatarPresentationHidden || this.options.hideDisabledAvatars) {
         entities = entities.filter((entity) => {
           if (this.localAvatarPresentationHidden && entity.id === this.session.avatarId) {
@@ -664,8 +667,8 @@ export class CanvasRuntime {
     this.session.spawnItem(definitionId, at, rotation, scale);
   }
 
-  moveItem(entityId: string, transform: Transform, preview = false): void {
-    this.session.moveItem(entityId, transform, preview);
+  moveItem(entityId: string, transform: Transform) {
+    return this.session.moveItem(entityId, transform);
   }
 
   rotateItem(entityId: string, rotation: number): void {

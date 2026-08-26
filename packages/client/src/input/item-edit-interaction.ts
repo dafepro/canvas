@@ -21,9 +21,29 @@ export interface ItemEditInteractionOptions {
 }
 
 interface PresentedTransform {
+  editSessionId: string;
+  entityId: string;
   transform: Transform;
-  committedAtMs?: number;
+  mutationId?: number;
+  accepted?: {
+    sceneRevision: number;
+    transform?: Transform;
+    deleted: boolean;
+  };
 }
+
+export type ItemPresentationSettlement =
+  | Readonly<{
+      status: "accepted";
+      mutationId: number;
+      sceneRevision: number;
+      item?: { entityId: string; transform: Transform };
+      deletedEntityId?: string;
+    }>
+  | Readonly<{
+      status: "rejected" | "cancelled" | "superseded";
+      mutationId: number;
+    }>;
 
 const transformMatches = (entity: RenderEntity, transform: Transform): boolean =>
   Math.abs(entity.x - transform.x) < 0.001 &&
@@ -34,47 +54,84 @@ const transformMatches = (entity: RenderEntity, transform: Transform): boolean =
 
 /**
  * Keeps an owner's direct manipulation at display cadence while the durable
- * preview remains rate-limited. A committed pose is held until canonical state
- * catches up, preventing a one-frame snap back after pointer-up.
+ * preview remains rate-limited. A committed pose is held until its accepted
+ * scene revision is visible in canonical state, preventing both snap-back and
+ * timeout-based guesses about relay latency.
  */
 export class ItemEditPresentation {
   private readonly transforms = new Map<string, PresentedTransform>();
 
-  constructor(private readonly commitTimeoutMs = 1_500) {}
-
-  preview(entityId: string, transform: Transform): void {
-    this.transforms.set(entityId, { transform: { ...transform } });
-  }
-
-  commit(entityId: string, transform: Transform, nowMs = performance.now()): void {
+  preview(editSessionId: string, entityId: string, transform: Transform): void {
     this.transforms.set(entityId, {
+      editSessionId,
+      entityId,
       transform: { ...transform },
-      committedAtMs: nowMs,
     });
   }
 
-  cancelPreview(entityId: string): void {
-    if (this.transforms.get(entityId)?.committedAtMs === undefined) {
-      this.transforms.delete(entityId);
+  commit(
+    editSessionId: string,
+    mutationId: number,
+    entityId: string,
+    transform: Transform,
+  ): void {
+    this.transforms.set(entityId, {
+      editSessionId,
+      entityId,
+      transform: { ...transform },
+      mutationId,
+    });
+  }
+
+  settle(outcome: ItemPresentationSettlement): void {
+    for (const [entityId, presented] of this.transforms) {
+      if (presented.mutationId !== outcome.mutationId) continue;
+      if (outcome.status !== "accepted") {
+        this.transforms.delete(entityId);
+        return;
+      }
+      const acceptedEntityId = outcome.item?.entityId ?? outcome.deletedEntityId;
+      if (acceptedEntityId !== presented.entityId) {
+        this.transforms.delete(entityId);
+        return;
+      }
+      presented.accepted = {
+        sceneRevision: outcome.sceneRevision,
+        transform: outcome.item ? { ...outcome.item.transform } : undefined,
+        deleted: outcome.deletedEntityId === presented.entityId,
+      };
+      return;
     }
   }
 
-  apply(entities: RenderEntity[], nowMs = performance.now()): RenderEntity[] {
+  observeCanonical(sceneRevision: number, entities: readonly RenderEntity[]): void {
+    if (this.transforms.size === 0) return;
+    const byId = new Map(entities.map((entity) => [entity.id, entity]));
+    for (const [entityId, presented] of this.transforms) {
+      const accepted = presented.accepted;
+      if (!accepted || sceneRevision < accepted.sceneRevision) continue;
+      const canonical = byId.get(entityId);
+      if (accepted.deleted ? !canonical : !!canonical && !!accepted.transform &&
+        transformMatches(canonical, accepted.transform)) {
+        this.transforms.delete(entityId);
+      }
+    }
+  }
+
+  endEdit(editSessionId: string): void {
+    for (const [entityId, presented] of this.transforms) {
+      if (presented.editSessionId === editSessionId && presented.mutationId === undefined) {
+        this.transforms.delete(entityId);
+      }
+    }
+  }
+
+  apply(entities: RenderEntity[]): RenderEntity[] {
     if (this.transforms.size === 0) return entities;
     let changed = false;
     const presented = entities.map((entity) => {
       const local = this.transforms.get(entity.id);
       if (!local) return entity;
-      if (local.committedAtMs !== undefined) {
-        if (transformMatches(entity, local.transform)) {
-          this.transforms.delete(entity.id);
-          return entity;
-        }
-        if (nowMs - local.committedAtMs >= this.commitTimeoutMs) {
-          this.transforms.delete(entity.id);
-          return entity;
-        }
-      }
       changed = true;
       return { ...entity, ...local.transform };
     });

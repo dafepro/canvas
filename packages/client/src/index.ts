@@ -21,6 +21,7 @@ export * from "./input/fullscreen-controller.js";
 export * from "./input/item-edit-interaction.js";
 export * from "./input/keyboard-controller.js";
 export * from "./runtime/room-session.js";
+export * from "./runtime/session/durable-command-session.js";
 export * from "./runtime/canvas-runtime.js";
 export * from "./runtime/linked-room-navigator.js";
 export * from "./runtime/lifecycle.js";

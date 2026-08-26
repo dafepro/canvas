@@ -153,6 +153,8 @@ export enum ItemMutationKind {
   ITEM_MUTATION_CONFIG = 4,
   ITEM_MUTATION_ISOLATION = 5,
   ITEM_MUTATION_COLLISIONS = 6,
+  ITEM_MUTATION_ROTATION = 7,
+  ITEM_MUTATION_SCALE = 8,
   UNRECOGNIZED = -1,
 }
 
@@ -179,6 +181,12 @@ export function itemMutationKindFromJSON(object: any): ItemMutationKind {
     case 6:
     case "ITEM_MUTATION_COLLISIONS":
       return ItemMutationKind.ITEM_MUTATION_COLLISIONS;
+    case 7:
+    case "ITEM_MUTATION_ROTATION":
+      return ItemMutationKind.ITEM_MUTATION_ROTATION;
+    case 8:
+    case "ITEM_MUTATION_SCALE":
+      return ItemMutationKind.ITEM_MUTATION_SCALE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -202,6 +210,10 @@ export function itemMutationKindToJSON(object: ItemMutationKind): string {
       return "ITEM_MUTATION_ISOLATION";
     case ItemMutationKind.ITEM_MUTATION_COLLISIONS:
       return "ITEM_MUTATION_COLLISIONS";
+    case ItemMutationKind.ITEM_MUTATION_ROTATION:
+      return "ITEM_MUTATION_ROTATION";
+    case ItemMutationKind.ITEM_MUTATION_SCALE:
+      return "ITEM_MUTATION_SCALE";
     case ItemMutationKind.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

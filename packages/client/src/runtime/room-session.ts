@@ -28,6 +28,9 @@ import {
 import {
   DurableCommandSession,
   type DurableCommandEffect,
+  type ItemEditHandle,
+  type ItemMutationReceipt,
+  type ItemMutationSnapshot,
 } from "./session/durable-command-session.js";
 import {
   ReplicationTimeline,
@@ -258,6 +261,7 @@ export class RoomSession {
       decorate: (entity) => this.durable.decorate(entity),
       onCanonical: (tick, entities) => {
         const canonical = [...entities];
+        this.durable.observeCanonical(this.client.durableRevision.sceneRevision, canonical);
         this.roster.observeCanonical(canonical);
         this.syncCountdowns(canonical, tick);
         this.presentation.markCanonical(
@@ -311,6 +315,10 @@ export class RoomSession {
   subscribeEffects(observer: Observer<Readonly<EffectEmission>>): () => void {
     this.effectObservers.add(observer);
     return () => this.effectObservers.delete(observer);
+  }
+
+  subscribeItemMutations(observer: Observer<ItemMutationSnapshot>): () => void {
+    return this.durable.subscribeMutations(observer);
   }
 
   get lifecycleState(): CanvasLifecycleState {
@@ -490,18 +498,17 @@ export class RoomSession {
       this.checkPresentationReady();
     });
 
-    this.client.on("durableAccepted", (command, _revision, itemJson) => {
-      const item = itemJson as SnapshotItem | undefined;
-      this.durable.accept(command, item);
+    this.client.on("itemMutationResult", (result, itemJson) => {
+      this.durable.acceptMutation(result, itemJson as SnapshotItem | undefined);
       this.checkPresentationReady();
     });
 
-    this.client.on("durablePreview", (command) => {
-      this.durable.acceptPreview(command);
+    this.client.on("itemEditPreview", (preview) => {
+      this.durable.acceptPreview(preview);
     });
 
-    this.client.on("durableRejected", (_command, reason) => {
-      this.durable.reject(reason);
+    this.client.on("itemEditSessionResult", (result, itemJson) => {
+      this.durable.acceptEditSession(result, itemJson as SnapshotItem | undefined);
     });
 
     this.client.on("error", (code, message) => {
@@ -538,6 +545,7 @@ export class RoomSession {
 
   private installAcceptedJoin(join: ConnectionJoin): void {
     this.durable.loadSnapshot(join.snapshot);
+    this.durable.connectionReady();
     this.timeline.resetEpoch(this.hostRole.hostEpoch || this.client.hostLease.epoch);
     this.roster.loadSnapshotPositions(join.snapshot);
     this.presentation.markItems(join.generation, this.durable.itemEntityIds);
@@ -757,7 +765,9 @@ export class RoomSession {
    * the interpolated remote state plus its reconciled local avatar.
    */
   entitiesToDraw(nowMs: number): RenderEntity[] {
-    return this.timeline.frame(nowMs, this.localAvatarId, this.hostRole.isHost);
+    return this.durable.present(
+      this.timeline.frame(nowMs, this.localAvatarId, this.hostRole.isHost),
+    );
   }
 
   /**
@@ -874,8 +884,13 @@ export class RoomSession {
   // ---------- durable mutations ----------
 
   /** Spec 14.1. Every durable edit goes through the backend. */
-  spawnItem(definitionId: string, at: Vec2, rotation = 0, scale = 1): void {
-    this.durable.spawnItem(definitionId, at, rotation, scale);
+  spawnItem(
+    definitionId: string,
+    at: Vec2,
+    rotation = 0,
+    scale = 1,
+  ): ItemMutationReceipt {
+    return this.durable.spawnItem(definitionId, at, rotation, scale);
   }
 
   private checkPresentationReady(): void {
@@ -895,48 +910,57 @@ export class RoomSession {
     );
   }
 
-  moveItem(entityId: string, transform: Transform, preview = false): void {
-    this.durable.moveItem(entityId, transform, preview);
+  beginItemEdit(entityId: string): ItemEditHandle {
+    return this.durable.beginItemEdit(entityId);
   }
 
-  rotateItem(entityId: string, rotation: number): void {
-    this.durable.rotateItem(entityId, rotation);
+  moveItem(entityId: string, transform: Transform): ItemMutationReceipt {
+    return this.durable.moveItem(entityId, transform);
   }
 
-  scaleItem(entityId: string, scale: number): void {
-    this.durable.scaleItem(entityId, scale);
+  rotateItem(entityId: string, rotation: number): ItemMutationReceipt {
+    return this.durable.rotateItem(entityId, rotation);
   }
 
-  setItemConfig(entityId: string, config: unknown): void {
-    this.durable.setItemConfig(entityId, config);
+  scaleItem(entityId: string, scale: number): ItemMutationReceipt {
+    return this.durable.scaleItem(entityId, scale);
   }
 
-  setItemIsolation(entityId: string, isolated: boolean): void {
-    this.durable.setItemIsolation(entityId, isolated);
+  setItemConfig(entityId: string, config: unknown): ItemMutationReceipt {
+    return this.durable.setItemConfig(entityId, config);
   }
 
-  setItemCollisionsEnabled(entityId: string, enabled: boolean): void {
-    this.durable.setItemCollisionsEnabled(entityId, enabled);
+  setItemIsolation(entityId: string, isolated: boolean): ItemMutationReceipt {
+    return this.durable.setItemIsolation(entityId, isolated);
   }
 
-  deleteItem(entityId: string): void {
-    this.durable.deleteItem(entityId);
+  setItemCollisionsEnabled(entityId: string, enabled: boolean): ItemMutationReceipt {
+    return this.durable.setItemCollisionsEnabled(entityId, enabled);
+  }
+
+  deleteItem(entityId: string): ItemMutationReceipt {
+    return this.durable.deleteItem(entityId);
   }
 
   private applyDurableEffect(effect: DurableCommandEffect): void {
     switch (effect.type) {
-      case "send":
-        this.client.sendDurableCommand(effect.command);
+      case "sendMutation":
+        this.client.sendItemMutation(effect.mutation);
+        break;
+      case "beginEdit":
+        this.client.beginItemEdit(effect.request);
+        break;
+      case "renewEdit":
+        this.client.renewItemEdit(effect.request);
+        break;
+      case "endEdit":
+        this.client.endItemEdit(effect.request);
+        break;
+      case "sendPreview":
+        this.client.sendItemEditPreview(effect.preview);
         break;
       case "simulate":
         this.driver.send(effect.request);
-        break;
-      case "rejected":
-        this.reportError(lifecycleError(
-          "durable_command_rejected",
-          effect.reason,
-          { source: "durable-command", recoverable: true },
-        ));
         break;
     }
   }

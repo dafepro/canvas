@@ -248,25 +248,38 @@ describe("item edit interaction", () => {
     controller.destroy();
   });
 
-  it("renders local edit previews at pointer cadence until the commit is observed", () => {
-    const presentation = new ItemEditPresentation(1_500);
+  it("holds local presentation until the matching result is canonical", () => {
+    const presentation = new ItemEditPresentation();
     const canonical = [item()];
     const preview = { x: 14, y: 8, rotation: 0.2, scale: 1.1 };
 
-    presentation.preview("item-1", preview);
-    expect(presentation.apply(canonical, 10)[0]).toMatchObject(preview);
+    presentation.preview("edit-1", "item-1", preview);
+    expect(presentation.apply(canonical)[0]).toMatchObject(preview);
     expect(canonical[0]).toMatchObject({ x: 10, y: 5, rotation: 0 });
 
-    presentation.commit("item-1", preview, 20);
-    expect(presentation.apply(canonical, 100)[0]).toMatchObject(preview);
-    expect(presentation.apply([{ ...item(), ...preview }], 110)[0]).toMatchObject(preview);
+    presentation.commit("edit-1", 7, "item-1", preview);
+    presentation.observeCanonical(3, [{ ...item(), ...preview }]);
+    expect(presentation.apply(canonical)[0]).toMatchObject(preview);
 
-    presentation.preview("item-1", { ...preview, x: 18 });
-    presentation.cancelPreview("item-1");
-    expect(presentation.apply(canonical, 120)[0]).toMatchObject({ x: 10, y: 5 });
+    presentation.settle({
+      status: "accepted",
+      mutationId: 7,
+      sceneRevision: 4,
+      item: { entityId: "item-1", transform: preview },
+    });
+    presentation.observeCanonical(3, [{ ...item(), ...preview }]);
+    expect(presentation.apply(canonical)[0]).toMatchObject(preview);
+    presentation.observeCanonical(4, [{ ...item(), ...preview }]);
+    expect(presentation.apply(canonical)[0]).toMatchObject({ x: 10, y: 5 });
 
-    presentation.commit("item-1", { ...preview, x: 19 }, 200);
-    expect(presentation.apply(canonical, 1_701)[0]).toMatchObject({ x: 10, y: 5 });
+    presentation.preview("edit-2", "item-1", { ...preview, x: 18 });
+    presentation.endEdit("edit-2");
+    expect(presentation.apply(canonical)[0]).toMatchObject({ x: 10, y: 5 });
+
+    presentation.preview("edit-3", "item-1", { ...preview, x: 19 });
+    presentation.commit("edit-3", 8, "item-1", { ...preview, x: 19 });
+    presentation.settle({ status: "rejected", mutationId: 8 });
+    expect(presentation.apply(canonical)[0]).toMatchObject({ x: 10, y: 5 });
   });
 
   it("lets product UI synchronize a selection before direct manipulation", () => {

@@ -32,6 +32,7 @@ const toRenderEntity = (entity: Entity, behaviorState?: unknown): RenderEntity =
   animationEpoch: entity.render?.animationEpoch,
   userId: entity.avatar?.userId,
   ownerUserId: entity.ownership?.ownerUserId,
+  itemRevision: entity.ownership?.itemRevision,
   lastProcessedInputSequence: entity.avatar?.lastProcessedInputSeq,
   behaviorState,
   quarantined: entity.quarantined,
@@ -208,6 +209,9 @@ export class SimulationKernel {
         break;
       case "setItemCollisions":
         this.simulation?.setItemCollisionsEnabled(request.entityId, request.enabled);
+        break;
+      case "setItemRevision":
+        this.simulation?.setItemRevision(request.entityId, request.itemRevision);
         break;
 
       case "requestSnapshot": {
