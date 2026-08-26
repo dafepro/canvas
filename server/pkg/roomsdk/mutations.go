@@ -137,7 +137,7 @@ func (r *Room) authorizeDurable(client *Client, command *pb.DurableCommand) (boo
 	result := r.cfg.DurableAuthorizer.AuthorizeDurable(ctx, DurableAuthorizationRequest{
 		RoomID: r.roomID, UserID: client.UserID, Operation: operation,
 		CommandID: command.CommandId, EntityID: command.EntityId, DefinitionID: command.DefinitionId,
-		Position: DurablePosition{X: position.X, Y: position.Y}, Scale: position.Scale, Preview: command.Preview,
+		Position: DurablePosition{X: position.X, Y: position.Y}, Rotation: position.Rotation, Scale: position.Scale, Preview: command.Preview,
 		ExistingItems: items,
 	})
 	if result.Allowed {

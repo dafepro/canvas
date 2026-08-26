@@ -892,6 +892,46 @@ func TestHostDurableAuthorizerReceivesTheRequestedScale(t *testing.T) {
 	}
 }
 
+func TestHostDurableAuthorizerReceivesTheRequestedRotation(t *testing.T) {
+	var requests []DurableAuthorizationRequest
+	h := newHarness(t, func(cfg *Config) {
+		cfg.DurableAuthorizer = DurableAuthorizerFunc(func(_ context.Context, request DurableAuthorizationRequest) DurableAuthorizationResult {
+			requests = append(requests, request)
+			return DurableAuthorizationResult{Allowed: true}
+		})
+	})
+	owner := h.dial("alice")
+	owner.join()
+	owner.send(spawnCommand("cmd-rotation-source", 12, 18))
+	spawned := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetDurableResult()
+		return result != nil && result.CommandId == "cmd-rotation-source"
+	}).GetDurableResult()
+	if !spawned.Accepted {
+		t.Fatalf("spawn rejected: %s", spawned.RejectReason)
+	}
+
+	owner.send(&pb.RoomEnvelope{
+		RoomId: "test-canvas",
+		Payload: &pb.RoomEnvelope_DurableCommand{DurableCommand: &pb.DurableCommand{
+			CommandId: "cmd-rotation-authorized",
+			Kind:      pb.DurableCommandKind_DURABLE_ROTATE_ITEM,
+			EntityId:  spawned.Command.EntityId,
+			Rotation:  float32(math.Pi / 12),
+		}},
+	})
+	result := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		candidate := envelope.GetDurableResult()
+		return candidate != nil && candidate.CommandId == "cmd-rotation-authorized"
+	}).GetDurableResult()
+	if !result.Accepted {
+		t.Fatalf("rotation rejected: %s", result.RejectReason)
+	}
+	if len(requests) != 2 || requests[1].Operation != DurableRotate || math.Abs(requests[1].Rotation-math.Pi/12) > 0.000001 {
+		t.Fatalf("rotation authorization request = %+v", requests)
+	}
+}
+
 func TestDurableLimitsAndBounds(t *testing.T) {
 	h := newHarness(t, nil)
 	owner := h.dial("alice")
