@@ -85,6 +85,7 @@ export interface RenderEntity {
   animationEpoch?: number;
   userId?: string;
   ownerUserId?: string;
+  resolvedConfig?: unknown;
   lastProcessedInputSequence?: number;
   behaviorState?: unknown;
   quarantined?: boolean;

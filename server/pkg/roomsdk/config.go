@@ -2,6 +2,7 @@ package roomsdk
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"time"
 )
@@ -66,9 +67,10 @@ type DurablePosition struct {
 }
 
 type DurableAuthorizationItem struct {
-	EntityID     string
-	DefinitionID string
-	OwnerUserID  string
+	EntityID       string
+	DefinitionID   string
+	OwnerUserID    string
+	ResolvedConfig json.RawMessage
 }
 
 type DurableAuthorizationRequest struct {
@@ -82,12 +84,14 @@ type DurableAuthorizationRequest struct {
 	Rotation      float64
 	Scale         float64
 	Preview       bool
+	ConfigJSON    json.RawMessage
 	ExistingItems []DurableAuthorizationItem
 }
 
 type DurableAuthorizationResult struct {
-	Allowed bool
-	Reason  string
+	Allowed         bool
+	Reason          string
+	CanonicalConfig json.RawMessage
 }
 
 type DurableAuthorizer interface {

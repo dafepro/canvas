@@ -28,6 +28,7 @@ export interface OverlayEntityProjection {
   readonly kind: RenderEntity["kind"];
   readonly definitionId: string;
   readonly ownerUserId?: string;
+  readonly resolvedConfig?: unknown;
   readonly world: Readonly<{ x: number; y: number; z: number }>;
   readonly screen: Readonly<Vec2>;
   readonly rotation: number;
@@ -201,6 +202,7 @@ const projectEntity = (
     kind: entity.kind,
     definitionId: entity.definitionId,
     ownerUserId: entity.ownerUserId,
+    resolvedConfig: entity.resolvedConfig,
     world: point.world,
     screen: point.screen,
     rotation: entity.rotation,

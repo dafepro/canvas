@@ -129,6 +129,7 @@ func (r *Room) authorizeDurable(client *Client, command *pb.DurableCommand) (boo
 	for _, item := range r.snapshot.Items {
 		items = append(items, DurableAuthorizationItem{
 			EntityID: item.EntityID, DefinitionID: item.DefinitionID, OwnerUserID: item.OwnerUserID,
+			ResolvedConfig: append(json.RawMessage(nil), item.ResolvedConfig...),
 		})
 	}
 	position := transformOf(command)
@@ -138,9 +139,26 @@ func (r *Room) authorizeDurable(client *Client, command *pb.DurableCommand) (boo
 		RoomID: r.roomID, UserID: client.UserID, Operation: operation,
 		CommandID: command.CommandId, EntityID: command.EntityId, DefinitionID: command.DefinitionId,
 		Position: DurablePosition{X: position.X, Y: position.Y}, Rotation: position.Rotation, Scale: position.Scale, Preview: command.Preview,
-		ExistingItems: items,
+		ConfigJSON: append(json.RawMessage(nil), command.ConfigJson...), ExistingItems: items,
 	})
 	if result.Allowed {
+		if len(result.CanonicalConfig) > 0 {
+			definitionID := command.DefinitionId
+			if operation == DurableConfigure {
+				item := r.items[command.EntityId]
+				if item == nil {
+					return false, "unknown_entity"
+				}
+				definitionID = item.DefinitionID
+			} else if operation != DurableSpawn {
+				return false, DurableRejectedByApplication
+			}
+			definition, err := r.itemDefinition(definitionID)
+			if err != nil || validateConfigJSON(definition.ConfigSchema, result.CanonicalConfig) != nil {
+				return false, "config_schema_mismatch"
+			}
+			command.ConfigJson = append([]byte(nil), result.CanonicalConfig...)
+		}
 		return true, ""
 	}
 	if !durableRejectReason.MatchString(result.Reason) {

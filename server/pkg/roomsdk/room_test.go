@@ -852,6 +852,69 @@ func TestHostDurableAuthorizerCanEnforceProductInventoryBeforeSpawn(t *testing.T
 	}
 }
 
+func TestHostDurableAuthorizerCanCanonicalizeProductConfig(t *testing.T) {
+	var requests []DurableAuthorizationRequest
+	h := newHarness(t, func(cfg *Config) {
+		cfg.DurableAuthorizer = DurableAuthorizerFunc(func(_ context.Context, request DurableAuthorizationRequest) DurableAuthorizationResult {
+			requests = append(requests, request)
+			return DurableAuthorizationResult{
+				Allowed:         true,
+				CanonicalConfig: json.RawMessage(`{"thrust":7}`),
+			}
+		})
+	})
+	owner := h.dial("alice")
+	owner.join()
+
+	owner.send(spawnCommand("cmd-canonical-config", 12, 18))
+	accepted := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetDurableResult()
+		return result != nil && result.CommandId == "cmd-canonical-config"
+	}).GetDurableResult()
+	if !accepted.Accepted {
+		t.Fatalf("canonicalized spawn rejected: %s", accepted.RejectReason)
+	}
+	var placed SnapshotItem
+	if err := json.Unmarshal(accepted.ItemInstanceJson, &placed); err != nil {
+		t.Fatal(err)
+	}
+	if string(placed.ResolvedConfig) != `{"thrust":7}` || string(accepted.Command.ConfigJson) != `{"thrust":7}` {
+		t.Fatalf("canonical config was not authoritative: item=%s command=%s", placed.ResolvedConfig, accepted.Command.ConfigJson)
+	}
+
+	owner.send(spawnCommand("cmd-canonical-config-two", 22, 28))
+	second := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		result := envelope.GetDurableResult()
+		return result != nil && result.CommandId == "cmd-canonical-config-two"
+	}).GetDurableResult()
+	if !second.Accepted {
+		t.Fatalf("second canonicalized spawn rejected: %s", second.RejectReason)
+	}
+	if len(requests) != 2 || string(requests[0].ConfigJSON) != `{"thrust":24}` ||
+		len(requests[1].ExistingItems) != 1 || string(requests[1].ExistingItems[0].ResolvedConfig) != `{"thrust":7}` {
+		t.Fatalf("authorizer config context = %+v", requests)
+	}
+}
+
+func TestHostDurableAuthorizerCanonicalConfigMustMatchDefinitionSchema(t *testing.T) {
+	h := newHarness(t, func(cfg *Config) {
+		cfg.DurableAuthorizer = DurableAuthorizerFunc(func(_ context.Context, _ DurableAuthorizationRequest) DurableAuthorizationResult {
+			return DurableAuthorizationResult{Allowed: true, CanonicalConfig: json.RawMessage(`{"placementDay":"today"}`)}
+		})
+	})
+	owner := h.dial("alice")
+	owner.join()
+
+	owner.send(spawnCommand("cmd-invalid-canonical-config", 12, 18))
+	result := owner.await(func(envelope *pb.RoomEnvelope) bool {
+		candidate := envelope.GetDurableResult()
+		return candidate != nil && candidate.CommandId == "cmd-invalid-canonical-config"
+	}).GetDurableResult()
+	if result.Accepted || result.RejectReason != "config_schema_mismatch" {
+		t.Fatalf("invalid canonical config result = accepted %v reason %q", result.Accepted, result.RejectReason)
+	}
+}
+
 func TestHostDurableAuthorizerReceivesTheRequestedScale(t *testing.T) {
 	var requests []DurableAuthorizationRequest
 	h := newHarness(t, func(cfg *Config) {

@@ -136,6 +136,7 @@ describe("DurableCommandSession", () => {
     })).toMatchObject({
       definitionId: crateDefinition.definitionId,
       ownerUserId: "alice",
+      resolvedConfig: {},
     });
 
     session.accept({

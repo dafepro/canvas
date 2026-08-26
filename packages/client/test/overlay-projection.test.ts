@@ -24,6 +24,7 @@ const source = (sampledAtMs: number): OverlayProjectionSource => ({
       kind: "item",
       definitionId: "soccer-ball",
       ownerUserId: "alice",
+      resolvedConfig: { placementDay: "2026-08-26" },
       x: 50,
       y: 30,
       z: 2,
@@ -97,6 +98,7 @@ describe("bounded overlay projection", () => {
       expect.objectContaining({
         entityId: "ball",
         ownerUserId: "alice",
+        resolvedConfig: { placementDay: "2026-08-26" },
         world: { x: 50, y: 30, z: 2 },
         scale: 1.25,
         screen: { x: 500, y: 330 },

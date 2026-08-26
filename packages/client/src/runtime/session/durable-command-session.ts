@@ -50,7 +50,11 @@ export class DurableCommandSession {
   private readonly emit: (effect: DurableCommandEffect) => void;
   private readonly metadataById = new Map<
     string,
-    Readonly<{ definitionId: string; ownerUserId: string }>
+    Readonly<{
+      definitionId: string;
+      ownerUserId: string;
+      resolvedConfig: unknown;
+    }>
   >();
   private previewTimer?: SessionTimeout;
   private pendingPreview?: { entityId: string; transform: Transform };
@@ -86,6 +90,7 @@ export class DurableCommandSession {
       ...entity,
       definitionId: entity.definitionId || metadata.definitionId,
       ownerUserId: metadata.ownerUserId,
+      resolvedConfig: metadata.resolvedConfig,
     };
   }
 
@@ -202,6 +207,7 @@ export class DurableCommandSession {
     this.metadataById.set(item.entityId, Object.freeze({
       definitionId: item.definitionId,
       ownerUserId: item.ownerUserId,
+      resolvedConfig: immutableConfig(item.resolvedConfig),
     }));
   }
 
@@ -357,3 +363,17 @@ export class DurableCommandSession {
     }
   }
 }
+
+const immutableConfig = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map(immutableConfig));
+  }
+  if (value && typeof value === "object") {
+    return Object.freeze(
+      Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [key, immutableConfig(item)]),
+      ),
+    );
+  }
+  return value;
+};
