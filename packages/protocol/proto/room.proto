@@ -34,6 +34,7 @@ message RoomEnvelope {
     RenewItemEdit renew_item_edit = 27;
     EndItemEdit end_item_edit = 28;
     ItemEditPreview item_edit_preview = 29;
+    ParticipantSignal participant_signal = 30;
   }
 }
 
@@ -221,6 +222,13 @@ enum ItemMutationKind {
   ITEM_MUTATION_COLLISIONS = 6;
   ITEM_MUTATION_ROTATION = 7;
   ITEM_MUTATION_SCALE = 8;
+}
+
+// A small, non-durable consumer signal. The room server allowlists kinds,
+// applies its rate and payload policy, and stamps sender_client_id on relay.
+message ParticipantSignal {
+  string kind = 1;
+  bytes params_json = 2;
 }
 
 enum ItemMutationRejectCode {

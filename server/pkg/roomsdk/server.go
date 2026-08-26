@@ -10,7 +10,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -35,7 +37,28 @@ func New(cfg Config) (*Server, error) {
 		return nil, ErrRoomTemplateResolverRequired
 	}
 	cfg.applyDefaults()
+	if err := validateParticipantSignalPolicy(cfg.ParticipantSignals); err != nil {
+		return nil, err
+	}
 	return &Server{cfg: cfg, rooms: make(map[string]*Room)}, nil
+}
+
+func validateParticipantSignalPolicy(policy ParticipantSignalPolicy) error {
+	if len(policy.AllowedKinds) == 0 {
+		return nil
+	}
+	if policy.MaxPayloadBytes < 0 || policy.MaxPayloadBytes > 4096 {
+		return errors.New("roomsdk: participant signal payload limit must be between 0 and 4096 bytes")
+	}
+	if policy.MinInterval < 100*time.Millisecond || policy.MinInterval > time.Minute {
+		return errors.New("roomsdk: participant signal interval must be between 100ms and 1m")
+	}
+	for kind := range policy.AllowedKinds {
+		if kind == "" || len(kind) > 64 || strings.TrimSpace(kind) != kind {
+			return errors.New("roomsdk: participant signal kinds must be 1 to 64 trimmed characters")
+		}
+	}
+	return nil
 }
 
 // Handler returns the HTTP routes from spec 16.4. Mount it under any prefix.

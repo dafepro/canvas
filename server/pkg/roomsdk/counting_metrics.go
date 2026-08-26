@@ -87,6 +87,10 @@ func (m *CountingMetrics) ProtocolMismatch(canvasID string) {
 	m.add("canvas_protocol_mismatch_total", canvasID, "", 1)
 }
 
+func (m *CountingMetrics) ParticipantSignal(canvasID, result string) {
+	m.add("canvas_participant_signals_total", canvasID, result, 1)
+}
+
 // Value reads one counter. A test uses it; the endpoint below uses WriteTo.
 func (m *CountingMetrics) Value(name, canvas, reason string) float64 {
 	m.mu.Lock()
@@ -185,6 +189,12 @@ func (t TeeMetrics) DurableRejected(canvasID, reason string) {
 func (t TeeMetrics) ProtocolMismatch(canvasID string) {
 	for _, m := range t {
 		m.ProtocolMismatch(canvasID)
+	}
+}
+
+func (t TeeMetrics) ParticipantSignal(canvasID, result string) {
+	for _, m := range t {
+		m.ParticipantSignal(canvasID, result)
 	}
 }
 

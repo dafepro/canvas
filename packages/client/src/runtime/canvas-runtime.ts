@@ -218,6 +218,16 @@ export class CanvasRuntime {
     return this.session.subscribeEffects(...args);
   }
 
+  subscribeParticipantSignals(
+    ...args: Parameters<RoomSession["subscribeParticipantSignals"]>
+  ) {
+    return this.session.subscribeParticipantSignals(...args);
+  }
+
+  sendParticipantSignal(...args: Parameters<RoomSession["sendParticipantSignal"]>) {
+    this.session.sendParticipantSignal(...args);
+  }
+
   get isFullscreen(): boolean {
     return this.fullscreen?.active ?? false;
   }

@@ -60,6 +60,7 @@ type Room struct {
 	mutationHighWater    map[string]uint64
 	definitions          map[string]ItemDefinitionRecord
 	nextEntityNo         uint64
+	participantSignalAt  map[string]time.Time
 
 	joins      chan *Client
 	departures chan departure
@@ -81,29 +82,30 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 	}
 
 	room := &Room{
-		cfg:               &server.cfg,
-		server:            server,
-		roomID:            roomID,
-		canvasID:          record.CanvasID,
-		canvasShape:       shape,
-		definitionRaw:     record.DefinitionRaw,
-		clients:           make(map[string]*Client),
-		participants:      make(map[string]struct{}),
-		items:             make(map[string]*SnapshotItem),
-		avatarPositions:   make(map[string]SnapshotAvatar),
-		editSessions:      make(map[string]*itemEditSession),
-		editByEntity:      make(map[string]string),
-		mutationReceipts:  make(map[string]*storedMutationReceipt),
-		mutationHighWater: make(map[string]uint64),
-		definitions:       make(map[string]ItemDefinitionRecord),
-		joins:             make(chan *Client, 8),
-		departures:        make(chan departure, 8),
-		messages:          make(chan inbound, 512),
-		done:              make(chan struct{}),
-		persistQueue:      make(chan SnapshotRecord, 1),
-		persistStop:       make(chan struct{}),
-		persistDone:       make(chan struct{}),
-		sleeping:          true,
+		cfg:                 &server.cfg,
+		server:              server,
+		roomID:              roomID,
+		canvasID:            record.CanvasID,
+		canvasShape:         shape,
+		definitionRaw:       record.DefinitionRaw,
+		clients:             make(map[string]*Client),
+		participants:        make(map[string]struct{}),
+		items:               make(map[string]*SnapshotItem),
+		avatarPositions:     make(map[string]SnapshotAvatar),
+		editSessions:        make(map[string]*itemEditSession),
+		editByEntity:        make(map[string]string),
+		mutationReceipts:    make(map[string]*storedMutationReceipt),
+		mutationHighWater:   make(map[string]uint64),
+		definitions:         make(map[string]ItemDefinitionRecord),
+		participantSignalAt: make(map[string]time.Time),
+		joins:               make(chan *Client, 8),
+		departures:          make(chan departure, 8),
+		messages:            make(chan inbound, 512),
+		done:                make(chan struct{}),
+		persistQueue:        make(chan SnapshotRecord, 1),
+		persistStop:         make(chan struct{}),
+		persistDone:         make(chan struct{}),
+		sleeping:            true,
 	}
 
 	if len(snapshot.SnapshotRaw) > 0 {
@@ -392,6 +394,9 @@ func (r *Room) handleMessage(msg inbound) {
 	case *pb.RoomEnvelope_StateDelta, *pb.RoomEnvelope_FullState, *pb.RoomEnvelope_EffectEvent:
 		r.relayFromHost(client, envelope)
 
+	case *pb.RoomEnvelope_ParticipantSignal:
+		r.handleParticipantSignal(client, payload.ParticipantSignal)
+
 	case *pb.RoomEnvelope_HostControl:
 		r.handleHostControl(client, payload.HostControl)
 
@@ -416,6 +421,40 @@ func (r *Room) handleMessage(msg inbound) {
 	default:
 		// Unknown payloads are ignored rather than closing the connection.
 	}
+}
+
+func (r *Room) handleParticipantSignal(client *Client, signal *pb.ParticipantSignal) {
+	policy := r.cfg.ParticipantSignals
+	if signal == nil {
+		r.cfg.Metrics.ParticipantSignal(r.roomID, "malformed")
+		return
+	}
+	if _, allowed := policy.AllowedKinds[signal.Kind]; !allowed {
+		r.cfg.Metrics.ParticipantSignal(r.roomID, "kind_rejected")
+		return
+	}
+	if len(signal.ParamsJson) > policy.MaxPayloadBytes ||
+		(len(signal.ParamsJson) > 0 && !json.Valid(signal.ParamsJson)) {
+		r.cfg.Metrics.ParticipantSignal(r.roomID, "payload_rejected")
+		return
+	}
+	now := r.cfg.Now()
+	if last := r.participantSignalAt[client.UserID]; !last.IsZero() &&
+		now.Sub(last) < policy.MinInterval {
+		r.cfg.Metrics.ParticipantSignal(r.roomID, "rate_limited")
+		return
+	}
+	r.participantSignalAt[client.UserID] = now
+	r.cfg.Metrics.ParticipantSignal(r.roomID, "accepted")
+	r.broadcast(&pb.RoomEnvelope{
+		RoomId:         r.roomID,
+		HostEpoch:      r.hostEpoch,
+		SenderClientId: client.ID,
+		Payload: &pb.RoomEnvelope_ParticipantSignal{ParticipantSignal: &pb.ParticipantSignal{
+			Kind:       signal.Kind,
+			ParamsJson: append([]byte(nil), signal.ParamsJson...),
+		}},
+	})
 }
 
 // checkDefinitions blocks a client from the host lease while it lacks a

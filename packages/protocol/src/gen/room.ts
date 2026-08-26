@@ -348,6 +348,7 @@ export interface RoomEnvelope {
   renewItemEdit?: RenewItemEdit | undefined;
   endItemEdit?: EndItemEdit | undefined;
   itemEditPreview?: ItemEditPreview | undefined;
+  participantSignal?: ParticipantSignal | undefined;
 }
 
 export interface Vec2 {
@@ -513,6 +514,15 @@ export interface EffectEvent {
   paramsJson: Uint8Array;
 }
 
+/**
+ * A small, non-durable consumer signal. The room server allowlists kinds,
+ * applies its rate and payload policy, and stamps sender_client_id on relay.
+ */
+export interface ParticipantSignal {
+  kind: string;
+  paramsJson: Uint8Array;
+}
+
 export interface ItemMutation {
   clientSessionId: string;
   mutationId: number;
@@ -629,6 +639,7 @@ function createBaseRoomEnvelope(): RoomEnvelope {
     renewItemEdit: undefined,
     endItemEdit: undefined,
     itemEditPreview: undefined,
+    participantSignal: undefined,
   };
 }
 
@@ -702,6 +713,9 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     }
     if (message.itemEditPreview !== undefined) {
       ItemEditPreview.encode(message.itemEditPreview, writer.uint32(234).fork()).join();
+    }
+    if (message.participantSignal !== undefined) {
+      ParticipantSignal.encode(message.participantSignal, writer.uint32(242).fork()).join();
     }
     return writer;
   },
@@ -903,6 +917,14 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
             message.itemEditPreview = ItemEditPreview.decode(reader, reader.uint32());
             continue;
           }
+          case 30: {
+            if (tag !== 242) {
+              break;
+            }
+
+            message.participantSignal = ParticipantSignal.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1004,6 +1026,11 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
         : isSet(object.item_edit_preview)
         ? ItemEditPreview.fromJSON(object.item_edit_preview)
         : undefined,
+      participantSignal: isSet(object.participantSignal)
+        ? ParticipantSignal.fromJSON(object.participantSignal)
+        : isSet(object.participant_signal)
+        ? ParticipantSignal.fromJSON(object.participant_signal)
+        : undefined,
     };
   },
 
@@ -1078,6 +1105,9 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     if (message.itemEditPreview !== undefined) {
       obj.itemEditPreview = ItemEditPreview.toJSON(message.itemEditPreview);
     }
+    if (message.participantSignal !== undefined) {
+      obj.participantSignal = ParticipantSignal.toJSON(message.participantSignal);
+    }
     return obj;
   },
 
@@ -1143,6 +1173,9 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
       : undefined;
     message.itemEditPreview = (object.itemEditPreview !== undefined && object.itemEditPreview !== null)
       ? ItemEditPreview.fromPartial(object.itemEditPreview)
+      : undefined;
+    message.participantSignal = (object.participantSignal !== undefined && object.participantSignal !== null)
+      ? ParticipantSignal.fromPartial(object.participantSignal)
       : undefined;
     return message;
   },
@@ -3547,6 +3580,95 @@ export const EffectEvent: MessageFns<EffectEvent> = {
     message.entityId = object.entityId ?? "";
     message.effect = object.effect ?? "";
     message.mode = object.mode ?? "";
+    message.paramsJson = object.paramsJson ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseParticipantSignal(): ParticipantSignal {
+  return { kind: "", paramsJson: new Uint8Array(0) };
+}
+
+export const ParticipantSignal: MessageFns<ParticipantSignal> = {
+  encode(message: ParticipantSignal, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.kind !== "") {
+      writer.uint32(10).string(message.kind);
+    }
+    if (message.paramsJson.length !== 0) {
+      writer.uint32(18).bytes(message.paramsJson);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ParticipantSignal {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseParticipantSignal();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.kind = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.paramsJson = reader.bytes();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ParticipantSignal {
+    return {
+      kind: isSet(object.kind) ? globalThis.String(object.kind) : "",
+      paramsJson: isSet(object.paramsJson)
+        ? bytesFromBase64(object.paramsJson)
+        : isSet(object.params_json)
+        ? bytesFromBase64(object.params_json)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ParticipantSignal): unknown {
+    const obj: any = {};
+    if (message.kind !== "") {
+      obj.kind = message.kind;
+    }
+    if (message.paramsJson.length !== 0) {
+      obj.paramsJson = base64FromBytes(message.paramsJson);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ParticipantSignal>, I>>(base?: I): ParticipantSignal {
+    return ParticipantSignal.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ParticipantSignal>, I>>(object: I): ParticipantSignal {
+    const message = createBaseParticipantSignal();
+    message.kind = object.kind ?? "";
     message.paramsJson = object.paramsJson ?? new Uint8Array(0);
     return message;
   },

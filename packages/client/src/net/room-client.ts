@@ -12,6 +12,7 @@ import {
   type ItemMutation,
   type ItemMutationResult,
   type Peer,
+  type ParticipantSignal,
   type PlayerInput,
   type RenewItemEdit,
   type RoomEnvelope,
@@ -70,6 +71,7 @@ export interface RoomClientEvents {
   fullState(state: FullState, epoch: number, tick: number): void;
   stateDelta(delta: StateDelta, epoch: number, tick: number): void;
   effect(event: EffectEvent, tick: number): void;
+  participantSignal(signal: ParticipantSignal, fromClientId: string): void;
   playerInput(input: PlayerInput, fromClientId: string): void;
   itemEditPreview(preview: ItemEditPreview, fromClientId: string): void;
   itemEditSessionResult(result: ItemEditSessionResult, itemJson?: unknown): void;
@@ -324,6 +326,16 @@ export class RoomClient {
     );
   }
 
+  sendParticipantSignal(signal: ParticipantSignal): void {
+    this.transport.sendReliable(
+      newEnvelope(this.joinDescriptor.roomId, {
+        hostEpoch: this.leaseValue.epoch,
+        sequence: ++this.sequence,
+        participantSignal: signal,
+      }),
+    );
+  }
+
   beginItemEdit(request: BeginItemEdit): void {
     this.transport.sendReliable(
       newEnvelope(this.joinDescriptor.roomId, {
@@ -482,6 +494,14 @@ export class RoomClient {
     }
     if (message.effectEvent) {
       this.emit("effect", message.effectEvent, message.tick);
+      return;
+    }
+    if (message.participantSignal) {
+      this.emit(
+        "participantSignal",
+        message.participantSignal,
+        message.senderClientId,
+      );
       return;
     }
     if (message.playerInput) {
