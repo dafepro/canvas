@@ -82,11 +82,10 @@ definition.
 The suite verifies semantic JSON equality for catalog records, zero records plus
 `roomsdk.ErrNotFound` for misses, snapshot round trips, room isolation, rejection
 of stale checkpoint revisions, and highest-revision wins under concurrent saves.
-When the returned adapter also implements `VersionedCatalogStore`, the fixture
-must also seed `PreviousCanvas` and `PreviousItemDefinition` with the same IDs
-and older versions. The kit retrieves both generations, proving retention rather
-than only version checking, and verifies missing-version `ErrNotFound`
-semantics. The capability remains optional for legacy adapters.
+The fixture must also seed `PreviousCanvas` and `PreviousItemDefinition` with
+the same IDs and older versions. The kit retrieves both generations, proving
+retention rather than only version checking, and verifies missing-version
+`ErrNotFound` semantics. Exact lookup is part of the base `Store` contract.
 
 Production adapters should also supply `ReopenStore`, which constructs a fresh
 adapter over the same backing data. The suite then proves that the latest
@@ -100,8 +99,8 @@ func TestProductStore(t *testing.T) {
         ReopenStore: reopenTestDatabase,
         Canvas: canvasFixture,
         ItemDefinition: definitionFixture,
-        PreviousCanvas: &previousCanvasFixture,
-        PreviousItemDefinition: &previousDefinitionFixture,
+        PreviousCanvas: previousCanvasFixture,
+        PreviousItemDefinition: previousDefinitionFixture,
         MissingCanvasID: "missing-canvas",
         MissingItemDefinitionID: "missing-definition",
         MissingRoomID: "missing-room",

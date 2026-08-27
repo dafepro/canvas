@@ -24,9 +24,9 @@ type StoreConformanceFixture struct {
 	Canvas         roomsdk.CanvasRecord
 	ItemDefinition roomsdk.ItemDefinitionRecord
 	// PreviousCanvas and PreviousItemDefinition use the same IDs at older
-	// versions. They are required when NewStore implements VersionedCatalogStore.
-	PreviousCanvas         *roomsdk.CanvasRecord
-	PreviousItemDefinition *roomsdk.ItemDefinitionRecord
+	// versions. Exact-version retention is mandatory for every Store.
+	PreviousCanvas         roomsdk.CanvasRecord
+	PreviousItemDefinition roomsdk.ItemDefinitionRecord
 
 	MissingCanvasID         string
 	MissingItemDefinitionID string
@@ -43,7 +43,7 @@ func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 		store := fixture.NewStore(t)
 		ctx := t.Context()
 
-		canvas, err := store.LoadCanvas(ctx, fixture.Canvas.CanvasID)
+		canvas, err := store.LoadCanvas(ctx, fixture.Canvas.CanvasID, fixture.Canvas.Version)
 		if err != nil {
 			t.Fatalf("LoadCanvas returned error: %v", err)
 		}
@@ -51,7 +51,11 @@ func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 			t.Fatalf("canvas = %#v, want %#v", canvas, fixture.Canvas)
 		}
 
-		definition, err := store.LoadItemDefinition(ctx, fixture.ItemDefinition.DefinitionID)
+		definition, err := store.LoadItemDefinition(
+			ctx,
+			fixture.ItemDefinition.DefinitionID,
+			fixture.ItemDefinition.Version,
+		)
 		if err != nil {
 			t.Fatalf("LoadItemDefinition returned error: %v", err)
 		}
@@ -59,69 +63,43 @@ func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 			t.Fatalf("definition = %#v, want %#v", definition, fixture.ItemDefinition)
 		}
 
-		if versioned, ok := store.(roomsdk.VersionedCatalogStore); ok {
-			if fixture.PreviousCanvas == nil || fixture.PreviousItemDefinition == nil {
-				t.Fatal("versioned store fixtures must seed previous catalog versions")
-			}
-			exactCanvas, err := versioned.LoadCanvasVersion(
-				ctx,
-				fixture.Canvas.CanvasID,
-				fixture.Canvas.Version,
-			)
-			if err != nil || !equalCanvas(exactCanvas, fixture.Canvas) {
-				t.Fatalf("LoadCanvasVersion returned %#v, %v", exactCanvas, err)
-			}
-			exactDefinition, err := versioned.LoadItemDefinitionVersion(
-				ctx,
-				fixture.ItemDefinition.DefinitionID,
-				fixture.ItemDefinition.Version,
-			)
-			if err != nil || !equalDefinition(exactDefinition, fixture.ItemDefinition) {
-				t.Fatalf("LoadItemDefinitionVersion returned %#v, %v", exactDefinition, err)
-			}
-			previousCanvas, err := versioned.LoadCanvasVersion(
-				ctx,
-				fixture.PreviousCanvas.CanvasID,
-				fixture.PreviousCanvas.Version,
-			)
-			if err != nil || !equalCanvas(previousCanvas, *fixture.PreviousCanvas) {
-				t.Fatalf("LoadCanvasVersion did not retain previous version: %#v, %v", previousCanvas, err)
-			}
-			previousDefinition, err := versioned.LoadItemDefinitionVersion(
-				ctx,
-				fixture.PreviousItemDefinition.DefinitionID,
-				fixture.PreviousItemDefinition.Version,
-			)
-			if err != nil || !equalDefinition(previousDefinition, *fixture.PreviousItemDefinition) {
-				t.Fatalf("LoadItemDefinitionVersion did not retain previous version: %#v, %v", previousDefinition, err)
-			}
-			missingCanvas, err := versioned.LoadCanvasVersion(
-				ctx,
-				fixture.Canvas.CanvasID,
-				fixture.Canvas.Version+1,
-			)
-			assertNotFound(
-				t,
-				"LoadCanvasVersion",
-				reflect.DeepEqual(missingCanvas, roomsdk.CanvasRecord{}),
-				err,
-			)
-			missingDefinition, err := versioned.LoadItemDefinitionVersion(
-				ctx,
-				fixture.ItemDefinition.DefinitionID,
-				fixture.ItemDefinition.Version+1,
-			)
-			assertNotFound(
-				t,
-				"LoadItemDefinitionVersion",
-				reflect.DeepEqual(missingDefinition, roomsdk.ItemDefinitionRecord{}),
-				err,
-			)
+		previousCanvas, err := store.LoadCanvas(
+			ctx,
+			fixture.PreviousCanvas.CanvasID,
+			fixture.PreviousCanvas.Version,
+		)
+		if err != nil || !equalCanvas(previousCanvas, fixture.PreviousCanvas) {
+			t.Fatalf("LoadCanvas did not retain previous version: %#v, %v", previousCanvas, err)
 		}
+		previousDefinition, err := store.LoadItemDefinition(
+			ctx,
+			fixture.PreviousItemDefinition.DefinitionID,
+			fixture.PreviousItemDefinition.Version,
+		)
+		if err != nil || !equalDefinition(previousDefinition, fixture.PreviousItemDefinition) {
+			t.Fatalf("LoadItemDefinition did not retain previous version: %#v, %v", previousDefinition, err)
+		}
+		missingCanvasVersion, err := store.LoadCanvas(
+			ctx,
+			fixture.Canvas.CanvasID,
+			fixture.Canvas.Version+1,
+		)
+		assertNotFound(t, "LoadCanvas", reflect.DeepEqual(missingCanvasVersion, roomsdk.CanvasRecord{}), err)
+		missingDefinitionVersion, err := store.LoadItemDefinition(
+			ctx,
+			fixture.ItemDefinition.DefinitionID,
+			fixture.ItemDefinition.Version+1,
+		)
+		assertNotFound(
+			t,
+			"LoadItemDefinition",
+			reflect.DeepEqual(missingDefinitionVersion, roomsdk.ItemDefinitionRecord{}),
+			err,
+		)
 
-		missingCanvas, err := store.LoadCanvas(ctx, fixture.MissingCanvasID)
+		missingCanvas, err := store.LoadCanvas(ctx, fixture.MissingCanvasID, 1)
 		assertNotFound(t, "LoadCanvas", reflect.DeepEqual(missingCanvas, roomsdk.CanvasRecord{}), err)
-		missingDefinition, err := store.LoadItemDefinition(ctx, fixture.MissingItemDefinitionID)
+		missingDefinition, err := store.LoadItemDefinition(ctx, fixture.MissingItemDefinitionID, 1)
 		assertNotFound(
 			t,
 			"LoadItemDefinition",
@@ -212,6 +190,16 @@ func validateStoreFixture(t *testing.T, fixture StoreConformanceFixture) {
 	}
 	if fixture.ItemDefinition.DefinitionID == "" || fixture.ItemDefinition.Version == 0 {
 		t.Fatal("roomsdktest: a versioned ItemDefinition fixture is required")
+	}
+	if fixture.PreviousCanvas.CanvasID != fixture.Canvas.CanvasID ||
+		fixture.PreviousCanvas.Version == 0 ||
+		fixture.PreviousCanvas.Version == fixture.Canvas.Version {
+		t.Fatal("roomsdktest: a previous Canvas version with the current Canvas ID is required")
+	}
+	if fixture.PreviousItemDefinition.DefinitionID != fixture.ItemDefinition.DefinitionID ||
+		fixture.PreviousItemDefinition.Version == 0 ||
+		fixture.PreviousItemDefinition.Version == fixture.ItemDefinition.Version {
+		t.Fatal("roomsdktest: a previous ItemDefinition version with the current definition ID is required")
 	}
 	if fixture.MissingCanvasID == "" || fixture.MissingItemDefinitionID == "" ||
 		fixture.MissingRoomID == "" {

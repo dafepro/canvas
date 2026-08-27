@@ -1,7 +1,7 @@
 # Layer compatibility audit
 
 Audit date: 2026-08-27  
-Release baseline: 0.3.0
+Release baseline: 0.4.0
 Wire baseline: protocol v8 / snapshot schema 1
 
 ## Goal and method
@@ -58,10 +58,12 @@ behavior.
 | COMPAT-015 | Corrupt persisted state bypassed live checkpoint validation after room wake; reconciled system items had revision zero. | Apply wake integrity validation and materialize revision-one system items. | Closed |
 | COMPAT-016 | Generated bindings could agree with a silently repurposed v8 proto declaration. | Freeze additive-friendly v8 wire signatures in the release gate. | Closed |
 | COMPAT-017 | Authored configuration schemas advertised numeric and collection constraints that the server did not enforce. | Strictly validate the schema subset and every advertised constraint before accepting item configuration. | Closed |
-| COMPAT-018 | A latest-by-ID catalog could not serve two immutable canvas or definition versions during a rolling deployment. | Add optional exact-version store capability while retaining the legacy adapter contract. | Closed |
+| COMPAT-018 | A latest-by-ID catalog could not serve two immutable canvas or definition versions during a rolling deployment. | Make exact `(ID, version)` lookup mandatory and remove the ambiguous legacy adapter path. | Closed in 0.4.0 |
 | COMPAT-019 | Throwing consumer observers could corrupt dispatch and unrelated observers, and subscriptions lacked grouped ownership. | Centralize failure-isolated observers, add `AbortSignal` ownership, and expose typed callback failures. | Closed |
-| COMPAT-020 | Consumers had to compose connection, initialization, canonical state, and render gates to know when a room was revealable. | Add compatible semantic `start({ until })` boundaries and retain no-argument timing. | Closed |
+| COMPAT-020 | Consumers had to compose connection, initialization, canonical state, and render gates to know when a room was revealable. | Make presentation readiness the browser façade default while retaining explicit boundaries and connection-oriented `RoomSession`. | Closed in 0.4.0 |
 | COMPAT-021 | Invalid local timer rates and late/mutable definitions could allocate resources or diverge after validation. | Validate before allocation and snapshot the accepted definition bundle. | Closed |
+| COMPAT-022 | Callback-identity dedup coupled separate subscription owners and made one teardown silently remove another owner's registration. | Give every subscription call independent notification and teardown ownership. | Closed in 0.4.0 |
+| COMPAT-023 | Missing definition IDs and missing exact versions required an extra latest-record lookup and exposed two message strings for one actionable failure. | Collapse both cases to `unknown_definition_version` while preserving the protobuf definition reject category. | Closed in 0.4.0 |
 
 ## Compatibility-sensitive behavior
 
@@ -69,10 +71,12 @@ Most changes above preserve documented client behavior. They do intentionally
 reject values that never met the now-explicit contract: non-finite/out-of-range
 physics values, ambiguous duplicate definition IDs, unsupported snapshot
 schemas, unsafe integer overflow, malformed embedded JSON, and corrupt durable
-state. Release 0.3.0 also moves malformed local definition/rate failures to
+state. Release 0.3.0 also moved malformed local definition/rate failures to
 construction and snapshots definition input; `docs/MAJOR_VERSION_NOTES.md`
-records the client impact and migration. No additional backward-incompatible
-change is currently scheduled for the next major.
+records the client impact and migration. Release 0.4.0 deliberately removes
+the legacy store capability split, changes the browser start default, makes
+duplicate subscriptions independent, and unifies missing-definition-version
+rejections. Their migrations are recorded in the same ledger.
 
 ## Residual risks and required discipline
 

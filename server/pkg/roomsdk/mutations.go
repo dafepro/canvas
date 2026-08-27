@@ -1,12 +1,10 @@
 package roomsdk
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"time"
 
 	pb "github.com/dafepro/canvas/server/gen/canvasphysicsv1"
 )
@@ -50,19 +48,10 @@ func (r *Room) validateItemMutation(
 		}
 		definition, err := r.itemDefinition(mutation.DefinitionId, mutation.DefinitionVersion)
 		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				if _, latestErr := r.cfg.Store.LoadItemDefinition(
-					ctx, mutation.DefinitionId,
-				); latestErr == nil {
-					return false, nil, "definition_version_mismatch"
-				}
-			}
-			return false, nil, "unknown_definition"
+			return false, nil, "unknown_definition_version"
 		}
 		if mutation.DefinitionVersion != definition.Version {
-			return false, nil, "definition_version_mismatch"
+			return false, nil, "unknown_definition_version"
 		}
 		if err := validateConfigJSON(definition.ConfigSchema, mutation.ConfigJson); err != nil {
 			return false, nil, "config_schema_mismatch"
@@ -130,7 +119,7 @@ func (r *Room) validateItemMutation(
 		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_CONFIG && len(mutation.ConfigJson) > 0 {
 			definition, err := r.itemDefinition(item.DefinitionID, item.DefinitionVersion)
 			if err != nil {
-				return false, item, "unknown_definition"
+				return false, item, "unknown_definition_version"
 			}
 			if err := validateConfigJSON(definition.ConfigSchema, mutation.ConfigJson); err != nil {
 				return false, item, "config_schema_mismatch"

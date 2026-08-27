@@ -134,7 +134,7 @@ export interface RuntimeDiagnostics extends SessionDiagnostics {
 export type CanvasRuntimeStartBoundary = RoomSessionStartBoundary;
 
 export interface CanvasRuntimeStartOptions {
-  /** Defaults to `connected` for compatibility with the original start contract. */
+  /** Defaults to `presented`, the safe boundary for revealing a canvas. */
   readonly until?: CanvasRuntimeStartBoundary;
 }
 
@@ -334,7 +334,7 @@ export class CanvasRuntime {
   }
 
   start(options: CanvasRuntimeStartOptions = {}): Promise<void> {
-    const boundary = options.until ?? "connected";
+    const boundary = options.until ?? "presented";
     if (
       boundary !== "connected" &&
       boundary !== "initialized" &&
@@ -361,7 +361,7 @@ export class CanvasRuntime {
     if (this.session.lifecycleState === "failed" ||
         this.session.lifecycleState === "stopping" ||
         this.session.lifecycleState === "stopped") {
-      return this.session.start();
+      return this.session.start({ until: "connected" });
     }
     if (this.startPromise) return this.startPromise;
     this.running = true;
@@ -384,7 +384,7 @@ export class CanvasRuntime {
           );
         }
         this.startup.completeAssets();
-        await this.session.start();
+        await this.session.start({ until: "connected" });
       } catch (cause) {
         this.running = false;
         if (cause instanceof CanvasConsumerError) throw cause;

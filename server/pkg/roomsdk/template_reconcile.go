@@ -47,7 +47,7 @@ func (s *Server) ReconcileRoomTemplate(
 	if _, awake := s.rooms[roomID]; awake {
 		return TemplateReconcileResult{}, ErrRoomAwake
 	}
-	record, err := loadCanvasCatalogVersion(ctx, s.cfg.Store, target.CanvasID, target.CanvasVersion)
+	record, err := s.cfg.Store.LoadCanvas(ctx, target.CanvasID, target.CanvasVersion)
 	if err != nil {
 		return TemplateReconcileResult{}, err
 	}

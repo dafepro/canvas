@@ -203,7 +203,7 @@ describe("asset manifest", () => {
     const phases: string[] = [];
     runtime.subscribeStartup((snapshot) => phases.push(snapshot.phase));
 
-    const started = runtime.start();
+    const started = runtime.start({ until: "connected" });
     await Promise.resolve();
     expect(connect).not.toHaveBeenCalled();
     expect(runtime.startupSnapshot).toMatchObject({
@@ -253,7 +253,7 @@ describe("asset manifest", () => {
     const presentation = new Promise<void>((resolve) => { reveal = resolve; });
     vi.spyOn(runtime, "whenStartupReady").mockReturnValue(presentation);
     let settled = false;
-    const started = runtime.start({ until: "presented" }).then(() => { settled = true; });
+    const started = runtime.start().then(() => { settled = true; });
     await Promise.resolve();
     await Promise.resolve();
     expect(connect).toHaveBeenCalledOnce();

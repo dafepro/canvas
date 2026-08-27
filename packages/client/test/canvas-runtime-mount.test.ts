@@ -79,7 +79,7 @@ describe("CanvasRuntime mount ownership", () => {
     });
     definitions.length = 0;
 
-    await runtime.start();
+    await runtime.start({ until: "connected" });
     const ready = runtime.whenReady();
     transport.deliver({
       roomId: "mount-race",

@@ -222,7 +222,7 @@ func TestJoinDefinitionSetRejectsAmbiguousEntries(t *testing.T) {
 
 func TestRoomWakeRejectsCorruptPersistedSnapshots(t *testing.T) {
 	h := newHarness(t, nil)
-	canvas, err := h.store.LoadCanvas(context.Background(), "test-canvas")
+	canvas, err := h.store.LoadCanvas(context.Background(), "test-canvas", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

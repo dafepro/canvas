@@ -2,20 +2,23 @@ import { describe, expect, it, vi } from "vitest";
 import { ObserverSet } from "../src/runtime/observers.js";
 
 describe("ObserverSet", () => {
-  it("preserves duplicate-listener deduplication while keeping teardown idempotent", () => {
+  it("owns duplicate listener registrations independently", () => {
     const observers = new ObserverSet<number>();
     const observer = vi.fn();
     const first = observers.subscribe(observer);
     const second = observers.subscribe(observer);
 
     observers.publish(1);
-    expect(observer).toHaveBeenCalledOnce();
-    expect(second).toBe(first);
+    expect(observer).toHaveBeenCalledTimes(2);
+    expect(second).not.toBe(first);
 
     second();
-    first();
     observers.publish(2);
-    expect(observer).toHaveBeenCalledOnce();
+    expect(observer).toHaveBeenCalledTimes(3);
+
+    first();
+    observers.publish(3);
+    expect(observer).toHaveBeenCalledTimes(3);
   });
 
   it("does not retain or replay a pre-aborted subscription", () => {

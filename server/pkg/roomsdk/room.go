@@ -243,7 +243,7 @@ func (r *Room) itemDefinition(
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	definition, err := loadItemDefinitionCatalogVersion(ctx, r.cfg.Store, definitionID, version)
+	definition, err := r.cfg.Store.LoadItemDefinition(ctx, definitionID, version)
 	if err != nil {
 		return ItemDefinitionRecord{}, err
 	}

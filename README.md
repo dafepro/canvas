@@ -205,7 +205,7 @@ export const enterCanvasRoute = async () => {
   runtime.subscribeStartup((snapshot) => {
     renderProductLoadingState(snapshot);
   }, { signal: subscriptions.signal });
-  await runtime.start({ until: "presented" });
+  await runtime.start();
   return {
     runtime,
     leave: async () => {
@@ -216,7 +216,7 @@ export const enterCanvasRoute = async () => {
 };
 ```
 
-`start({ until: "presented" })` is the browser reveal gate: it waits for
+`start()` is the browser reveal gate: it waits for
 required assets, room access, JOIN, simulation, complete canonical state, and
 the first renderer update. `subscribeStartup()` reports each of those waits as
 a frozen semantic snapshot, including per-source asset settlement and typed terminal failure.

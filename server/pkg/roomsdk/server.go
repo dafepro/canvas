@@ -91,8 +91,8 @@ func (s *Server) handleGetRoom(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "room not found", http.StatusNotFound)
 		return
 	}
-	record, err := loadCanvasCatalogVersion(
-		r.Context(), s.cfg.Store, template.CanvasID, template.CanvasVersion,
+	record, err := s.cfg.Store.LoadCanvas(
+		r.Context(), template.CanvasID, template.CanvasVersion,
 	)
 	if err != nil {
 		http.Error(w, "room not found", http.StatusNotFound)
@@ -151,9 +151,7 @@ func (s *Server) roomFor(ctx context.Context, roomID string) (*Room, error) {
 		return room, nil
 	}
 
-	record, err := loadCanvasCatalogVersion(
-		ctx, s.cfg.Store, template.CanvasID, template.CanvasVersion,
-	)
+	record, err := s.cfg.Store.LoadCanvas(ctx, template.CanvasID, template.CanvasVersion)
 	if err != nil {
 		return nil, err
 	}

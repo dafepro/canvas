@@ -1,13 +1,47 @@
-# Major-version backward-incompatibility notes
+# Backward-incompatibility notes
 
 This is the cumulative migration ledger for incompatible changes. Entries stay
-under **Next major** until that release ships; release sections remain as the
+under **Next release** until that release ships; release sections remain as the
 historical migration record. Each entry must name the affected contract, client
 impact, and required migration.
 
-## Next major (unreleased)
+## Next release (unreleased)
 
 No backward-incompatible changes are currently scheduled.
+
+## 0.4.0
+
+- **Exact-version Store contract:** `roomsdk.Store.LoadCanvas` and
+  `LoadItemDefinition` now require a `version uint32`; the ID-only methods,
+  `VersionedCatalogStore`, and `Load*Version` names were removed. Every adapter
+  must retain all catalog generations needed by durable rooms. Client impact:
+  existing Go store adapters no longer compile, and conformance fixtures must
+  always seed both current and previous generations. Migration: add the version
+  parameter to both methods, key records by `(ID, version)`, return
+  `roomsdk.ErrNotFound` for an absent pair, and provide non-pointer
+  `PreviousCanvas` and `PreviousItemDefinition` fixtures.
+- **Definition rejection reason:** spawn and configuration mutations that name
+  an unavailable `(definitionId, version)` now report
+  `unknown_definition_version`; `unknown_definition` and
+  `definition_version_mismatch` are no longer emitted. The protobuf reject code
+  remains `ITEM_MUTATION_REJECT_DEFINITION`. Client impact: UI or telemetry
+  branching on the result message must recognize the combined reason.
+  Migration: branch on the stable reject enum when possible, or replace both
+  legacy strings with `unknown_definition_version`.
+- **CanvasRuntime startup default:** `CanvasRuntime.start()` now waits for the
+  complete presentation boundary, including required assets, authoritative
+  canonical state, scene mount, and first renderer update. Client impact: code
+  that awaited no-argument `start()` merely to inject test traffic or perform
+  work while JOIN was pending may now wait longer. Migration: ordinary browser
+  routes should keep `await runtime.start()`; low-level consumers can request
+  `start({ until: "connected" })`. `RoomSession.start()` remains
+  connection-oriented and unchanged.
+- **Independent subscription registrations:** subscribing the same callback
+  more than once now creates multiple registrations and notifications. Each
+  returned unsubscribe function or `AbortSignal` owns only its registration.
+  Client impact: code that relied on callback-identity deduplication receives
+  one notification per subscription. Migration: subscribe once when one
+  notification is intended, and retain or abort each registration separately.
 
 ## 0.3.0
 

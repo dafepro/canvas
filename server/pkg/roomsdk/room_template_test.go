@@ -150,7 +150,7 @@ type mismatchedCanvasVersionStore struct {
 	*MemoryStore
 }
 
-func (s mismatchedCanvasVersionStore) LoadCanvasVersion(
+func (s mismatchedCanvasVersionStore) LoadCanvas(
 	context.Context,
 	string,
 	uint32,

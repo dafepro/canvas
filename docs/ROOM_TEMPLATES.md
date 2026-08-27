@@ -23,13 +23,10 @@ Resolution follows these rules:
   awake or persisted room binding fails with `ErrRoomTemplateConflict`;
 - room wake performs no template migration or version upgrade.
 
-Hosts that retain more than one immutable version during a rollout should
-implement the optional `VersionedCatalogStore` capability in addition to
-`Store`. The rooms SDK then loads the exact `(canvasId, version)` and
-`(definitionId, version)` selected by each room or durable item. Existing
-`Store` implementations remain supported through their ID-only lookup, but
-they can expose only whichever version their adapter chooses for that ID and
-therefore cannot safely overlap old and new room bindings.
+Every `Store` must retain immutable catalog generations and load the exact
+`(canvasId, version)` or `(definitionId, version)` selected by a room or durable
+item. An ID-only “latest” lookup cannot satisfy the contract because an awake
+room and a sleeping room may legitimately be pinned to different generations.
 
 For example, a Zoomigo host can implement `RoomTemplateResolver` by looking up
 the authenticated team's lounge configuration and returning

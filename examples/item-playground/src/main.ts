@@ -433,7 +433,7 @@ const join = async (): Promise<void> => {
       maxHz: 60,
       kinds: ["item"],
     });
-    await nextRuntime.start({ until: "presented" });
+    await nextRuntime.start();
     nextRuntime.setEditMode(true);
     leaveButton.disabled = false;
     spawnToggle.disabled = false;

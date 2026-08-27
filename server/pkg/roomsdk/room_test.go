@@ -895,7 +895,7 @@ func TestSpawnRequiresAKnownDefinitionVersion(t *testing.T) {
 		r := e.GetItemMutationResult()
 		return r != nil && r.MutationId == mutationID("cmd-unknown")
 	}).GetItemMutationResult()
-	if unknownResult.Accepted || unknownResult.Message != "unknown_definition" {
+	if unknownResult.Accepted || unknownResult.Message != "unknown_definition_version" {
 		t.Errorf("unknown definition: accepted=%v reason=%q", unknownResult.Accepted, unknownResult.Message)
 	}
 
@@ -906,7 +906,7 @@ func TestSpawnRequiresAKnownDefinitionVersion(t *testing.T) {
 		r := e.GetItemMutationResult()
 		return r != nil && r.MutationId == mutationID("cmd-version")
 	}).GetItemMutationResult()
-	if versionResult.Accepted || versionResult.Message != "definition_version_mismatch" {
+	if versionResult.Accepted || versionResult.Message != "unknown_definition_version" {
 		t.Errorf("wrong version: accepted=%v reason=%q", versionResult.Accepted, versionResult.Message)
 	}
 }

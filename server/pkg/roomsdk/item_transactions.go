@@ -262,7 +262,7 @@ func rejectCodeForReason(reason string) pb.ItemMutationRejectCode {
 		return pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_OUTSIDE_CANVAS
 	case "scale_out_of_range":
 		return pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_SCALE_OUT_OF_RANGE
-	case "missing_definition_id", "unknown_definition", "definition_version_mismatch":
+	case "missing_definition_id", "unknown_definition_version":
 		return pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_DEFINITION
 	case "invalid_config_json", "config_schema_mismatch":
 		return pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_CONFIG

@@ -9,13 +9,14 @@ export type ObserverErrorHandler = (cause: unknown) => void;
 
 interface ObserverEntry<T> {
   readonly observer: Observer<T>;
-  readonly aborts: Map<AbortSignal, () => void>;
+  readonly signal?: AbortSignal;
+  readonly abort?: () => void;
   readonly unsubscribe: () => void;
 }
 
 /** Failure-isolated observer ownership shared by every public client stream. */
 export class ObserverSet<T> {
-  private readonly entries = new Map<Observer<T>, ObserverEntry<T>>();
+  private readonly entries = new Set<ObserverEntry<T>>();
 
   constructor(private readonly onError?: ObserverErrorHandler) {}
 
@@ -25,52 +26,40 @@ export class ObserverSet<T> {
     replay?: () => T,
   ): () => void {
     if (options.signal?.aborted) return () => {};
-    const existing = this.entries.get(observer);
-    if (existing) {
-      this.attachSignal(existing, options.signal);
-      if (replay) this.notify(observer, replay());
-      return existing.unsubscribe;
-    }
 
     let entry: ObserverEntry<T>;
     let active = true;
     const unsubscribe = (): void => {
       if (!active) return;
       active = false;
-      this.entries.delete(observer);
-      for (const [signal, abort] of entry.aborts) {
-        signal.removeEventListener("abort", abort);
+      this.entries.delete(entry);
+      if (entry.signal && entry.abort) {
+        entry.signal.removeEventListener("abort", entry.abort);
       }
-      entry.aborts.clear();
     };
     entry = {
       observer,
-      aborts: new Map(),
+      signal: options.signal,
+      abort: options.signal ? unsubscribe : undefined,
       unsubscribe,
     };
-    this.entries.set(observer, entry);
-    this.attachSignal(entry, options.signal);
+    this.entries.add(entry);
+    if (entry.signal && entry.abort) {
+      entry.signal.addEventListener("abort", entry.abort, { once: true });
+    }
     if (replay) this.notify(observer, replay());
     return unsubscribe;
   }
 
   publish(value: T): void {
-    for (const entry of [...this.entries.values()]) {
-      if (this.entries.get(entry.observer) === entry) this.notify(entry.observer, value);
+    for (const entry of [...this.entries]) {
+      if (this.entries.has(entry)) this.notify(entry.observer, value);
     }
   }
 
   clear(): void {
     for (const entry of [...this.entries.values()]) entry.unsubscribe();
   }
-
-  private attachSignal(entry: ObserverEntry<T>, signal?: AbortSignal): void {
-    if (!signal || entry.aborts.has(signal)) return;
-    const abort = entry.unsubscribe;
-    entry.aborts.set(signal, abort);
-    signal.addEventListener("abort", abort, { once: true });
-  }
-
   private notify(observer: Observer<T>, value: T): void {
     try {
       observer(value);

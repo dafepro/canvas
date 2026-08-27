@@ -108,7 +108,7 @@ const join = async (): Promise<void> => {
         )}`;
       });
       try {
-        await runtime.start({ until: "presented" });
+        await runtime.start();
       } catch (error) {
         unsubscribeStartup();
         runtime.stop();

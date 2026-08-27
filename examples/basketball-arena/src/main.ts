@@ -199,7 +199,7 @@ const join = async (): Promise<void> => {
         fullscreenButton.setAttribute("aria-pressed", String(active));
       }),
     ];
-    await next.start({ until: "presented" });
+    await next.start();
     leaveButton.disabled = false;
     fullscreenButton.disabled = false;
   } catch (error) {

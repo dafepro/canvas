@@ -21,23 +21,26 @@ listeners, and transports from being revived into partially initialized state.
 
 `subscribeLifecycle` immediately replays the current frozen snapshot, then
 publishes each transition. Concurrent `start()` calls return the same promise.
-`start()` resolves when the transport has opened and JOIN has been sent;
+`RoomSession.start()` resolves when the transport has opened and JOIN has been
+sent. `CanvasRuntime.start()` uses the safer presentation boundary by default;
 `whenReady()` resolves after JOIN and consumer initialization, including a
 `CanvasRuntime` scene mount. `whenPresented()` additionally waits for presence,
 a canonical frame, every durable snapshot item, and every connected avatar to
 be represented. Use that stronger gate before revealing a staged room. Starting
 a stopped or failed instance rejects.
 
-The compatible one-call form selects that boundary explicitly:
+The browser one-call form is therefore enough:
 
 ```ts
-await runtime.start({ until: "presented" });
+await runtime.start();
 ```
 
-`until: "initialized"` composes the original start with `whenReady()`, while
-`until: "presented"` composes it with the complete headless presentation gate
-and, for `CanvasRuntime`, the first actual renderer update. Omitting `until`
-retains the original connection-only timing for existing consumers.
+`until: "initialized"` waits through `whenReady()`, while `until: "presented"`
+waits for the complete headless presentation gate and, for `CanvasRuntime`, the
+first actual renderer update. `CanvasRuntime` defaults to `presented`;
+connection-level consumers can opt into `start({ until: "connected" })`.
+`RoomSession` remains a lower-level coordination primitive and defaults to
+`connected`.
 
 ## Startup and presentation progress
 
@@ -61,7 +64,7 @@ authoritative frame. `subscribeStartup` immediately replays a frozen
 
 `startupSnapshot` reads the newest value and `whenStartupReady()` waits on the
 same state machine. Applications should subscribe before `start()`, display
-their own wording, and use `start({ until: "presented" })` before revealing controls.
+their own wording, and await `start()` before revealing controls.
 They do not need to combine asset callbacks, lifecycle states, `whenReady()`,
 `whenPresented()`, or an invented timeout.
 `formatRuntimeStartupStatus()` supplies optional neutral English labels for all
@@ -110,6 +113,9 @@ await runtime.stopGracefully();
 ```
 
 Aborting before subscription produces no replay and no retained callback.
+Every call to `subscribe*` creates an independent registration, even when two
+registrations use the same function; each returned unsubscribe function or
+abort signal releases only its own registration.
 Observer callbacks are failure-isolated: one throwing observer cannot prevent
 later observers, room readiness, transport dispatch, or rendering. The runtime
 reports the failure as a recoverable `consumer_callback_failed`; error
