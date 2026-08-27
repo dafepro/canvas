@@ -56,6 +56,7 @@ export class WebSocketRoomTransport implements RoomTransport {
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private closedByCaller = false;
   private failed = false;
+  private hasOpened = false;
   private readonly backoffMs: number[];
   private readonly maxReconnects: number;
   private readonly maxPendingReliable: number;
@@ -76,11 +77,21 @@ export class WebSocketRoomTransport implements RoomTransport {
     return this.currentStatus;
   }
 
-  connect(join: JoinDescriptor): Promise<void> {
+  async connect(join: JoinDescriptor): Promise<void> {
     this.join = join;
     this.closedByCaller = false;
     this.failed = false;
-    return this.open();
+    this.hasOpened = false;
+    try {
+      await this.open();
+    } catch (error) {
+      // A rejected initial connect is terminal. Reconnect attempts are started
+      // only after a socket has opened successfully and manage their own retry.
+      if (!this.hasOpened && !this.closedByCaller && this.currentStatus !== "failed") {
+        this.failTransport(error instanceof Error ? error.message : String(error));
+      }
+      throw error;
+    }
   }
 
   private url(join: JoinDescriptor): string {
@@ -123,6 +134,7 @@ export class WebSocketRoomTransport implements RoomTransport {
 
       socket.onopen = () => {
         opened = true;
+        this.hasOpened = true;
         finishHandshake();
         this.reconnects = 0;
         this.setStatus("open");
@@ -276,6 +288,16 @@ export class WebSocketRoomTransport implements RoomTransport {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = undefined;
     this.socket?.close(4001, "reliable send queue exceeded");
+    this.socket = undefined;
+    this.setStatus("failed", detail);
+  }
+
+  private failTransport(detail: string): void {
+    this.failed = true;
+    this.pendingReliable.length = 0;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = undefined;
+    this.socket?.close(4000, "initial connection failed");
     this.socket = undefined;
     this.setStatus("failed", detail);
   }

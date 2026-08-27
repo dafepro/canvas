@@ -44,6 +44,7 @@ export const emptyTraffic = (): TransportTraffic => ({
  * transport needs no change to the runtime or the behaviors.
  */
 export interface RoomTransport {
+  /** Resolves only in `open`; rejection must leave the transport in `failed`. */
   connect(join: JoinDescriptor): Promise<void>;
   /**
    * Reliable ordered delivery: coordination and durable mutations. Messages

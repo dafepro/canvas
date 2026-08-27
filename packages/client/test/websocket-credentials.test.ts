@@ -53,6 +53,43 @@ afterEach(() => {
 });
 
 describe("WebSocketRoomTransport credentials", () => {
+  it("enters a terminal failed state when initial credential acquisition fails", async () => {
+    const failure = new Error("ticket service unavailable");
+    const observed: { status: string; detail?: string }[] = [];
+    const transport = new WebSocketRoomTransport({
+      credentialProvider: async () => { throw failure; },
+    });
+    transport.onStatus((status, detail) => observed.push({ status, detail }));
+
+    await expect(transport.connect({
+      roomId: "failed-credentials",
+      serverUrl: "https://rooms.example.test",
+    })).rejects.toThrow("ticket service unavailable");
+
+    expect(transport.status).toBe("failed");
+    expect(observed).toEqual([
+      { status: "credentials", detail: undefined },
+      { status: "failed", detail: "ticket service unavailable" },
+    ]);
+  });
+
+  it("enters a terminal failed state when the initial socket cannot be constructed", async () => {
+    vi.stubGlobal("WebSocket", class {
+      constructor() {
+        throw new Error("WebSocket is unavailable");
+      }
+    });
+    const transport = new WebSocketRoomTransport({
+      credentialProvider: async () => "ticket.constructor",
+    });
+
+    await expect(transport.connect({
+      roomId: "failed-constructor",
+      serverUrl: "https://rooms.example.test",
+    })).rejects.toThrow("WebSocket is unavailable");
+    expect(transport.status).toBe("failed");
+  });
+
   it("separates credential acquisition from the socket handshake", async () => {
     vi.stubGlobal("WebSocket", FakeWebSocket);
     let releaseCredential!: (value: string) => void;
