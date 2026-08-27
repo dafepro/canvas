@@ -154,6 +154,14 @@ with the newest pointer position. Delayed keyframes and checkpoints therefore
 cannot pull newer tangential edge movement backward. Prediction history is
 bounded and is reset on host-role changes.
 
+Realtime numeric input is a validated contract, including input supplied by a
+custom consumer adapter. Direction is finite and lies in the unit disk,
+intensity is finite in `[0, 1]`, and an optional absolute target has finite
+coordinates. The rooms service drops invalid peer input before host relay, and
+the simulation kernel independently converts invalid adapter input to a stopped
+avatar. Heartbeat health is finite and non-negative, capped at 1000 Hz and
+60,000 ms drift; invalid health never renews a host lease or enters election.
+
 `RuntimeDiagnostics.pointer` exposes the pointer phase, pointer ID, last local
 point, and capture status; `pointerWorldTarget` exposes the projected world
 target. Session diagnostics expose sent and acknowledged input sequences,

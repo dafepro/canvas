@@ -613,11 +613,23 @@ export class RapierWorld implements BehaviorHost {
       record.lastDirectInputTick = undefined;
       return;
     }
-    const nextInput = inputSequence > entity.avatar.lastProcessedInputSeq;
+    const directionLength = Math.hypot(direction.x, direction.y);
+    const validInput = Number.isFinite(direction.x) && Number.isFinite(direction.y) &&
+      Number.isFinite(intensity) && Number.isSafeInteger(inputSequence) &&
+      inputSequence >= 0 && inputSequence <= 0xffff_ffff;
+    const safeDirection = validInput && directionLength > 0
+      ? {
+          x: direction.x / Math.max(1, directionLength),
+          y: direction.y / Math.max(1, directionLength),
+        }
+      : { x: 0, y: 0 };
+    const safeIntensity = validInput ? Math.max(0, Math.min(1, intensity)) : 0;
+    const nextInput = validInput && inputSequence > entity.avatar.lastProcessedInputSeq;
     if (held) {
-      entity.avatar.desiredDirection = direction;
-      entity.avatar.desiredIntensity = Math.max(0, Math.min(1, intensity));
-      entity.avatar.desiredPosition = target && Number.isFinite(target.x) && Number.isFinite(target.y)
+      entity.avatar.desiredDirection = safeDirection;
+      entity.avatar.desiredIntensity = safeIntensity;
+      entity.avatar.desiredPosition = validInput && target &&
+        Number.isFinite(target.x) && Number.isFinite(target.y)
         ? {
             x: clampBodyCentre(
               target.x,
@@ -654,17 +666,17 @@ export class RapierWorld implements BehaviorHost {
       entity.avatar.desiredPosition = undefined;
       record.pendingDirectInteractionVelocity = undefined;
       record.lastDirectInputTick = undefined;
-      const length = Math.hypot(direction.x, direction.y);
-      if (nextInput && intensity > 0 && length > 0) {
-        const speed = Math.max(0, Math.min(1, intensity)) * entity.avatar.maxSpeed;
+      const length = Math.hypot(safeDirection.x, safeDirection.y);
+      if (nextInput && safeIntensity > 0 && length > 0) {
+        const speed = safeIntensity * entity.avatar.maxSpeed;
         record.body.setLinvel({
-          x: direction.x / length * speed,
-          y: direction.y / length * speed,
+          x: safeDirection.x / length * speed,
+          y: safeDirection.y / length * speed,
         }, true);
         entity.avatar.flicking = true;
       }
     }
-    if (inputSequence > entity.avatar.lastProcessedInputSeq) {
+    if (validInput && inputSequence > entity.avatar.lastProcessedInputSeq) {
       entity.avatar.lastProcessedInputSeq = inputSequence;
     }
   }

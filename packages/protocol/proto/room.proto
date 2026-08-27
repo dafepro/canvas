@@ -111,6 +111,8 @@ message HostControl {
 message Heartbeat {
   uint64 sent_at_unix_ms = 1;
   // Host health signals used for election (spec 11.2).
+  // Both values must be finite and non-negative. The rooms service accepts at
+  // most 1000 Hz and 60000 ms so malformed telemetry cannot poison election.
   float simulation_hz = 2;
   float worker_drift_ms = 3;
   bool page_visible = 4;
@@ -120,7 +122,9 @@ message Heartbeat {
 
 message PlayerInput {
   uint32 input_sequence = 1;
+  // Finite normalized intent in the unit disk. Missing means zero.
   Vec2 direction = 2;
+  // Finite inclusive range [0, 1].
   float intensity = 3;
   uint64 client_time_unix_ms = 4;
   // True while the pointer is held, so a lost packet leaves no stale input.
@@ -129,6 +133,7 @@ message PlayerInput {
   // The flag rides on every input, so a lost packet cannot leave a stale value.
   bool avatar_disabled = 6;
   // Absolute world target for collision-safe direct avatar dragging.
+  // When present, both coordinates must be finite.
   Vec2 target_position = 7;
 }
 

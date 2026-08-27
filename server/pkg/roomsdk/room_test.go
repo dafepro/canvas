@@ -271,6 +271,64 @@ func (c *testClient) heartbeat() {
 	})
 }
 
+func TestRealtimeNumericContractsRejectNonFiniteValues(t *testing.T) {
+	validInput := &pb.PlayerInput{
+		Direction:      &pb.Vec2{X: 0.5, Y: -0.5},
+		Intensity:      0.5,
+		TargetPosition: &pb.Vec2{X: 10, Y: 20},
+	}
+	if !validPlayerInput(validInput) {
+		t.Fatal("finite player input should be valid")
+	}
+
+	for name, input := range map[string]*pb.PlayerInput{
+		"direction NaN": {
+			Direction: &pb.Vec2{X: float32(math.NaN())}, Intensity: 1,
+		},
+		"direction infinity": {
+			Direction: &pb.Vec2{Y: float32(math.Inf(1))}, Intensity: 1,
+		},
+		"intensity NaN": {
+			Direction: &pb.Vec2{X: 1}, Intensity: float32(math.NaN()),
+		},
+		"intensity above one": {
+			Direction: &pb.Vec2{X: 1}, Intensity: 1.01,
+		},
+		"direction outside unit disk": {
+			Direction: &pb.Vec2{X: 1, Y: 1}, Intensity: 1,
+		},
+		"target infinity": {
+			Direction: &pb.Vec2{X: 1}, Intensity: 1,
+			TargetPosition: &pb.Vec2{X: float32(math.Inf(-1))},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if validPlayerInput(input) {
+				t.Fatal("malformed player input should be rejected")
+			}
+		})
+	}
+
+	if !validHeartbeat(&pb.Heartbeat{SimulationHz: 60, WorkerDriftMs: 2}) {
+		t.Fatal("finite heartbeat health should be valid")
+	}
+	for name, beat := range map[string]*pb.Heartbeat{
+		"simulation NaN":         {SimulationHz: float32(math.NaN())},
+		"simulation infinity":    {SimulationHz: float32(math.Inf(1))},
+		"negative simulation":    {SimulationHz: -1},
+		"implausible simulation": {SimulationHz: 1001},
+		"drift NaN":              {WorkerDriftMs: float32(math.NaN())},
+		"negative drift":         {WorkerDriftMs: -1},
+		"implausible drift":      {WorkerDriftMs: 60_001},
+	} {
+		t.Run("heartbeat "+name, func(t *testing.T) {
+			if validHeartbeat(beat) {
+				t.Fatal("malformed heartbeat should be rejected")
+			}
+		})
+	}
+}
+
 func TestJoinReturnsCanvasAndGrantsFirstHost(t *testing.T) {
 	h := newHarness(t, nil)
 	client := h.dial("alice")

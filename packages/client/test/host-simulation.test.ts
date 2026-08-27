@@ -213,6 +213,34 @@ describe("HostSimulation with real physics", () => {
     return transform;
   };
 
+  it("fails closed when an adapter supplies non-finite avatar input", () => {
+    const simulation = build();
+    simulation.addAvatar({
+      entityId: "avatar:a",
+      clientId: "a",
+      userId: "alice",
+      position: { x: 50, y: 55 },
+    });
+
+    simulation.world.setAvatarInput(
+      "avatar:a",
+      { x: Number.NaN, y: Number.POSITIVE_INFINITY },
+      Number.NaN,
+      1,
+      true,
+      { x: Number.NEGATIVE_INFINITY, y: 10 },
+    );
+    for (let i = 0; i < 5; i++) simulation.step();
+
+    const avatar = simulation.world.registry.require("avatar:a");
+    expect(avatar.avatar?.desiredDirection).toEqual({ x: 0, y: 0 });
+    expect(avatar.avatar?.desiredIntensity).toBe(0);
+    expect(avatar.avatar?.desiredPosition).toBeUndefined();
+    expect(Number.isFinite(avatar.transform.x)).toBe(true);
+    expect(Number.isFinite(avatar.transform.y)).toBe(true);
+    simulation.free();
+  });
+
   // Addendum A3. The left and the right edge return the body after a delay.
   it("returns an avatar to the spawn point after it leaves the left edge", () => {
     const transform = drivenAvatar({ x: -1, y: 0 });

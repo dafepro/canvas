@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -393,7 +394,9 @@ func (r *Room) handleMessage(msg inbound) {
 
 	case *pb.RoomEnvelope_PlayerInput:
 		// Input goes only to the simulation host.
-		r.relayToHost(client, envelope)
+		if validPlayerInput(payload.PlayerInput) {
+			r.relayToHost(client, envelope)
+		}
 
 	case *pb.RoomEnvelope_StateDelta, *pb.RoomEnvelope_FullState, *pb.RoomEnvelope_EffectEvent:
 		r.relayFromHost(client, envelope)
@@ -480,6 +483,9 @@ func (r *Room) checkAllDefinitions() {
 }
 
 func (r *Room) handleHeartbeat(client *Client, beat *pb.Heartbeat) {
+	if !validHeartbeat(beat) {
+		return
+	}
 	client.lastHeartbeat = r.cfg.Now()
 	client.simulationHz = beat.SimulationHz
 	client.workerDrift = beat.WorkerDriftMs
@@ -487,6 +493,40 @@ func (r *Room) handleHeartbeat(client *Client, beat *pb.Heartbeat) {
 	if client.ID == r.hostClientID {
 		r.hostLeaseUntil = r.cfg.Now().Add(r.cfg.HostLeaseTTL)
 	}
+}
+
+const (
+	maxReportedSimulationHz  = 1000
+	maxReportedWorkerDriftMs = 60_000
+)
+
+func finiteFloat32(value float32) bool {
+	converted := float64(value)
+	return !math.IsNaN(converted) && !math.IsInf(converted, 0)
+}
+
+func validVec2(value *pb.Vec2) bool {
+	return value == nil || finiteFloat32(value.X) && finiteFloat32(value.Y)
+}
+
+func validPlayerInput(input *pb.PlayerInput) bool {
+	if input == nil || !validVec2(input.Direction) || !validVec2(input.TargetPosition) ||
+		!finiteFloat32(input.Intensity) || input.Intensity < 0 || input.Intensity > 1 {
+		return false
+	}
+	if input.Direction == nil {
+		return true
+	}
+	// Direction is a normalized intent vector. Enforcing the unit disk prevents
+	// custom clients from multiplying the authored maximum avatar speed.
+	return math.Hypot(float64(input.Direction.X), float64(input.Direction.Y)) <= 1.000001
+}
+
+func validHeartbeat(beat *pb.Heartbeat) bool {
+	return beat != nil && finiteFloat32(beat.SimulationHz) &&
+		beat.SimulationHz >= 0 && beat.SimulationHz <= maxReportedSimulationHz &&
+		finiteFloat32(beat.WorkerDriftMs) && beat.WorkerDriftMs >= 0 &&
+		beat.WorkerDriftMs <= maxReportedWorkerDriftMs
 }
 
 // relayToHost forwards player input. The server never reads the physics content.
