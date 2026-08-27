@@ -422,8 +422,19 @@ export class RoomClient {
         isHost: accepted.hostClientId === accepted.clientId,
       });
       this.revisionValue = Object.freeze({ sceneRevision: accepted.sceneRevision });
-      const canvas = fromJsonBytes<CanvasDefinition>(accepted.canvasDefinitionJson);
-      const snapshot = fromJsonBytes<CanvasSnapshot>(accepted.snapshotJson);
+      let canvas: CanvasDefinition | undefined;
+      let snapshot: CanvasSnapshot | undefined;
+      try {
+        canvas = fromJsonBytes<CanvasDefinition>(accepted.canvasDefinitionJson);
+        snapshot = fromJsonBytes<CanvasSnapshot>(accepted.snapshotJson);
+      } catch (cause) {
+        this.emit(
+          "error",
+          "malformed_join",
+          cause instanceof Error ? cause.message : "the server sent malformed JOIN JSON",
+        );
+        return;
+      }
       if (!canvas) {
         this.emit("error", "bad_canvas", "the server sent no canvas definition");
         return;

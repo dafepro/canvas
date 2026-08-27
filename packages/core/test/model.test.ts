@@ -183,6 +183,25 @@ describe("validation", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("validates canvas limits without treating explicit zero as an omitted default", () => {
+    expect(validateCanvasDefinition({
+      ...canvas,
+      limits: { maxAvatars: 1, maxItems: 0, maxComplexPhysicsItems: 0 },
+    })).toEqual({ ok: true });
+
+    expect(validateCanvasDefinition({
+      ...canvas,
+      limits: { maxAvatars: 0, maxItems: 2.5, maxComplexPhysicsItems: 3 },
+    })).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([
+        expect.objectContaining({ path: "limits.maxAvatars" }),
+        expect.objectContaining({ path: "limits.maxItems" }),
+        expect.objectContaining({ path: "limits.maxComplexPhysicsItems" }),
+      ]),
+    });
+  });
+
   it("refuses NaN and grossly out-of-bounds transforms", () => {
     expect(validateTransform({ x: NaN, y: 0, rotation: 0 }, canvas).ok).toBe(false);
     expect(validateTransform({ x: 100000, y: 0, rotation: 0 }, canvas).ok).toBe(false);
@@ -203,6 +222,23 @@ describe("validation", () => {
       resolvedConfig: {},
     }));
     expect(validateSnapshot(snapshot, canvas).ok).toBe(false);
+  });
+
+  it("refuses snapshots from an unsupported schema or canvas version", () => {
+    expect(validateSnapshot({
+      ...emptySnapshot(canvas.id, canvas.version),
+      schemaVersion: 2,
+    }, canvas)).toMatchObject({
+      ok: false,
+      problems: [expect.objectContaining({ path: "schemaVersion" })],
+    });
+    expect(validateSnapshot({
+      ...emptySnapshot(canvas.id, canvas.version),
+      canvasVersion: canvas.version + 1,
+    }, canvas)).toMatchObject({
+      ok: false,
+      problems: [expect.objectContaining({ path: "canvasVersion" })],
+    });
   });
 
   it("requires every durable item to carry a positive item revision", () => {

@@ -2,6 +2,7 @@ import type { CanvasDefinition } from "../model/canvas-definition.js";
 import type { ItemDefinition } from "../model/item-definition.js";
 import type { Transform } from "../model/item-instance.js";
 import type { CanvasSnapshot } from "../model/snapshot.js";
+import { SCHEMA_VERSIONS } from "../model/versioning.js";
 
 export interface Problem {
   path: string;
@@ -20,12 +21,30 @@ export const validateCanvasDefinition = (
 ): ValidationResult => {
   const problems: Problem[] = [];
   if (!canvas.id) problems.push({ path: "id", message: "required" });
-  if (canvas.version < 1) problems.push({ path: "version", message: "must be >= 1" });
-  if (canvas.size.width <= 0 || canvas.size.height <= 0) {
-    problems.push({ path: "size", message: "width and height must be positive" });
+  if (!Number.isSafeInteger(canvas.version) || canvas.version < 1) {
+    problems.push({ path: "version", message: "must be a positive safe integer" });
   }
-  if (canvas.limits.maxItems < 0) {
-    problems.push({ path: "limits.maxItems", message: "must be >= 0" });
+  if (
+    !Number.isFinite(canvas.size.width) || canvas.size.width <= 0 ||
+    !Number.isFinite(canvas.size.height) || canvas.size.height <= 0
+  ) {
+    problems.push({ path: "size", message: "width and height must be positive finite numbers" });
+  }
+  if (!Number.isSafeInteger(canvas.limits.maxAvatars) || canvas.limits.maxAvatars < 1) {
+    problems.push({ path: "limits.maxAvatars", message: "must be a positive safe integer" });
+  }
+  if (!Number.isSafeInteger(canvas.limits.maxItems) || canvas.limits.maxItems < 0) {
+    problems.push({ path: "limits.maxItems", message: "must be a non-negative safe integer" });
+  }
+  if (
+    !Number.isSafeInteger(canvas.limits.maxComplexPhysicsItems) ||
+    canvas.limits.maxComplexPhysicsItems < 0 ||
+    canvas.limits.maxComplexPhysicsItems > canvas.limits.maxItems
+  ) {
+    problems.push({
+      path: "limits.maxComplexPhysicsItems",
+      message: "must be a non-negative safe integer no greater than maxItems",
+    });
   }
   for (const key of [
     "radius",
@@ -173,8 +192,17 @@ export const validateSnapshot = (
   canvas: CanvasDefinition,
 ): ValidationResult => {
   const problems: Problem[] = [];
+  if (snapshot.schemaVersion !== SCHEMA_VERSIONS.snapshot) {
+    problems.push({
+      path: "schemaVersion",
+      message: `unsupported snapshot schema ${snapshot.schemaVersion}`,
+    });
+  }
   if (snapshot.canvasId !== canvas.id) {
     problems.push({ path: "canvasId", message: "does not match the canvas" });
+  }
+  if (snapshot.canvasVersion !== canvas.version) {
+    problems.push({ path: "canvasVersion", message: "does not match the canvas" });
   }
   if (snapshot.items.length > canvas.limits.maxItems) {
     problems.push({

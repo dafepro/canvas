@@ -23,6 +23,7 @@ var (
 	errInvalidBehavior    = errors.New("canonical behavior state is not valid json")
 	errNormalizationFlag  = errors.New("checkpoint final flag does not match snapshot normalization")
 	errInvalidTimer       = errors.New("checkpoint contains invalid behavior timer state")
+	errSnapshotSchema     = errors.New("snapshot schema version is not supported")
 )
 
 const (
@@ -55,7 +56,6 @@ func (r *Room) validateItemMutation(
 			return false, nil, "config_schema_mismatch"
 		}
 		if definition.Complexity == ItemComplexityComplex &&
-			r.canvasShape.Limits.MaxComplexPhysicsItems > 0 &&
 			r.complexItemCount() >= r.canvasShape.Limits.MaxComplexPhysicsItems {
 			return false, nil, "complex_item_limit_reached"
 		}
@@ -102,9 +102,14 @@ func (r *Room) validateItemMutation(
 			(math.IsNaN(float64(mutation.Rotation)) || math.IsInf(float64(mutation.Rotation), 0)) {
 			return false, item, "non_finite_transform"
 		}
-		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_SCALE &&
-			(float64(mutation.Scale) < minItemScale || float64(mutation.Scale) > maxItemScale) {
-			return false, item, "scale_out_of_range"
+		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_SCALE {
+			scale := float64(mutation.Scale)
+			if math.IsNaN(scale) || math.IsInf(scale, 0) {
+				return false, item, "non_finite_transform"
+			}
+			if scale < minItemScale || scale > maxItemScale {
+				return false, item, "scale_out_of_range"
+			}
 		}
 		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_CONFIG &&
 			len(mutation.ConfigJson) > 0 && !json.Valid(mutation.ConfigJson) {

@@ -114,6 +114,9 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 			snapshot.CanvasVersion != room.snapshot.CanvasVersion {
 			return nil, ErrRoomTemplateConflict
 		}
+		if room.snapshot.SchemaVersion != 1 {
+			return nil, errSnapshotSchema
+		}
 		room.snapshotRaw = snapshot.SnapshotRaw
 		room.sceneRevision = snapshot.SceneRevision
 		room.checkpointNo = snapshot.CheckpointRevision
@@ -177,8 +180,7 @@ func (r *Room) bootstrapSystemItems() error {
 		}
 		if definition.Complexity == ItemComplexityComplex {
 			complexItems++
-			if r.canvasShape.Limits.MaxComplexPhysicsItems > 0 &&
-				complexItems > r.canvasShape.Limits.MaxComplexPhysicsItems {
+			if complexItems > r.canvasShape.Limits.MaxComplexPhysicsItems {
 				return fmt.Errorf("system complex item count exceeds canvas limit")
 			}
 		}
@@ -642,6 +644,9 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 	var incoming CanvasSnapshot
 	if err := json.Unmarshal(checkpoint.SnapshotJson, &incoming); err != nil {
 		return err
+	}
+	if incoming.SchemaVersion != 1 {
+		return errSnapshotSchema
 	}
 	if incoming.CanvasID != r.canvasID {
 		return errCanvasMismatch

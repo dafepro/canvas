@@ -171,8 +171,7 @@ func (r *Room) reconcileTemplate(
 			complexItems++
 		}
 	}
-	if r.canvasShape.Limits.MaxComplexPhysicsItems > 0 &&
-		complexItems > r.canvasShape.Limits.MaxComplexPhysicsItems {
+	if complexItems > r.canvasShape.Limits.MaxComplexPhysicsItems {
 		return result, fmt.Errorf("reconciled complex item count exceeds canvas limit")
 	}
 

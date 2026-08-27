@@ -2,6 +2,7 @@ package roomsdk
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"time"
 )
@@ -123,24 +124,36 @@ type canvasShape struct {
 		Width  float64 `json:"width"`
 		Height float64 `json:"height"`
 	} `json:"size"`
-	Limits struct {
-		MaxAvatars             int `json:"maxAvatars"`
-		MaxItems               int `json:"maxItems"`
-		MaxComplexPhysicsItems int `json:"maxComplexPhysicsItems"`
-	} `json:"limits"`
+	Limits      canvasLimits         `json:"limits"`
 	SystemItems []SystemItemTemplate `json:"systemItems"`
 }
 
+type canvasLimits struct {
+	MaxAvatars             int `json:"maxAvatars"`
+	MaxItems               int `json:"maxItems"`
+	MaxComplexPhysicsItems int `json:"maxComplexPhysicsItems"`
+}
+
 func parseCanvasShape(raw json.RawMessage) (canvasShape, error) {
-	var shape canvasShape
+	shape := canvasShape{Limits: canvasLimits{
+		MaxAvatars:             20,
+		MaxItems:               50,
+		MaxComplexPhysicsItems: 5,
+	}}
 	if err := json.Unmarshal(raw, &shape); err != nil {
 		return canvasShape{}, err
 	}
-	if shape.Limits.MaxItems == 0 {
-		shape.Limits.MaxItems = 50
+	if shape.Limits.MaxAvatars < 1 {
+		return canvasShape{}, errors.New("canvas maxAvatars must be positive")
 	}
-	if shape.Limits.MaxAvatars == 0 {
-		shape.Limits.MaxAvatars = 20
+	if shape.Limits.MaxItems < 0 {
+		return canvasShape{}, errors.New("canvas maxItems must be non-negative")
+	}
+	if shape.Limits.MaxComplexPhysicsItems < 0 ||
+		shape.Limits.MaxComplexPhysicsItems > shape.Limits.MaxItems {
+		return canvasShape{}, errors.New(
+			"canvas maxComplexPhysicsItems must be non-negative and no greater than maxItems",
+		)
 	}
 	return shape, nil
 }

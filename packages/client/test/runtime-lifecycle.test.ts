@@ -451,6 +451,38 @@ describe("RoomSession lifecycle", () => {
     session.stop();
   });
 
+  it("rejects malformed and unsupported join data through typed errors", async () => {
+    const malformedTransport = new LifecycleTransport();
+    const malformed = build(malformedTransport).session;
+    await malformed.start();
+    const malformedReady = malformed.whenReady();
+    const malformedJoin = accepted();
+    malformedJoin.joinAccepted!.canvasDefinitionJson = new TextEncoder().encode("{");
+
+    expect(() => malformedTransport.deliver(malformedJoin)).not.toThrow();
+    await expect(malformedReady).rejects.toMatchObject({
+      code: "server_rejected",
+      source: "protocol",
+      details: { serverCode: "malformed_join" },
+    });
+
+    const unsupportedTransport = new LifecycleTransport();
+    const unsupported = build(unsupportedTransport).session;
+    await unsupported.start();
+    const unsupportedReady = unsupported.whenReady();
+    const unsupportedJoin = accepted();
+    unsupportedJoin.joinAccepted!.snapshotJson = toJsonBytes({
+      ...emptySnapshot(rocketCanvas.id, rocketCanvas.version),
+      schemaVersion: 2,
+    });
+    unsupportedTransport.deliver(unsupportedJoin);
+
+    await expect(unsupportedReady).rejects.toMatchObject({
+      code: "join_initialization_failed",
+      source: "initialization",
+    });
+  });
+
   it("uses a requested arrival spawn and rejects an unknown one", async () => {
     const transport = new LifecycleTransport();
     const { session, send } = build(transport, { spawnPointId: "pad" });

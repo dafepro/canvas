@@ -1,4 +1,6 @@
 import {
+  validateCanvasDefinition,
+  validateSnapshot,
   type CanvasDefinition,
   type CanvasSnapshot,
   type EffectEmission,
@@ -87,6 +89,10 @@ export interface InputIntent {
 }
 
 const NO_INTENT: InputIntent = { direction: { x: 0, y: 0 }, intensity: 0, held: false };
+
+const formatProblems = (
+  problems: readonly { path: string; message: string }[],
+): string => problems.map(({ path, message }) => `${path} ${message}`).join("; ");
 
 const immutableValue = <T>(value: T): T => {
   if (Array.isArray(value)) {
@@ -277,7 +283,7 @@ export class RoomSession {
       },
     });
     this.connection = new ConnectionSession({
-      validateJoin: (canvas) => this.validateJoinCanvas(canvas),
+      validateJoin: (canvas, snapshot) => this.validateJoinPayload(canvas, snapshot),
       initializeConsumer: options.onJoined,
       installJoin: (join) => this.installAcceptedJoin(join),
       emit: (effect) => this.applyConnectionEffect(effect),
@@ -575,7 +581,15 @@ export class RoomSession {
     this.installJoin(join.canvas, join.snapshot, join.wasSleeping);
   }
 
-  private validateJoinCanvas(canvas: CanvasDefinition): void {
+  private validateJoinPayload(canvas: CanvasDefinition, snapshot: CanvasSnapshot): void {
+    const canvasValidation = validateCanvasDefinition(canvas);
+    if (!canvasValidation.ok) {
+      throw new Error(`invalid canvas definition: ${formatProblems(canvasValidation.problems)}`);
+    }
+    const snapshotValidation = validateSnapshot(snapshot, canvas);
+    if (!snapshotValidation.ok) {
+      throw new Error(`invalid canvas snapshot: ${formatProblems(snapshotValidation.problems)}`);
+    }
     if (
       this.options.spawnPointId &&
       !canvas.spawnPoints.some((candidate) => candidate.id === this.options.spawnPointId)

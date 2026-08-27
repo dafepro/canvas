@@ -29,7 +29,7 @@ export type ConnectionEffect =
 
 export interface ConnectionSessionOptions {
   readonly clock?: SessionClock;
-  readonly validateJoin?: (canvas: CanvasDefinition) => void;
+  readonly validateJoin?: (canvas: CanvasDefinition, snapshot: CanvasSnapshot) => void;
   readonly initializeConsumer?: (
     canvas: CanvasDefinition,
     snapshot: CanvasSnapshot,
@@ -272,7 +272,7 @@ export class ConnectionSession {
 
   private async initialize(firstJoin: ConnectionJoin): Promise<void> {
     try {
-      this.options.validateJoin?.(firstJoin.canvas);
+      this.options.validateJoin?.(firstJoin.canvas, firstJoin.snapshot);
       await this.options.initializeConsumer?.(
         firstJoin.canvas,
         firstJoin.snapshot,
@@ -303,7 +303,7 @@ export class ConnectionSession {
       join.generation !== this.generationValue
     ) return;
     try {
-      this.options.validateJoin?.(join.canvas);
+      this.options.validateJoin?.(join.canvas, join.snapshot);
       const initialized = this.initializedCanvas;
       if (
         initialized &&
