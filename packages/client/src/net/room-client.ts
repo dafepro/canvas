@@ -407,6 +407,24 @@ export class RoomClient {
 
     if (message.joinAccepted) {
       const accepted = message.joinAccepted;
+      const canvasResult = this.decodeJson<CanvasDefinition>(
+        accepted.canvasDefinitionJson,
+        "malformed_join",
+        "the server sent malformed canvas definition JSON",
+      );
+      if (!canvasResult.ok) return;
+      const snapshotResult = this.decodeJson<CanvasSnapshot>(
+        accepted.snapshotJson,
+        "malformed_join",
+        "the server sent malformed snapshot JSON",
+      );
+      if (!snapshotResult.ok) return;
+      const canvas = canvasResult.value;
+      const snapshot = snapshotResult.value;
+      if (!canvas) {
+        this.emit("error", "bad_canvas", "the server sent no canvas definition");
+        return;
+      }
       this.identityValue = Object.freeze({
         generation: this.identityValue.generation + 1,
         clientId: accepted.clientId,
@@ -422,23 +440,6 @@ export class RoomClient {
         isHost: accepted.hostClientId === accepted.clientId,
       });
       this.revisionValue = Object.freeze({ sceneRevision: accepted.sceneRevision });
-      let canvas: CanvasDefinition | undefined;
-      let snapshot: CanvasSnapshot | undefined;
-      try {
-        canvas = fromJsonBytes<CanvasDefinition>(accepted.canvasDefinitionJson);
-        snapshot = fromJsonBytes<CanvasSnapshot>(accepted.snapshotJson);
-      } catch (cause) {
-        this.emit(
-          "error",
-          "malformed_join",
-          cause instanceof Error ? cause.message : "the server sent malformed JOIN JSON",
-        );
-        return;
-      }
-      if (!canvas) {
-        this.emit("error", "bad_canvas", "the server sent no canvas definition");
-        return;
-      }
       this.emit("joined", {
         roomId: this.joinDescriptor.roomId,
         canvasId: canvas.id,
@@ -484,14 +485,22 @@ export class RoomClient {
     if (isState && message.hostEpoch !== this.leaseValue.epoch) return;
 
     if (message.fullState) {
+      if (!this.validateBehaviorStateJson(message.fullState.entities)) return;
       this.emit("fullState", message.fullState, message.hostEpoch, message.tick);
       return;
     }
     if (message.stateDelta) {
+      if (!this.validateBehaviorStateJson(message.stateDelta.entities)) return;
       this.emit("stateDelta", message.stateDelta, message.hostEpoch, message.tick);
       return;
     }
     if (message.effectEvent) {
+      const decoded = this.decodeJson(
+        message.effectEvent.paramsJson,
+        "malformed_effect",
+        "the server sent malformed effect parameter JSON",
+      );
+      if (!decoded.ok) return;
       this.emit("effect", message.effectEvent, message.tick);
       return;
     }
@@ -506,15 +515,27 @@ export class RoomClient {
     }
     if (message.itemEditSessionResult) {
       const result = message.itemEditSessionResult;
+      const decoded = this.decodeJson(
+        result.itemInstanceJson,
+        "malformed_item_edit_result",
+        "the server sent malformed item edit result JSON",
+      );
+      if (!decoded.ok) return;
       this.emit(
         "itemEditSessionResult",
         result,
-        fromJsonBytes(result.itemInstanceJson),
+        decoded.value,
       );
       return;
     }
     if (message.itemMutationResult) {
       const result = message.itemMutationResult;
+      const decoded = this.decodeJson(
+        result.itemInstanceJson,
+        "malformed_item_mutation_result",
+        "the server sent malformed item mutation result JSON",
+      );
+      if (!decoded.ok) return;
       if (result.accepted) {
         this.revisionValue = Object.freeze({
           sceneRevision: Math.max(this.revisionValue.sceneRevision, result.sceneRevision),
@@ -523,13 +544,23 @@ export class RoomClient {
       this.emit(
         "itemMutationResult",
         result,
-        fromJsonBytes(result.itemInstanceJson),
+        decoded.value,
       );
     }
   }
 
   private handleHostControl(message: RoomEnvelope): void {
     const control = message.hostControl!;
+    let snapshot: CanvasSnapshot | undefined;
+    if (control.kind === HostControlKind.HOST_CONTROL_GRANTED) {
+      const decoded = this.decodeJson<CanvasSnapshot>(
+        control.snapshotJson,
+        "malformed_host_snapshot",
+        "the server sent malformed host snapshot JSON",
+      );
+      if (!decoded.ok) return;
+      snapshot = decoded.value;
+    }
     this.leaseValue = Object.freeze({
       epoch: control.hostEpoch,
       hostClientId: control.hostClientId,
@@ -543,7 +574,7 @@ export class RoomClient {
       this.emit(
         "hostGranted",
         this.leaseValue,
-        fromJsonBytes<CanvasSnapshot>(control.snapshotJson),
+        snapshot,
         control.reason,
       );
       return;
@@ -555,5 +586,33 @@ export class RoomClient {
     if (control.kind === HostControlKind.HOST_CONTROL_YIELD_REQUEST) {
       this.yieldHost("server_request", this.leaseValue);
     }
+  }
+
+  private decodeJson<T>(
+    bytes: Uint8Array | undefined,
+    code: string,
+    context: string,
+  ): { ok: true; value: T | undefined } | { ok: false } {
+    try {
+      return { ok: true, value: fromJsonBytes<T>(bytes) };
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      this.emit("error", code, `${context}: ${detail}`);
+      return { ok: false };
+    }
+  }
+
+  private validateBehaviorStateJson(
+    entities: readonly { behaviorStateJson: Uint8Array }[],
+  ): boolean {
+    for (const entity of entities) {
+      const decoded = this.decodeJson(
+        entity.behaviorStateJson,
+        "malformed_behavior_state",
+        "the server sent malformed behavior state JSON",
+      );
+      if (!decoded.ok) return false;
+    }
+    return true;
   }
 }

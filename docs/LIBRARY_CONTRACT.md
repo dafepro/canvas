@@ -162,6 +162,12 @@ the simulation kernel independently converts invalid adapter input to a stopped
 avatar. Heartbeat health is finite and non-negative, capped at 1000 Hz and
 60,000 ms drift; invalid health never renews a host lease or enters election.
 
+JSON embedded in protobuf envelopes is decoded at the coordination boundary.
+Malformed JOIN data, host snapshots, item mutation/edit results, effect
+parameters, or canonical behavior state emit a stable protocol error and are
+not handed to runtime callbacks. State that accompanies the bad payload—such
+as a new host lease or scene revision—is not partially applied.
+
 `RuntimeDiagnostics.pointer` exposes the pointer phase, pointer ID, last local
 point, and capture status; `pointerWorldTarget` exposes the projected world
 target. Session diagnostics expose sent and acknowledged input sequences,
