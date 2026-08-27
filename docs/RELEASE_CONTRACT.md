@@ -28,6 +28,11 @@ fields, so old and new peers keep interoperating. Increment the protocol version
 only for an incompatible semantic or wire change. Prefer a staged server that
 can accept the old and new versions during rollout; if that is impractical,
 record the coordinated deployment in `MAJOR_VERSION_NOTES.md` before merging.
+`proto/wire-contract.v{PROTOCOL_VERSION}.txt` freezes every released message
+field number, scalar/message type, repetition label, oneof membership, enum
+number, and reservation. The release gate permits additive declarations but
+fails if a released signature is removed or repurposed under the same protocol
+baseline.
 
 Snapshots and behavior state have independent schema versions. The current
 snapshot schema must be validated before use. A durable shape change requires a
