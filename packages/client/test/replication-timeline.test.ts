@@ -24,6 +24,31 @@ const avatar = (
 });
 
 describe("ReplicationTimeline", () => {
+  it("decorates host frames with durable item metadata", () => {
+    const timeline = new ReplicationTimeline({
+      sceneRevision: () => 1,
+      decorate: (entity) => ({
+        ...entity,
+        ownerUserId: "alice",
+        resolvedConfig: { placementDay: "2026-08-26" },
+      }),
+    });
+    timeline.acceptHostFrame(1, [
+      {
+        ...avatar(10),
+        id: "stamp-1",
+        kind: "item",
+        definitionId: "stamp",
+        userId: undefined,
+      },
+    ]);
+
+    expect(timeline.frame(0, "avatar:alice", true)[0]).toMatchObject({
+      ownerUserId: "alice",
+      resolvedConfig: { placementDay: "2026-08-26" },
+    });
+  });
+
   it("publishes frozen complete snapshots after encoding and decoding a keyframe", () => {
     const host = new ReplicationTimeline({ sceneRevision: () => 7 });
     host.acceptHostFrame(30, [avatar(12)]);

@@ -132,8 +132,8 @@ export class ReplicationTimeline {
   acceptHostFrame(tick: number, entities: RenderEntity[]): void {
     if (tick < this.currentTick) return;
     this.currentTick = tick;
-    this.hostEntitiesValue = entities;
-    this.publish(tick, entities);
+    this.hostEntitiesValue = entities.map((entity) => this.decorate(entity));
+    this.publish(tick, this.hostEntitiesValue);
   }
 
   acceptLocalPredictionFrame(
