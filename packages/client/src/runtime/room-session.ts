@@ -539,8 +539,8 @@ export class RoomSession {
       this.durable.acceptPreview(command);
     });
 
-    this.client.on("durableRejected", (_command, reason) => {
-      this.durable.reject(reason);
+    this.client.on("durableRejected", (command, reason) => {
+      this.durable.reject(command, reason);
     });
 
     this.client.on("error", (code, message) => {
@@ -978,7 +978,15 @@ export class RoomSession {
         this.reportError(lifecycleError(
           "durable_command_rejected",
           effect.reason,
-          { source: "durable-command", recoverable: true },
+          {
+            source: "durable-command",
+            recoverable: true,
+            details: {
+              commandKind: effect.command.kind,
+              entityId: effect.command.entityId,
+              preview: effect.command.preview,
+            },
+          },
         ));
         break;
     }

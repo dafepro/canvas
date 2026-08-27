@@ -31,7 +31,11 @@ export interface DurableCommandContext {
 export type DurableCommandEffect =
   | { readonly type: "send"; readonly command: DurableCommand }
   | { readonly type: "simulate"; readonly request: SimulationRequest }
-  | { readonly type: "rejected"; readonly reason: string };
+  | {
+      readonly type: "rejected";
+      readonly command: DurableCommand;
+      readonly reason: string;
+    };
 
 export interface DurableCommandSessionOptions {
   readonly definitions: readonly ItemDefinition[];
@@ -203,8 +207,8 @@ export class DurableCommandSession {
     this.applyAccepted(command);
   }
 
-  reject(reason: string): void {
-    this.emit(Object.freeze({ type: "rejected", reason }));
+  reject(command: DurableCommand, reason: string): void {
+    this.emit(Object.freeze({ type: "rejected", command, reason }));
   }
 
   private remember(item: SnapshotItem): void {

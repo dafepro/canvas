@@ -214,9 +214,16 @@ describe("DurableCommandSession", () => {
       }],
     });
 
-    session.reject("not_owner");
+    session.deleteItem("crate-1");
+    const command = effects.at(-1);
+    if (command?.type !== "send") throw new Error("delete command was not sent");
+    session.reject(command.command, "not_owner");
 
-    expect(effects.at(-1)).toEqual({ type: "rejected", reason: "not_owner" });
+    expect(effects.at(-1)).toEqual({
+      type: "rejected",
+      command: command.command,
+      reason: "not_owner",
+    });
     expect(session.itemCount).toBe(1);
   });
 });
