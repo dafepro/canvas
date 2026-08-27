@@ -1,7 +1,7 @@
 # Library UX and maintainability audit
 
-Audit date: 2026-08-27  
-Target release: 0.3.0  
+Audit date: 2026-08-27
+Target release: 0.3.0
 Scope: TypeScript packages, browser runtime, Go rooms SDK, examples, and public
 documentation
 
