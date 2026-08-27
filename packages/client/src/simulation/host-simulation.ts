@@ -30,6 +30,7 @@ export class HostSimulation {
   readonly behaviors: BehaviorRuntime;
   private checkpointRevision = 0;
   private lastSentTransforms = new Map<string, string>();
+  private resolvedConfigByEntityID = new Map<string, unknown>();
 
   constructor(
     readonly canvas: CanvasDefinition,
@@ -116,6 +117,7 @@ export class HostSimulation {
 
   addItem(instance: ItemInstance): Entity | undefined {
     const entity = this.world.addItem(instance);
+    if (entity) this.resolvedConfigByEntityID.set(entity.id, instance.resolvedConfig);
     if (!entity?.behavior) return entity;
     const slot = this.behaviors.attach({
       entityId: entity.id,
@@ -137,6 +139,7 @@ export class HostSimulation {
     this.behaviors.detach(entityId);
     this.world.removeEntity(entityId);
     this.lastSentTransforms.delete(entityId);
+    this.resolvedConfigByEntityID.delete(entityId);
   }
 
   setItemConfig(entityId: string, config: unknown): boolean {
@@ -210,7 +213,8 @@ export class HostSimulation {
         transform: { ...entity.transform },
         isolated: entity.isolated || undefined,
         collisionsDisabled: entity.collisionsDisabled || undefined,
-        resolvedConfig: entity.behavior?.config,
+        resolvedConfig:
+          entity.behavior?.config ?? this.resolvedConfigByEntityID.get(entity.id),
       };
       if (slot && persistence?.behaviorState) {
         item.behaviorState = slot.state;
@@ -289,6 +293,7 @@ export class HostSimulation {
   }
 
   free(): void {
+    this.resolvedConfigByEntityID.clear();
     this.world.free();
   }
 }

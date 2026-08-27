@@ -1089,6 +1089,18 @@ describe("HostSimulation with real physics", () => {
     simulation.free();
   });
 
+  it("preserves resolved config for behaviorless items in checkpoints", () => {
+    const simulation = build();
+    const config = { placementDay: "2026-08-26" };
+    simulation.addItem({
+      ...instance("crate-1", crateDefinition as ItemDefinition, 50, 20),
+      resolvedConfig: config,
+    });
+
+    expect(simulation.snapshot().items[0]?.resolvedConfig).toEqual(config);
+    simulation.free();
+  });
+
   it("scales item visuals and collider geometry as one persisted transform", () => {
     const simulation = build();
     simulation.addItem(instance("crate-1", crateDefinition as ItemDefinition, 50, 20));
