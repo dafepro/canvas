@@ -15,6 +15,19 @@ type Transform struct {
 	Z        *float64 `json:"z,omitempty"`
 }
 
+// UnmarshalJSON keeps the Go representation aligned with the TypeScript
+// Transform contract, where an omitted scale means 1. An explicit scale,
+// including zero, still overwrites the default so validation can reject it.
+func (t *Transform) UnmarshalJSON(data []byte) error {
+	type transformJSON Transform
+	decoded := transformJSON{Scale: 1}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*t = Transform(decoded)
+	return nil
+}
+
 func (t Transform) finite() bool {
 	if math.IsNaN(t.X) || math.IsInf(t.X, 0) ||
 		math.IsNaN(t.Y) || math.IsInf(t.Y, 0) ||

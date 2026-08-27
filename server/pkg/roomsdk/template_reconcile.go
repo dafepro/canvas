@@ -211,7 +211,7 @@ func (r *Room) materializeSystemItem(template SystemItemTemplate) (SnapshotItem,
 	if err := validateConfigJSON(definition.ConfigSchema, template.ResolvedConfig); err != nil {
 		return SnapshotItem{}, fmt.Errorf("system item %q config: %w", template.EntityID, err)
 	}
-	if !template.Transform.finite() || !r.insideCanvas(template.Transform) {
+	if !r.validSystemItemTransform(template.Transform) {
 		return SnapshotItem{}, fmt.Errorf("system item %q transform is invalid", template.EntityID)
 	}
 	return SnapshotItem{

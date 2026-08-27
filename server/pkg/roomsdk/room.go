@@ -172,7 +172,7 @@ func (r *Room) bootstrapSystemItems() error {
 		if err := validateConfigJSON(definition.ConfigSchema, template.ResolvedConfig); err != nil {
 			return fmt.Errorf("system item %q config: %w", template.EntityID, err)
 		}
-		if !template.Transform.finite() || !r.insideCanvas(template.Transform) {
+		if !r.validSystemItemTransform(template.Transform) {
 			return fmt.Errorf("system item %q transform is invalid", template.EntityID)
 		}
 		if definition.Complexity == ItemComplexityComplex {
@@ -197,6 +197,10 @@ func (r *Room) bootstrapSystemItems() error {
 		r.snapshot.SceneRevision = 1
 	}
 	return nil
+}
+
+func (r *Room) validSystemItemTransform(transform Transform) bool {
+	return transform.finite() && transform.Scale > 0 && r.insideCanvas(transform)
 }
 
 func (r *Room) itemDefinition(definitionID string) (ItemDefinitionRecord, error) {

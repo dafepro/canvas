@@ -51,6 +51,9 @@ func TestRoomBootstrapsSystemOwnedItems(t *testing.T) {
 	if item.EntityID != "match-ball" || item.OwnerUserID != "" {
 		t.Fatalf("system item = %#v", item)
 	}
+	if item.Transform.Scale != 1 {
+		t.Fatalf("system item scale = %v, want default 1", item.Transform.Scale)
+	}
 	var config map[string]float64
 	if err := json.Unmarshal(item.ResolvedConfig, &config); err != nil || config["thrust"] != 12 {
 		t.Fatalf("resolved config = %s, error = %v", item.ResolvedConfig, err)
@@ -63,6 +66,24 @@ func TestRoomBootstrapsSystemOwnedItems(t *testing.T) {
 	})
 	if accepted || reason != "system_owned" {
 		t.Fatalf("move accepted = %v, reason = %q", accepted, reason)
+	}
+}
+
+func TestTransformJSONDefaultsOnlyAnOmittedScale(t *testing.T) {
+	var omitted Transform
+	if err := json.Unmarshal([]byte(`{"x":50,"y":35,"rotation":0}`), &omitted); err != nil {
+		t.Fatal(err)
+	}
+	if omitted.Scale != 1 {
+		t.Fatalf("omitted scale = %v, want 1", omitted.Scale)
+	}
+
+	var explicit Transform
+	if err := json.Unmarshal([]byte(`{"x":50,"y":35,"rotation":0,"scale":0}`), &explicit); err != nil {
+		t.Fatal(err)
+	}
+	if explicit.Scale != 0 {
+		t.Fatalf("explicit scale = %v, want 0", explicit.Scale)
 	}
 }
 
@@ -86,6 +107,30 @@ func TestRoomRejectsInvalidSystemItemConfig(t *testing.T) {
 
 	if _, err := h.server.roomFor(context.Background(), "test-canvas"); err == nil {
 		t.Fatal("roomFor accepted an invalid system item config")
+	}
+}
+
+func TestRoomRejectsExplicitZeroSystemItemScale(t *testing.T) {
+	h := newHarness(t, nil)
+	var definition map[string]any
+	if err := json.Unmarshal([]byte(canvasWithSystemItemJSON), &definition); err != nil {
+		t.Fatal(err)
+	}
+	items := definition["systemItems"].([]any)
+	transform := items[0].(map[string]any)["transform"].(map[string]any)
+	transform["scale"] = float64(0)
+	raw, err := json.Marshal(definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.store.PutCanvas(CanvasRecord{
+		CanvasID:      "test-canvas",
+		Version:       1,
+		DefinitionRaw: raw,
+	})
+
+	if _, err := h.server.roomFor(context.Background(), "test-canvas"); err == nil {
+		t.Fatal("roomFor accepted a system item with an explicit zero scale")
 	}
 }
 
