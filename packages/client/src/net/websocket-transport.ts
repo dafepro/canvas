@@ -20,6 +20,8 @@ export interface WebSocketTransportOptions {
   /** Reconnect delays in milliseconds. The last value repeats. */
   backoffMs?: number[];
   maxReconnects?: number;
+  /** Maximum reliable messages retained across a reconnect. Defaults to 256. */
+  maxPendingReliable?: number;
 }
 
 export type RealtimeCredentialProvider = () => Promise<string>;
@@ -53,8 +55,11 @@ export class WebSocketRoomTransport implements RoomTransport {
   private reconnects = 0;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private closedByCaller = false;
+  private failed = false;
   private readonly backoffMs: number[];
   private readonly maxReconnects: number;
+  private readonly maxPendingReliable: number;
+  private readonly pendingReliable: Uint8Array[] = [];
   private readonly connectTimeoutMs: number;
   private readonly credentialProvider: RealtimeCredentialProvider;
   readonly traffic: TransportTraffic = emptyTraffic();
@@ -64,6 +69,7 @@ export class WebSocketRoomTransport implements RoomTransport {
     this.connectTimeoutMs = Math.max(1, options.connectTimeoutMs ?? 10_000);
     this.backoffMs = options.backoffMs ?? [250, 500, 1000, 2000, 4000];
     this.maxReconnects = options.maxReconnects ?? 20;
+    this.maxPendingReliable = Math.max(1, Math.floor(options.maxPendingReliable ?? 256));
   }
 
   get status(): TransportStatus {
@@ -73,6 +79,7 @@ export class WebSocketRoomTransport implements RoomTransport {
   connect(join: JoinDescriptor): Promise<void> {
     this.join = join;
     this.closedByCaller = false;
+    this.failed = false;
     return this.open();
   }
 
@@ -106,6 +113,8 @@ export class WebSocketRoomTransport implements RoomTransport {
         timedOut = true;
         if (this.socket === socket) this.socket = undefined;
         const message = `websocket connection timed out after ${this.connectTimeoutMs}ms`;
+        this.failed = true;
+        this.pendingReliable.length = 0;
         this.setStatus("failed", message);
         socket.close(4000, "connection timeout");
         reject(new Error(message));
@@ -117,6 +126,7 @@ export class WebSocketRoomTransport implements RoomTransport {
         finishHandshake();
         this.reconnects = 0;
         this.setStatus("open");
+        this.flushReliable();
         resolve();
       };
 
@@ -148,6 +158,7 @@ export class WebSocketRoomTransport implements RoomTransport {
           this.setStatus("closed");
           return;
         }
+        if (this.failed) return;
         if (!opened) {
           if (timedOut) return;
           const detail = event.reason || `code ${event.code}`;
@@ -161,7 +172,10 @@ export class WebSocketRoomTransport implements RoomTransport {
   }
 
   private scheduleReconnect(detail: string): void {
+    if (this.failed || this.closedByCaller) return;
     if (this.reconnects >= this.maxReconnects) {
+      this.failed = true;
+      this.pendingReliable.length = 0;
       this.setStatus("failed", detail);
       return;
     }
@@ -182,7 +196,21 @@ export class WebSocketRoomTransport implements RoomTransport {
   }
 
   sendReliable(message: RoomEnvelope): void {
-    this.write(message);
+    const bytes = encodeEnvelope(message);
+    if (this.writeBytes(bytes)) return;
+    if (
+      !this.join ||
+      this.closedByCaller ||
+      this.failed ||
+      this.currentStatus === "idle" ||
+      this.currentStatus === "closed" ||
+      this.currentStatus === "failed"
+    ) return;
+    if (this.pendingReliable.length >= this.maxPendingReliable) {
+      this.failReliableQueue();
+      return;
+    }
+    this.pendingReliable.push(bytes);
   }
 
   sendRealtime(message: RoomEnvelope): void {
@@ -222,11 +250,34 @@ export class WebSocketRoomTransport implements RoomTransport {
   }
 
   private write(message: RoomEnvelope): void {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const bytes = encodeEnvelope(message);
+    this.writeBytes(encodeEnvelope(message));
+  }
+
+  private writeBytes(bytes: Uint8Array): boolean {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
     this.traffic.outboundBytes += bytes.byteLength;
     this.traffic.outboundMessages++;
     this.socket.send(bytes);
+    return true;
+  }
+
+  private flushReliable(): void {
+    while (this.pendingReliable.length > 0) {
+      const bytes = this.pendingReliable[0]!;
+      if (!this.writeBytes(bytes)) return;
+      this.pendingReliable.shift();
+    }
+  }
+
+  private failReliableQueue(): void {
+    const detail = `reliable send queue exceeded ${this.maxPendingReliable} messages`;
+    this.pendingReliable.length = 0;
+    this.failed = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = undefined;
+    this.socket?.close(4001, "reliable send queue exceeded");
+    this.socket = undefined;
+    this.setStatus("failed", detail);
   }
 
   onMessage(handler: (message: RoomEnvelope) => void): Unsubscribe {
@@ -243,6 +294,8 @@ export class WebSocketRoomTransport implements RoomTransport {
 
   close(): void {
     this.closedByCaller = true;
+    this.failed = false;
+    this.pendingReliable.length = 0;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.socket?.close(1000, "client closed the room");
     this.socket = undefined;

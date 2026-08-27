@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { decodeEnvelope, envelope } from "@canvas-physics/protocol";
 import { WebSocketRoomTransport } from "../src/net/websocket-transport.js";
 
 class FakeWebSocket {
@@ -11,6 +12,7 @@ class FakeWebSocket {
   bufferedAmount = 0;
   readyState = 0;
   closeCalls = 0;
+  readonly sent: Uint8Array[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
@@ -32,7 +34,11 @@ class FakeWebSocket {
     this.onclose?.({ code: 1006, reason: "test disconnect" });
   }
 
-  send(): void {}
+  send(data: ArrayBufferView | ArrayBuffer): void {
+    this.sent.push(data instanceof ArrayBuffer
+      ? new Uint8Array(data.slice(0))
+      : new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)));
+  }
 
   close(): void {
     this.closeCalls++;
@@ -153,6 +159,69 @@ describe("WebSocketRoomTransport credentials", () => {
       "canvas-realtime",
       "ticket.reconnect",
     ]);
+    transport.close();
+  });
+
+  it("delivers reliable messages submitted while reconnecting in order", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const transport = new WebSocketRoomTransport({
+      credentialProvider: async () => "ticket.reliable",
+      backoffMs: [10],
+      maxReconnects: 1,
+    });
+
+    const opening = transport.connect({
+      roomId: "reliable-room",
+      serverUrl: "https://rooms.example.test",
+    });
+    await vi.waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+    FakeWebSocket.sockets[0]!.open();
+    await opening;
+
+    FakeWebSocket.sockets[0]!.disconnect();
+    transport.sendReliable(envelope("reliable-room", { sequence: 41 }));
+    transport.sendReliable(envelope("reliable-room", { sequence: 42 }));
+
+    await vi.advanceTimersByTimeAsync(10);
+    await vi.waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(2));
+    FakeWebSocket.sockets[1]!.open();
+
+    expect(FakeWebSocket.sockets[1]!.sent.map((bytes) => decodeEnvelope(bytes).sequence))
+      .toEqual([41, 42]);
+    transport.close();
+  });
+
+  it("fails visibly instead of growing the reconnect queue without bound", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const observed: { status: string; detail?: string }[] = [];
+    const transport = new WebSocketRoomTransport({
+      credentialProvider: async () => "ticket.bounded",
+      backoffMs: [10],
+      maxPendingReliable: 1,
+    });
+    transport.onStatus((status, detail) => observed.push({ status, detail }));
+
+    const opening = transport.connect({
+      roomId: "bounded-room",
+      serverUrl: "https://rooms.example.test",
+    });
+    await vi.waitFor(() => expect(FakeWebSocket.sockets).toHaveLength(1));
+    FakeWebSocket.sockets[0]!.open();
+    await opening;
+    FakeWebSocket.sockets[0]!.disconnect();
+
+    transport.sendReliable(envelope("bounded-room", { sequence: 1 }));
+    transport.sendReliable(envelope("bounded-room", { sequence: 2 }));
+
+    expect(transport.status).toBe("failed");
+    expect(observed.at(-1)).toEqual({
+      status: "failed",
+      detail: "reliable send queue exceeded 1 messages",
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(FakeWebSocket.sockets).toHaveLength(1);
     transport.close();
   });
 });

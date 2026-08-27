@@ -118,8 +118,9 @@ expect(report.issues).toEqual([]);
 ```
 
 The suite verifies zeroed cumulative counters, the `idle` → `connecting` →
-`open` lifecycle, ordered reliable delivery, uncongested realtime delivery,
-inbound delivery, listener unsubscription, reconnect recovery in both
+`open` lifecycle, ordered reliable delivery (including submissions retained
+during reconnect), uncongested realtime delivery, inbound delivery, listener
+unsubscription, reconnect recovery in both
 directions, cumulative encoded-byte/message counters, and terminal caller
 close. The immutable report is independent of Vitest or Jest. The test peer is
 responsible for running against the real adapter boundary rather than calling

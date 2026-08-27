@@ -177,13 +177,26 @@ export const runRoomTransportConformance = async (
     await check("reconnect_failed", async () => {
       assert(connected, "reconnect requires a successful initial connection");
       const before = statuses.length;
-      await harness.interrupt("conformance interruption");
+      const interruption = harness.interrupt("conformance interruption");
+      const queued = envelope(400);
+      transport.sendReliable(queued);
+      await interruption;
       await waitUntil(() => {
         const later = statuses.slice(before).map(({ status }) => status);
         const reconnecting = later.indexOf("reconnecting");
         return reconnecting >= 0 && later.indexOf("open", reconnecting + 1) > reconnecting;
       }, timeoutMs, "transport did not publish reconnecting then open");
       assert(transport.status === "open", `transport recovered with status '${transport.status}'`);
+
+      assertEnvelope(
+        await withTimeout(
+          harness.nextOutbound(),
+          timeoutMs,
+          "reliable envelope submitted during reconnect was not delivered",
+        ),
+        queued,
+        "reconnect changed a queued reliable envelope",
+      );
 
       const outbound = envelope(401);
       transport.sendReliable(outbound);

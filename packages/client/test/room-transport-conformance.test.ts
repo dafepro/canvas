@@ -15,6 +15,7 @@ class LoopbackTransport implements RoomTransport {
   status: TransportStatus = "idle";
   readonly traffic = emptyTraffic();
   readonly outbound: RoomEnvelope[] = [];
+  private readonly pendingReliable: RoomEnvelope[] = [];
   private readonly messageHandlers = new Set<(message: RoomEnvelope) => void>();
   private readonly statusHandlers = new Set<(status: TransportStatus, detail?: string) => void>();
 
@@ -27,7 +28,12 @@ class LoopbackTransport implements RoomTransport {
     this.setStatus("open");
   }
 
-  sendReliable(message: RoomEnvelope): void { this.write(message); }
+  sendReliable(message: RoomEnvelope): void {
+    if (this.status === "open") this.write(message);
+    else if (this.status === "connecting" || this.status === "reconnecting") {
+      this.pendingReliable.push(structuredClone(message));
+    }
+  }
   sendRealtime(message: RoomEnvelope): void { this.write(message); }
 
   onMessage(handler: (message: RoomEnvelope) => void): () => void {
@@ -67,6 +73,9 @@ class LoopbackTransport implements RoomTransport {
   private setStatus(status: TransportStatus, detail?: string): void {
     this.status = status;
     for (const handler of this.statusHandlers) handler(status, detail);
+    if (status === "open") {
+      for (const message of this.pendingReliable.splice(0)) this.write(message);
+    }
   }
 }
 

@@ -45,7 +45,10 @@ export const emptyTraffic = (): TransportTraffic => ({
  */
 export interface RoomTransport {
   connect(join: JoinDescriptor): Promise<void>;
-  /** Reliable ordered delivery: coordination and durable mutations. */
+  /**
+   * Reliable ordered delivery: coordination and durable mutations. Messages
+   * submitted during a temporary reconnect are retained in order.
+   */
   sendReliable(message: RoomEnvelope): void;
   /** Newest matters most: input and state deltas. */
   sendRealtime(message: RoomEnvelope): void;
