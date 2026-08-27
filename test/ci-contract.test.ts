@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -53,6 +53,20 @@ describe("cross-platform release verification", () => {
     expect(workflow).toContain("test/package-artifacts.test.ts");
     expect(workflow).toContain("test/release-contract.test.ts");
     expect(workflow).toContain("test/library-boundaries.test.ts");
+    expect(read("test/package-artifacts.test.ts")).toContain('"basketball-arena"');
+  });
+
+  it("keeps every reference integration on the real-process smoke gate", () => {
+    for (const [example, test] of [
+      ["soccer-lounge", "soccer-lounge.e2e.test.ts"],
+      ["item-playground", "item-playground.e2e.test.ts"],
+      ["linked-rooms", "linked-rooms.e2e.test.ts"],
+      ["basketball-arena", "basketball-arena.e2e.test.ts"],
+    ] as const) {
+      expect(existsSync(resolve(root, "examples", example, "test", test))).toBe(true);
+    }
+    expect(existsSync(resolve(root, "test/example-catalog-compatibility.test.ts"))).toBe(true);
+    expect(existsSync(resolve(root, "test/example-server-launcher.test.ts"))).toBe(true);
   });
 
   it("resolves workspace packages from source during repository tests", () => {

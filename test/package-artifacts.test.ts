@@ -220,7 +220,12 @@ describe("published package artifacts", () => {
       stdio: "pipe",
     });
 
-    for (const example of ["soccer-lounge", "item-playground", "linked-rooms"] as const) {
+    for (const example of [
+      "soccer-lounge",
+      "item-playground",
+      "linked-rooms",
+      "basketball-arena",
+    ] as const) {
       const exampleSource = join(workspaceRoot, "examples", example);
       const exampleConsumer = join(fixtureRoot, example);
       mkdirSync(exampleConsumer, { recursive: true });

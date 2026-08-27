@@ -14,7 +14,7 @@ checks:
   `room.proto` contract and fails on any checked-in difference.
 - **Cross-platform verification (ubuntu-latest)** builds the reusable packages,
   type-checks packages, examples, and Node-backed tests,
-  installs their packed archives into clean external consumers, builds both
+  installs their packed archives into clean external consumers, builds all four
   reference integrations from those archives, runs the TypeScript suite, runs
   the scene/network load budget in an isolated process, and runs the Go suite
   with race detection.
@@ -47,8 +47,11 @@ A commit passing all required checks establishes that:
    independent consumers.
 4. The public declaration fingerprint belongs to the coordinated release
    version, so an API change cannot silently redefine an existing artifact.
-5. The soccer lounge and item playground build against only those packed public
-   artifacts, catching missing files and accidental internal imports.
+5. The soccer lounge, item playground, linked rooms, and basketball arena build
+   against only those packed public artifacts, catching missing files and
+   accidental internal imports. Their checked-in real-`canvasd` smoke tests
+   additionally prove room startup, exact catalog compatibility, and the
+   behavior paths each example advertises.
 6. The generated TypeScript and Go protocol bindings match the checked-in
    protobuf contract, and their exact protocol versions agree.
 7. The reusable Go rooms SDK passes its conformance and race-detection suite.

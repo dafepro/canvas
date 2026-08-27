@@ -35,7 +35,7 @@ behavior.
 | Durable mutations | Mutations remain pending until a joined connection can send them and reliable transport retains them across reconnect. | `packages/client/test/item-mutation-session.test.ts`, `packages/client/test/reconnect-join.test.ts` |
 | Restart/reconciliation | Room wake applies live-equivalent integrity checks; explicit template reconciliation alone may bridge declared canvas/version differences; resulting system items carry valid revisions. | `server/pkg/roomsdk/compatibility_test.go`, `server/pkg/roomsdk/room_test.go`, `server/pkg/roomsdk/system_items_test.go` |
 | Runtime/worker lifecycle | Invalid JOIN/definition data fails before simulation initialization; initial/reconnect/terminal states and cleanup remain typed and deterministic. | `packages/client/test/runtime-lifecycle.test.ts`, `packages/client/test/connection-session.test.ts`, `packages/client/test/session-transition-model.test.ts`, `packages/client/test/custom-worker-runtime.test.ts` |
-| Network integration | Host election, direct input, state repair, host migration, graceful restart, packet loss/reordering, and external package use execute through real service/encoded boundaries. | `packages/client/test/two-client-relay.test.ts`, `packages/client/test/packet-loss.test.ts`, `packages/client/test/graceful-sleep.test.ts`, example E2E suites |
+| Network integration | Host election, direct input, state repair, host migration, graceful restart, packet loss/reordering, and external package use execute through real service/encoded boundaries. Every reference example also opens its declared room against a real `canvasd`, and its client/server definition catalogs must agree exactly. | `packages/client/test/two-client-relay.test.ts`, `packages/client/test/packet-loss.test.ts`, `packages/client/test/graceful-sleep.test.ts`, all four example E2E suites, `test/example-catalog-compatibility.test.ts` |
 
 ## Findings ledger
 
@@ -64,6 +64,7 @@ behavior.
 | COMPAT-021 | Invalid local timer rates and late/mutable definitions could allocate resources or diverge after validation. | Validate before allocation and snapshot the accepted definition bundle. | Closed |
 | COMPAT-022 | Callback-identity dedup coupled separate subscription owners and made one teardown silently remove another owner's registration. | Give every subscription call independent notification and teardown ownership. | Closed in 0.4.0 |
 | COMPAT-023 | Missing definition IDs and missing exact versions required an extra latest-record lookup and exposed two message strings for one actionable failure. | Collapse both cases to `unknown_definition_version` while preserving the protobuf definition reject category. | Closed in 0.4.0 |
+| COMPAT-024 | Reference examples reused unversioned local snapshots after 0.4.0 strengthened the durable-item contract, so a stale development room failed to open with the generic `room unavailable` rejection. | Scope disposable example data by the root release version, permit an explicit data-directory override, and run every example plus exact client/server definition parity through the release gate. Existing local data remains recoverable but is no longer opened implicitly. | Closed in 0.4.0 |
 
 ## Compatibility-sensitive behavior
 
