@@ -1194,6 +1194,8 @@ type Heartbeat struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	SentAtUnixMs uint64                 `protobuf:"varint,1,opt,name=sent_at_unix_ms,json=sentAtUnixMs,proto3" json:"sent_at_unix_ms,omitempty"`
 	// Host health signals used for election (spec 11.2).
+	// Both values must be finite and non-negative. The rooms service accepts at
+	// most 1000 Hz and 60000 ms so malformed telemetry cannot poison election.
 	SimulationHz  float32 `protobuf:"fixed32,2,opt,name=simulation_hz,json=simulationHz,proto3" json:"simulation_hz,omitempty"`
 	WorkerDriftMs float32 `protobuf:"fixed32,3,opt,name=worker_drift_ms,json=workerDriftMs,proto3" json:"worker_drift_ms,omitempty"`
 	PageVisible   bool    `protobuf:"varint,4,opt,name=page_visible,json=pageVisible,proto3" json:"page_visible,omitempty"`
@@ -1260,17 +1262,20 @@ func (x *Heartbeat) GetPageVisible() bool {
 }
 
 type PlayerInput struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	InputSequence    uint32                 `protobuf:"varint,1,opt,name=input_sequence,json=inputSequence,proto3" json:"input_sequence,omitempty"`
-	Direction        *Vec2                  `protobuf:"bytes,2,opt,name=direction,proto3" json:"direction,omitempty"`
-	Intensity        float32                `protobuf:"fixed32,3,opt,name=intensity,proto3" json:"intensity,omitempty"`
-	ClientTimeUnixMs uint64                 `protobuf:"varint,4,opt,name=client_time_unix_ms,json=clientTimeUnixMs,proto3" json:"client_time_unix_ms,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	InputSequence uint32                 `protobuf:"varint,1,opt,name=input_sequence,json=inputSequence,proto3" json:"input_sequence,omitempty"`
+	// Finite normalized intent in the unit disk. Missing means zero.
+	Direction *Vec2 `protobuf:"bytes,2,opt,name=direction,proto3" json:"direction,omitempty"`
+	// Finite inclusive range [0, 1].
+	Intensity        float32 `protobuf:"fixed32,3,opt,name=intensity,proto3" json:"intensity,omitempty"`
+	ClientTimeUnixMs uint64  `protobuf:"varint,4,opt,name=client_time_unix_ms,json=clientTimeUnixMs,proto3" json:"client_time_unix_ms,omitempty"`
 	// True while the pointer is held, so a lost packet leaves no stale input.
 	Held bool `protobuf:"varint,5,opt,name=held,proto3" json:"held,omitempty"`
 	// Addendum A1. True while the sender asks the host to disable its avatar.
 	// The flag rides on every input, so a lost packet cannot leave a stale value.
 	AvatarDisabled bool `protobuf:"varint,6,opt,name=avatar_disabled,json=avatarDisabled,proto3" json:"avatar_disabled,omitempty"`
 	// Absolute world target for collision-safe direct avatar dragging.
+	// When present, both coordinates must be finite.
 	TargetPosition *Vec2 `protobuf:"bytes,7,opt,name=target_position,json=targetPosition,proto3" json:"target_position,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache

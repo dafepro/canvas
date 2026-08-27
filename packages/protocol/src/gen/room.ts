@@ -412,7 +412,11 @@ export interface HostControl {
 
 export interface Heartbeat {
   sentAtUnixMs: number;
-  /** Host health signals used for election (spec 11.2). */
+  /**
+   * Host health signals used for election (spec 11.2).
+   * Both values must be finite and non-negative. The rooms service accepts at
+   * most 1000 Hz and 60000 ms so malformed telemetry cannot poison election.
+   */
   simulationHz: number;
   workerDriftMs: number;
   pageVisible: boolean;
@@ -420,7 +424,11 @@ export interface Heartbeat {
 
 export interface PlayerInput {
   inputSequence: number;
-  direction?: Vec2 | undefined;
+  /** Finite normalized intent in the unit disk. Missing means zero. */
+  direction?:
+    | Vec2
+    | undefined;
+  /** Finite inclusive range [0, 1]. */
   intensity: number;
   clientTimeUnixMs: number;
   /** True while the pointer is held, so a lost packet leaves no stale input. */
@@ -430,7 +438,10 @@ export interface PlayerInput {
    * The flag rides on every input, so a lost packet cannot leave a stale value.
    */
   avatarDisabled: boolean;
-  /** Absolute world target for collision-safe direct avatar dragging. */
+  /**
+   * Absolute world target for collision-safe direct avatar dragging.
+   * When present, both coordinates must be finite.
+   */
   targetPosition?: Vec2 | undefined;
 }
 
