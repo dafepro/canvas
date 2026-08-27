@@ -422,18 +422,15 @@ func (r *Room) handleMessage(msg inbound) {
 	}
 }
 
-// checkDefinitions blocks a client from the host lease while it lacks a
-// definition the scene uses, or holds an older version of one. A client that
-// declared nothing is not checked, because nothing can be compared.
+// checkDefinitions blocks a client from the host lease while it lacks the
+// exact version of any definition the scene uses. A different version can
+// change physics or behavior and is not a compatible substitute.
 func (r *Room) checkDefinitions(client *Client) {
-	if client.definitions == nil {
-		return
-	}
 	missing := make([]string, 0)
 	for _, item := range r.snapshot.Items {
 		version, ok := client.definitions[item.DefinitionID]
-		if !ok || version < item.DefinitionVersion {
-			missing = append(missing, item.DefinitionID)
+		if !ok || version != item.DefinitionVersion {
+			missing = append(missing, fmt.Sprintf("%s@%d", item.DefinitionID, item.DefinitionVersion))
 		}
 	}
 	sort.Strings(missing)
@@ -453,14 +450,14 @@ func (r *Room) checkDefinitions(client *Client) {
 	}
 
 	r.cfg.Metrics.ProtocolMismatch(r.roomID)
-	r.cfg.Logger.Warn("client lacks an item definition the scene uses",
+	r.cfg.Logger.Warn("client lacks an exact item definition the scene uses",
 		"canvas", r.roomID, "client", client.ID, "definitions", missing)
 	r.sendTo(client, &pb.RoomEnvelope{
 		RoomId:    r.roomID,
 		HostEpoch: r.hostEpoch,
 		Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
 			Code:    "definition_mismatch",
-			Message: "the client lacks these item definitions: " + strings.Join(missing, ", "),
+			Message: "the client lacks these exact item definitions: " + strings.Join(missing, ", "),
 		}},
 	})
 	if r.hostClientID == client.ID {

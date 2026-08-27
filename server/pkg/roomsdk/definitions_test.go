@@ -53,6 +53,27 @@ func TestClientWithoutADefinitionLosesTheHostLease(t *testing.T) {
 	}
 }
 
+func TestClientWithANewerDefinitionLosesTheHostLease(t *testing.T) {
+	h := newHarness(t, nil)
+
+	host := h.dial("alice")
+	host.join(&pb.DefinitionVersion{DefinitionId: "rocket", Version: 1})
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetHostControl() != nil })
+
+	newer := h.dial("bob")
+	newer.join(&pb.DefinitionVersion{DefinitionId: "rocket", Version: 2})
+
+	host.send(spawnCommand("cmd-spawn", 20, 30))
+	host.await(func(e *pb.RoomEnvelope) bool { return e.GetItemMutationResult() != nil })
+
+	failure := newer.await(func(e *pb.RoomEnvelope) bool {
+		return e.GetError() != nil
+	}).GetError()
+	if failure.Code != "definition_mismatch" {
+		t.Fatalf("error code = %q, want definition_mismatch", failure.Code)
+	}
+}
+
 // A client that holds every definition the scene uses stays eligible.
 func TestClientWithEveryDefinitionStaysEligible(t *testing.T) {
 	h := newHarness(t, nil)

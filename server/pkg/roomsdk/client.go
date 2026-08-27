@@ -29,8 +29,7 @@ type Client struct {
 	pageVisible   bool
 	hostEligible  bool
 
-	// Spec 20. Item definition versions the client declared on join. A nil map
-	// means the client declared nothing, so no check is possible.
+	// Spec 20. Exact item definition versions the client declared on join.
 	definitions map[string]uint32
 	// True while the client lacks a definition the scene uses.
 	definitionMismatch bool
