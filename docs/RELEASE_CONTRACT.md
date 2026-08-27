@@ -35,6 +35,11 @@ complete migration chain or an explicit major-version migration; it must never
 be accepted by an older decoder and silently rewritten with fields discarded.
 Item definition versions match exactly because a newer definition is not proof
 that it preserves an older definition's physics or behavior.
+Fields represented as protobuf `uint32` are JSON integers no greater than
+`4294967295`. Snapshot counters represented as protobuf `uint64` remain in
+JavaScript's non-negative safe-integer range. The TypeScript and Go validators
+enforce those shared domains, and both accept positions exactly on the
+four-times canvas slack boundary.
 
 ## Coordinated artifacts
 

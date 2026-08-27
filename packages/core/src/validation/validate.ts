@@ -16,13 +16,20 @@ export type ValidationResult =
 const result = (problems: Problem[]): ValidationResult =>
   problems.length === 0 ? { ok: true } : { ok: false, problems };
 
+const MAX_UINT32 = 0xffff_ffff;
+const isUint32 = (value: number): boolean =>
+  Number.isInteger(value) && value >= 0 && value <= MAX_UINT32;
+const isPositiveUint32 = (value: number): boolean => isUint32(value) && value > 0;
+const isNonNegativeSafeInteger = (value: number): boolean =>
+  Number.isSafeInteger(value) && value >= 0;
+
 export const validateCanvasDefinition = (
   canvas: CanvasDefinition,
 ): ValidationResult => {
   const problems: Problem[] = [];
   if (!canvas.id) problems.push({ path: "id", message: "required" });
-  if (!Number.isSafeInteger(canvas.version) || canvas.version < 1) {
-    problems.push({ path: "version", message: "must be a positive safe integer" });
+  if (!isPositiveUint32(canvas.version)) {
+    problems.push({ path: "version", message: "must be a positive uint32 integer" });
   }
   if (
     !Number.isFinite(canvas.size.width) || canvas.size.width <= 0 ||
@@ -94,8 +101,11 @@ export const validateCanvasDefinition = (
     if (!item.definitionId) {
       problems.push({ path: `${path}.definitionId`, message: "required" });
     }
-    if (item.definitionVersion < 1) {
-      problems.push({ path: `${path}.definitionVersion`, message: "must be >= 1" });
+    if (!isPositiveUint32(item.definitionVersion)) {
+      problems.push({
+        path: `${path}.definitionVersion`,
+        message: "must be a positive uint32 integer",
+      });
     }
     const { x, y, rotation, scale, z } = item.transform;
     if (
@@ -128,7 +138,9 @@ export const validateItemDefinition = (
 ): ValidationResult => {
   const problems: Problem[] = [];
   if (!definition.definitionId) problems.push({ path: "definitionId", message: "required" });
-  if (definition.version < 1) problems.push({ path: "version", message: "must be >= 1" });
+  if (!isPositiveUint32(definition.version)) {
+    problems.push({ path: "version", message: "must be a positive uint32 integer" });
+  }
   if (definition.visual.size.width <= 0 || definition.visual.size.height <= 0) {
     problems.push({ path: "visual.size", message: "must be positive world units" });
   }
@@ -204,6 +216,11 @@ export const validateSnapshot = (
   if (snapshot.canvasVersion !== canvas.version) {
     problems.push({ path: "canvasVersion", message: "does not match the canvas" });
   }
+  for (const key of ["sceneRevision", "hostEpoch", "checkpointRevision", "tick"] as const) {
+    if (!isNonNegativeSafeInteger(snapshot[key])) {
+      problems.push({ path: key, message: "must be a non-negative safe integer" });
+    }
+  }
   if (snapshot.items.length > canvas.limits.maxItems) {
     problems.push({
       path: "items",
@@ -216,6 +233,12 @@ export const validateSnapshot = (
       problems.push({ path: `items[${i}].entityId`, message: "duplicate entity id" });
     }
     ids.add(item.entityId);
+    if (!isPositiveUint32(item.definitionVersion)) {
+      problems.push({
+        path: `items[${i}].definitionVersion`,
+        message: "must be a positive uint32 integer",
+      });
+    }
     if (!Number.isSafeInteger(item.itemRevision) || item.itemRevision < 1) {
       problems.push({
         path: `items[${i}].itemRevision`,

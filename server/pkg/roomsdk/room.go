@@ -80,6 +80,10 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 	if err != nil {
 		return nil, err
 	}
+	if shape.ID != record.CanvasID || shape.Version != record.Version {
+		return nil, fmt.Errorf("%w: record=%s@%d definition=%s@%d",
+			ErrRoomTemplateConflict, record.CanvasID, record.Version, shape.ID, shape.Version)
+	}
 
 	room := &Room{
 		cfg:               &server.cfg,
@@ -697,6 +701,9 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 	if incoming.CanvasID != r.canvasID {
 		return errCanvasMismatch
 	}
+	if incoming.CanvasVersion != r.canvasShape.Version {
+		return errCanvasMismatch
+	}
 	if incoming.SceneRevision != r.sceneRevision {
 		return errStaleScene
 	}
@@ -807,7 +814,7 @@ func (r *Room) withinBounds(t Transform) bool {
 	if maxX == 0 || maxY == 0 {
 		return true
 	}
-	return t.X > -maxX && t.X < maxX && t.Y > -maxY && t.Y < maxY
+	return t.X >= -maxX && t.X <= maxX && t.Y >= -maxY && t.Y <= maxY
 }
 
 func (r *Room) snapshotRecord() SnapshotRecord {

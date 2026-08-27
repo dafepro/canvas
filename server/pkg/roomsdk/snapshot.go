@@ -143,14 +143,29 @@ func parseCanvasShape(raw json.RawMessage) (canvasShape, error) {
 	if err := json.Unmarshal(raw, &shape); err != nil {
 		return canvasShape{}, err
 	}
+	if shape.ID == "" {
+		return canvasShape{}, errors.New("canvas id is required")
+	}
+	if shape.Version == 0 {
+		return canvasShape{}, errors.New("canvas version must be positive")
+	}
+	if math.IsNaN(shape.Size.Width) || math.IsInf(shape.Size.Width, 0) || shape.Size.Width <= 0 ||
+		math.IsNaN(shape.Size.Height) || math.IsInf(shape.Size.Height, 0) || shape.Size.Height <= 0 {
+		return canvasShape{}, errors.New("canvas width and height must be positive finite numbers")
+	}
+	const maxSafeInteger = int64(1<<53 - 1)
 	if shape.Limits.MaxAvatars < 1 {
 		return canvasShape{}, errors.New("canvas maxAvatars must be positive")
 	}
-	if shape.Limits.MaxItems < 0 {
+	if int64(shape.Limits.MaxAvatars) > maxSafeInteger {
+		return canvasShape{}, errors.New("canvas maxAvatars exceeds the JSON safe integer range")
+	}
+	if shape.Limits.MaxItems < 0 || int64(shape.Limits.MaxItems) > maxSafeInteger {
 		return canvasShape{}, errors.New("canvas maxItems must be non-negative")
 	}
 	if shape.Limits.MaxComplexPhysicsItems < 0 ||
-		shape.Limits.MaxComplexPhysicsItems > shape.Limits.MaxItems {
+		shape.Limits.MaxComplexPhysicsItems > shape.Limits.MaxItems ||
+		int64(shape.Limits.MaxComplexPhysicsItems) > maxSafeInteger {
 		return canvasShape{}, errors.New(
 			"canvas maxComplexPhysicsItems must be non-negative and no greater than maxItems",
 		)

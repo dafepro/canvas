@@ -1359,6 +1359,7 @@ func TestCheckpointOnlyFromHost(t *testing.T) {
 	badSnapshot, _ := json.Marshal(CanvasSnapshot{
 		SchemaVersion: 1,
 		CanvasID:      "test-canvas",
+		CanvasVersion: 1,
 		Items: []SnapshotItem{{
 			EntityID:  "e1",
 			Transform: Transform{X: 999999, Y: 0},
@@ -1419,6 +1420,7 @@ func TestCheckpointCannotRewriteDurableItemMetadata(t *testing.T) {
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
 		SchemaVersion: 1,
 		CanvasID:      "test-canvas",
+		CanvasVersion: 1,
 		SceneRevision: spawned.SceneRevision,
 		Items: []SnapshotItem{{
 			EntityID:          entityID,
@@ -1523,6 +1525,7 @@ func TestCheckpointDoesNotPersistAnUncommittedPreviewTransform(t *testing.T) {
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
 		SchemaVersion: 1,
 		CanvasID:      "test-canvas",
+		CanvasVersion: 1,
 		SceneRevision: spawned.SceneRevision,
 		Items: []SnapshotItem{{
 			EntityID:          entityID,
@@ -1634,6 +1637,7 @@ func TestCheckpointRejectsUnknownEntityIDs(t *testing.T) {
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
 		SchemaVersion: 1,
 		CanvasID:      "test-canvas",
+		CanvasVersion: 1,
 		SceneRevision: 0,
 		Items: []SnapshotItem{{
 			EntityID:          "host-invented-item",
@@ -1708,6 +1712,7 @@ func TestCheckpointRejectsAStaleSceneRevision(t *testing.T) {
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
 		SchemaVersion: 1,
 		CanvasID:      "test-canvas",
+		CanvasVersion: 1,
 		SceneRevision: spawned.SceneRevision,
 		Items: []SnapshotItem{{
 			EntityID:          entityID,
@@ -1768,6 +1773,7 @@ func TestCheckpointRejectsAStaleHostEpoch(t *testing.T) {
 	checkpointRaw, err := json.Marshal(CanvasSnapshot{
 		SchemaVersion: 1,
 		CanvasID:      "test-canvas",
+		CanvasVersion: 1,
 		SceneRevision: spawned.SceneRevision,
 		Items: []SnapshotItem{{
 			EntityID:          entityID,

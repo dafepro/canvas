@@ -202,12 +202,63 @@ describe("validation", () => {
     });
   });
 
+  it("keeps JSON versions and counters inside their cross-language integer domains", () => {
+    expect(validateCanvasDefinition({ ...canvas, version: 0xffff_ffff })).toEqual({ ok: true });
+    expect(validateCanvasDefinition({ ...canvas, version: 0x1_0000_0000 })).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([expect.objectContaining({ path: "version" })]),
+    });
+    expect(validateCanvasDefinition({
+      ...canvas,
+      systemItems: [{
+        entityId: "future-item",
+        definitionId: "rocket",
+        definitionVersion: 0x1_0000_0000,
+        transform: { x: 1, y: 1, rotation: 0 },
+        resolvedConfig: {},
+      }],
+    })).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([
+        expect.objectContaining({ path: "systemItems[0].definitionVersion" }),
+      ]),
+    });
+    expect(validateItemDefinition({
+      ...rocketDefinition,
+      version: 0x1_0000_0000,
+    })).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([expect.objectContaining({ path: "version" })]),
+    });
+
+    const snapshot = emptySnapshot(canvas.id, canvas.version);
+    snapshot.sceneRevision = Number.MAX_SAFE_INTEGER + 1;
+    snapshot.items = [{
+      entityId: "rocket-1",
+      definitionId: "rocket",
+      definitionVersion: 0x1_0000_0000,
+      ownerUserId: "u1",
+      itemRevision: 1,
+      transform: { x: 1, y: 1, rotation: 0 },
+      resolvedConfig: {},
+    }];
+    expect(validateSnapshot(snapshot, canvas)).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([
+        expect.objectContaining({ path: "sceneRevision" }),
+        expect.objectContaining({ path: "items[0].definitionVersion" }),
+      ]),
+    });
+  });
+
   it("refuses NaN and grossly out-of-bounds transforms", () => {
     expect(validateTransform({ x: NaN, y: 0, rotation: 0 }, canvas).ok).toBe(false);
     expect(validateTransform({ x: 100000, y: 0, rotation: 0 }, canvas).ok).toBe(false);
     expect(validateTransform({ x: 50, y: 35, rotation: 1 }, canvas).ok).toBe(true);
     expect(validateTransform({ x: 50, y: 35, rotation: 1, scale: 0 }, canvas).ok)
       .toBe(false);
+    expect(validateTransform({ x: canvas.size.width * 4, y: 0, rotation: 0 }, canvas))
+      .toEqual({ ok: true });
   });
 
   it("refuses a snapshot above the item limit", () => {
