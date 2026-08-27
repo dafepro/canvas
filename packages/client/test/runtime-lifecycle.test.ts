@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { emptySnapshot } from "@canvas-physics/core";
+import { emptySnapshot, type ItemDefinition } from "@canvas-physics/core";
 import {
   HostControlKind,
   toJsonBytes,
@@ -94,6 +94,7 @@ const build = (
     onError?: (error: CanvasConsumerError) => void;
     onJoined?: () => void | Promise<void>;
     spawnPointId?: string;
+    definitions?: ItemDefinition[];
   } = {},
 ) => {
   const terminate = vi.fn();
@@ -102,7 +103,7 @@ const build = (
   const session = new RoomSession({
     roomId: "team-lounge",
     serverUrl: "http://rooms.test",
-    definitions: rocketCanvasDefinitions,
+    definitions: options.definitions ?? rocketCanvasDefinitions,
     transport,
     driver,
     spawnPointId: options.spawnPointId,
@@ -481,6 +482,27 @@ describe("RoomSession lifecycle", () => {
       code: "join_initialization_failed",
       source: "initialization",
     });
+  });
+
+  it("rejects a duplicate definition bundle before initializing simulation", async () => {
+    const transport = new LifecycleTransport();
+    const duplicate = {
+      ...rocketCanvasDefinitions[0]!,
+      version: rocketCanvasDefinitions[0]!.version + 1,
+    };
+    const { session, send } = build(transport, {
+      definitions: [...rocketCanvasDefinitions, duplicate],
+    });
+    await session.start();
+    const ready = session.whenReady();
+    transport.deliver(accepted());
+
+    await expect(ready).rejects.toMatchObject({
+      code: "join_initialization_failed",
+      source: "initialization",
+      message: expect.stringContaining("duplicate item definition"),
+    });
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "init" }));
   });
 
   it("uses a requested arrival spawn and rejects an unknown one", async () => {

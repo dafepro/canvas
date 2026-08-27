@@ -62,6 +62,11 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	definitions, err := joinDefinitionSet(join.Definitions)
+	if err != nil {
+		s.writeJoinError(ctx, conn, roomID, "malformed_join", err.Error())
+		return
+	}
 
 	room, err := s.roomFor(ctx, roomID)
 	if err != nil {
@@ -88,10 +93,7 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 	client := newClient(newClientID(), identity, sendQueueDepth)
 	client.pageVisible = !join.PageHidden
 	client.hostEligible = !join.PageHidden
-	client.definitions = make(map[string]uint32, len(join.Definitions))
-	for _, definition := range join.Definitions {
-		client.definitions[definition.DefinitionId] = definition.Version
-	}
+	client.definitions = definitions
 
 	room.joins <- client
 	reason := "closed"
@@ -189,6 +191,20 @@ func (s *Server) readJoin(
 		return nil, false
 	}
 	return join, true
+}
+
+func joinDefinitionSet(definitions []*pb.DefinitionVersion) (map[string]uint32, error) {
+	result := make(map[string]uint32, len(definitions))
+	for _, definition := range definitions {
+		if definition == nil || definition.DefinitionId == "" {
+			return nil, errors.New("JOIN definition ids must be non-empty")
+		}
+		if _, duplicate := result[definition.DefinitionId]; duplicate {
+			return nil, errors.New("JOIN definition ids must be unique")
+		}
+		result[definition.DefinitionId] = definition.Version
+	}
+	return result, nil
 }
 
 func (s *Server) writeJoinError(

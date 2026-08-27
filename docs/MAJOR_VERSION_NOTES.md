@@ -27,9 +27,11 @@ or adapters that depended on previously under-specified behavior:
   fields receive defaults. Migration: omit a limit to request the default, or
   configure the intended positive limit explicitly.
 - **Snapshot and numeric validation:** unknown snapshot schemas, non-finite
-  mutation values, malformed effect JSON, and invalid limit shapes are rejected
-  instead of being accepted and partially interpreted. Migration: emit snapshot
-  schema 1 and values satisfying the published core validators.
+  mutation values, malformed embedded JSON, invalid definition/canvas physics,
+  duplicate JOIN definition IDs, cross-language integer overflow, and invalid
+  limit shapes are rejected instead of being accepted and partially
+  interpreted. Migration: emit snapshot schema 1, advertise each definition ID
+  once, and supply values satisfying the published core validators.
 
 ## Historical wire migration: protocol v4
 

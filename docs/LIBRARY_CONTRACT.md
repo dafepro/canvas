@@ -11,6 +11,22 @@ authentication, and metrics through documented interfaces. A product-specific
 feature that can be expressed through those interfaces does not belong in
 Canvas core.
 
+## Definition bundle contract
+
+A consumer supplies one item definition per `definitionId`. Duplicate IDs are
+ambiguous because the network advertisement, renderer, mutation controller,
+and physics worker otherwise choose by map insertion order; both client startup
+and server JOIN validation reject them. Before worker initialization, Canvas
+validates the complete bundle, including uint32 versions, positive finite visual
+and shape dimensions, finite body tuning and offsets, collision bit masks, and
+bounded material properties.
+
+Canvas definitions received in JOIN are likewise validated through all nested
+physics inputs: orientation and edge enums, static geometry, region and field
+shapes, environment values, spawn points, respawn references, limits, and
+system-item transforms. A bad bundle or canvas fails initialization atomically;
+no renderer or simulation callback receives a partially valid definition set.
+
 ## Observation contract
 
 `RoomSession` and `CanvasRuntime` expose four application-facing subscriptions:

@@ -1,5 +1,6 @@
 import {
   validateCanvasDefinition,
+  validateItemDefinition,
   validateSnapshot,
   type CanvasDefinition,
   type CanvasSnapshot,
@@ -582,6 +583,20 @@ export class RoomSession {
   }
 
   private validateJoinPayload(canvas: CanvasDefinition, snapshot: CanvasSnapshot): void {
+    const definitionIds = new Set<string>();
+    for (const definition of this.options.definitions) {
+      if (definitionIds.has(definition.definitionId)) {
+        throw new Error(`duplicate item definition '${definition.definitionId}'`);
+      }
+      definitionIds.add(definition.definitionId);
+      const validation = validateItemDefinition(definition);
+      if (!validation.ok) {
+        throw new Error(
+          `invalid item definition '${definition.definitionId}': ` +
+          formatProblems(validation.problems),
+        );
+      }
+    }
     const canvasValidation = validateCanvasDefinition(canvas);
     if (!canvasValidation.ok) {
       throw new Error(`invalid canvas definition: ${formatProblems(canvasValidation.problems)}`);

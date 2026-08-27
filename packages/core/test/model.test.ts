@@ -183,6 +183,106 @@ describe("validation", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("rejects malformed nested canvas physics before worker initialization", () => {
+    const broken = {
+      ...canvas,
+      orientation: "diagonal" as "side",
+      edges: { ...canvas.edges, top: "teleport" as "solid" },
+      staticGeometry: [{
+        id: "bad-wall",
+        shape: { type: "rect" as const, width: 0, height: 2 },
+        position: { x: Number.NaN, y: 1 },
+        rotation: Number.POSITIVE_INFINITY,
+        restitution: 2,
+        friction: -1,
+      }],
+      regions: [{
+        id: "bad-region",
+        shape: { type: "circle" as const, x: 1, y: 2, radius: 0 },
+        fieldModifier: {
+          blend: "linear" as const,
+          priority: Number.NaN,
+          gravityScale: Number.POSITIVE_INFINITY,
+        },
+      }],
+      environment: {
+        base: {
+          gravityXY: { x: Number.NaN, y: 20 },
+          linearDrag: -1,
+          angularDrag: Number.POSITIVE_INFINITY,
+        },
+      },
+      spawnPoints: [{ id: "bad-spawn", position: { x: -1, y: Number.NaN } }],
+      respawn: { delaySeconds: -1, spawnPointId: "missing" },
+    };
+
+    expect(validateCanvasDefinition(broken)).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([
+        expect.objectContaining({ path: "orientation" }),
+        expect.objectContaining({ path: "edges.top" }),
+        expect.objectContaining({ path: "staticGeometry[0].shape.width" }),
+        expect.objectContaining({ path: "staticGeometry[0].position" }),
+        expect.objectContaining({ path: "staticGeometry[0].rotation" }),
+        expect.objectContaining({ path: "staticGeometry[0].restitution" }),
+        expect.objectContaining({ path: "staticGeometry[0].friction" }),
+        expect.objectContaining({ path: "regions[0].shape.radius" }),
+        expect.objectContaining({ path: "regions[0].fieldModifier.priority" }),
+        expect.objectContaining({ path: "regions[0].fieldModifier.gravityScale" }),
+        expect.objectContaining({ path: "environment.base.gravityXY" }),
+        expect.objectContaining({ path: "environment.base.linearDrag" }),
+        expect.objectContaining({ path: "environment.base.angularDrag" }),
+        expect.objectContaining({ path: "spawnPoints[0].position" }),
+        expect.objectContaining({ path: "respawn.delaySeconds" }),
+        expect.objectContaining({ path: "respawn.spawnPointId" }),
+      ]),
+    });
+  });
+
+  it("rejects item-definition numerics that physics and rendering cannot represent", () => {
+    const broken = {
+      ...rocketDefinition,
+      visual: {
+        ...rocketDefinition.visual,
+        size: { width: Number.NaN, height: Number.POSITIVE_INFINITY },
+        animations: { broken: { frames: ["frame"], fps: 0, loop: true } },
+      },
+      body: {
+        mode: "dynamic" as const,
+        mass: 0,
+        gravityScale: Number.NaN,
+        linearDamping: -1,
+      },
+      colliders: [{
+        ...rocketDefinition.colliders[0]!,
+        shape: { type: "circle" as const, radius: 0 },
+        offset: { x: Number.NaN, y: 0 },
+        rotation: Number.POSITIVE_INFINITY,
+        collisionMask: 1.5,
+        restitution: 2,
+        friction: -1,
+        density: Number.NaN,
+      }],
+    };
+    expect(validateItemDefinition(broken)).toMatchObject({
+      ok: false,
+      problems: expect.arrayContaining([
+        expect.objectContaining({ path: "visual.size" }),
+        expect.objectContaining({ path: "visual.animations.broken.fps" }),
+        expect.objectContaining({ path: "body.mass" }),
+        expect.objectContaining({ path: "body.gravityScale" }),
+        expect.objectContaining({ path: "body.linearDamping" }),
+        expect.objectContaining({ path: "colliders[0].shape.radius" }),
+        expect.objectContaining({ path: "colliders[0].offset" }),
+        expect.objectContaining({ path: "colliders[0].rotation" }),
+        expect.objectContaining({ path: "colliders[0].collisionMask" }),
+        expect.objectContaining({ path: "colliders[0].restitution" }),
+        expect.objectContaining({ path: "colliders[0].friction" }),
+        expect.objectContaining({ path: "colliders[0].density" }),
+      ]),
+    });
+  });
+
   it("validates canvas limits without treating explicit zero as an omitted default", () => {
     expect(validateCanvasDefinition({
       ...canvas,

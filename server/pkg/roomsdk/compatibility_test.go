@@ -193,3 +193,28 @@ func TestCanonicalEffectRejectsMalformedJSONParameters(t *testing.T) {
 		t.Fatal("accepted malformed effect parameter JSON")
 	}
 }
+
+func TestJoinDefinitionSetRejectsAmbiguousEntries(t *testing.T) {
+	valid, err := joinDefinitionSet([]*pb.DefinitionVersion{
+		{DefinitionId: "rocket", Version: 1},
+		{DefinitionId: "ball", Version: 2},
+	})
+	if err != nil || valid["rocket"] != 1 || valid["ball"] != 2 {
+		t.Fatalf("valid definition set = %#v, %v", valid, err)
+	}
+
+	for name, definitions := range map[string][]*pb.DefinitionVersion{
+		"nil":      {nil},
+		"empty id": {{DefinitionId: "", Version: 1}},
+		"duplicate": {
+			{DefinitionId: "rocket", Version: 1},
+			{DefinitionId: "rocket", Version: 2},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := joinDefinitionSet(definitions); err == nil {
+				t.Fatal("accepted an ambiguous JOIN definition set")
+			}
+		})
+	}
+}
