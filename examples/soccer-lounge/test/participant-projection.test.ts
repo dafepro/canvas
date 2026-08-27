@@ -24,9 +24,11 @@ describe("soccer participant projection", () => {
         canvas,
         previousStatus: "active",
       });
-      expect(projection?.position.y).toBe(74);
-      expect(projection?.position.x).toBeGreaterThanOrEqual(44);
-      expect(projection?.position.x).toBeLessThanOrEqual(76);
+      const position = projection?.position;
+      expect(position).toBeDefined();
+      expect(position?.y).toBe(74);
+      expect(position?.x).toBeGreaterThanOrEqual(44);
+      expect(position?.x).toBeLessThanOrEqual(76);
     },
   );
 
@@ -35,9 +37,11 @@ describe("soccer participant projection", () => {
       canvas,
       previousStatus: "disconnected",
     });
-    expect([42, 78]).toContain(projection?.position.x);
-    expect(projection?.position.y).toBeGreaterThanOrEqual(30);
-    expect(projection?.position.y).toBeLessThanOrEqual(42);
+    const position = projection?.position;
+    expect(position).toBeDefined();
+    expect([42, 78]).toContain(position?.x);
+    expect(position?.y).toBeGreaterThanOrEqual(30);
+    expect(position?.y).toBeLessThanOrEqual(42);
   });
 
   it("does not override an initial active spawn", () => {

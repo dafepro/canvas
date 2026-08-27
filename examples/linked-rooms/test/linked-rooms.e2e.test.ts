@@ -183,6 +183,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
       ownerUserId: "",
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
     simulation.addAvatar({
       entityId: "avatar:traveler",
@@ -237,6 +238,7 @@ describe.skipIf(!goAvailable())("linked rooms through canvasd", () => {
       ownerUserId: "",
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
     simulation.addAvatar({
       entityId: "avatar:kicker",

@@ -46,6 +46,7 @@ const instance = (x: number, y: number): ItemInstance => ({
   ),
   createdAt: new Date(0).toISOString(),
   sceneRevision: 1,
+  itemRevision: 1,
 });
 
 const build = () =>
@@ -65,7 +66,7 @@ describe("soccer field integration", () => {
     expect(soccerBallJson.visual).toEqual(soccerBallDefinition.visual);
     expect(soccerGoalJson.visual).toEqual(soccerGoalDefinition.visual);
     expect(soccerBallDefinition.visual.size).toEqual({ width: 6, height: 6 });
-    expect(soccerBallDefinition.body.lockRotation).not.toBe(true);
+    expect(soccerBallDefinition.body?.lockRotation).not.toBe(true);
     expect(soccerBallDefinition.colliders[0]?.shape).toEqual({
       type: "circle",
       radius: 3,
@@ -99,7 +100,7 @@ describe("soccer field integration", () => {
 
     expect(ball?.visual.animations).toBeUndefined();
     expect(soccerBallDefinition.visual.animations?.hardKick).toBeDefined();
-    expect(ball?.body.lockRotation).not.toBe(true);
+    expect(ball?.body?.lockRotation).not.toBe(true);
   });
 
   it("applies the faster canvas-owned movement tuning to avatars", () => {

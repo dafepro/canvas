@@ -68,10 +68,13 @@ const withCooldown = (
   state: Readonly<BasketballState>,
   entityId: string,
   tick: number,
-): BasketballState["cooldownUntil"] => [
-  ...state.cooldownUntil.filter(([id]) => id !== entityId),
-  [entityId, tick],
-].sort((a, b) => a[0].localeCompare(b[0])) as BasketballState["cooldownUntil"];
+): BasketballState["cooldownUntil"] => {
+  const cooldowns: BasketballState["cooldownUntil"] = [
+    ...state.cooldownUntil.filter(([id]) => id !== entityId),
+    [entityId, tick],
+  ];
+  return cooldowns.sort(([left], [right]) => left.localeCompare(right));
+};
 
 const resetCommands = (centre: Vec2): BehaviorResult<BasketballState>["commands"] => [
   { type: "teleport", position: centre, velocity: { x: 0, y: 0 }, rotation: 0 },

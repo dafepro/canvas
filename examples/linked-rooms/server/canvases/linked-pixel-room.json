@@ -6,9 +6,9 @@
   "terrainDefaults": { "avatars": true, "items": true },
   "avatarController": { "radius": 1.4, "maxSpeed": 13, "acceleration": 70 },
   "staticGeometry": [
-    { "id": "top-furniture", "role": "worldSolid", "shape": { "type": "rect", "width": 40, "height": 4 }, "position": { "x": 24, "y": 4 } },
-    { "id": "left-bench", "role": "worldSolid", "shape": { "type": "rect", "width": 6, "height": 11 }, "position": { "x": 5, "y": 16 } },
-    { "id": "bottom-furniture", "role": "worldSolid", "shape": { "type": "rect", "width": 31, "height": 3 }, "position": { "x": 29, "y": 27.5 } }
+    { "id": "top-furniture", "role": "worldStatic", "shape": { "type": "rect", "width": 40, "height": 4 }, "position": { "x": 24, "y": 4 } },
+    { "id": "left-bench", "role": "worldStatic", "shape": { "type": "rect", "width": 6, "height": 11 }, "position": { "x": 5, "y": 16 } },
+    { "id": "bottom-furniture", "role": "worldStatic", "shape": { "type": "rect", "width": 31, "height": 3 }, "position": { "x": 29, "y": 27.5 } }
   ],
   "regions": [],
   "environment": { "base": { "gravityXY": { "x": 0, "y": 0 }, "linearDrag": 0.08, "angularDrag": 0.1, "softSpeedLimit": 14, "surfaceFrictionMultiplier": 1 } },

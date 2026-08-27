@@ -54,6 +54,7 @@ const ballInstance = (x: number, y: number): ItemInstance => ({
   resolvedConfig: basketballBallDefinition.defaultConfig,
   createdAt: new Date(0).toISOString(),
   sceneRevision: 1,
+  itemRevision: 1,
 });
 
 const simulation = () =>

@@ -247,6 +247,7 @@ describe("compact item playground", () => {
       resolvedConfig: defaultReactiveOrbConfig,
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     };
     simulation.addItem(orb);
     simulation.addAvatar({
@@ -341,6 +342,7 @@ describe("compact item playground", () => {
       resolvedConfig: defaultPairedPortalConfig,
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
     simulation.addAvatar({
       entityId: "avatar:traveler",
@@ -387,6 +389,7 @@ describe("compact item playground", () => {
       resolvedConfig: defaultPairedPortalConfig,
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
     simulation.addItem({
       entityId: "traveling-ball",
@@ -398,6 +401,7 @@ describe("compact item playground", () => {
       resolvedConfig: { speed: 8.5, initialDirection: { x: 1, y: 0 } },
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
 
     const effects = [];
@@ -482,6 +486,7 @@ describe("compact item playground", () => {
       resolvedConfig: antigravityFieldConfig,
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
     simulation.addItem({
       entityId: "lifted-ball",
@@ -493,6 +498,7 @@ describe("compact item playground", () => {
       resolvedConfig: { speed: 8.5, initialDirection: { x: 1, y: 0 } },
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
 
     for (let tick = 0; tick < 35; tick++) simulation.step();
@@ -521,6 +527,7 @@ describe("compact item playground", () => {
       resolvedConfig: blackHoleFieldConfig,
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
     simulation.addItem({
       entityId: "curved-ball",
@@ -532,6 +539,7 @@ describe("compact item playground", () => {
       resolvedConfig: { speed: 8.5, initialDirection: { x: 1, y: 0 } },
       createdAt: new Date().toISOString(),
       sceneRevision: 1,
+      itemRevision: 1,
     });
 
     for (let tick = 0; tick < 20; tick++) simulation.step();

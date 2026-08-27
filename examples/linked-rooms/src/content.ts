@@ -211,19 +211,19 @@ export const pixelRoomCanvas: CanvasDefinition = {
   staticGeometry: [
     {
       id: "top-furniture",
-      role: "worldSolid",
+      role: "worldStatic",
       shape: { type: "rect", width: 40, height: 4 },
       position: { x: 24, y: 4 },
     },
     {
       id: "left-bench",
-      role: "worldSolid",
+      role: "worldStatic",
       shape: { type: "rect", width: 6, height: 11 },
       position: { x: 5, y: 16 },
     },
     {
       id: "bottom-furniture",
-      role: "worldSolid",
+      role: "worldStatic",
       shape: { type: "rect", width: 31, height: 3 },
       position: { x: 29, y: 27.5 },
     },

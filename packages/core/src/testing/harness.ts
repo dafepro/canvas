@@ -234,6 +234,10 @@ export class BehaviorTestHarness<Config, State> {
     return this;
   }
 
+  commands<T extends BehaviorCommand["type"]>(
+    type: T,
+  ): Extract<BehaviorCommand, { type: T }>[];
+  commands(): BehaviorCommand[];
   commands(type?: BehaviorCommand["type"]): BehaviorCommand[] {
     const all = this.commandLog.map((entry) => entry.command);
     return type ? all.filter((command) => command.type === type) : all;
