@@ -46,5 +46,7 @@ describe("coordinated release contract", () => {
     expect(existsSync(join(root, majorNotes))).toBe(true);
     expect(read(majorNotes)).toContain("Next major");
     expect(read(majorNotes)).toContain("Migration");
+    expect(read("docs/COMPATIBILITY_AUDIT.md")).toContain("Findings ledger");
+    expect(read("docs/COMPATIBILITY_AUDIT.md")).toContain("Residual risks");
   });
 });
