@@ -524,6 +524,12 @@ func (r *Room) relayFromHost(from *Client, envelope *pb.RoomEnvelope) {
 }
 
 func (r *Room) validateCanonicalState(envelope *pb.RoomEnvelope) error {
+	if effect := envelope.GetEffectEvent(); effect != nil {
+		if len(effect.ParamsJson) > 0 && !json.Valid(effect.ParamsJson) {
+			return errInvalidEffect
+		}
+		return nil
+	}
 	if delta := envelope.GetStateDelta(); delta != nil {
 		if delta.SceneRevision != r.sceneRevision {
 			return errStaleScene

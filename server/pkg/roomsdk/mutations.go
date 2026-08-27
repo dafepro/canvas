@@ -21,6 +21,7 @@ var (
 	errMissingStateVector = errors.New("canonical state is missing a position or velocity")
 	errDefinitionMismatch = errors.New("canonical state definition does not match the durable item")
 	errInvalidBehavior    = errors.New("canonical behavior state is not valid json")
+	errInvalidEffect      = errors.New("canonical effect parameters are not valid json")
 	errNormalizationFlag  = errors.New("checkpoint final flag does not match snapshot normalization")
 	errInvalidTimer       = errors.New("checkpoint contains invalid behavior timer state")
 	errSnapshotSchema     = errors.New("snapshot schema version is not supported")

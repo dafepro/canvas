@@ -100,3 +100,18 @@ func TestScaleMutationRejectsANonFiniteValue(t *testing.T) {
 		t.Fatalf("accepted = %v, reason = %q, want non_finite_transform", accepted, reason)
 	}
 }
+
+func TestCanonicalEffectRejectsMalformedJSONParameters(t *testing.T) {
+	room := &Room{}
+	err := room.validateCanonicalState(&pb.RoomEnvelope{
+		Payload: &pb.RoomEnvelope_EffectEvent{EffectEvent: &pb.EffectEvent{
+			EntityId:   "item-1",
+			Effect:     "spark",
+			Mode:       "oneShot",
+			ParamsJson: []byte(`{`),
+		}},
+	})
+	if err == nil {
+		t.Fatal("accepted malformed effect parameter JSON")
+	}
+}
