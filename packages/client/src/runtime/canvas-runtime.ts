@@ -39,7 +39,6 @@ import {
 import type {
   ItemEditHandle,
   ItemMutationReceipt,
-  ItemMutationSnapshot,
 } from "./session/item-mutation-session.js";
 import {
   pixiAssetLoader,
@@ -71,6 +70,11 @@ import {
   type OverlayProjectionOptions,
   type OverlayViewportProjection,
 } from "../render/overlay-projection.js";
+import {
+  ObserverSet,
+  type Observer,
+  type SubscriptionOptions,
+} from "./observers.js";
 
 export interface CanvasRuntimeOptions {
   /** Product-owned room instance id. The server resolves its canvas template. */
@@ -162,16 +166,29 @@ export class CanvasRuntime {
   private disableKeyListener?: (event: KeyboardEvent) => void;
   private assetBundle?: LoadedAssetBundle<Texture>;
   private startPromise?: Promise<void>;
-  private readonly overlayProjections = new OverlayProjectionStore();
+  private readonly overlayProjections: OverlayProjectionStore;
+  private readonly errorObservers: ObserverSet<CanvasConsumerError>;
   private readonly fullscreen?: FullscreenController;
   private pointerWorldTarget?: Vec2;
-  private readonly startup = new RuntimeStartupProgressCoordinator();
+  private readonly startup: RuntimeStartupProgressCoordinator;
+  private readonly internalUnsubscribers: Array<() => void> = [];
+  private browserResourcesReleased = false;
 
   constructor(private readonly options: CanvasRuntimeOptions) {
+    this.errorObservers = new ObserverSet();
+    this.overlayProjections = new OverlayProjectionStore(
+      (cause) => this.reportObserverFailure("overlayProjection", cause),
+    );
+    this.startup = new RuntimeStartupProgressCoordinator(
+      () => Date.now(),
+      (cause) => this.reportObserverFailure("startup", cause),
+    );
     this.startup.configureAssets(options.assets?.sources ?? []);
     if (typeof document !== "undefined") {
       this.fullscreen = new FullscreenController(
         options.fullscreenElement ?? options.mount,
+        document,
+        (cause) => this.reportObserverFailure("fullscreen", cause),
       );
     }
     this.session = new RoomSession({
@@ -186,10 +203,15 @@ export class CanvasRuntime {
       spawnPointId: options.spawnPointId,
       projectParticipantAvatar: options.projectParticipantAvatar,
       onJoined: (canvas) => this.mountScene(canvas),
-      onError: options.onError,
+      onError: (error) => this.reportError(error),
     });
-    this.session.subscribeStartup((snapshot) => this.startup.acceptSession(snapshot));
-    this.session.subscribeEffects((emission) => this.scene?.effects.apply(emission));
+    this.internalUnsubscribers.push(
+      this.session.subscribeStartup((snapshot) => this.startup.acceptSession(snapshot)),
+      this.session.subscribeEffects((emission) => this.scene?.effects.apply(emission)),
+      this.session.subscribeLifecycle(({ state }) => {
+        if (state === "failed" || state === "stopped") this.releaseBrowserResources();
+      }),
+    );
   }
 
   /** The coordination client, for an application that needs the raw events. */
@@ -234,8 +256,8 @@ export class CanvasRuntime {
     return this.fullscreen?.toggle() ?? Promise.resolve(false);
   }
 
-  subscribeFullscreen(observer: FullscreenObserver): () => void {
-    return this.fullscreen?.subscribe(observer) ?? (() => {});
+  subscribeFullscreen(observer: FullscreenObserver, options?: SubscriptionOptions): () => void {
+    return this.fullscreen?.subscribe(observer, options) ?? (() => {});
   }
 
   get lifecycleState(): CanvasLifecycleState {
@@ -250,8 +272,16 @@ export class CanvasRuntime {
     return this.startup.snapshot;
   }
 
-  subscribeStartup(observer: RuntimeStartupObserver): () => void {
-    return this.startup.subscribe(observer);
+  subscribeStartup(observer: RuntimeStartupObserver, options?: SubscriptionOptions): () => void {
+    return this.startup.subscribe(observer, options);
+  }
+
+  /** Transient typed runtime failures. Errors are not replayed. */
+  subscribeErrors(
+    observer: Observer<CanvasConsumerError>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.errorObservers.subscribe(observer, options);
   }
 
   /** Resolves only after assets, canonical state, and the first Pixi update. */
@@ -300,7 +330,10 @@ export class CanvasRuntime {
           this.assetBundle = await preloadAssetManifest(this.options.assets, {
             adapter: this.options.assetLoader ?? pixiAssetLoader,
             onProgress: (progress) => this.startup.updateAssets(progress),
-            onWarning: this.options.onAssetWarning,
+            onWarning: (warning) => this.invokeConsumerCallback(
+              "assetWarning",
+              () => this.options.onAssetWarning?.(warning),
+            ),
           });
         }
         if (!this.running) {
@@ -321,11 +354,7 @@ export class CanvasRuntime {
         );
         this.startup.fail(error);
         this.session.stop();
-        try {
-          this.options.onError?.(error);
-        } catch {
-          // Keep the typed start rejection stable even if consumer reporting fails.
-        }
+        this.reportError(error);
         throw error;
       }
     })();
@@ -348,6 +377,12 @@ export class CanvasRuntime {
   private prepareStop(): void {
     this.running = false;
     this.startup.cancel();
+    this.releaseBrowserResources();
+  }
+
+  private releaseBrowserResources(): void {
+    if (this.browserResourcesReleased) return;
+    this.browserResourcesReleased = true;
     if (this.visibilityListener) {
       document.removeEventListener("visibilitychange", this.visibilityListener);
       this.visibilityListener = undefined;
@@ -371,12 +406,44 @@ export class CanvasRuntime {
     this.overlayProjections.clear();
     if (this.fullscreen?.active) void this.fullscreen.exit();
     this.fullscreen?.destroy();
+    for (const unsubscribe of this.internalUnsubscribers.splice(0)) unsubscribe();
+    this.destroyScene();
   }
 
   private destroyScene(): void {
     const scene = this.scene;
     this.scene = undefined;
     scene?.destroy();
+  }
+
+  private reportError(error: CanvasConsumerError): void {
+    try {
+      this.options.onError?.(error);
+    } catch {
+      // Error reporting cannot replace the original failure or recurse.
+    }
+    this.errorObservers.publish(error);
+  }
+
+  private reportObserverFailure(stream: string, cause: unknown): void {
+    this.reportError(lifecycleError(
+      "consumer_callback_failed",
+      `A '${stream}' callback threw`,
+      {
+        source: "consumer",
+        recoverable: true,
+        cause,
+        details: { stream },
+      },
+    ));
+  }
+
+  private invokeConsumerCallback(stream: string, callback: () => void): void {
+    try {
+      callback();
+    } catch (cause) {
+      this.reportObserverFailure(stream, cause);
+    }
   }
 
   private async mountScene(canvas: CanvasDefinition): Promise<void> {
@@ -386,20 +453,34 @@ export class CanvasRuntime {
         canvas,
         this.options.definitions,
       )) {
-        this.options.onAssetWarning?.(Object.freeze({
-          sourceId: "references",
-          message,
-          cause: undefined,
-        }));
+        this.invokeConsumerCallback("assetWarning", () => {
+          this.options.onAssetWarning?.(Object.freeze({
+            sourceId: "references",
+            message,
+            cause: undefined,
+          }));
+        });
       }
     }
-    this.scene = new PixiScene(
+    const scene = new PixiScene(
       canvas,
       this.options.definitions,
       this.options.scene,
       this.assetBundle,
     );
-    await this.scene.mount(this.options.mount);
+    this.scene = scene;
+    try {
+      await scene.mount(this.options.mount);
+    } catch (cause) {
+      if (this.scene === scene) this.scene = undefined;
+      scene.destroy();
+      throw cause;
+    }
+    if (!this.running) {
+      if (this.scene === scene) this.scene = undefined;
+      scene.destroy();
+      throw lifecycleError("start_cancelled", "Runtime startup was cancelled by stop");
+    }
     this.pointer = new AvatarPointerInteraction({
       ...this.options.pointer,
       avatarPosition: () => {
@@ -440,7 +521,10 @@ export class CanvasRuntime {
             : undefined;
         }
         this.scene?.setEditState(state);
-        this.options.onEditSelectionChange?.(state);
+        this.invokeConsumerCallback(
+          "editSelectionChange",
+          () => this.options.onEditSelectionChange?.(state),
+        );
       },
     });
     this.pointerCoordinator = new PointerInteractionCoordinator(
@@ -463,11 +547,7 @@ export class CanvasRuntime {
               details: { strategyId },
             },
           );
-          try {
-            this.options.onError?.(error);
-          } catch {
-            // Consumer reporting cannot corrupt pointer ownership.
-          }
+          this.reportError(error);
         },
       },
     );
@@ -495,7 +575,10 @@ export class CanvasRuntime {
       coordinator.cancel("avatar_disabled");
       pointer.reset();
     }
-    this.options.onAvatarDisabledChange?.(disabled);
+    this.invokeConsumerCallback(
+      "avatarDisabledChange",
+      () => this.options.onAvatarDisabledChange?.(disabled),
+    );
   }
 
   toggleAvatarDisabled(): boolean {
@@ -514,7 +597,10 @@ export class CanvasRuntime {
       this.clearItemEditSelection();
     }
     if (this.scene) this.scene.app.canvas.style.cursor = enabled ? "crosshair" : "";
-    this.options.onEditModeChange?.(enabled);
+    this.invokeConsumerCallback(
+      "editModeChange",
+      () => this.options.onEditModeChange?.(enabled),
+    );
   }
 
   toggleEditMode(): boolean {
@@ -640,7 +726,10 @@ export class CanvasRuntime {
         )
       ) {
         this.lastDiagnosticsAtMs = nowMs;
-        this.options.onDiagnostics(this.diagnostics());
+        this.invokeConsumerCallback(
+          "diagnostics",
+          () => this.options.onDiagnostics?.(this.diagnostics()),
+        );
       }
     });
   }
@@ -728,8 +817,8 @@ export class CanvasRuntime {
     return this.session.deleteItem(entityId);
   }
 
-  subscribeItemMutations(observer: (snapshot: ItemMutationSnapshot) => void): () => void {
-    return this.session.subscribeItemMutations(observer);
+  subscribeItemMutations(...args: Parameters<RoomSession["subscribeItemMutations"]>) {
+    return this.session.subscribeItemMutations(...args);
   }
 
   diagnostics(): RuntimeDiagnostics {

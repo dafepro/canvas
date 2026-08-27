@@ -2,6 +2,7 @@ import type { ItemBehavior } from "@canvas-physics/core";
 import { createSimulationBehaviorRegistry } from "./behavior-registry.js";
 import { SimulationKernel } from "./kernel.js";
 import type { SimulationRequest, SimulationResponse } from "./messages.js";
+import { ObserverSet, type SubscriptionOptions } from "../runtime/observers.js";
 
 export type SimulationListener = (message: SimulationResponse) => void;
 
@@ -13,12 +14,12 @@ interface SimulationChannel {
 
 /** The main-thread handle on the simulation. */
 export class SimulationDriver {
-  private readonly listeners = new Set<SimulationListener>();
+  private readonly listeners = new ObserverSet<SimulationResponse>();
   private readonly channel: SimulationChannel;
 
   constructor(source: Worker | ((post: SimulationListener) => SimulationChannel)) {
     const deliver: SimulationListener = (message) => {
-      for (const listener of this.listeners) listener(message);
+      this.listeners.publish(message);
     };
     if (typeof source === "function") {
       this.channel = source(deliver);
@@ -64,9 +65,8 @@ export class SimulationDriver {
     this.channel.send(request);
   }
 
-  onMessage(listener: SimulationListener): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+  onMessage(listener: SimulationListener, options?: SubscriptionOptions): () => void {
+    return this.listeners.subscribe(listener, options);
   }
 
   terminate(): void {

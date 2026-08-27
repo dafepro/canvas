@@ -33,5 +33,6 @@ export type {
   RuntimeStartupPhaseTiming,
   RuntimeStartupSnapshot,
 } from "./runtime/startup-progress.js";
+export type { SubscriptionOptions } from "./runtime/observers.js";
 export * from "./definitions/rocket-canvas.js";
 export * from "./assets/index.js";

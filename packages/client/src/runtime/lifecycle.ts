@@ -23,7 +23,8 @@ export type CanvasErrorSource =
   | "simulation"
   | "item-mutation"
   | "assets"
-  | "input";
+  | "input"
+  | "consumer";
 
 export type CanvasErrorCode =
   | "invalid_lifecycle_state"
@@ -36,7 +37,8 @@ export type CanvasErrorCode =
   | "simulation_failed"
   | "item_mutation_rejected"
   | "asset_preload_failed"
-  | "pointer_interaction_failed";
+  | "pointer_interaction_failed"
+  | "consumer_callback_failed";
 
 export interface CanvasConsumerErrorOptions {
   code: CanvasErrorCode;

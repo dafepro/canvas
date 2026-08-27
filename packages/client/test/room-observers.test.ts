@@ -12,6 +12,7 @@ import {
   type CanonicalStateSnapshot,
   type PresenceSnapshot,
 } from "../src/runtime/room-session.js";
+import type { CanvasConsumerError } from "../src/runtime/lifecycle.js";
 import { SimulationDriver } from "../src/simulation/driver.js";
 import { rocketCanvas, rocketCanvasDefinitions } from "../src/definitions/rocket-canvas.js";
 
@@ -54,6 +55,83 @@ const envelope = (payload: Partial<RoomEnvelope>): RoomEnvelope => ({
 });
 
 describe("RoomSession observers", () => {
+  it("isolates throwing observers, reports them, and owns AbortSignal cleanup", async () => {
+    const transport = new ObserverTransport();
+    const session = new RoomSession({
+      transport,
+      driver: new SimulationDriver(() => ({ send: () => {}, terminate: () => {} })),
+      roomId: rocketCanvas.id,
+      serverUrl: "http://rooms.test",
+      definitions: rocketCanvasDefinitions,
+    });
+    const errors: CanvasConsumerError[] = [];
+    session.subscribeErrors((error) => errors.push(error));
+
+    const lifecycle: string[] = [];
+    expect(() => session.subscribeLifecycle(() => {
+      throw new Error("broken lifecycle UI");
+    })).not.toThrow();
+    session.subscribeLifecycle(({ state }) => lifecycle.push(state));
+
+    const presence: PresenceSnapshot[] = [];
+    const presenceOwner = new AbortController();
+    session.subscribePresence(() => {
+      throw new Error("broken roster UI");
+    });
+    session.subscribePresence(
+      (snapshot) => presence.push(snapshot),
+      { signal: presenceOwner.signal },
+    );
+
+    await session.start();
+    expect(lifecycle).toContain("joining");
+    transport.deliver(envelope({
+      joinAccepted: {
+        clientId: "client-1",
+        userId: "user-1",
+        displayName: "Authenticated User",
+        sceneRevision: 0,
+        hostEpoch: 1,
+        hostClientId: "other-host",
+        canvasDefinitionJson: toJsonBytes(rocketCanvas),
+        snapshotJson: toJsonBytes(emptySnapshot(rocketCanvas.id, rocketCanvas.version)),
+        roomWasSleeping: false,
+        tickRate: 60,
+      },
+    }));
+    await session.whenReady();
+
+    const peer: Peer = {
+      clientId: "client-1",
+      userId: "user-1",
+      displayName: "Authenticated User",
+      isHost: false,
+      hostEligible: true,
+    };
+    expect(() => transport.deliver(envelope({ presence: { peers: [peer] } }))).not.toThrow();
+    expect(presence).toHaveLength(1);
+    expect(session.lifecycleState).toBe("active");
+    expect(errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "consumer_callback_failed",
+        source: "consumer",
+        recoverable: true,
+        details: { stream: "lifecycle" },
+      }),
+      expect.objectContaining({
+        code: "consumer_callback_failed",
+        source: "consumer",
+        recoverable: true,
+        details: { stream: "presence" },
+      }),
+    ]));
+
+    presenceOwner.abort();
+    transport.deliver(envelope({ presence: { peers: [] } }));
+    expect(presence).toHaveLength(1);
+    session.stop();
+  });
+
   it("replays immutable authenticated presence and complete canonical state", async () => {
     const transport = new ObserverTransport();
     const driver = new SimulationDriver(() => ({ send: () => {}, terminate: () => {} }));

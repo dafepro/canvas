@@ -162,6 +162,25 @@ describe("bounded overlay projection", () => {
     expect(second).not.toHaveBeenCalled();
   });
 
+  it("isolates observers and removes signal-owned subscriptions", () => {
+    const failures: unknown[] = [];
+    const store = new OverlayProjectionStore((cause) => failures.push(cause));
+    const owner = new AbortController();
+    const healthy = vi.fn();
+    store.subscribe(() => {
+      throw new Error("broken overlay UI");
+    });
+    store.subscribe(healthy, { maxHz: 60, signal: owner.signal });
+
+    expect(() => store.publish(source(0))).not.toThrow();
+    expect(healthy).toHaveBeenCalledOnce();
+    expect(failures).toHaveLength(1);
+
+    owner.abort();
+    store.publish(source(20));
+    expect(healthy).toHaveBeenCalledOnce();
+  });
+
   it("projects consumer-owned world anchors through a plain immutable camera value", () => {
     const projected = projectOverlayPoint(
       { x: 4, y: 6, z: 1 },

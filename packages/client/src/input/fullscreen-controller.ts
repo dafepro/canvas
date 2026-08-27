@@ -1,3 +1,9 @@
+import {
+  ObserverSet,
+  type ObserverErrorHandler,
+  type SubscriptionOptions,
+} from "../runtime/observers.js";
+
 export type FullscreenObserver = (active: boolean) => void;
 
 type FullscreenElement = HTMLElement & {
@@ -11,15 +17,17 @@ type FullscreenDocument = Document & {
 
 /** Product-UI-agnostic wrapper around the browser fullscreen contract. */
 export class FullscreenController {
-  private readonly observers = new Set<FullscreenObserver>();
+  private readonly observers: ObserverSet<boolean>;
   private readonly onChange = (): void => {
-    for (const observer of this.observers) observer(this.active);
+    this.observers.publish(this.active);
   };
 
   constructor(
     private readonly element: HTMLElement,
     private readonly ownerDocument: Document = document,
+    onObserverError?: ObserverErrorHandler,
   ) {
+    this.observers = new ObserverSet(onObserverError);
     this.ownerDocument.addEventListener("fullscreenchange", this.onChange);
     this.ownerDocument.addEventListener("webkitfullscreenchange", this.onChange);
   }
@@ -30,10 +38,8 @@ export class FullscreenController {
       this.element;
   }
 
-  subscribe(observer: FullscreenObserver): () => void {
-    this.observers.add(observer);
-    observer(this.active);
-    return () => this.observers.delete(observer);
+  subscribe(observer: FullscreenObserver, options?: SubscriptionOptions): () => void {
+    return this.observers.subscribe(observer, options, () => this.active);
   }
 
   async enter(): Promise<boolean> {

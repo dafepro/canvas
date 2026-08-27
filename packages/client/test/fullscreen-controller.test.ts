@@ -58,4 +58,34 @@ describe("FullscreenController", () => {
     expect(await controller.enter()).toBe(false);
     expect(await controller.exit()).toBe(false);
   });
+
+  it("isolates observers and removes signal-owned subscriptions", async () => {
+    const document = new FullscreenDocument();
+    const failures: unknown[] = [];
+    const element = {
+      requestFullscreen: vi.fn(async () => {
+        document.fullscreenElement = element as unknown as Element;
+        document.emit();
+      }),
+    } as unknown as HTMLElement;
+    const controller = new FullscreenController(
+      element,
+      document as unknown as Document,
+      (cause) => failures.push(cause),
+    );
+    const owner = new AbortController();
+    const states: boolean[] = [];
+    expect(() => controller.subscribe(() => {
+      throw new Error("broken fullscreen control");
+    })).not.toThrow();
+    controller.subscribe((active) => states.push(active), { signal: owner.signal });
+
+    await expect(controller.enter()).resolves.toBe(true);
+    expect(states).toEqual([false, true]);
+    expect(failures).toHaveLength(2);
+
+    owner.abort();
+    await controller.exit();
+    expect(states).toEqual([false, true]);
+  });
 });

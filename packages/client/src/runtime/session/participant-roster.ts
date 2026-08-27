@@ -1,6 +1,12 @@
 import type { CanvasDefinition, CanvasSnapshot, Vec2 } from "@canvas-physics/core";
 import type { Peer } from "@canvas-physics/protocol";
 import type { RenderEntity, SimulationRequest } from "../../simulation/messages.js";
+import {
+  ObserverSet,
+  type Observer,
+  type ObserverErrorHandler,
+  type SubscriptionOptions,
+} from "../observers.js";
 
 export type ParticipantStatus = "active" | "inactive" | "disconnected";
 
@@ -35,6 +41,7 @@ export interface PresenceSnapshot {
 
 export interface ParticipantRosterOptions {
   readonly projectAvatar?: ParticipantAvatarProjector;
+  readonly onObserverError?: ObserverErrorHandler;
 }
 
 export interface HostAvatarReconciliationContext {
@@ -43,18 +50,18 @@ export interface HostAvatarReconciliationContext {
   readonly spawnPosition: (entityId: string) => Vec2;
 }
 
-type Observer<T> = (value: T) => void;
-
 /** Stable participant identity, lifecycle, projection, and last validated pose. */
 export class ParticipantRoster {
   private readonly participantsById = new Map<string, ParticipantPresence>();
   private readonly appliedStatusByAvatar = new Map<string, ParticipantStatus>();
   private readonly lastCanonicalPositions = new Map<string, Vec2>();
-  private readonly observers = new Set<Observer<PresenceSnapshot>>();
+  private readonly observers: ObserverSet<PresenceSnapshot>;
   private peersValue?: readonly Peer[];
   private snapshotValue: PresenceSnapshot = Object.freeze({ participants: Object.freeze([]) });
 
-  constructor(private readonly options: ParticipantRosterOptions = {}) {}
+  constructor(private readonly options: ParticipantRosterOptions = {}) {
+    this.observers = new ObserverSet(options.onObserverError);
+  }
 
   get snapshot(): PresenceSnapshot {
     return this.snapshotValue;
@@ -72,10 +79,12 @@ export class ParticipantRoster {
     return Object.freeze((this.peersValue ?? []).map((peer) => avatarEntityId(peer.userId)));
   }
 
-  subscribe(observer: Observer<PresenceSnapshot>): () => void {
-    this.observers.add(observer);
-    if (this.peersValue !== undefined) observer(this.snapshotValue);
-    return () => this.observers.delete(observer);
+  subscribe(observer: Observer<PresenceSnapshot>, options?: SubscriptionOptions): () => void {
+    return this.observers.subscribe(
+      observer,
+      options,
+      this.peersValue !== undefined ? () => this.snapshotValue : undefined,
+    );
   }
 
   clearObservers(): void {
@@ -229,7 +238,7 @@ export class ParticipantRoster {
         .map((participant) => Object.freeze({ ...participant })),
     );
     this.snapshotValue = Object.freeze({ participants });
-    for (const observer of this.observers) observer(this.snapshotValue);
+    this.observers.publish(this.snapshotValue);
   }
 }
 

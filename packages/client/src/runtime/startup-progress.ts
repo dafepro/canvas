@@ -3,6 +3,11 @@ import {
   lifecycleError,
   type CanvasConsumerError,
 } from "./lifecycle.js";
+import {
+  ObserverSet,
+  type ObserverErrorHandler,
+  type SubscriptionOptions,
+} from "./observers.js";
 
 export type RuntimeStartupActivePhase =
   | "assets"
@@ -74,7 +79,7 @@ const sameAssets = (
 
 /** Internal monotonic state machine behind the public startup snapshot stream. */
 export class StartupProgress {
-  private readonly observers = new Set<RuntimeStartupObserver>();
+  private readonly observers: ObserverSet<Readonly<RuntimeStartupSnapshot>>;
   private readonly startedAtMs: number;
   private phaseStartedAtMs: number;
   private phaseValue: RuntimeStartupPhase;
@@ -91,7 +96,9 @@ export class StartupProgress {
   constructor(
     initialPhase: RuntimeStartupActivePhase,
     private readonly now: () => number = () => Date.now(),
+    onObserverError?: ObserverErrorHandler,
   ) {
+    this.observers = new ObserverSet(onObserverError);
     this.startedAtMs = now();
     this.phaseStartedAtMs = this.startedAtMs;
     this.phaseValue = initialPhase;
@@ -102,10 +109,8 @@ export class StartupProgress {
     return this.snapshotValue;
   }
 
-  subscribe(observer: RuntimeStartupObserver): () => void {
-    this.observers.add(observer);
-    this.notify(observer);
-    return () => this.observers.delete(observer);
+  subscribe(observer: RuntimeStartupObserver, options?: SubscriptionOptions): () => void {
+    return this.observers.subscribe(observer, options, () => this.snapshotValue);
   }
 
   waitUntilReady(): Promise<void> {
@@ -189,15 +194,7 @@ export class StartupProgress {
 
   private publish(): void {
     this.snapshotValue = this.createSnapshot();
-    for (const observer of this.observers) this.notify(observer);
-  }
-
-  private notify(observer: RuntimeStartupObserver): void {
-    try {
-      observer(this.snapshotValue);
-    } catch {
-      // A presentation callback cannot corrupt startup state or other observers.
-    }
+    this.observers.publish(this.snapshotValue);
   }
 
   private createSnapshot(): Readonly<RuntimeStartupSnapshot> {
@@ -220,16 +217,19 @@ export class RuntimeStartupProgressCoordinator {
   private pendingSession?: Readonly<RuntimeStartupSnapshot>;
   private awaitingPresentedFrame = false;
 
-  constructor(now: () => number = () => Date.now()) {
-    this.progress = new StartupProgress("assets", now);
+  constructor(
+    now: () => number = () => Date.now(),
+    onObserverError?: ObserverErrorHandler,
+  ) {
+    this.progress = new StartupProgress("assets", now, onObserverError);
   }
 
   get snapshot(): Readonly<RuntimeStartupSnapshot> {
     return this.progress.snapshot;
   }
 
-  subscribe(observer: RuntimeStartupObserver): () => void {
-    return this.progress.subscribe(observer);
+  subscribe(observer: RuntimeStartupObserver, options?: SubscriptionOptions): () => void {
+    return this.progress.subscribe(observer, options);
   }
 
   waitUntilReady(): Promise<void> {

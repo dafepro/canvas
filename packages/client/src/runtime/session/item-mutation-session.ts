@@ -27,6 +27,12 @@ import {
   type SessionClock,
   type SessionTimeout,
 } from "./session-clock.js";
+import {
+  ObserverSet,
+  type Observer,
+  type ObserverErrorHandler,
+  type SubscriptionOptions,
+} from "../observers.js";
 
 export interface ItemMutationContext {
   readonly clientId: string;
@@ -51,6 +57,7 @@ export interface ItemMutationSessionOptions {
   readonly clock?: SessionClock;
   readonly context: () => ItemMutationContext;
   readonly emit: (effect: ItemMutationEffect) => void;
+  readonly onObserverError?: ObserverErrorHandler;
 }
 
 export type ItemMutationRejectCode =
@@ -164,8 +171,6 @@ interface EditRecord {
   previewSequence: number;
 }
 
-type Observer<T> = (value: T) => void;
-
 const freezeItem = (item: SnapshotItem | undefined): SnapshotItem | undefined =>
   item ? Object.freeze({ ...item, transform: Object.freeze({ ...item.transform }) }) : undefined;
 
@@ -195,7 +200,7 @@ export class ItemMutationSession {
   private readonly mutationQueues = new Map<string, PendingMutation[]>();
   private readonly editsById = new Map<string, EditRecord>();
   private readonly editByEntity = new Map<string, EditRecord>();
-  private readonly mutationObservers = new Set<Observer<ItemMutationSnapshot>>();
+  private readonly mutationObservers: ObserverSet<ItemMutationSnapshot>;
   private readonly presentation = new ItemEditPresentation();
   private mutationCounter = 0;
   private editCounter = 0;
@@ -209,6 +214,7 @@ export class ItemMutationSession {
     this.clock = options.clock ?? systemSessionClock;
     this.context = options.context;
     this.emit = options.emit;
+    this.mutationObservers = new ObserverSet(options.onObserverError);
   }
 
   get itemCount(): number { return this.metadataById.size; }
@@ -221,10 +227,11 @@ export class ItemMutationSession {
     return this.metadataById.get(entityId)?.itemRevision;
   }
 
-  subscribeMutations(observer: Observer<ItemMutationSnapshot>): () => void {
-    this.mutationObservers.add(observer);
-    observer(this.mutationSnapshot());
-    return () => this.mutationObservers.delete(observer);
+  subscribeMutations(
+    observer: Observer<ItemMutationSnapshot>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.mutationObservers.subscribe(observer, options, () => this.mutationSnapshot());
   }
 
   loadSnapshot(snapshot: CanvasSnapshot): void {
@@ -868,9 +875,8 @@ export class ItemMutationSession {
   }
 
   private publishMutations(): void {
-    if (this.mutationObservers.size === 0) return;
     const snapshot = this.mutationSnapshot();
-    for (const observer of this.mutationObservers) observer(snapshot);
+    this.mutationObservers.publish(snapshot);
   }
 }
 

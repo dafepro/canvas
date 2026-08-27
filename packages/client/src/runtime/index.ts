@@ -39,6 +39,7 @@ export type {
   RuntimeStartupPhaseTiming,
   RuntimeStartupSnapshot,
 } from "./startup-progress.js";
+export type { SubscriptionOptions } from "./observers.js";
 export * from "../render/overlay-projection.js";
 export { defaultPointerFlickOptions } from "../input/avatar-pointer-interaction.js";
 export type {

@@ -9,6 +9,12 @@ import { AvatarReconciler } from "../../net/avatar-reconciler.js";
 import { dequantizeTransform, quantizeTransform } from "../../net/quantization.js";
 import { InterpolationBuffer } from "../../render/interpolation-buffer.js";
 import type { RenderEntity } from "../../simulation/messages.js";
+import {
+  ObserverSet,
+  type Observer,
+  type ObserverErrorHandler,
+  type SubscriptionOptions,
+} from "../observers.js";
 
 export interface CanonicalStateSnapshot {
   readonly tick: number;
@@ -24,12 +30,11 @@ export interface BehaviorStateSnapshot {
   }[];
 }
 
-type Observer<T> = (value: T) => void;
-
 export interface ReplicationTimelineOptions {
   readonly sceneRevision: () => number;
   readonly decorate?: (entity: RenderEntity) => RenderEntity;
   readonly onCanonical?: (tick: number, entities: readonly RenderEntity[]) => void;
+  readonly onObserverError?: ObserverErrorHandler;
 }
 
 export interface EncodedHostFrame {
@@ -55,8 +60,8 @@ export class ReplicationTimeline {
   private readonly localPredictionHistory = new Map<number, Readonly<Vec2>>();
   private readonly lastSent = new Map<string, SentSample>();
   private readonly lastBehaviorJson = new Map<string, string>();
-  private readonly canonicalObservers = new Set<Observer<CanonicalStateSnapshot>>();
-  private readonly behaviorObservers = new Set<Observer<BehaviorStateSnapshot>>();
+  private readonly canonicalObservers: ObserverSet<CanonicalStateSnapshot>;
+  private readonly behaviorObservers: ObserverSet<BehaviorStateSnapshot>;
   private hostEntitiesValue: RenderEntity[] = [];
   private localPrediction?: RenderEntity;
   private lastReconciledTick?: number;
@@ -66,7 +71,10 @@ export class ReplicationTimeline {
   private latestCanonicalSnapshot?: CanonicalStateSnapshot;
   private latestBehaviorSnapshot?: BehaviorStateSnapshot;
 
-  constructor(private readonly options: ReplicationTimelineOptions) {}
+  constructor(private readonly options: ReplicationTimelineOptions) {
+    this.canonicalObservers = new ObserverSet(options.onObserverError);
+    this.behaviorObservers = new ObserverSet(options.onObserverError);
+  }
 
   get tick(): number {
     return this.currentTick;
@@ -99,16 +107,26 @@ export class ReplicationTimeline {
     });
   }
 
-  subscribeCanonical(observer: Observer<CanonicalStateSnapshot>): () => void {
-    this.canonicalObservers.add(observer);
-    if (this.latestCanonicalSnapshot) observer(this.latestCanonicalSnapshot);
-    return () => this.canonicalObservers.delete(observer);
+  subscribeCanonical(
+    observer: Observer<CanonicalStateSnapshot>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.canonicalObservers.subscribe(
+      observer,
+      options,
+      this.latestCanonicalSnapshot ? () => this.latestCanonicalSnapshot! : undefined,
+    );
   }
 
-  subscribeBehavior(observer: Observer<BehaviorStateSnapshot>): () => void {
-    this.behaviorObservers.add(observer);
-    if (this.latestBehaviorSnapshot) observer(this.latestBehaviorSnapshot);
-    return () => this.behaviorObservers.delete(observer);
+  subscribeBehavior(
+    observer: Observer<BehaviorStateSnapshot>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.behaviorObservers.subscribe(
+      observer,
+      options,
+      this.latestBehaviorSnapshot ? () => this.latestBehaviorSnapshot! : undefined,
+    );
   }
 
   clearObservers(): void {
@@ -264,8 +282,8 @@ export class ReplicationTimeline {
     );
     const behavior = Object.freeze({ tick, states });
     this.latestBehaviorSnapshot = behavior;
-    for (const observer of this.canonicalObservers) observer(canonical);
-    for (const observer of this.behaviorObservers) observer(behavior);
+    this.canonicalObservers.publish(canonical);
+    this.behaviorObservers.publish(behavior);
   }
 
   private changedEntities(): RenderEntity[] {

@@ -11,6 +11,12 @@ import {
   type SessionClock,
   type SessionInterval,
 } from "./session-clock.js";
+import {
+  ObserverSet,
+  type Observer,
+  type ObserverErrorHandler,
+  type SubscriptionOptions,
+} from "../observers.js";
 
 export interface ConnectionJoin {
   readonly generation: number;
@@ -37,16 +43,15 @@ export interface ConnectionSessionOptions {
   ) => void | Promise<void>;
   readonly installJoin: (join: ConnectionJoin) => void;
   readonly emit: (effect: ConnectionEffect) => void;
+  readonly onObserverError?: ObserverErrorHandler;
 }
-
-type Observer<T> = (value: T) => void;
 
 /** Owns single-use connection lifecycle, JOIN generations, and public readiness. */
 export class ConnectionSession {
   private generationValue = 0;
   private lifecycleValue: CanvasLifecycleState = "idle";
   private snapshotValue: CanvasLifecycleSnapshot = Object.freeze({ state: "idle" });
-  private readonly observers = new Set<Observer<CanvasLifecycleSnapshot>>();
+  private readonly observers: ObserverSet<CanvasLifecycleSnapshot>;
   private readonly readyWaiters = new Set<{
     resolve: () => void;
     reject: (error: CanvasConsumerError) => void;
@@ -65,6 +70,7 @@ export class ConnectionSession {
 
   constructor(private readonly options: ConnectionSessionOptions) {
     this.clock = options.clock ?? systemSessionClock;
+    this.observers = new ObserverSet(options.onObserverError);
   }
 
   get generation(): number {
@@ -107,10 +113,11 @@ export class ConnectionSession {
     this.schedules.push(this.clock.setInterval(callback, everyMs));
   }
 
-  subscribe(observer: Observer<CanvasLifecycleSnapshot>): () => void {
-    this.observers.add(observer);
-    observer(this.snapshotValue);
-    return () => this.observers.delete(observer);
+  subscribe(
+    observer: Observer<CanvasLifecycleSnapshot>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.observers.subscribe(observer, options, () => this.snapshotValue);
   }
 
   whenReady(): Promise<void> {
@@ -331,7 +338,7 @@ export class ConnectionSession {
     const previousState = this.lifecycleValue;
     this.lifecycleValue = state;
     this.snapshotValue = Object.freeze({ state, previousState, detail });
-    for (const observer of this.observers) observer(this.snapshotValue);
+    this.observers.publish(this.snapshotValue);
 
     if (state === "active" || state === "backgrounded") {
       for (const waiter of this.readyWaiters) waiter.resolve();

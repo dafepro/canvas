@@ -1,5 +1,9 @@
 import type { Vec2 } from "@canvas-physics/core";
 import type { RenderEntity } from "../simulation/messages.js";
+import type {
+  ObserverErrorHandler,
+  SubscriptionOptions,
+} from "../runtime/observers.js";
 
 export const MAX_OVERLAY_OBSERVATION_HZ = 60;
 export const MAX_OVERLAY_ENTITIES = 256;
@@ -55,7 +59,7 @@ export interface OverlayProjectionSnapshot {
   readonly truncated: boolean;
 }
 
-export interface OverlayProjectionOptions {
+export interface OverlayProjectionOptions extends SubscriptionOptions {
   /** Defaults to 10 and may not exceed 60. */
   readonly maxHz?: number;
   /** Defaults to 128 and may not exceed 256. */
@@ -104,6 +108,7 @@ interface Subscription {
   readonly kinds?: ReadonlySet<RenderEntity["kind"]>;
   readonly definitionIds?: ReadonlySet<string>;
   lastPublishedAtMs: number;
+  unsubscribe(): void;
 }
 
 /**
@@ -113,6 +118,8 @@ interface Subscription {
 export class OverlayProjectionStore {
   private readonly subscriptions = new Set<Subscription>();
 
+  constructor(private readonly onObserverError?: ObserverErrorHandler) {}
+
   get hasObservers(): boolean {
     return this.subscriptions.size > 0;
   }
@@ -121,6 +128,7 @@ export class OverlayProjectionStore {
     observer: OverlayProjectionObserver,
     options: OverlayProjectionOptions = {},
   ): () => void {
+    if (options.signal?.aborted) return () => {};
     const maxHz = options.maxHz ?? DEFAULT_OVERLAY_OBSERVATION_HZ;
     const maxEntities = options.maxEntities ?? DEFAULT_OVERLAY_ENTITIES;
     assertFiniteRange("maxHz", maxHz, 0, MAX_OVERLAY_OBSERVATION_HZ);
@@ -128,7 +136,15 @@ export class OverlayProjectionStore {
     assertFilterBound("entityIds", options.entityIds);
     assertFilterBound("definitionIds", options.definitionIds);
 
-    const subscription: Subscription = {
+    let active = true;
+    let subscription: Subscription;
+    const unsubscribe = (): void => {
+      if (!active) return;
+      active = false;
+      this.subscriptions.delete(subscription);
+      options.signal?.removeEventListener("abort", unsubscribe);
+    };
+    subscription = {
       observer,
       intervalMs: 1_000 / maxHz,
       maxEntities,
@@ -138,9 +154,11 @@ export class OverlayProjectionStore {
         ? new Set(options.definitionIds)
         : undefined,
       lastPublishedAtMs: Number.NEGATIVE_INFINITY,
+      unsubscribe,
     };
     this.subscriptions.add(subscription);
-    return () => this.subscriptions.delete(subscription);
+    options.signal?.addEventListener("abort", unsubscribe, { once: true });
+    return unsubscribe;
   }
 
   publish(source: OverlayProjectionSource): void {
@@ -152,14 +170,19 @@ export class OverlayProjectionStore {
       const snapshot = projectSnapshot(source, subscription);
       try {
         subscription.observer(snapshot);
-      } catch {
+      } catch (cause) {
         // One application overlay must not interrupt rendering or other observers.
+        try {
+          this.onObserverError?.(cause);
+        } catch {
+          // Reporting is another consumer callback and cannot interrupt rendering.
+        }
       }
     }
   }
 
   clear(): void {
-    this.subscriptions.clear();
+    for (const subscription of [...this.subscriptions]) subscription.unsubscribe();
   }
 }
 

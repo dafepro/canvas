@@ -64,6 +64,11 @@ import {
   type RuntimeStartupObserver,
   type RuntimeStartupSnapshot,
 } from "./startup-progress.js";
+import {
+  ObserverSet,
+  type Observer,
+  type SubscriptionOptions,
+} from "./observers.js";
 
 export type {
   BehaviorStateSnapshot,
@@ -146,8 +151,6 @@ export interface RoomSessionOptions {
   onError?: (error: CanvasConsumerError) => void;
 }
 
-type Observer<T> = (value: T) => void;
-
 export interface SessionDiagnostics {
   status: string;
   isHost: boolean;
@@ -199,12 +202,13 @@ export class RoomSession {
   private readonly timeline: ReplicationTimeline;
   private readonly roster: ParticipantRoster;
   private readonly presentation = new PresentationGate();
-  private readonly startup = new StartupProgress("credentials");
+  private readonly startup: StartupProgress;
   private readonly hostRole: HostRoleSession;
   private readonly connection: ConnectionSession;
   private localAvatarId = "";
   private inputSequence = 0;
-  private readonly effectObservers = new Set<Observer<Readonly<EffectEmission>>>();
+  private readonly effectObservers: ObserverSet<Readonly<EffectEmission>>;
+  private readonly errorObservers: ObserverSet<CanvasConsumerError>;
   private stats = {
     hz: 0,
     driftMs: 0,
@@ -237,6 +241,15 @@ export class RoomSession {
     const transport =
       options.transport ??
       new WebSocketRoomTransport({ credentialProvider: options.credentialProvider! });
+    this.errorObservers = new ObserverSet();
+    this.effectObservers = new ObserverSet(
+      (cause) => this.reportObserverFailure("effects", cause),
+    );
+    this.startup = new StartupProgress(
+      "credentials",
+      () => Date.now(),
+      (cause) => this.reportObserverFailure("startup", cause),
+    );
     this.driver = options.driver ?? SimulationDriver.spawn();
     this.client = new RoomClient({
       transport,
@@ -265,9 +278,11 @@ export class RoomSession {
         canvas: this.canvasDefinition,
       }),
       emit: (effect) => this.applyItemMutationEffect(effect),
+      onObserverError: (cause) => this.reportObserverFailure("itemMutations", cause),
     });
     this.roster = new ParticipantRoster({
       projectAvatar: options.projectParticipantAvatar,
+      onObserverError: (cause) => this.reportObserverFailure("presence", cause),
     });
     this.timeline = new ReplicationTimeline({
       sceneRevision: () => this.client.durableRevision.sceneRevision,
@@ -282,12 +297,14 @@ export class RoomSession {
           canonical.map((entity) => entity.id),
         );
       },
+      onObserverError: (cause) => this.reportObserverFailure("canonicalState", cause),
     });
     this.connection = new ConnectionSession({
       validateJoin: (canvas, snapshot) => this.validateJoinPayload(canvas, snapshot),
       initializeConsumer: options.onJoined,
       installJoin: (join) => this.installAcceptedJoin(join),
       emit: (effect) => this.applyConnectionEffect(effect),
+      onObserverError: (cause) => this.reportObserverFailure("lifecycle", cause),
     });
     this.connection.subscribe((snapshot) => this.observeConnectionStartup(snapshot));
     this.wireClient();
@@ -314,41 +331,63 @@ export class RoomSession {
     return this.client.connectionIdentity.displayName;
   }
 
-  subscribePresence(observer: Observer<PresenceSnapshot>): () => void {
-    return this.roster.subscribe(observer);
+  subscribePresence(observer: Observer<PresenceSnapshot>, options?: SubscriptionOptions): () => void {
+    return this.roster.subscribe(observer, options);
   }
 
-  subscribeCanonicalState(observer: Observer<CanonicalStateSnapshot>): () => void {
-    return this.timeline.subscribeCanonical(observer);
+  subscribeCanonicalState(
+    observer: Observer<CanonicalStateSnapshot>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.timeline.subscribeCanonical(observer, options);
   }
 
-  subscribeBehaviorState(observer: Observer<BehaviorStateSnapshot>): () => void {
-    return this.timeline.subscribeBehavior(observer);
+  subscribeBehaviorState(
+    observer: Observer<BehaviorStateSnapshot>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.timeline.subscribeBehavior(observer, options);
   }
 
-  subscribeEffects(observer: Observer<Readonly<EffectEmission>>): () => void {
-    this.effectObservers.add(observer);
-    return () => this.effectObservers.delete(observer);
+  subscribeEffects(
+    observer: Observer<Readonly<EffectEmission>>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.effectObservers.subscribe(observer, options);
   }
 
-  subscribeItemMutations(observer: Observer<ItemMutationSnapshot>): () => void {
-    return this.mutations.subscribeMutations(observer);
+  subscribeItemMutations(
+    observer: Observer<ItemMutationSnapshot>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.mutations.subscribeMutations(observer, options);
   }
 
   get lifecycleState(): CanvasLifecycleState {
     return this.connection.lifecycleState;
   }
 
-  subscribeLifecycle(observer: Observer<CanvasLifecycleSnapshot>): () => void {
-    return this.connection.subscribe(observer);
+  subscribeLifecycle(
+    observer: Observer<CanvasLifecycleSnapshot>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.connection.subscribe(observer, options);
   }
 
   get startupSnapshot(): Readonly<RuntimeStartupSnapshot> {
     return this.startup.snapshot;
   }
 
-  subscribeStartup(observer: RuntimeStartupObserver): () => void {
-    return this.startup.subscribe(observer);
+  subscribeStartup(observer: RuntimeStartupObserver, options?: SubscriptionOptions): () => void {
+    return this.startup.subscribe(observer, options);
+  }
+
+  /** Transient typed runtime failures. Errors are not replayed. */
+  subscribeErrors(
+    observer: Observer<CanvasConsumerError>,
+    options?: SubscriptionOptions,
+  ): () => void {
+    return this.errorObservers.subscribe(observer, options);
   }
 
   whenStartupReady(): Promise<void> {
@@ -427,6 +466,7 @@ export class RoomSession {
     this.roster.clearObservers();
     this.timeline.clearObservers();
     this.effectObservers.clear();
+    this.errorObservers.clear();
   }
 
   private reportError(error: CanvasConsumerError): void {
@@ -437,12 +477,26 @@ export class RoomSession {
       // A consumer callback must not prevent terminal resource cleanup or
       // replace the typed error rejected by start()/whenReady().
     }
+    this.errorObservers.publish(error);
+  }
+
+  private reportObserverFailure(stream: string, cause: unknown): void {
+    this.reportError(lifecycleError(
+      "consumer_callback_failed",
+      `A '${stream}' observer threw`,
+      {
+        source: "consumer",
+        recoverable: true,
+        cause,
+        details: { stream },
+      },
+    ));
   }
 
   private handleConnectionFailure(error: CanvasConsumerError): void {
     this.presentation.fail(error);
-    this.terminateResources();
     this.reportError(error);
+    this.terminateResources();
   }
 
   private isTerminalOrStopping(): boolean {
@@ -561,7 +615,7 @@ export class RoomSession {
       ...emission,
       params: immutableValue(emission.params),
     }) as Readonly<EffectEmission>;
-    for (const observer of this.effectObservers) observer(effect);
+    this.effectObservers.publish(effect);
   }
 
   private spawnPosition(entityId: string): Vec2 {

@@ -222,6 +222,8 @@ describe("asset manifest", () => {
       assetLoader: fakeAdapter("missing.png") as AssetLoaderAdapter<import("pixi.js").Texture>,
       onError,
     });
+    const observedErrors: CanvasConsumerError[] = [];
+    runtime.subscribeErrors((error) => observedErrors.push(error));
 
     await expect(runtime.start()).rejects.toMatchObject({
       code: "asset_preload_failed",
@@ -230,6 +232,9 @@ describe("asset manifest", () => {
     });
     expect(onError).toHaveBeenCalledOnce();
     expect(onError.mock.calls[0][0]).toBeInstanceOf(CanvasConsumerError);
+    expect(observedErrors).toEqual([
+      expect.objectContaining({ code: "asset_preload_failed", source: "assets" }),
+    ]);
     expect(connect).not.toHaveBeenCalled();
     expect(runtime.lifecycleState).toBe("stopped");
     expect(runtime.startupSnapshot).toMatchObject({
