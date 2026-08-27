@@ -47,14 +47,49 @@ func newClient(id string, identity Identity, queueDepth int) *Client {
 	}
 }
 
-// enqueue drops the envelope when the client queue is full. Realtime state is
-// newest-matters-most, so a dropped packet is repaired by the next keyframe.
+// enqueue prioritizes reliable envelopes over repairable realtime state. A
+// false return for a reliable envelope means the client cannot keep up even
+// after all queued realtime state has been discarded.
 func (c *Client) enqueue(envelope *pb.RoomEnvelope) bool {
 	if c.closed.Load() {
 		return false
 	}
-	select {
-	case c.send <- envelope:
+	if cap(c.send) == 0 {
+		return false
+	}
+	for {
+		select {
+		case c.send <- envelope:
+			return true
+		default:
+		}
+		if isRealtimeEnvelope(envelope) {
+			return false
+		}
+		select {
+		case queued := <-c.send:
+			if isRealtimeEnvelope(queued) {
+				continue
+			}
+			// Only the room goroutine produces outbound messages. With one
+			// slot just removed, restoring an earlier reliable envelope cannot
+			// block even while the writer consumes from the channel.
+			c.send <- queued
+			return false
+		default:
+			// The writer freed capacity after the first send attempt.
+		}
+	}
+}
+
+func isRealtimeEnvelope(envelope *pb.RoomEnvelope) bool {
+	if envelope == nil {
+		return false
+	}
+	switch envelope.Payload.(type) {
+	case *pb.RoomEnvelope_PlayerInput,
+		*pb.RoomEnvelope_StateDelta,
+		*pb.RoomEnvelope_ItemEditPreview:
 		return true
 	default:
 		return false

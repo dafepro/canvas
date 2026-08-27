@@ -870,8 +870,14 @@ func (r *Room) sendTo(client *Client, envelope *pb.RoomEnvelope) {
 		envelope.RoomId = r.roomID
 	}
 	if !client.enqueue(envelope) {
-		r.cfg.Logger.Warn("dropped envelope for slow client",
+		if isRealtimeEnvelope(envelope) {
+			r.cfg.Logger.Warn("dropped realtime envelope for slow client",
+				"canvas", r.roomID, "client", client.ID)
+			return
+		}
+		r.cfg.Logger.Warn("closing client whose reliable queue is saturated",
 			"canvas", r.roomID, "client", client.ID)
+		client.close()
 	}
 }
 

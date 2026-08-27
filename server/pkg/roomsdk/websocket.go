@@ -128,15 +128,34 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		}
 		envelope.SenderClientId = client.ID
 
-		select {
-		case room.messages <- inbound{client: client, envelope: envelope, size: len(data)}:
-		case <-ctx.Done():
-			return
-		default:
-			// The room loop is behind. Dropping a realtime packet is correct;
-			// the next keyframe repairs the client.
-			s.cfg.Logger.Warn("room inbox full, dropped envelope", "room", roomID)
+		if !enqueueInbound(ctx, room.messages, inbound{
+			client: client, envelope: envelope, size: len(data),
+		}) {
+			if ctx.Err() != nil {
+				return
+			}
+			// Only newest-matters-most traffic returns false while the room is
+			// live. Reliable traffic applies socket backpressure until the room
+			// accepts it.
+			s.cfg.Logger.Warn("room inbox full, dropped realtime envelope", "room", roomID)
 		}
+	}
+}
+
+func enqueueInbound(ctx context.Context, inbox chan<- inbound, message inbound) bool {
+	if isRealtimeEnvelope(message.envelope) {
+		select {
+		case inbox <- message:
+			return true
+		default:
+			return false
+		}
+	}
+	select {
+	case inbox <- message:
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }
 
