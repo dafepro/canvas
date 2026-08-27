@@ -44,7 +44,7 @@ describe("coordinated release contract", () => {
     expect(release).toContain("never be replaced or republished");
     expect(release).toContain("MAJOR_VERSION_NOTES.md");
     expect(existsSync(join(root, majorNotes))).toBe(true);
-    expect(read(majorNotes)).toContain("Next major");
+    expect(read(majorNotes)).toContain("Next release");
     expect(read(majorNotes)).toContain("Migration");
     expect(read("docs/COMPATIBILITY_AUDIT.md")).toContain("Findings ledger");
     expect(read("docs/COMPATIBILITY_AUDIT.md")).toContain("Residual risks");

@@ -8,17 +8,20 @@ with different contents under the same version.
 
 - Preserve documented TypeScript exports, runtime behavior, rooms SDK
   interfaces, HTTP routes, protobuf fields, JSON schemas, persisted state, and
-  configuration semantics throughout a supported major line.
+  configuration semantics throughout a stable 1.x-or-later major line.
 - Prefer additive fields and methods. Existing fields keep their meaning and
   defaults; removed protobuf field numbers and enum values stay reserved.
-- Deprecate before removal and provide a migration path. An unavoidable
-  incompatible change is scheduled for a major release and accumulated in
+- Deprecate before removal and provide a migration path once the project enters
+  its stable 1.x line. During the current 0.x design period, a minor release may
+  deliberately remove obsolete contracts; every such break is accumulated in
   `MAJOR_VERSION_NOTES.md` with its affected contract, client impact, and
   migration.
 - Bug fixes may reject input that never satisfied the documented contract, but
   the release notes must identify compatibility-sensitive validation changes.
-- Package versions follow semantic versioning even before 1.0. Canvas does not
-  use prerelease status as permission to redefine an already released version.
+- Patch releases preserve their minor line. Before 1.0, minor releases may be
+  backward-incompatible only when the migration ledger is complete and the
+  release advances all coordinated artifacts. Released versions remain
+  immutable; prerelease status never permits republishing changed contents.
 
 ## Wire and durable-data compatibility
 
@@ -63,9 +66,11 @@ One source commit and semantic version define a Canvas release:
   rooms SDK
 
 The root and JavaScript package versions must match. The Go submodule uses the
-same semantic version with a `server/vX.Y.Z` repository tag. JavaScript registry
-publication and that Go tag must refer to the same commit. A partial release is
-not supported.
+same semantic version with a `server/vX.Y.Z` repository tag. Source releases
+use matching `vX.Y.Z` and `server/vX.Y.Z` tags on one commit and verify all npm
+archives before pushing. Once registry publication begins, JavaScript registry
+artifacts and both tags must refer to that same commit; publishing only part of
+that coordinated registry release is unsupported.
 
 Any `room.proto` change regenerates both bindings in the same commit. Release
 verification runs the package-artifact, public API fingerprint,
