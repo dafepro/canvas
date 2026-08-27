@@ -114,6 +114,28 @@ const build = (
 };
 
 describe("RoomSession lifecycle", () => {
+  it("can await initialization from one start call without changing the default boundary", async () => {
+    const transport = new LifecycleTransport();
+    const { session } = build(transport);
+
+    const connected = session.start();
+    expect(session.start()).toBe(connected);
+    await connected;
+    expect(session.lifecycleState).toBe("joining");
+
+    let initializedSettled = false;
+    const initialized = session.start({ until: "initialized" }).then(() => {
+      initializedSettled = true;
+    });
+    await Promise.resolve();
+    expect(initializedSettled).toBe(false);
+
+    transport.deliver(accepted());
+    await initialized;
+    expect(session.lifecycleState).toBe("active");
+    session.stop();
+  });
+
   it("publishes truthful startup milestones through canonical presentation", async () => {
     const transport = new LifecycleTransport();
     let postFromSimulation:
@@ -137,6 +159,10 @@ describe("RoomSession lifecycle", () => {
     const startup: RuntimeStartupSnapshot[] = [];
     session.subscribeStartup((snapshot) => startup.push(snapshot));
 
+    let presentedSettled = false;
+    const presentedStart = session.start({ until: "presented" }).then(() => {
+      presentedSettled = true;
+    });
     await session.start();
     expect(startup.map(({ phase }) => phase)).toEqual([
       "credentials",
@@ -147,6 +173,7 @@ describe("RoomSession lifecycle", () => {
     transport.deliver(accepted("peer"));
     await session.whenReady();
     expect(startup.at(-1)?.phase).toBe("simulation");
+    expect(presentedSettled).toBe(false);
     const generation = (requests.find(
       (request) => (request as { type?: string }).type === "init",
     ) as { generation: number }).generation;
@@ -175,6 +202,7 @@ describe("RoomSession lifecycle", () => {
       },
     });
     await session.whenPresented();
+    await presentedStart;
     expect(startup.map(({ phase }) => phase)).toEqual([
       "credentials",
       "connecting",

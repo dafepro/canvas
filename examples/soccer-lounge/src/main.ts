@@ -223,8 +223,7 @@ const join = async (): Promise<void> => {
           })]
         : []),
     ];
-    await nextRuntime.start();
-    await nextRuntime.whenStartupReady();
+    await nextRuntime.start({ until: "presented" });
     leaveButton.disabled = false;
     benchButton.disabled = false;
   } catch (error) {

@@ -38,6 +38,11 @@ or adapters that depended on previously under-specified behavior:
   internally inconsistent schema keywords instead of silently ignoring them.
   Migration: keep schemas within the documented rooms SDK subset and ensure
   durable item configuration satisfies every authored constraint.
+- **Consumer callback isolation:** throwing lifecycle, state, effect,
+  mutation, fullscreen, overlay, diagnostics, or option callbacks no longer
+  escape into transport, simulation, or render dispatch. Migration: observe
+  `consumer_callback_failed` through `onError` or `subscribeErrors` for
+  recoverable UI failures instead of relying on exceptions to propagate.
 
 ## Historical wire migration: protocol v4
 

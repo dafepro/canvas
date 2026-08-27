@@ -199,8 +199,7 @@ const join = async (): Promise<void> => {
         fullscreenButton.setAttribute("aria-pressed", String(active));
       }),
     ];
-    await next.start();
-    await next.whenStartupReady();
+    await next.start({ until: "presented" });
     leaveButton.disabled = false;
     fullscreenButton.disabled = false;
   } catch (error) {

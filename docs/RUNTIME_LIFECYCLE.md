@@ -28,6 +28,17 @@ a canonical frame, every durable snapshot item, and every connected avatar to
 be represented. Use that stronger gate before revealing a staged room. Starting
 a stopped or failed instance rejects.
 
+The compatible one-call form selects that boundary explicitly:
+
+```ts
+await runtime.start({ until: "presented" });
+```
+
+`until: "initialized"` composes the original start with `whenReady()`, while
+`until: "presented"` composes it with the complete headless presentation gate
+and, for `CanvasRuntime`, the first actual renderer update. Omitting `until`
+retains the original connection-only timing for existing consumers.
+
 ## Startup and presentation progress
 
 Lifecycle answers whether a room connection remains usable. Startup progress
@@ -50,7 +61,7 @@ authoritative frame. `subscribeStartup` immediately replays a frozen
 
 `startupSnapshot` reads the newest value and `whenStartupReady()` waits on the
 same state machine. Applications should subscribe before `start()`, display
-their own wording, and await `whenStartupReady()` before revealing controls.
+their own wording, and use `start({ until: "presented" })` before revealing controls.
 They do not need to combine asset callbacks, lifecycle states, `whenReady()`,
 `whenPresented()`, or an invented timeout.
 `formatRuntimeStartupStatus()` supplies optional neutral English labels for all
@@ -78,13 +89,39 @@ instance to `active`. A route unmount calls `stop()`; page exit may call
 `stopGracefully()` to give a sole host a bounded opportunity to persist a final
 normalized checkpoint. Both stop operations are idempotent and terminal.
 
+## Subscription ownership
+
+Every public runtime subscription accepts an optional `AbortSignal` in
+addition to returning its individual unsubscribe function. A route can
+therefore own all of its observers with one standard controller:
+
+```ts
+const subscriptions = new AbortController();
+runtime.subscribePresence(renderRoster, { signal: subscriptions.signal });
+runtime.subscribeLifecycle(renderConnection, { signal: subscriptions.signal });
+runtime.subscribeOverlayProjection(renderLabels, {
+  signal: subscriptions.signal,
+  maxHz: 30,
+});
+
+// Route unmount
+subscriptions.abort();
+await runtime.stopGracefully();
+```
+
+Aborting before subscription produces no replay and no retained callback.
+Observer callbacks are failure-isolated: one throwing observer cannot prevent
+later observers, room readiness, transport dispatch, or rendering. The runtime
+reports the failure as a recoverable `consumer_callback_failed`; error
+observers are themselves isolated to prevent recursive reporting.
+
 ## Typed errors
 
 Every application-facing failure is a `CanvasConsumerError` with:
 
 - `code`: stable machine-readable classification;
 - `source`: `lifecycle`, `transport`, `protocol`, `initialization`,
-  `simulation`, `item-mutation`, or `assets`;
+  `simulation`, `item-mutation`, `assets`, `input`, or `consumer`;
 - `recoverable`: whether the current room instance can continue;
 - `message`: human-readable diagnostic text, not an application contract;
 - optional `details` and original `cause`.
@@ -94,9 +131,12 @@ or `whenStartupReady()` waiter, enter a terminal state, and release the worker
 and transport. Recoverable simulation and item-mutation errors are
 reported through `onError` without terminating the session. Required asset
 preload failures reject `CanvasRuntime.start()` before a room connection opens.
+The non-replaying `subscribeErrors` stream provides the same typed failures for
+applications that prefer subscription ownership; `onError` remains supported.
 
 The current stable codes are `invalid_lifecycle_state`, `start_cancelled`,
 `transport_connection_failed`, `transport_reconnect_exhausted`,
 `transport_closed`, `server_rejected`, `join_initialization_failed`,
-`simulation_failed`, `item_mutation_rejected`, and `asset_preload_failed`.
+`simulation_failed`, `item_mutation_rejected`, `asset_preload_failed`,
+`pointer_interaction_failed`, and `consumer_callback_failed`.
 Consumers should branch on `code` and `recoverable`, never parse `message`.

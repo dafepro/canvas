@@ -50,7 +50,8 @@ terminal room failure.
 
 Presence, canonical-state, and behavior-state subscriptions immediately replay
 the newest snapshot when one exists. Effects are event streams and are never
-replayed. Each method returns an unsubscribe function.
+replayed. Each method returns an unsubscribe function and accepts an optional
+`AbortSignal` so a route can release all of its observers as one owned scope.
 
 Published snapshots are frozen copies. A consumer must treat nested behavior
 state and effect parameters as immutable and must not use an observer callback
@@ -60,6 +61,9 @@ canonical snapshot remains complete.
 
 Observer callbacks run synchronously at the source update cadence. Consumers
 must enqueue expensive work rather than block simulation or network handling.
+Callback failures are isolated from engine dispatch and other observers, then
+reported as recoverable `consumer_callback_failed` errors. `subscribeErrors`
+is itself non-replaying and failure-isolated.
 
 `subscribeOverlayProjection` is the renderer-safe exception for visual product
 UI: it publishes filtered, capped, rate-limited plain screen projections of the

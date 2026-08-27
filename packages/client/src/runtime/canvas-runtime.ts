@@ -34,6 +34,7 @@ import {
   type InputIntent,
   type ParticipantAvatarProjector,
   type RoomSessionRates,
+  type RoomSessionStartBoundary,
   type SessionDiagnostics,
 } from "./room-session.js";
 import type {
@@ -129,6 +130,13 @@ export interface RuntimeDiagnostics extends SessionDiagnostics {
   pointerWorldTarget?: Readonly<Vec2>;
 }
 
+export type CanvasRuntimeStartBoundary = RoomSessionStartBoundary;
+
+export interface CanvasRuntimeStartOptions {
+  /** Defaults to `connected` for compatibility with the original start contract. */
+  readonly until?: CanvasRuntimeStartBoundary;
+}
+
 export const runtimeDiagnosticsIntervalMs = (requestedHz = 4): number => {
   const hz = Number.isFinite(requestedHz) && requestedHz > 0
     ? Math.min(requestedHz, 60)
@@ -166,6 +174,7 @@ export class CanvasRuntime {
   private disableKeyListener?: (event: KeyboardEvent) => void;
   private assetBundle?: LoadedAssetBundle<Texture>;
   private startPromise?: Promise<void>;
+  private readonly boundedStartPromises = new Map<CanvasRuntimeStartBoundary, Promise<void>>();
   private readonly overlayProjections: OverlayProjectionStore;
   private readonly errorObservers: ObserverSet<CanvasConsumerError>;
   private readonly fullscreen?: FullscreenController;
@@ -316,7 +325,20 @@ export class CanvasRuntime {
     return this.session.whenPresented();
   }
 
-  start(): Promise<void> {
+  start(options: CanvasRuntimeStartOptions = {}): Promise<void> {
+    const connected = this.startConnection();
+    const boundary = options.until ?? "connected";
+    if (boundary === "connected") return connected;
+    const existing = this.boundedStartPromises.get(boundary);
+    if (existing) return existing;
+    const operation = connected.then(() => boundary === "initialized"
+      ? this.whenReady()
+      : this.whenStartupReady());
+    this.boundedStartPromises.set(boundary, operation);
+    return operation;
+  }
+
+  private startConnection(): Promise<void> {
     if (this.session.lifecycleState === "failed" ||
         this.session.lifecycleState === "stopping" ||
         this.session.lifecycleState === "stopped") {

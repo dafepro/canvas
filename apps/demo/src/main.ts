@@ -92,7 +92,7 @@ const join = async (): Promise<void> => {
     },
   });
   try {
-    await runtime.start();
+    await runtime.start({ until: "presented" });
     leaveButton.disabled = false;
     disableButton.disabled = false;
     editButton.disabled = false;

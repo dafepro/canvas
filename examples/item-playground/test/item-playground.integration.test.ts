@@ -155,7 +155,7 @@ describe("compact item playground", () => {
     expect(main).toContain("text.textContent = render.text");
     expect(main).toContain("import.meta.env.VITE_SERVER_URL ?? location.origin");
     expect(main).toContain("subscribeStartup");
-    expect(main).toContain("whenStartupReady");
+    expect(main).toContain('start({ until: "presented" })');
     expect(main).toContain("formatRuntimeStartupStatus");
     expect(vite).toContain('target: "http://127.0.0.1:8083"');
     expect(vite).toContain("ws: true");

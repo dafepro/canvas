@@ -201,19 +201,25 @@ export const enterCanvasRoute = async () => {
     mount: document.querySelector("#stage")!,
     definitions: productCanvasDefinitions,
   });
-  const unsubscribeStartup = runtime.subscribeStartup((snapshot) => {
+  const subscriptions = new AbortController();
+  runtime.subscribeStartup((snapshot) => {
     renderProductLoadingState(snapshot);
-  });
-  await runtime.start();
-  await runtime.whenStartupReady();
-  return { runtime, unsubscribeStartup };
+  }, { signal: subscriptions.signal });
+  await runtime.start({ until: "presented" });
+  return {
+    runtime,
+    leave: async () => {
+      subscriptions.abort();
+      await runtime.stopGracefully();
+    },
+  };
 };
 ```
 
-`whenStartupReady()` is the browser reveal gate: it waits for required assets,
-room access, JOIN, simulation, complete canonical state, and the first renderer
-update. `subscribeStartup()` reports each of those waits as a frozen semantic
-snapshot, including per-source asset settlement and typed terminal failure.
+`start({ until: "presented" })` is the browser reveal gate: it waits for
+required assets, room access, JOIN, simulation, complete canonical state, and
+the first renderer update. `subscribeStartup()` reports each of those waits as
+a frozen semantic snapshot, including per-source asset settlement and typed terminal failure.
 `RoomSession.whenPresented()` remains the lower-level headless gate for a
 complete authoritative entity set.
 

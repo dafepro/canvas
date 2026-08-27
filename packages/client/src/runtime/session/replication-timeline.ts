@@ -34,7 +34,8 @@ export interface ReplicationTimelineOptions {
   readonly sceneRevision: () => number;
   readonly decorate?: (entity: RenderEntity) => RenderEntity;
   readonly onCanonical?: (tick: number, entities: readonly RenderEntity[]) => void;
-  readonly onObserverError?: ObserverErrorHandler;
+  readonly onCanonicalObserverError?: ObserverErrorHandler;
+  readonly onBehaviorObserverError?: ObserverErrorHandler;
 }
 
 export interface EncodedHostFrame {
@@ -72,8 +73,8 @@ export class ReplicationTimeline {
   private latestBehaviorSnapshot?: BehaviorStateSnapshot;
 
   constructor(private readonly options: ReplicationTimelineOptions) {
-    this.canonicalObservers = new ObserverSet(options.onObserverError);
-    this.behaviorObservers = new ObserverSet(options.onObserverError);
+    this.canonicalObservers = new ObserverSet(options.onCanonicalObserverError);
+    this.behaviorObservers = new ObserverSet(options.onBehaviorObserverError);
   }
 
   get tick(): number {

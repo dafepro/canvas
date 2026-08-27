@@ -151,6 +151,13 @@ export interface RoomSessionOptions {
   onError?: (error: CanvasConsumerError) => void;
 }
 
+export type RoomSessionStartBoundary = "connected" | "initialized" | "presented";
+
+export interface RoomSessionStartOptions {
+  /** Defaults to `connected` for compatibility with the original start contract. */
+  readonly until?: RoomSessionStartBoundary;
+}
+
 export interface SessionDiagnostics {
   status: string;
   isHost: boolean;
@@ -219,6 +226,7 @@ export class RoomSession {
   };
   private lastRejection?: string;
   private readonly countdowns = new Set<string>();
+  private readonly boundedStartPromises = new Map<RoomSessionStartBoundary, Promise<void>>();
   /** Spec 22.1. One sample of the transport counters, taken every second. */
   private trafficMark = {
     atMs: 0,
@@ -297,7 +305,8 @@ export class RoomSession {
           canonical.map((entity) => entity.id),
         );
       },
-      onObserverError: (cause) => this.reportObserverFailure("canonicalState", cause),
+      onCanonicalObserverError: (cause) => this.reportObserverFailure("canonicalState", cause),
+      onBehaviorObserverError: (cause) => this.reportObserverFailure("behaviorState", cause),
     });
     this.connection = new ConnectionSession({
       validateJoin: (canvas, snapshot) => this.validateJoinPayload(canvas, snapshot),
@@ -412,9 +421,21 @@ export class RoomSession {
     return this.presentation.wait();
   }
 
-  /** Opens the transport and sends JOIN. Use whenReady() to await initialization. */
-  start(): Promise<void> {
-    return this.connection.start(() => this.client.connect());
+  /**
+   * Starts the room and optionally waits for a semantic usability boundary.
+   * The no-argument form retains the original connected/JOIN-sent contract.
+   */
+  start(options: RoomSessionStartOptions = {}): Promise<void> {
+    const connected = this.connection.start(() => this.client.connect());
+    const boundary = options.until ?? "connected";
+    if (boundary === "connected") return connected;
+    const existing = this.boundedStartPromises.get(boundary);
+    if (existing) return existing;
+    const operation = connected.then(() => boundary === "initialized"
+      ? this.whenReady()
+      : this.whenPresented());
+    this.boundedStartPromises.set(boundary, operation);
+    return operation;
   }
 
   stop(): void {

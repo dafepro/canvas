@@ -108,8 +108,7 @@ const join = async (): Promise<void> => {
         )}`;
       });
       try {
-        await runtime.start();
-        await runtime.whenStartupReady();
+        await runtime.start({ until: "presented" });
       } catch (error) {
         unsubscribeStartup();
         runtime.stop();
