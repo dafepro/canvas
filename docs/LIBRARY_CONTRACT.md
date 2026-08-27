@@ -15,11 +15,17 @@ Canvas core.
 
 A consumer supplies one item definition per `definitionId`. Duplicate IDs are
 ambiguous because the network advertisement, renderer, mutation controller,
-and physics worker otherwise choose by map insertion order; both client startup
-and server JOIN validation reject them. Before worker initialization, Canvas
+and physics worker otherwise choose by map insertion order; the client
+constructor and server JOIN validation reject them. Before worker initialization, Canvas
 validates the complete bundle, including uint32 versions, positive finite visual
 and shape dimensions, finite body tuning and offsets, collision bit masks, and
 bounded material properties.
+
+The runtime snapshots the validated definition bundle during construction.
+Later mutation of the caller-owned array or definition objects cannot create a
+different renderer, worker, and network view. Session send rates are likewise
+validated before allocation and must be finite, greater than zero, and at most
+240 Hz.
 
 Canvas definitions received in JOIN are likewise validated through all nested
 physics inputs: orientation and edge enums, static geometry, region and field

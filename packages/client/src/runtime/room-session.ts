@@ -115,6 +115,7 @@ const immutableValue = <T>(value: T): T => {
 
 /** Send rates from spec 10.3. */
 export interface RoomSessionRates {
+  /** All configured rates must be finite and between 0 (exclusive) and 240 Hz. */
   inputHz?: number;
   deltaHz?: number;
   keyframeHz?: number;
@@ -150,6 +151,53 @@ export interface RoomSessionOptions {
   /** Stable application-facing failures; consumers never need to parse strings. */
   onError?: (error: CanvasConsumerError) => void;
 }
+
+const MAX_SESSION_RATE_HZ = 240;
+
+const validateLocalConfiguration = (options: RoomSessionOptions): void => {
+  const fail = (
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): never => {
+    throw lifecycleError("invalid_configuration", message, {
+      source: "configuration",
+      details,
+    });
+  };
+
+  const definitionIds = new Set<string>();
+  for (const definition of options.definitions) {
+    if (definitionIds.has(definition.definitionId)) {
+      fail(`duplicate item definition '${definition.definitionId}'`, {
+        definitionId: definition.definitionId,
+      });
+    }
+    definitionIds.add(definition.definitionId);
+    const validation = validateItemDefinition(definition);
+    if (!validation.ok) {
+      fail(
+        `invalid item definition '${definition.definitionId}': ` +
+        formatProblems(validation.problems),
+        { definitionId: definition.definitionId },
+      );
+    }
+  }
+
+  for (const [name, value] of Object.entries(options.rates ?? {})) {
+    if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value <= 0 ||
+      value > MAX_SESSION_RATE_HZ
+    ) {
+      fail(`${name} must be a finite rate above 0 and at most ${MAX_SESSION_RATE_HZ} Hz`, {
+        option: `rates.${name}`,
+        value,
+        maximumHz: MAX_SESSION_RATE_HZ,
+      });
+    }
+  }
+};
 
 export type RoomSessionStartBoundary = "connected" | "initialized" | "presented";
 
@@ -202,6 +250,7 @@ export interface SessionDiagnostics {
  * top of one session.
  */
 export class RoomSession {
+  private readonly options: RoomSessionOptions;
   readonly client: RoomClient;
   readonly driver: SimulationDriver;
   private canvasDefinition?: CanvasDefinition;
@@ -242,10 +291,20 @@ export class RoomSession {
     outboundMessagesPerSecond: 0,
   };
 
-  constructor(private readonly options: RoomSessionOptions) {
+  constructor(options: RoomSessionOptions) {
+    validateLocalConfiguration(options);
     if (!options.transport && !options.credentialProvider) {
-      throw new Error("RoomSession requires a credentialProvider for WebSocket transport");
+      throw lifecycleError(
+        "invalid_configuration",
+        "RoomSession requires a credentialProvider for WebSocket transport",
+        { source: "configuration", details: { option: "credentialProvider" } },
+      );
     }
+    options = {
+      ...options,
+      definitions: immutableValue(options.definitions),
+    };
+    this.options = options;
     const transport =
       options.transport ??
       new WebSocketRoomTransport({ credentialProvider: options.credentialProvider! });
@@ -664,20 +723,6 @@ export class RoomSession {
   }
 
   private validateJoinPayload(canvas: CanvasDefinition, snapshot: CanvasSnapshot): void {
-    const definitionIds = new Set<string>();
-    for (const definition of this.options.definitions) {
-      if (definitionIds.has(definition.definitionId)) {
-        throw new Error(`duplicate item definition '${definition.definitionId}'`);
-      }
-      definitionIds.add(definition.definitionId);
-      const validation = validateItemDefinition(definition);
-      if (!validation.ok) {
-        throw new Error(
-          `invalid item definition '${definition.definitionId}': ` +
-          formatProblems(validation.problems),
-        );
-      }
-    }
     const canvasValidation = validateCanvasDefinition(canvas);
     if (!canvasValidation.ok) {
       throw new Error(`invalid canvas definition: ${formatProblems(canvasValidation.problems)}`);

@@ -24,7 +24,8 @@ export type CanvasErrorSource =
   | "item-mutation"
   | "assets"
   | "input"
-  | "consumer";
+  | "consumer"
+  | "configuration";
 
 export type CanvasErrorCode =
   | "invalid_lifecycle_state"
@@ -38,7 +39,8 @@ export type CanvasErrorCode =
   | "item_mutation_rejected"
   | "asset_preload_failed"
   | "pointer_interaction_failed"
-  | "consumer_callback_failed";
+  | "consumer_callback_failed"
+  | "invalid_configuration";
 
 export interface CanvasConsumerErrorOptions {
   code: CanvasErrorCode;

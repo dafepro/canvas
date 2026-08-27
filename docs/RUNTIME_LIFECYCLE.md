@@ -121,7 +121,8 @@ Every application-facing failure is a `CanvasConsumerError` with:
 
 - `code`: stable machine-readable classification;
 - `source`: `lifecycle`, `transport`, `protocol`, `initialization`,
-  `simulation`, `item-mutation`, `assets`, `input`, or `consumer`;
+  `simulation`, `item-mutation`, `assets`, `input`, `consumer`, or
+  `configuration`;
 - `recoverable`: whether the current room instance can continue;
 - `message`: human-readable diagnostic text, not an application contract;
 - optional `details` and original `cause`.
@@ -138,5 +139,13 @@ The current stable codes are `invalid_lifecycle_state`, `start_cancelled`,
 `transport_connection_failed`, `transport_reconnect_exhausted`,
 `transport_closed`, `server_rejected`, `join_initialization_failed`,
 `simulation_failed`, `item_mutation_rejected`, `asset_preload_failed`,
-`pointer_interaction_failed`, and `consumer_callback_failed`.
+`pointer_interaction_failed`, `consumer_callback_failed`, and
+`invalid_configuration`.
 Consumers should branch on `code` and `recoverable`, never parse `message`.
+
+Invalid caller-owned configuration is the one synchronous failure boundary:
+constructing a session or runtime rejects duplicate or malformed definitions,
+missing WebSocket credentials, and configured send rates outside `(0, 240]`
+before a worker or connection is allocated. Applications that assemble these
+options dynamically should construct the runtime inside their ordinary error
+boundary.

@@ -14,6 +14,7 @@ import {
   rocketCanvasDefinitions,
   type CanvasLifecycleSnapshot,
   type JoinDescriptor,
+  type RoomSessionRates,
   type RoomTransport,
   type RuntimeStartupSnapshot,
   type TransportStatus,
@@ -95,6 +96,7 @@ const build = (
     onJoined?: () => void | Promise<void>;
     spawnPointId?: string;
     definitions?: ItemDefinition[];
+    rates?: RoomSessionRates;
   } = {},
 ) => {
   const terminate = vi.fn();
@@ -107,6 +109,7 @@ const build = (
     transport,
     driver,
     spawnPointId: options.spawnPointId,
+    rates: options.rates,
     onError: options.onError,
     onJoined: options.onJoined,
   });
@@ -544,25 +547,60 @@ describe("RoomSession lifecycle", () => {
     });
   });
 
-  it("rejects a duplicate definition bundle before initializing simulation", async () => {
+  it("rejects invalid local configuration before opening the transport", () => {
     const transport = new LifecycleTransport();
     const duplicate = {
       ...rocketCanvasDefinitions[0]!,
       version: rocketCanvasDefinitions[0]!.version + 1,
     };
-    const { session, send } = build(transport, {
-      definitions: [...rocketCanvasDefinitions, duplicate],
-    });
-    await session.start();
-    const ready = session.whenReady();
-    transport.deliver(accepted());
-
-    await expect(ready).rejects.toMatchObject({
-      code: "join_initialization_failed",
-      source: "initialization",
+    let duplicateError: unknown;
+    try {
+      build(transport, { definitions: [...rocketCanvasDefinitions, duplicate] });
+    } catch (cause) {
+      duplicateError = cause;
+    }
+    expect(duplicateError).toMatchObject({
+      code: "invalid_configuration",
+      source: "configuration",
       message: expect.stringContaining("duplicate item definition"),
     });
-    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "init" }));
+
+    for (const rates of [
+      { inputHz: 0 },
+      { deltaHz: Number.NaN },
+      { keyframeHz: Number.POSITIVE_INFINITY },
+      { checkpointHz: -1 },
+      { previewHz: 241 },
+    ]) {
+      let rateError: unknown;
+      try {
+        build(new LifecycleTransport(), { rates });
+      } catch (cause) {
+        rateError = cause;
+      }
+      expect(rateError).toMatchObject({
+        code: "invalid_configuration",
+        source: "configuration",
+      });
+    }
+    expect(transport.connectCalls).toBe(0);
+  });
+
+  it("snapshots validated definitions so later caller mutation cannot change startup", async () => {
+    const transport = new LifecycleTransport();
+    const definitions = [...rocketCanvasDefinitions];
+    const { session, send } = build(transport, { definitions });
+
+    definitions.length = 0;
+    await session.start();
+    transport.deliver(accepted());
+    await session.whenReady();
+
+    const init = send.mock.calls
+      .map(([message]) => message)
+      .find((message) => message.type === "init");
+    expect(init?.definitions).toHaveLength(rocketCanvasDefinitions.length);
+    session.stop();
   });
 
   it("uses a requested arrival spawn and rejects an unknown one", async () => {
