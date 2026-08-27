@@ -52,6 +52,14 @@ twice during mount, schema keywords could appear on the wrong value type, and
 the external store kit did not prove two-version retention. Each was converted
 into a focused regression and corrected before the release gate.
 
+The 0.4.0 pre-publish recheck found two final contract gaps: the reference store
+still shared caller-owned JSON bytes despite calling catalog generations
+immutable, and the documented workspace type check was not a required CI step.
+The store now copies catalog bytes at registration and read boundaries, and CI
+now runs the same package/example/Node-test type check as the local release
+gate. The conformance fixture also rejects a purported previous generation that
+is not actually older.
+
 ## Implemented findings and proof
 
 | Seam | Previous consumer experience | New contract | Automated proof |

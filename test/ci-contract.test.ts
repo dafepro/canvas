@@ -20,6 +20,7 @@ describe("cross-platform release verification", () => {
     expect(workflow).toContain("pnpm install --frozen-lockfile");
     expect(workflow).toContain("pnpm vitest run");
     expect(workflow).toContain('pnpm -r --filter "./packages/*" build');
+    expect(workflow).toContain("pnpm typecheck");
     expect(workflow).toContain("go -C server test ./...");
     expect(workflow).toContain("if: runner.os == 'Linux'");
     expect(workflow).toContain("go -C server test ./... -race");

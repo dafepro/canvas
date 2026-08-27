@@ -1,6 +1,7 @@
 package roomsdk
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,7 +9,8 @@ import (
 	"time"
 )
 
-// ErrNotFound is returned by a Store when a canvas or snapshot is absent.
+// ErrNotFound is returned when a requested catalog ID/version pair or room
+// snapshot is absent.
 var ErrNotFound = errors.New("roomsdk: not found")
 
 // CanvasRecord is the durable definition of one canvas. The definition stays
@@ -111,14 +113,16 @@ func NewMemoryStore() *MemoryStore {
 func (s *MemoryStore) PutItemDefinition(record ItemDefinitionRecord) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.definitionVersions[catalogVersionKey{id: record.DefinitionID, version: record.Version}] = record
+	s.definitionVersions[catalogVersionKey{id: record.DefinitionID, version: record.Version}] =
+		cloneItemDefinitionRecord(record)
 }
 
 // PutCanvas registers a canvas definition. Call it at start-up.
 func (s *MemoryStore) PutCanvas(record CanvasRecord) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.canvasVersions[catalogVersionKey{id: record.CanvasID, version: record.Version}] = record
+	s.canvasVersions[catalogVersionKey{id: record.CanvasID, version: record.Version}] =
+		cloneCanvasRecord(record)
 }
 
 // LoadCanvas loads one exact immutable catalog entry.
@@ -133,7 +137,7 @@ func (s *MemoryStore) LoadCanvas(
 	if !ok {
 		return CanvasRecord{}, ErrNotFound
 	}
-	return record, nil
+	return cloneCanvasRecord(record), nil
 }
 
 // LoadItemDefinition loads one exact immutable catalog entry.
@@ -148,7 +152,18 @@ func (s *MemoryStore) LoadItemDefinition(
 	if !ok {
 		return ItemDefinitionRecord{}, ErrNotFound
 	}
-	return record, nil
+	return cloneItemDefinitionRecord(record), nil
+}
+
+func cloneCanvasRecord(record CanvasRecord) CanvasRecord {
+	record.DefinitionRaw = bytes.Clone(record.DefinitionRaw)
+	return record
+}
+
+func cloneItemDefinitionRecord(record ItemDefinitionRecord) ItemDefinitionRecord {
+	record.ConfigSchema = bytes.Clone(record.ConfigSchema)
+	record.DefinitionRaw = bytes.Clone(record.DefinitionRaw)
+	return record
 }
 
 func (s *MemoryStore) LoadSnapshot(_ context.Context, roomID string) (SnapshotRecord, error) {

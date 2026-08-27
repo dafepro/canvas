@@ -67,6 +67,28 @@ func storeFixture(newStore func(*testing.T) roomsdk.Store) StoreConformanceFixtu
 	}
 }
 
+func TestStoreConformanceRejectsANewerPreviousGeneration(t *testing.T) {
+	for name, makeNewer := range map[string]func(*StoreConformanceFixture){
+		"canvas": func(fixture *StoreConformanceFixture) {
+			fixture.PreviousCanvas.Version = fixture.Canvas.Version + 1
+		},
+		"item definition": func(fixture *StoreConformanceFixture) {
+			fixture.PreviousItemDefinition.Version = fixture.ItemDefinition.Version + 1
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fixture := storeFixture(func(t *testing.T) roomsdk.Store {
+				t.Helper()
+				return roomsdk.NewMemoryStore()
+			})
+			makeNewer(&fixture)
+			if err := validateStoreFixture(fixture); err == nil {
+				t.Fatal("accepted a previous generation newer than the current generation")
+			}
+		})
+	}
+}
+
 var conformanceCanvas = roomsdk.CanvasRecord{
 	CanvasID:      "conformance-canvas",
 	Version:       3,

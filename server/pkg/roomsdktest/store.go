@@ -37,7 +37,9 @@ type StoreConformanceFixture struct {
 // rooms service relies on. External hosts call it from their own Go tests.
 func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 	t.Helper()
-	validateStoreFixture(t, fixture)
+	if err := validateStoreFixture(fixture); err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("catalog records and not-found semantics", func(t *testing.T) {
 		store := fixture.NewStore(t)
@@ -180,31 +182,31 @@ func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 	}
 }
 
-func validateStoreFixture(t *testing.T, fixture StoreConformanceFixture) {
-	t.Helper()
+func validateStoreFixture(fixture StoreConformanceFixture) error {
 	if fixture.NewStore == nil {
-		t.Fatal("roomsdktest: StoreConformanceFixture.NewStore is required")
+		return errors.New("roomsdktest: StoreConformanceFixture.NewStore is required")
 	}
 	if fixture.Canvas.CanvasID == "" || fixture.Canvas.Version == 0 {
-		t.Fatal("roomsdktest: a versioned Canvas fixture is required")
+		return errors.New("roomsdktest: a versioned Canvas fixture is required")
 	}
 	if fixture.ItemDefinition.DefinitionID == "" || fixture.ItemDefinition.Version == 0 {
-		t.Fatal("roomsdktest: a versioned ItemDefinition fixture is required")
+		return errors.New("roomsdktest: a versioned ItemDefinition fixture is required")
 	}
 	if fixture.PreviousCanvas.CanvasID != fixture.Canvas.CanvasID ||
 		fixture.PreviousCanvas.Version == 0 ||
-		fixture.PreviousCanvas.Version == fixture.Canvas.Version {
-		t.Fatal("roomsdktest: a previous Canvas version with the current Canvas ID is required")
+		fixture.PreviousCanvas.Version >= fixture.Canvas.Version {
+		return errors.New("roomsdktest: an older Canvas version with the current Canvas ID is required")
 	}
 	if fixture.PreviousItemDefinition.DefinitionID != fixture.ItemDefinition.DefinitionID ||
 		fixture.PreviousItemDefinition.Version == 0 ||
-		fixture.PreviousItemDefinition.Version == fixture.ItemDefinition.Version {
-		t.Fatal("roomsdktest: a previous ItemDefinition version with the current definition ID is required")
+		fixture.PreviousItemDefinition.Version >= fixture.ItemDefinition.Version {
+		return errors.New("roomsdktest: an older ItemDefinition version with the current definition ID is required")
 	}
 	if fixture.MissingCanvasID == "" || fixture.MissingItemDefinitionID == "" ||
 		fixture.MissingRoomID == "" {
-		t.Fatal("roomsdktest: explicit missing record IDs are required")
+		return errors.New("roomsdktest: explicit missing record IDs are required")
 	}
+	return nil
 }
 
 func conformanceSnapshot(

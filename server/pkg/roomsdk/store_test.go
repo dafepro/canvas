@@ -40,3 +40,49 @@ func TestMemoryStoreRetainsExactCatalogVersions(t *testing.T) {
 		t.Fatalf("missing definition version error = %v, want ErrNotFound", err)
 	}
 }
+
+func TestMemoryStoreOwnsImmutableCatalogBytes(t *testing.T) {
+	store := NewMemoryStore()
+	canvas := CanvasRecord{
+		CanvasID: "owned", Version: 1, DefinitionRaw: json.RawMessage(`{"version":1}`),
+	}
+	definition := ItemDefinitionRecord{
+		DefinitionID: "owned-item",
+		Version:      1,
+		ConfigSchema: json.RawMessage(`{"type":"object"}`),
+		DefinitionRaw: json.RawMessage(
+			`{"definitionId":"owned-item","version":1}`,
+		),
+	}
+	store.PutCanvas(canvas)
+	store.PutItemDefinition(definition)
+
+	canvas.DefinitionRaw[0] = '['
+	definition.ConfigSchema[0] = '['
+	definition.DefinitionRaw[0] = '['
+
+	loadedCanvas, err := store.LoadCanvas(context.Background(), "owned", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadedDefinition, err := store.LoadItemDefinition(context.Background(), "owned-item", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(loadedCanvas.DefinitionRaw) != `{"version":1}` ||
+		string(loadedDefinition.ConfigSchema) != `{"type":"object"}` ||
+		string(loadedDefinition.DefinitionRaw) != `{"definitionId":"owned-item","version":1}` {
+		t.Fatalf("registration retained caller-owned bytes: %#v, %#v", loadedCanvas, loadedDefinition)
+	}
+
+	loadedCanvas.DefinitionRaw[0] = '['
+	loadedDefinition.ConfigSchema[0] = '['
+	loadedDefinition.DefinitionRaw[0] = '['
+	reloadedCanvas, _ := store.LoadCanvas(context.Background(), "owned", 1)
+	reloadedDefinition, _ := store.LoadItemDefinition(context.Background(), "owned-item", 1)
+	if string(reloadedCanvas.DefinitionRaw) != `{"version":1}` ||
+		string(reloadedDefinition.ConfigSchema) != `{"type":"object"}` ||
+		string(reloadedDefinition.DefinitionRaw) != `{"definitionId":"owned-item","version":1}` {
+		t.Fatalf("load exposed store-owned bytes: %#v, %#v", reloadedCanvas, reloadedDefinition)
+	}
+}

@@ -13,6 +13,7 @@ checks:
 - **Generated protocol bindings** regenerates TypeScript and Go from the one
   `room.proto` contract and fails on any checked-in difference.
 - **Cross-platform verification (ubuntu-latest)** builds the reusable packages,
+  type-checks packages, examples, and Node-backed tests,
   installs their packed archives into clean external consumers, builds both
   reference integrations from those archives, runs the TypeScript suite, runs
   the scene/network load budget in an isolated process, and runs the Go suite
@@ -65,6 +66,7 @@ and protobuf compiler 35.1. Then run:
 pnpm install --frozen-lockfile
 bash scripts/verify-generated.sh
 pnpm -r --filter "./packages/*" build
+pnpm typecheck
 pnpm vitest run
 go -C server test ./... -race
 ```
