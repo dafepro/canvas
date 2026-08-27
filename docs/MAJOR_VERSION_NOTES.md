@@ -32,6 +32,12 @@ or adapters that depended on previously under-specified behavior:
   limit shapes are rejected instead of being accepted and partially
   interpreted. Migration: emit snapshot schema 1, advertise each definition ID
   once, and supply values satisfying the published core validators.
+- **Item configuration schemas:** the rooms SDK now enforces the numeric and
+  collection constraints it advertises (`minimum`, `maximum`, exclusive
+  bounds, `minItems`, `maxItems`, and `uniqueItems`) and rejects unsupported or
+  internally inconsistent schema keywords instead of silently ignoring them.
+  Migration: keep schemas within the documented rooms SDK subset and ensure
+  durable item configuration satisfies every authored constraint.
 
 ## Historical wire migration: protocol v4
 
