@@ -452,6 +452,38 @@ describe("RoomSession lifecycle", () => {
     session.stop();
   });
 
+  it("keeps a peer active when only host definition eligibility is refused", async () => {
+    const transport = new LifecycleTransport();
+    const errors: CanvasConsumerError[] = [];
+    const { session } = build(transport, { onError: (error) => errors.push(error) });
+    await session.start();
+    transport.deliver(accepted());
+    await session.whenReady();
+
+    transport.deliver({
+      roomId: "team-lounge",
+      hostEpoch: 1,
+      sequence: 0,
+      tick: 0,
+      senderClientId: "",
+      error: {
+        code: "definition_mismatch",
+        message: "the client lacks rocket@1",
+        serverProtocolVersion: 0,
+      },
+    });
+
+    expect(session.lifecycleState).toBe("active");
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      code: "server_rejected",
+      source: "protocol",
+      recoverable: true,
+      details: { serverCode: "definition_mismatch" },
+    });
+    session.stop();
+  });
+
   it("rejects malformed and unsupported join data through typed errors", async () => {
     const malformedTransport = new LifecycleTransport();
     const malformed = build(malformedTransport).session;

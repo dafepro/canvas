@@ -542,11 +542,17 @@ export class RoomSession {
     });
 
     this.client.on("error", (code, message) => {
-      this.connection.fail(lifecycleError(
+      const recoverable = code === "definition_mismatch";
+      const error = lifecycleError(
         "server_rejected",
         `${code}: ${message}`,
-        { source: "protocol", details: { serverCode: code } },
-      ));
+        { source: "protocol", recoverable, details: { serverCode: code } },
+      );
+      if (recoverable) {
+        this.reportError(error);
+        return;
+      }
+      this.connection.fail(error);
     });
   }
 

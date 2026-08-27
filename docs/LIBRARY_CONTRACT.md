@@ -26,6 +26,11 @@ physics inputs: orientation and edge enums, static geometry, region and field
 shapes, environment values, spawn points, respawn references, limits, and
 system-item transforms. A bad bundle or canvas fails initialization atomically;
 no renderer or simulation callback receives a partially valid definition set.
+An exact-version mismatch for an item already in the scene is different from a
+malformed bundle: the server marks that connection host-ineligible and emits a
+recoverable `definition_mismatch` advisory. The peer remains connected and may
+render a fallback; the runtime does not misclassify host eligibility as a
+terminal room failure.
 
 ## Observation contract
 
