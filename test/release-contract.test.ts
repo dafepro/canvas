@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -7,7 +7,7 @@ const read = (path: string): string => readFileSync(join(root, path), "utf8");
 const manifest = (path: string): { name: string; version: string } =>
   JSON.parse(read(path)) as { name: string; version: string };
 
-describe("coordinated prerelease contract", () => {
+describe("coordinated release contract", () => {
   it("keeps every release artifact on one semantic version", () => {
     const releases = [
       manifest("package.json"),
@@ -17,7 +17,7 @@ describe("coordinated prerelease contract", () => {
     ];
     const versions = new Set(releases.map(({ version }) => version));
     expect(versions.size).toBe(1);
-    expect(releases[0]!.version).toMatch(/^0\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u);
+    expect(releases[0]!.version).toMatch(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/u);
     expect(read("server/go.mod")).toMatch(/^module github\.com\/dafepro\/canvas\/server$/mu);
   });
 
@@ -33,5 +33,18 @@ describe("coordinated prerelease contract", () => {
     expect(read("packages/protocol/src/version.ts")).toContain(
       "clientVersion === PROTOCOL_VERSION",
     );
+  });
+
+  it("publishes an explicit compatibility and breaking-change policy", () => {
+    const release = read("docs/RELEASE_CONTRACT.md");
+    const majorNotes = "docs/MAJOR_VERSION_NOTES.md";
+
+    expect(release).not.toContain("Backward compatibility is explicitly rejected");
+    expect(release).toContain("external application clients");
+    expect(release).toContain("never be replaced or republished");
+    expect(release).toContain("MAJOR_VERSION_NOTES.md");
+    expect(existsSync(join(root, majorNotes))).toBe(true);
+    expect(read(majorNotes)).toContain("Next major");
+    expect(read(majorNotes)).toContain("Migration");
   });
 });

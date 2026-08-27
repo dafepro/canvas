@@ -1,6 +1,6 @@
 {
   "name": "@canvas-physics/protocol",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node ../../scripts/clean-package.mjs && tsc -p tsconfig.json",
     "generate": "bash scripts/generate.sh",
     "prepack": "pnpm run build"
   },

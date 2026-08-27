@@ -188,8 +188,9 @@ depends on it.
   transport, clock, worker, or consumer-initialization callbacks may produce no
   sends, observer publications, or waiter resolutions.
 
-These are internal prerelease contracts. The old untagged worker messages are
-removed when tagging lands; there is no dual decoder.
+These worker messages are consumed through the public worker runtime. Any
+replacement must preserve tagged messages during a deprecation window or be
+scheduled and documented as a major-version migration.
 
 #### Declared transition policy
 
@@ -363,9 +364,10 @@ watching an unrelated room revision.
    client session, and mutation ID. A duplicate returns the stored result and
    never reapplies the mutation. A duplicate older than the retained window is
    rejected as `mutation_receipt_expired`; it is never guessed or reapplied.
-7. **Replace the prerelease contract in place.** The `preview` boolean command,
-   anonymous rejection callbacks, and timeout fallback are removed. There is no
-   compatibility decoder, overload, or parallel protocol path.
+7. **Version the contract transition.** The historical redesign removed the
+   `preview` boolean command, anonymous rejection callbacks, and timeout
+   fallback. Future replacements require a deprecation/compatibility path or an
+   entry in the major-version migration ledger.
 
 #### Public contract
 
@@ -459,10 +461,9 @@ families:
 
 `SnapshotItem` gains `itemRevision`. The persisted room snapshot also stores a
 bounded mutation-receipt ledger and its per-client high-water marks so an
-accepted mutation cannot be duplicated after a relay restart. Because the
-project is prerelease, existing fixtures and generated TypeScript/Go protocol
-code move directly to the new shape; old snapshots and command envelopes are
-not migrated or decoded.
+accepted mutation cannot be duplicated after a relay restart. This describes a
+historical direct transition; future snapshot and command changes must migrate
+supported data or be scheduled as a major-version break.
 
 Stable rejection codes cover at least malformed payload, not found,
 system-owned, not owner, edit in use, edit expired, stale item revision, bounds,
@@ -510,7 +511,7 @@ code and only affected suites are run before committing.
 1. **Core and protocol model.** Add `itemRevision`, typed mutation unions,
    edit-session messages, preview sequence, authoritative results, and reject
    codes. Regenerate TypeScript and Go protocol code and update snapshot/protocol
-   round-trip tests and prerelease fixtures.
+   round-trip and compatibility fixtures.
 2. **Relay transaction authority.** Add edit leases, per-item revision checks,
    typed validation results, receipt deduplication, disconnect/expiry cleanup,
    persisted receipt-window state, and accepted authoritative broadcasts. Cover
@@ -603,9 +604,10 @@ at `ready`.
 Asset progress is source-aware rather than only N/N. Each manifest source is
 `pending`, `loaded`, `warning` (an optional failure), or `failed` (a required
 failure). The aggregate uses `settled` and `total`, so N/N always means that
-the asset phase will advance or fail in the same turn. The old aggregate-only
-callback shape and demo-specific status composition are replaced in place;
-this prerelease package keeps no compatibility path.
+the asset phase will advance or fail in the same turn. The aggregate-only
+callback shape and demo-specific status composition were replaced historically;
+future callback changes retain a compatibility path or follow the major-version
+migration policy.
 
 `RoomSession` owns credential through canonical progress because it observes
 those semantic boundaries without a DOM. `CanvasRuntime` composes that stream

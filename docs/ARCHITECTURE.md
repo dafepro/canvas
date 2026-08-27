@@ -162,9 +162,10 @@ angular velocity are signed integers at 1/1000-radian precision. This keeps the
 host's 15 Hz deltas compact while keeping maximum round-trip error at 0.005
 canvas units and 0.0005 radians.
 
-The wire protocol is prerelease: superseded transform fields are removed rather
-than decoded through a compatibility branch. The server rejects canonical state
-without the current transform message.
+Protocol v8 uses only the fixed-point transform message. The incompatible
+transition from superseded float fields is historical; future field removals
+must follow `RELEASE_CONTRACT.md` and be recorded in `MAJOR_VERSION_NOTES.md`.
+The server rejects canonical state without the current transform message.
 
 ## Rates
 

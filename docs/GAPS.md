@@ -92,9 +92,10 @@ work below because they determine the public boundary every consumer will use.
 - [x] Specify and enforce the product boundary: Canvas owns generic simulation,
   rendering, synchronization, and room infrastructure; consumers own domain
   rules, content, and product state.
-- [x] Define the prerelease compatibility and release policy: exact protocol
-  matches; coordinated JavaScript, Go SDK, generated protocol, and worker
-  versions; and fail-fast mismatches with no legacy or compatibility branches.
+- [x] Define the client compatibility and release policy: immutable coordinated
+  JavaScript, Go SDK, generated protocol, and worker versions; additive changes
+  within a supported major line; fail-fast schema mismatches; and cumulative
+  migration notes for unavoidable breaks.
 
 ## Consumer-library Priority 1 — major completeness gaps
 

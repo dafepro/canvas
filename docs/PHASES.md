@@ -98,7 +98,7 @@ same simulation in the test process.
 | NaN and out-of-bounds protection, item quarantine | Done. A NaN value and a body more than one canvas width outside the canvas are both quarantined. |
 | Definition and protocol compatibility checks | Done. The client declares its item definitions on join. A client that lacks the exact version of a definition the scene uses receives a `definition_mismatch` refusal and loses the host lease; newer definitions are not assumed to preserve older physics or behavior. |
 | Asset preloading and reconnect behavior | Done. A versioned consumer manifest preloads required art before room connection, reports optional failures, and renders backgrounds, sprites, atlas frames, variants, and synchronized named animations with placeholder fallbacks. Reconnect still uses the loaded bundle and does not retain a stale host role. |
-| Fixed-point realtime transforms | Done. Position and linear velocity use 1/100-unit precision; rotation and angular velocity use 1/1000-radian precision. The prerelease protocol has no float-transform compatibility path. |
+| Fixed-point realtime transforms | Done. Position and linear velocity use 1/100-unit precision; rotation and angular velocity use 1/1000-radian precision. Protocol v8 has no float-transform path; that historical break is governed by the migration ledger, and future wire changes must preserve supported clients or schedule a major migration. |
 | Exit criterion: the scene stays responsive and recoverable at the room limits | Met for the simulation and the repair path. Busy-scene traffic is lower after quantization but remains above the network guidance; see the measurement below. |
 
 ### The measured room, 20 avatars and 50 items

@@ -1,14 +1,40 @@
-# Prerelease and release contract
+# Release and compatibility contract
 
-Canvas is prerelease software. Backward compatibility is explicitly rejected:
-an incompatible contract replaces the old contract and increments
-`PROTOCOL_VERSION`. Clients and hosts accept an exact protocol-version match
-only. They fail fast on mismatch and contain no v1/v2 negotiation, legacy field
-fallback, or compatibility branch.
+Canvas supports external application clients. A released artifact is an
+immutable client contract: an npm archive or Go module tag must never be replaced or republished
+with different contents under the same version.
 
-Durable behavior-state migrations are different. A snapshot can outlive a
-deployment, so a behavior that changes persisted state supplies a complete
-`MigrationChain`. That does not make old network clients compatible.
+## Compatibility policy
+
+- Preserve documented TypeScript exports, runtime behavior, rooms SDK
+  interfaces, HTTP routes, protobuf fields, JSON schemas, persisted state, and
+  configuration semantics throughout a supported major line.
+- Prefer additive fields and methods. Existing fields keep their meaning and
+  defaults; removed protobuf field numbers and enum values stay reserved.
+- Deprecate before removal and provide a migration path. An unavoidable
+  incompatible change is scheduled for a major release and accumulated in
+  `MAJOR_VERSION_NOTES.md` with its affected contract, client impact, and
+  migration.
+- Bug fixes may reject input that never satisfied the documented contract, but
+  the release notes must identify compatibility-sensitive validation changes.
+- Package versions follow semantic versioning even before 1.0. Canvas does not
+  use prerelease status as permission to redefine an already released version.
+
+## Wire and durable-data compatibility
+
+Clients and hosts currently require an exact `PROTOCOL_VERSION`. Additive
+protobuf fields do not require a protocol bump: protobuf readers ignore unknown
+fields, so old and new peers keep interoperating. Increment the protocol version
+only for an incompatible semantic or wire change. Prefer a staged server that
+can accept the old and new versions during rollout; if that is impractical,
+record the coordinated deployment in `MAJOR_VERSION_NOTES.md` before merging.
+
+Snapshots and behavior state have independent schema versions. The current
+snapshot schema must be validated before use. A durable shape change requires a
+complete migration chain or an explicit major-version migration; it must never
+be accepted by an older decoder and silently rewritten with fields discarded.
+Item definition versions match exactly because a newer definition is not proof
+that it preserves an older definition's physics or behavior.
 
 ## Coordinated artifacts
 
@@ -26,16 +52,11 @@ publication and that Go tag must refer to the same commit. A partial release is
 not supported.
 
 Any `room.proto` change regenerates both bindings in the same commit. Release
-verification runs the package-artifact, library-boundary, release-contract,
-TypeScript protocol/client, and Go rooms SDK tests before publishing or tagging.
-The required Windows/Linux checks and local reproduction commands are defined in
-`CI_RELEASE_GATE.md`. CI produces release candidates but never publishes or tags
-implicitly.
-
-Protocol v4 separates product `room_id` from the server-selected canvas
-template. Its room routes are `/v1/rooms/{id}` and
-`/v1/realtime/rooms/{id}`; the removed canvas-instance routes and JOIN
-`canvas_id` field are not supported.
+verification runs the package-artifact, public API fingerprint,
+library-boundary, release-contract, TypeScript protocol/client, and Go rooms SDK
+tests before publishing or tagging. The required Windows/Linux checks and local
+reproduction commands are defined in `CI_RELEASE_GATE.md`. CI produces release
+candidates but never publishes or tags implicitly.
 
 ## Dependency direction
 

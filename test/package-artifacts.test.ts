@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -11,7 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const workspaceRoot = resolve(import.meta.dirname, "..");
@@ -64,17 +65,40 @@ const findWindowsPnpm = (): string => {
 };
 
 interface PackageManifest {
+  version: string;
   main?: string;
   types?: string;
   files?: string[];
   exports?: Record<string, string | Record<string, string>>;
 }
 
+const declarationFiles = (directory: string): string[] =>
+  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return declarationFiles(path);
+    return entry.name.endsWith(".d.ts") ? [path] : [];
+  });
+
+const declarationFingerprint = (packageRoot: string): string => {
+  const dist = join(packageRoot, "dist");
+  const hash = createHash("sha256");
+  for (const path of declarationFiles(dist).sort()) {
+    hash.update(relative(dist, path).replaceAll("\\", "/"));
+    hash.update("\0");
+    hash.update(readFileSync(path, "utf8").replaceAll("\r\n", "\n"));
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+};
+
 describe("published package artifacts", () => {
   it("packs built entry points and installs them outside the workspace", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "canvas-package-contract-"));
     fixtureRoots.add(fixtureRoot);
     const archives: Record<string, string> = {};
+    const publicApi = JSON.parse(
+      readFileSync(join(workspaceRoot, "test", "public-api-fingerprints.json"), "utf8"),
+    ) as Record<string, Partial<Record<(typeof packageDirectories)[number], string>>>;
 
     for (const directory of packageDirectories) {
       const packageRoot = join(workspaceRoot, "packages", directory);
@@ -88,6 +112,20 @@ describe("published package artifacts", () => {
       const manifest = JSON.parse(
         readFileSync(join(packageRoot, "package.json"), "utf8"),
       ) as PackageManifest;
+      expect(
+        declarationFiles(join(packageRoot, "dist"))
+          .map((path) => relative(join(packageRoot, "dist"), path))
+          .filter((path) => !existsSync(join(
+            packageRoot,
+            "src",
+            path.replace(/\.d\.ts$/u, ".ts"),
+          ))),
+        `${directory} artifact contains output for removed source modules`,
+      ).toEqual([]);
+      expect(
+        declarationFingerprint(packageRoot),
+        `${directory} public declarations changed without a new coordinated release baseline`,
+      ).toBe(publicApi[manifest.version]?.[directory]);
       expect(manifest.main).toBe("./dist/index.js");
       expect(manifest.types).toBe("./dist/index.d.ts");
       expect(manifest.files).toEqual(["dist"]);

@@ -1,6 +1,6 @@
 # Cross-platform CI and release gate
 
-Canvas is an independent prerelease library. Its CI verifies the reusable
+Canvas is an independent, versioned library used by application clients. Its CI verifies the reusable
 packages and rooms SDK without assuming a particular product, application
 backend, identity provider, database, or deployment platform.
 
@@ -44,11 +44,13 @@ A commit passing all required checks establishes that:
    artifacts and install outside this monorepo.
 3. Public testing, runtime, worker, and worker-runtime subpaths remain usable by
    independent consumers.
-4. The soccer lounge and item playground build against only those packed public
+4. The public declaration fingerprint belongs to the coordinated release
+   version, so an API change cannot silently redefine an existing artifact.
+5. The soccer lounge and item playground build against only those packed public
    artifacts, catching missing files and accidental internal imports.
-5. The generated TypeScript and Go protocol bindings match the checked-in
+6. The generated TypeScript and Go protocol bindings match the checked-in
    protobuf contract, and their exact protocol versions agree.
-6. The reusable Go rooms SDK passes its conformance and race-detection suite.
+7. The reusable Go rooms SDK passes its conformance and race-detection suite.
 
 CI does not certify a consumer's custom behaviors, authentication adapter,
 store adapter, room-template resolver, assets, or product UI. The conformance

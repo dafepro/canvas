@@ -18,9 +18,10 @@ Each example:
 - names every missing generic capability it works around; and
 - is verified against clean installs of packed release artifacts.
 
-Examples are not compatibility fixtures. This repository is prerelease, so a
-public contract change updates the examples in the same release and removes the
-superseded path.
+Examples are executable compatibility fixtures for their documented use cases,
+but they are not the complete public API baseline. A public contract change must
+keep them building from packed artifacts and follow the release compatibility
+policy; updating an example alone does not authorize removal of the old path.
 
 ## Linked rooms reference integration
 

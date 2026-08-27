@@ -1,0 +1,41 @@
+# Major-version backward-incompatibility notes
+
+This is the cumulative migration ledger for incompatible changes. Entries stay
+under **Next major** until that release ships; release sections remain as the
+historical migration record. Each entry must name the affected contract, client
+impact, and required migration.
+
+## Next major (unreleased)
+
+No backward-incompatible changes are currently scheduled.
+
+## Compatibility hardening after 0.1.0
+
+These corrections preserve the intended public surface but may expose clients
+or adapters that depended on previously under-specified behavior:
+
+- **Custom `RoomTransport` adapters:** reliable messages submitted during a
+  reconnect must be retained and delivered in order after the connection
+  reopens. Migration: buffer reliable encoded messages across temporary
+  disconnects and run `runRoomTransportConformance`.
+- **Item definition negotiation:** only the exact definition version used by a
+  live scene is host-compatible. Migration: retain every definition version
+  needed by deployed rooms or migrate the room template and durable items as one
+  reconciled operation.
+- **Canvas limits:** explicit `maxItems: 0` and
+  `maxComplexPhysicsItems: 0` mean that no such items are permitted; only omitted
+  fields receive defaults. Migration: omit a limit to request the default, or
+  configure the intended positive limit explicitly.
+- **Snapshot and numeric validation:** unknown snapshot schemas, non-finite
+  mutation values, malformed effect JSON, and invalid limit shapes are rejected
+  instead of being accepted and partially interpreted. Migration: emit snapshot
+  schema 1 and values satisfying the published core validators.
+
+## Historical wire migration: protocol v4
+
+- **Affected contract:** room HTTP/WebSocket routes and JOIN identity.
+- **Client impact:** canvas-instance routes and the JOIN `canvas_id` field were
+  removed when product room IDs were separated from reusable canvas templates.
+- **Migration:** use `/v1/rooms/{roomId}` and
+  `/v1/realtime/rooms/{roomId}`; send `room_id` in JOIN and read the selected
+  `canvas_id` from `JoinAccepted`.

@@ -7,8 +7,9 @@ never fetch images and never use pixels as collision data.
 ## Manifest
 
 An application may pass one `AssetManifest` to `CanvasRuntime`. Version 1 is an
-exact prerelease contract; unsupported versions fail instead of entering a
-compatibility path.
+exact schema contract. Unsupported versions fail explicitly instead of being
+partially interpreted; a future schema must retain a v1 decoder or follow the
+major-version migration policy.
 
 ```ts
 const assets: AssetManifest = {

@@ -67,11 +67,12 @@ diagnostic and must not be parsed as a contract.
 
 ## Server and snapshot requirements
 
-The browser packages and Go room SDK must use the same generated prerelease
+The browser packages and Go room SDK must use the same generated versioned
 protocol. Every persisted `SnapshotItem` has an `itemRevision >= 1`. Mutation
 receipts and per-session high-water marks are server-private persistence state;
-they are not exposed in the client canvas snapshot. There is intentionally no
-decoder or compatibility path for the superseded anonymous command protocol.
+they are not exposed in the client canvas snapshot. The superseded anonymous
+command protocol is a historical break; future removals require the documented
+major-version migration process.
 
 The item studio in `examples/item-playground` is the reference consumer: its
 action status follows the matching receipt rather than inferring acceptance
