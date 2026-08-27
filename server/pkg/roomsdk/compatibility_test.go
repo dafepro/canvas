@@ -1,6 +1,7 @@
 package roomsdk
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"testing"
@@ -214,6 +215,85 @@ func TestJoinDefinitionSetRejectsAmbiguousEntries(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if _, err := joinDefinitionSet(definitions); err == nil {
 				t.Fatal("accepted an ambiguous JOIN definition set")
+			}
+		})
+	}
+}
+
+func TestRoomWakeRejectsCorruptPersistedSnapshots(t *testing.T) {
+	h := newHarness(t, nil)
+	canvas, err := h.store.LoadCanvas(context.Background(), "test-canvas")
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := func(id string) SnapshotItem {
+		return SnapshotItem{
+			EntityID: id, DefinitionID: "rocket", DefinitionVersion: 1,
+			OwnerUserID: "alice", ItemRevision: 1,
+			Transform:      Transform{X: 10, Y: 10, Scale: 1},
+			ResolvedConfig: json.RawMessage(`{"thrust":1}`),
+		}
+	}
+	tests := map[string]func(*CanvasSnapshot, *SnapshotRecord){
+		"record metadata disagreement": func(_ *CanvasSnapshot, record *SnapshotRecord) {
+			record.Tick++
+		},
+		"unsafe JavaScript counter": func(snapshot *CanvasSnapshot, _ *SnapshotRecord) {
+			snapshot.Tick = 1 << 53
+		},
+		"duplicate entity": func(snapshot *CanvasSnapshot, _ *SnapshotRecord) {
+			snapshot.Items = []SnapshotItem{item("duplicate"), item("duplicate")}
+		},
+		"too many items": func(snapshot *CanvasSnapshot, _ *SnapshotRecord) {
+			snapshot.Items = []SnapshotItem{item("one"), item("two"), item("three")}
+		},
+		"wrong definition version": func(snapshot *CanvasSnapshot, _ *SnapshotRecord) {
+			invalid := item("wrong-version")
+			invalid.DefinitionVersion = 2
+			snapshot.Items = []SnapshotItem{invalid}
+		},
+		"invalid item revision": func(snapshot *CanvasSnapshot, _ *SnapshotRecord) {
+			invalid := item("bad-revision")
+			invalid.ItemRevision = 0
+			snapshot.Items = []SnapshotItem{invalid}
+		},
+		"out of bounds transform": func(snapshot *CanvasSnapshot, _ *SnapshotRecord) {
+			invalid := item("out-of-bounds")
+			invalid.Transform.X = 401
+			snapshot.Items = []SnapshotItem{invalid}
+		},
+		"timer in normalized snapshot": func(snapshot *CanvasSnapshot, _ *SnapshotRecord) {
+			invalid := item("active-timer")
+			invalid.BehaviorTimers = []BehaviorTimer{{Key: "countdown", RemainingTicks: 1}}
+			snapshot.Items = []SnapshotItem{invalid}
+		},
+		"invalid avatar identity": func(snapshot *CanvasSnapshot, _ *SnapshotRecord) {
+			snapshot.Avatars = []SnapshotAvatar{{
+				EntityID: "avatar:alice", UserID: "mallory", Position: Vec2{X: 10, Y: 10},
+			}}
+		},
+	}
+
+	for name, corrupt := range tests {
+		t.Run(name, func(t *testing.T) {
+			snapshot := emptySnapshot("test-canvas", 1, h.server.cfg.Now())
+			snapshot.SceneRevision = 3
+			snapshot.CheckpointRevision = 2
+			snapshot.HostEpoch = 1
+			snapshot.Tick = 10
+			record := SnapshotRecord{
+				RoomID: "wake-room", CanvasID: "test-canvas", CanvasVersion: 1,
+				SceneRevision: 3, CheckpointRevision: 2, HostEpoch: 1, Tick: 10,
+				Normalized: true,
+			}
+			corrupt(&snapshot, &record)
+			raw, err := json.Marshal(snapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record.SnapshotRaw = raw
+			if _, err := newRoom(h.server, "wake-room", canvas, record); err == nil {
+				t.Fatal("accepted corrupt persisted snapshot during room wake")
 			}
 		})
 	}

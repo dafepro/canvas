@@ -59,7 +59,7 @@ func (s *Server) ReconcileRoomTemplate(
 	if err != nil {
 		return TemplateReconcileResult{}, err
 	}
-	room, err := newRoom(s, roomID, record, snapshotRecord)
+	room, err := newRoomForReconciliation(s, roomID, record, snapshotRecord)
 	if err != nil {
 		return TemplateReconcileResult{}, err
 	}
@@ -217,6 +217,7 @@ func (r *Room) materializeSystemItem(template SystemItemTemplate) (SnapshotItem,
 		EntityID:          template.EntityID,
 		DefinitionID:      template.DefinitionID,
 		DefinitionVersion: template.DefinitionVersion,
+		ItemRevision:      1,
 		Transform:         template.Transform,
 		ResolvedConfig:    append(json.RawMessage(nil), template.ResolvedConfig...),
 	}, nil

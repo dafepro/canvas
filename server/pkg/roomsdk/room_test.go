@@ -474,6 +474,7 @@ func TestPersistedAvatarRemainsValidAfterRoomProcessRestart(t *testing.T) {
 		CanvasID:           "test-canvas",
 		CanvasVersion:      1,
 		CheckpointRevision: 1,
+		Normalized:         true,
 		SnapshotRaw:        raw,
 	}); err != nil {
 		t.Fatalf("save snapshot: %v", err)

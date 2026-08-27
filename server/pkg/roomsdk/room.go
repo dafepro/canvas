@@ -3,6 +3,7 @@ package roomsdk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -76,6 +77,25 @@ type Room struct {
 }
 
 func newRoom(server *Server, roomID string, record CanvasRecord, snapshot SnapshotRecord) (*Room, error) {
+	return newRoomWithMode(server, roomID, record, snapshot, false)
+}
+
+func newRoomForReconciliation(
+	server *Server,
+	roomID string,
+	record CanvasRecord,
+	snapshot SnapshotRecord,
+) (*Room, error) {
+	return newRoomWithMode(server, roomID, record, snapshot, true)
+}
+
+func newRoomWithMode(
+	server *Server,
+	roomID string,
+	record CanvasRecord,
+	snapshot SnapshotRecord,
+	allowTemplateMigration bool,
+) (*Room, error) {
 	shape, err := parseCanvasShape(record.DefinitionRaw)
 	if err != nil {
 		return nil, err
@@ -121,6 +141,9 @@ func newRoom(server *Server, roomID string, record CanvasRecord, snapshot Snapsh
 		}
 		if room.snapshot.SchemaVersion != 1 {
 			return nil, errSnapshotSchema
+		}
+		if err := room.validateLoadedSnapshot(snapshot, allowTemplateMigration); err != nil {
+			return nil, err
 		}
 		room.snapshotRaw = snapshot.SnapshotRaw
 		room.sceneRevision = snapshot.SceneRevision
@@ -739,10 +762,10 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 		if len(item.BehaviorTimers) > 64 {
 			return errInvalidTimer
 		}
-		const maxSafeInteger = uint64(1<<53 - 1)
 		for _, timer := range item.BehaviorTimers {
 			if timer.Key == "" || len(timer.Key) > 128 || timer.RemainingTicks == 0 ||
-				timer.ElapsedTicks > maxSafeInteger || timer.RemainingTicks > maxSafeInteger {
+				timer.ElapsedTicks > maxJSONSafeInteger ||
+				timer.RemainingTicks > maxJSONSafeInteger {
 				return errInvalidTimer
 			}
 		}
@@ -804,6 +827,99 @@ func (r *Room) acceptCheckpoint(checkpoint *pb.Checkpoint) error {
 		return err
 	}
 	r.snapshotRaw = raw
+	return nil
+}
+
+func (r *Room) validateLoadedSnapshot(
+	record SnapshotRecord,
+	allowTemplateMigration bool,
+) error {
+	snapshot := &r.snapshot
+	if !allowTemplateMigration &&
+		(snapshot.CanvasID != r.canvasID || snapshot.CanvasVersion != r.canvasShape.Version) {
+		return errCanvasMismatch
+	}
+	if record.SceneRevision != snapshot.SceneRevision ||
+		record.CheckpointRevision != snapshot.CheckpointRevision ||
+		record.HostEpoch < snapshot.HostEpoch || record.Tick != snapshot.Tick ||
+		record.Normalized != snapshot.Normalized {
+		return errors.New("persisted snapshot metadata disagrees with its record")
+	}
+	if snapshot.SceneRevision > maxJSONSafeInteger ||
+		snapshot.CheckpointRevision > maxJSONSafeInteger ||
+		snapshot.HostEpoch > maxJSONSafeInteger || snapshot.Tick > maxJSONSafeInteger {
+		return errors.New("persisted snapshot counter exceeds the JSON safe integer range")
+	}
+	if len(snapshot.Items) > r.canvasShape.Limits.MaxItems {
+		return errTooManyItems
+	}
+	seen := make(map[string]struct{}, len(snapshot.Items)+len(snapshot.Avatars))
+	complexItems := 0
+	for i := range snapshot.Items {
+		item := &snapshot.Items[i]
+		if item.EntityID == "" || item.DefinitionID == "" || item.DefinitionVersion == 0 {
+			return errors.New("persisted item identity is incomplete")
+		}
+		if _, duplicate := seen[item.EntityID]; duplicate {
+			return errDuplicateEntity
+		}
+		seen[item.EntityID] = struct{}{}
+		if item.ItemRevision == 0 || item.ItemRevision > maxJSONSafeInteger {
+			return errors.New("persisted item revision is outside the JSON contract")
+		}
+		if !item.Transform.finite() || item.Transform.Scale <= 0 {
+			return errNonFiniteTransform
+		}
+		if !r.withinBounds(item.Transform) {
+			return errOutOfBounds
+		}
+		definition, err := r.itemDefinition(item.DefinitionID)
+		if err != nil {
+			return fmt.Errorf("persisted item %q definition: %w", item.EntityID, err)
+		}
+		if !allowTemplateMigration && definition.Version != item.DefinitionVersion {
+			return errDefinitionMismatch
+		}
+		if err := validateConfigJSON(definition.ConfigSchema, item.ResolvedConfig); err != nil {
+			return fmt.Errorf("persisted item %q config: %w", item.EntityID, err)
+		}
+		if definition.Complexity == ItemComplexityComplex {
+			complexItems++
+		}
+		if snapshot.Normalized && len(item.BehaviorTimers) > 0 {
+			return errInvalidTimer
+		}
+		if len(item.BehaviorTimers) > 64 {
+			return errInvalidTimer
+		}
+		for _, timer := range item.BehaviorTimers {
+			if timer.Key == "" || len(timer.Key) > 128 || timer.RemainingTicks == 0 ||
+				timer.ElapsedTicks > maxJSONSafeInteger ||
+				timer.RemainingTicks > maxJSONSafeInteger {
+				return errInvalidTimer
+			}
+		}
+	}
+	if complexItems > r.canvasShape.Limits.MaxComplexPhysicsItems {
+		return errors.New("persisted snapshot exceeds the complex item limit")
+	}
+	for _, avatar := range snapshot.Avatars {
+		if avatar.EntityID == "" || avatar.UserID == "" ||
+			avatar.EntityID != "avatar:"+avatar.UserID {
+			return fmt.Errorf("%w %q", errUnknownEntity, avatar.EntityID)
+		}
+		if _, duplicate := seen[avatar.EntityID]; duplicate {
+			return errDuplicateEntity
+		}
+		seen[avatar.EntityID] = struct{}{}
+		transform := Transform{X: avatar.Position.X, Y: avatar.Position.Y, Scale: 1}
+		if !transform.finite() {
+			return errNonFiniteTransform
+		}
+		if !r.withinBounds(transform) {
+			return errOutOfBounds
+		}
+	}
 	return nil
 }
 

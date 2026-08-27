@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const maxJSONSafeInteger = uint64(1<<53 - 1)
+
 // Transform mirrors the client Transform type.
 type Transform struct {
 	X        float64  `json:"x"`

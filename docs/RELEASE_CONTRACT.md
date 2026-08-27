@@ -40,6 +40,12 @@ Fields represented as protobuf `uint32` are JSON integers no greater than
 JavaScript's non-negative safe-integer range. The TypeScript and Go validators
 enforce those shared domains, and both accept positions exactly on the
 four-times canvas slack boundary.
+Live checkpoints and persisted room wakes enforce the same identity, revision,
+counter, transform, timer, configuration, definition-version, and item-limit
+rules. Restarting a room cannot turn rejected live state into accepted durable
+state. Explicit template reconciliation validates the old snapshot's integrity
+while permitting only the canvas and definition-version differences that the
+reconciliation operation is responsible for replacing.
 
 ## Coordinated artifacts
 

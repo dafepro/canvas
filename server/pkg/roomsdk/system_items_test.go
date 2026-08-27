@@ -182,16 +182,19 @@ func TestReconcileRoomTemplateExplicitlyAddsReplacesAndRetiresSystemItems(t *tes
 		Items: []SnapshotItem{
 			{
 				EntityID: "match-ball", DefinitionID: "rocket", DefinitionVersion: 1,
-				Transform: Transform{X: 40, Y: 35}, ResolvedConfig: json.RawMessage(`{"thrust":12}`),
+				ItemRevision: 1,
+				Transform:    Transform{X: 40, Y: 35, Scale: 1}, ResolvedConfig: json.RawMessage(`{"thrust":12}`),
 				BehaviorState: json.RawMessage(`{"old":true}`),
 			},
 			{
 				EntityID: "old-banner", DefinitionID: "rocket", DefinitionVersion: 1,
-				Transform: Transform{X: 10, Y: 10}, ResolvedConfig: json.RawMessage(`{"thrust":0}`),
+				ItemRevision: 1,
+				Transform:    Transform{X: 10, Y: 10, Scale: 1}, ResolvedConfig: json.RawMessage(`{"thrust":0}`),
 			},
 			{
 				EntityID: "alice-crate", DefinitionID: "rocket", DefinitionVersion: 1,
-				OwnerUserID: "alice", Transform: Transform{X: 20, Y: 20},
+				ItemRevision: 1,
+				OwnerUserID:  "alice", Transform: Transform{X: 20, Y: 20, Scale: 1},
 				ResolvedConfig: json.RawMessage(`{"thrust":8}`),
 			},
 		},
