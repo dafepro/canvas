@@ -53,4 +53,13 @@ describe("cross-platform release verification", () => {
     expect(workflow).toContain("test/release-contract.test.ts");
     expect(workflow).toContain("test/library-boundaries.test.ts");
   });
+
+  it("resolves workspace packages from source during repository tests", () => {
+    const config = read("vitest.config.ts");
+
+    for (const layer of ["core", "protocol", "client"]) {
+      expect(config).toContain(`"@canvas-physics/${layer}"`);
+      expect(config).toContain(`packages/${layer}/src/index.ts`);
+    }
+  });
 });
