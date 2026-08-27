@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0 --port 5175",
     "build": "vite build",
     "test": "vitest run test",
-    "server": "go -C ../../server run ./cmd/canvasd -addr :8083 -canvases ../examples/item-playground/server/canvases -definitions ../examples/item-playground/server/definitions -data-dir ../examples/item-playground/.data"
+    "server": "node ../../scripts/run-example-server.mjs item-playground"
   },
   "dependencies": {
     "@canvas-physics/client": "workspace:*",

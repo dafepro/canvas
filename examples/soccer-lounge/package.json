@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0 --port 5174",
     "build": "vite build",
     "test": "vitest run test",
-    "server": "go -C ../../server run ./cmd/canvasd -addr :8082 -canvases ../examples/soccer-lounge/server/canvases -definitions ../examples/soccer-lounge/server/definitions -data-dir ../examples/soccer-lounge/.data"
+    "server": "node ../../scripts/run-example-server.mjs soccer-lounge"
   },
   "dependencies": {
     "@canvas-physics/client": "workspace:*",

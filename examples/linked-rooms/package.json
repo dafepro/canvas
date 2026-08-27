@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0 --port 5176",
     "build": "vite build",
     "test": "vitest run test",
-    "server": "go -C ../../server run ./cmd/canvasd -addr :8084 -canvases ../examples/linked-rooms/server/canvases -definitions ../examples/linked-rooms/server/definitions -data-dir ../examples/linked-rooms/.data"
+    "server": "node ../../scripts/run-example-server.mjs linked-rooms"
   },
   "dependencies": {
     "@canvas-physics/client": "workspace:*",

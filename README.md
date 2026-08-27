@@ -98,6 +98,21 @@ Open <http://localhost:5176/?autojoin=1&user=traveler>. Walk into the glowing
 door or use Back after traveling. See `docs/LINKED_ROOM_TRAVEL.md` for the
 authorization, staging, rollback, and reverse-route contract.
 
+For the configuration-first basketball arena:
+
+```bash
+pnpm example:basketball:server # terminal 1; service on :8085
+pnpm example:basketball        # terminal 2; app on :5177
+```
+
+Open <http://localhost:5177/?autojoin=1&user=baller-one>.
+
+Every reference server stores ordinary development snapshots under its
+coordinated release directory, such as `.data/v0.4.0`. An intentionally
+incompatible release therefore starts from a clean demo room without deleting
+older snapshots. Set `CANVAS_EXAMPLE_DATA_DIR` to reuse a specific directory
+when testing persistence or migration behavior.
+
 ## Emulate a bad network
 
 `scripts/net.sh` drives Toxiproxy, so impairment needs no code change.

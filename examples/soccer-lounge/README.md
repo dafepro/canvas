@@ -20,7 +20,11 @@ Open <http://localhost:5174>. Add `?autojoin=1&user=alex` to join immediately,
 or `?debug=1` to inspect the collision geometry. Add `?kickAnimation=0` (or
 append `&kickAnimation=0` to other flags) to hide the deformation atlas while
 testing the ball's physical rotation. The service listens on port 8082 and
-stores local state under `examples/soccer-lounge/.data`.
+stores local state under the coordinated release directory
+`examples/soccer-lounge/.data/v0.4.0`. Future library versions use a new
+directory instead of reinterpreting intentionally incompatible demo snapshots.
+Set `CANVAS_EXAMPLE_DATA_DIR` when deliberately testing restart durability or a
+data migration against a specific directory.
 
 The example selects Canvas's relative `thumbstick` pointer mode and a faster
 canvas-owned avatar controller. Touch or click anywhere on the field, then drag

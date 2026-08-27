@@ -24,7 +24,10 @@ Open `http://localhost:5176/?autojoin=1&user=traveler`. The Vite server binds to
 the LAN interface and proxies `/v1` WebSocket traffic to the reference service
 on port 8084. Give simultaneous tabs or devices different `user` values. A
 second connection with the same participant identity intentionally replaces
-the first one instead of creating a duplicate avatar.
+the first one instead of creating a duplicate avatar. The server stores
+ordinary local state under `.data/v0.4.0`; set `CANVAS_EXAMPLE_DATA_DIR` to select a durability or
+migration fixture explicitly. Release scoping preserves older snapshots
+without letting an incompatible snapshot prevent the current example opening.
 
 The active room is stored in the `room` URL parameter after a successful
 transition. Refresh therefore rejoins the committed room, and unknown room IDs
