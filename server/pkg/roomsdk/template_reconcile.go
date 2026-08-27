@@ -47,7 +47,7 @@ func (s *Server) ReconcileRoomTemplate(
 	if _, awake := s.rooms[roomID]; awake {
 		return TemplateReconcileResult{}, ErrRoomAwake
 	}
-	record, err := s.cfg.Store.LoadCanvas(ctx, target.CanvasID)
+	record, err := loadCanvasCatalogVersion(ctx, s.cfg.Store, target.CanvasID, target.CanvasVersion)
 	if err != nil {
 		return TemplateReconcileResult{}, err
 	}
@@ -163,7 +163,7 @@ func (r *Room) reconcileTemplate(
 	}
 	complexItems := 0
 	for _, item := range items {
-		definition, err := r.itemDefinition(item.DefinitionID)
+		definition, err := r.itemDefinition(item.DefinitionID, item.DefinitionVersion)
 		if err != nil {
 			return result, err
 		}
@@ -200,7 +200,7 @@ func (r *Room) materializeSystemItem(template SystemItemTemplate) (SnapshotItem,
 	if template.EntityID == "" {
 		return SnapshotItem{}, errors.New("system item entity id is required")
 	}
-	definition, err := r.itemDefinition(template.DefinitionID)
+	definition, err := r.itemDefinition(template.DefinitionID, template.DefinitionVersion)
 	if err != nil {
 		return SnapshotItem{}, fmt.Errorf("load system item %q definition: %w", template.EntityID, err)
 	}

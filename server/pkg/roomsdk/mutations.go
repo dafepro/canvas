@@ -1,6 +1,7 @@
 package roomsdk
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,8 +47,15 @@ func (r *Room) validateItemMutation(
 		if mutation.DefinitionId == "" {
 			return false, nil, "missing_definition_id"
 		}
-		definition, err := r.itemDefinition(mutation.DefinitionId)
+		definition, err := r.itemDefinition(mutation.DefinitionId, mutation.DefinitionVersion)
 		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				if _, latestErr := r.cfg.Store.LoadItemDefinition(
+					context.Background(), mutation.DefinitionId,
+				); latestErr == nil {
+					return false, nil, "definition_version_mismatch"
+				}
+			}
 			return false, nil, "unknown_definition"
 		}
 		if mutation.DefinitionVersion != definition.Version {
@@ -117,7 +125,7 @@ func (r *Room) validateItemMutation(
 			return false, item, "invalid_config_json"
 		}
 		if mutation.Kind == pb.ItemMutationKind_ITEM_MUTATION_CONFIG && len(mutation.ConfigJson) > 0 {
-			definition, err := r.itemDefinition(item.DefinitionID)
+			definition, err := r.itemDefinition(item.DefinitionID, item.DefinitionVersion)
 			if err != nil {
 				return false, item, "unknown_definition"
 			}

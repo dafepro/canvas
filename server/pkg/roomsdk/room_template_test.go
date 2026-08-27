@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -72,6 +73,76 @@ func TestResolvedRoomsShareTemplateDataButNotCanonicalState(t *testing.T) {
 	}
 	if blueAccepted.CanvasId != "test-canvas" || len(snapshot.Items) != 0 {
 		t.Fatalf("blue joined canvas %q with items %#v", blueAccepted.CanvasId, snapshot.Items)
+	}
+}
+
+func TestResolvedRoomsCanUseDifferentVersionsOfTheSameCatalogEntries(t *testing.T) {
+	h := newHarness(t, func(config *Config) {
+		config.RoomTemplates = StaticRoomTemplates{
+			"legacy-room":  {CanvasID: "test-canvas", CanvasVersion: 1},
+			"current-room": {CanvasID: "test-canvas", CanvasVersion: 2},
+		}
+	})
+
+	canvasAt := func(version uint32) json.RawMessage {
+		t.Helper()
+		var canvas map[string]any
+		if err := json.Unmarshal([]byte(canvasJSON), &canvas); err != nil {
+			t.Fatal(err)
+		}
+		canvas["version"] = version
+		canvas["systemItems"] = []any{map[string]any{
+			"entityId":          "versioned-ball",
+			"definitionId":      "versioned-ball",
+			"definitionVersion": version,
+			"transform": map[string]any{
+				"x": 50, "y": 35, "rotation": 0, "scale": 1,
+			},
+			"resolvedConfig": map[string]any{"generation": fmt.Sprintf("v%d", version)},
+		}}
+		raw, err := json.Marshal(canvas)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
+	definitionAt := func(version uint32) ItemDefinitionRecord {
+		return ItemDefinitionRecord{
+			DefinitionID: "versioned-ball",
+			Version:      version,
+			Complexity:   ItemComplexitySimple,
+			ConfigSchema: json.RawMessage(fmt.Sprintf(`{
+				"type":"object",
+				"properties":{"generation":{"type":"string","const":"v%d"}},
+				"required":["generation"],
+				"additionalProperties":false
+			}`, version)),
+		}
+	}
+
+	for _, version := range []uint32{1, 2} {
+		h.store.PutCanvas(CanvasRecord{
+			CanvasID: "test-canvas", Version: version, DefinitionRaw: canvasAt(version),
+		})
+		h.store.PutItemDefinition(definitionAt(version))
+	}
+
+	legacy, err := h.server.roomFor(context.Background(), "legacy-room")
+	if err != nil {
+		t.Fatalf("wake legacy room: %v", err)
+	}
+	current, err := h.server.roomFor(context.Background(), "current-room")
+	if err != nil {
+		t.Fatalf("wake current room: %v", err)
+	}
+	if legacy.canvasShape.Version != 1 || current.canvasShape.Version != 2 {
+		t.Fatalf("resolved versions = %d and %d", legacy.canvasShape.Version, current.canvasShape.Version)
+	}
+	if legacy.snapshot.Items[0].DefinitionVersion != 1 ||
+		current.snapshot.Items[0].DefinitionVersion != 2 {
+		t.Fatalf("system item versions = %d and %d",
+			legacy.snapshot.Items[0].DefinitionVersion,
+			current.snapshot.Items[0].DefinitionVersion)
 	}
 }
 

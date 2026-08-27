@@ -93,8 +93,8 @@ func TestZeroComplexItemLimitRejectsAComplexSpawn(t *testing.T) {
 	room := &Room{
 		canvasShape: canvasShape{},
 		items:       make(map[string]*SnapshotItem),
-		definitions: map[string]ItemDefinitionRecord{
-			"complex": {
+		definitions: map[catalogVersionKey]ItemDefinitionRecord{
+			{id: "complex", version: 1}: {
 				DefinitionID: "complex",
 				Version:      1,
 				Complexity:   ItemComplexityComplex,

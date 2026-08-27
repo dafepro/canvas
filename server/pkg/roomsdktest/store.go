@@ -55,6 +55,47 @@ func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 			t.Fatalf("definition = %#v, want %#v", definition, fixture.ItemDefinition)
 		}
 
+		if versioned, ok := store.(roomsdk.VersionedCatalogStore); ok {
+			exactCanvas, err := versioned.LoadCanvasVersion(
+				ctx,
+				fixture.Canvas.CanvasID,
+				fixture.Canvas.Version,
+			)
+			if err != nil || !equalCanvas(exactCanvas, fixture.Canvas) {
+				t.Fatalf("LoadCanvasVersion returned %#v, %v", exactCanvas, err)
+			}
+			exactDefinition, err := versioned.LoadItemDefinitionVersion(
+				ctx,
+				fixture.ItemDefinition.DefinitionID,
+				fixture.ItemDefinition.Version,
+			)
+			if err != nil || !equalDefinition(exactDefinition, fixture.ItemDefinition) {
+				t.Fatalf("LoadItemDefinitionVersion returned %#v, %v", exactDefinition, err)
+			}
+			missingCanvas, err := versioned.LoadCanvasVersion(
+				ctx,
+				fixture.Canvas.CanvasID,
+				fixture.Canvas.Version+1,
+			)
+			assertNotFound(
+				t,
+				"LoadCanvasVersion",
+				reflect.DeepEqual(missingCanvas, roomsdk.CanvasRecord{}),
+				err,
+			)
+			missingDefinition, err := versioned.LoadItemDefinitionVersion(
+				ctx,
+				fixture.ItemDefinition.DefinitionID,
+				fixture.ItemDefinition.Version+1,
+			)
+			assertNotFound(
+				t,
+				"LoadItemDefinitionVersion",
+				reflect.DeepEqual(missingDefinition, roomsdk.ItemDefinitionRecord{}),
+				err,
+			)
+		}
+
 		missingCanvas, err := store.LoadCanvas(ctx, fixture.MissingCanvasID)
 		assertNotFound(t, "LoadCanvas", reflect.DeepEqual(missingCanvas, roomsdk.CanvasRecord{}), err)
 		missingDefinition, err := store.LoadItemDefinition(ctx, fixture.MissingItemDefinitionID)

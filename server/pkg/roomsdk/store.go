@@ -80,20 +80,46 @@ type Store interface {
 	SaveSnapshot(ctx context.Context, snapshot SnapshotRecord) error
 }
 
+// VersionedCatalogStore is an optional Store capability for hosts that retain
+// more than one immutable canvas or item-definition version during a rollout.
+// The SDK prefers these exact lookups when available and falls back to the
+// original Store methods for existing adapters.
+type VersionedCatalogStore interface {
+	LoadCanvasVersion(
+		ctx context.Context,
+		canvasID string,
+		version uint32,
+	) (CanvasRecord, error)
+	LoadItemDefinitionVersion(
+		ctx context.Context,
+		definitionID string,
+		version uint32,
+	) (ItemDefinitionRecord, error)
+}
+
+type catalogVersionKey struct {
+	id      string
+	version uint32
+}
+
 // MemoryStore keeps every canvas and snapshot in process memory. It is the
 // default for local runs and tests.
 type MemoryStore struct {
-	mu          sync.RWMutex
-	canvases    map[string]CanvasRecord
-	definitions map[string]ItemDefinitionRecord
-	snapshots   map[string]SnapshotRecord
+	mu                 sync.RWMutex
+	canvases           map[string]CanvasRecord
+	definitions        map[string]ItemDefinitionRecord
+	canvasVersions     map[catalogVersionKey]CanvasRecord
+	definitionVersions map[catalogVersionKey]ItemDefinitionRecord
+	snapshots          map[string]SnapshotRecord
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		canvases:    make(map[string]CanvasRecord),
-		definitions: make(map[string]ItemDefinitionRecord),
-		snapshots:   make(map[string]SnapshotRecord),
+		canvases:           make(map[string]CanvasRecord),
+		definitions:        make(map[string]ItemDefinitionRecord),
+		canvasVersions:     make(map[catalogVersionKey]CanvasRecord),
+		definitionVersions: make(map[catalogVersionKey]ItemDefinitionRecord),
+		snapshots:          make(map[string]SnapshotRecord),
 	}
 }
 
@@ -103,6 +129,7 @@ func (s *MemoryStore) PutItemDefinition(record ItemDefinitionRecord) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.definitions[record.DefinitionID] = record
+	s.definitionVersions[catalogVersionKey{id: record.DefinitionID, version: record.Version}] = record
 }
 
 // PutCanvas registers a canvas definition. Call it at start-up.
@@ -110,6 +137,22 @@ func (s *MemoryStore) PutCanvas(record CanvasRecord) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.canvases[record.CanvasID] = record
+	s.canvasVersions[catalogVersionKey{id: record.CanvasID, version: record.Version}] = record
+}
+
+// LoadCanvasVersion loads one exact immutable catalog entry.
+func (s *MemoryStore) LoadCanvasVersion(
+	_ context.Context,
+	canvasID string,
+	version uint32,
+) (CanvasRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	record, ok := s.canvasVersions[catalogVersionKey{id: canvasID, version: version}]
+	if !ok {
+		return CanvasRecord{}, ErrNotFound
+	}
+	return record, nil
 }
 
 func (s *MemoryStore) LoadCanvas(_ context.Context, canvasID string) (CanvasRecord, error) {
@@ -118,6 +161,21 @@ func (s *MemoryStore) LoadCanvas(_ context.Context, canvasID string) (CanvasReco
 	record, ok := s.canvases[canvasID]
 	if !ok {
 		return CanvasRecord{}, ErrNotFound
+	}
+	return record, nil
+}
+
+// LoadItemDefinitionVersion loads one exact immutable catalog entry.
+func (s *MemoryStore) LoadItemDefinitionVersion(
+	_ context.Context,
+	definitionID string,
+	version uint32,
+) (ItemDefinitionRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	record, ok := s.definitionVersions[catalogVersionKey{id: definitionID, version: version}]
+	if !ok {
+		return ItemDefinitionRecord{}, ErrNotFound
 	}
 	return record, nil
 }
@@ -169,4 +227,28 @@ func (s *MemoryStore) CanvasIDs() []string {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+func loadCanvasCatalogVersion(
+	ctx context.Context,
+	store Store,
+	canvasID string,
+	version uint32,
+) (CanvasRecord, error) {
+	if versioned, ok := store.(VersionedCatalogStore); ok {
+		return versioned.LoadCanvasVersion(ctx, canvasID, version)
+	}
+	return store.LoadCanvas(ctx, canvasID)
+}
+
+func loadItemDefinitionCatalogVersion(
+	ctx context.Context,
+	store Store,
+	definitionID string,
+	version uint32,
+) (ItemDefinitionRecord, error) {
+	if versioned, ok := store.(VersionedCatalogStore); ok {
+		return versioned.LoadItemDefinitionVersion(ctx, definitionID, version)
+	}
+	return store.LoadItemDefinition(ctx, definitionID)
 }

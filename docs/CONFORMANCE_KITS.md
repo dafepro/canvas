@@ -81,6 +81,10 @@ function returns a fresh adapter preloaded with one canvas and item definition.
 The suite verifies semantic JSON equality for catalog records, zero records plus
 `roomsdk.ErrNotFound` for misses, snapshot round trips, room isolation, rejection
 of stale checkpoint revisions, and highest-revision wins under concurrent saves.
+When the returned adapter also implements `VersionedCatalogStore`, the kit
+additionally verifies exact-version catalog lookup and missing-version
+`ErrNotFound` semantics without making that capability mandatory for legacy
+adapters.
 
 Production adapters should also supply `ReopenStore`, which constructs a fresh
 adapter over the same backing data. The suite then proves that the latest

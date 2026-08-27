@@ -60,7 +60,7 @@ type Room struct {
 	mutationReceipts     map[string]*storedMutationReceipt
 	mutationReceiptOrder []string
 	mutationHighWater    map[string]uint64
-	definitions          map[string]ItemDefinitionRecord
+	definitions          map[catalogVersionKey]ItemDefinitionRecord
 	nextEntityNo         uint64
 
 	joins      chan *Client
@@ -120,7 +120,7 @@ func newRoomWithMode(
 		editByEntity:      make(map[string]string),
 		mutationReceipts:  make(map[string]*storedMutationReceipt),
 		mutationHighWater: make(map[string]uint64),
-		definitions:       make(map[string]ItemDefinitionRecord),
+		definitions:       make(map[catalogVersionKey]ItemDefinitionRecord),
 		joins:             make(chan *Client, 8),
 		departures:        make(chan departure, 8),
 		messages:          make(chan inbound, 512),
@@ -193,7 +193,7 @@ func (r *Room) bootstrapSystemItems() error {
 			return fmt.Errorf("duplicate system item entity id %q", template.EntityID)
 		}
 		seen[template.EntityID] = struct{}{}
-		definition, err := r.itemDefinition(template.DefinitionID)
+		definition, err := r.itemDefinition(template.DefinitionID, template.DefinitionVersion)
 		if err != nil {
 			return fmt.Errorf("load system item %q definition: %w", template.EntityID, err)
 		}
@@ -233,24 +233,34 @@ func (r *Room) validSystemItemTransform(transform Transform) bool {
 	return transform.finite() && transform.Scale > 0 && r.insideCanvas(transform)
 }
 
-func (r *Room) itemDefinition(definitionID string) (ItemDefinitionRecord, error) {
-	if definition, ok := r.definitions[definitionID]; ok {
+func (r *Room) itemDefinition(
+	definitionID string,
+	version uint32,
+) (ItemDefinitionRecord, error) {
+	key := catalogVersionKey{id: definitionID, version: version}
+	if definition, ok := r.definitions[key]; ok {
 		return definition, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	definition, err := r.cfg.Store.LoadItemDefinition(ctx, definitionID)
+	definition, err := loadItemDefinitionCatalogVersion(ctx, r.cfg.Store, definitionID, version)
 	if err != nil {
 		return ItemDefinitionRecord{}, err
 	}
-	r.definitions[definitionID] = definition
+	if definition.DefinitionID != definitionID || definition.Version != version {
+		return ItemDefinitionRecord{}, fmt.Errorf(
+			"definition catalog returned %s@%d for requested %s@%d",
+			definition.DefinitionID, definition.Version, definitionID, version,
+		)
+	}
+	r.definitions[key] = definition
 	return definition, nil
 }
 
 func (r *Room) complexItemCount() int {
 	count := 0
 	for _, item := range r.snapshot.Items {
-		definition, err := r.itemDefinition(item.DefinitionID)
+		definition, err := r.itemDefinition(item.DefinitionID, item.DefinitionVersion)
 		if err == nil && definition.Complexity == ItemComplexityComplex {
 			count++
 		}
@@ -873,7 +883,7 @@ func (r *Room) validateLoadedSnapshot(
 		if !r.withinBounds(item.Transform) {
 			return errOutOfBounds
 		}
-		definition, err := r.itemDefinition(item.DefinitionID)
+		definition, err := r.itemDefinition(item.DefinitionID, item.DefinitionVersion)
 		if err != nil {
 			return fmt.Errorf("persisted item %q definition: %w", item.EntityID, err)
 		}
