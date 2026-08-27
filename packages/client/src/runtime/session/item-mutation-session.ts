@@ -200,6 +200,7 @@ export class ItemMutationSession {
   private mutationCounter = 0;
   private editCounter = 0;
   private lastOutcome?: ItemMutationOutcome;
+  private connectionReadyValue = true;
 
   constructor(options: ItemMutationSessionOptions) {
     this.clientSessionId = options.clientSessionId ?? randomSessionId();
@@ -232,6 +233,7 @@ export class ItemMutationSession {
   }
 
   connectionReady(): void {
+    this.connectionReadyValue = true;
     for (const queue of this.mutationQueues.values()) {
       const pending = queue[0];
       if (pending && !pending.sent) this.sendPending(pending);
@@ -259,6 +261,7 @@ export class ItemMutationSession {
   }
 
   resetConnection(): void {
+    this.connectionReadyValue = false;
     for (const pending of this.pendingById.values()) pending.sent = false;
     for (const edit of [...this.editsById.values()]) {
       this.finishEdit(edit, "superseded", undefined, "connection generation changed");
@@ -578,6 +581,7 @@ export class ItemMutationSession {
   }
 
   private sendPending(pending: PendingMutation): void {
+    if (!this.connectionReadyValue) return;
     const mutation = this.buildMutation(pending);
     pending.mutation = mutation;
     pending.sent = true;

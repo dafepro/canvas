@@ -314,6 +314,23 @@ describe("ItemMutationSession", () => {
     await expect(receipt.settled).resolves.toMatchObject({ status: "accepted" });
   });
 
+  it("holds mutations created during reconnect until the new join is ready", () => {
+    const { session, sentMutations } = build();
+
+    session.resetConnection();
+    const receipt = session.moveItem("crate-1", transform(30));
+
+    expect(receipt).toMatchObject({ mutationId: 1 });
+    expect(sentMutations()).toHaveLength(0);
+
+    session.connectionReady();
+    expect(sentMutations()).toHaveLength(1);
+    expect(sentMutations()[0]).toMatchObject({
+      mutationId: receipt.mutationId,
+      kind: ItemMutationKind.ITEM_MUTATION_TRANSFORM,
+    });
+  });
+
   it("owns canonical item metadata and translates accepted host mutations", () => {
     const { effects, session } = build();
     expect(session.decorate({
