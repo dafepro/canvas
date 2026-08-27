@@ -51,7 +51,7 @@ func (s *Server) ReconcileRoomTemplate(
 	if err != nil {
 		return TemplateReconcileResult{}, err
 	}
-	if record.Version != target.CanvasVersion {
+	if record.CanvasID != target.CanvasID || record.Version != target.CanvasVersion {
 		return TemplateReconcileResult{}, fmt.Errorf("%w: target=%s@%d available=%s@%d",
 			ErrCanvasVersionConflict, target.CanvasID, target.CanvasVersion, record.CanvasID, record.Version)
 	}

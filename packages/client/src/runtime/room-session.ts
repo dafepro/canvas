@@ -113,6 +113,17 @@ const immutableValue = <T>(value: T): T => {
   return value;
 };
 
+const definitionSnapshots = new WeakMap<object, ItemDefinition[]>();
+
+const snapshotDefinitionBundle = (definitions: ItemDefinition[]): ItemDefinition[] => {
+  const existing = definitionSnapshots.get(definitions);
+  if (existing) return existing;
+  const snapshot = immutableValue(definitions);
+  definitionSnapshots.set(definitions, snapshot);
+  definitionSnapshots.set(snapshot, snapshot);
+  return snapshot;
+};
+
 /** Send rates from spec 10.3. */
 export interface RoomSessionRates {
   /** All configured rates must be finite and between 0 (exclusive) and 240 Hz. */
@@ -154,7 +165,9 @@ export interface RoomSessionOptions {
 
 const MAX_SESSION_RATE_HZ = 240;
 
-const validateLocalConfiguration = (options: RoomSessionOptions): void => {
+export const prepareRoomSessionOptions = (
+  options: RoomSessionOptions,
+): RoomSessionOptions => {
   const fail = (
     message: string,
     details?: Readonly<Record<string, unknown>>,
@@ -165,8 +178,15 @@ const validateLocalConfiguration = (options: RoomSessionOptions): void => {
     });
   };
 
+  if (!Array.isArray(options?.definitions)) {
+    fail("definitions must be an array", { option: "definitions" });
+  }
+
   const definitionIds = new Set<string>();
   for (const definition of options.definitions) {
+    if (!definition || typeof definition !== "object") {
+      fail("every definition must be an object", { option: "definitions" });
+    }
     if (definitionIds.has(definition.definitionId)) {
       fail(`duplicate item definition '${definition.definitionId}'`, {
         definitionId: definition.definitionId,
@@ -183,7 +203,23 @@ const validateLocalConfiguration = (options: RoomSessionOptions): void => {
     }
   }
 
+  if (
+    options.rates !== undefined &&
+    (options.rates === null || typeof options.rates !== "object" || Array.isArray(options.rates))
+  ) {
+    fail("rates must be an object", { option: "rates", value: options.rates });
+  }
+  const rateNames = new Set([
+    "inputHz",
+    "deltaHz",
+    "keyframeHz",
+    "checkpointHz",
+    "previewHz",
+  ]);
   for (const [name, value] of Object.entries(options.rates ?? {})) {
+    if (!rateNames.has(name)) {
+      fail(`Unknown session rate '${name}'`, { option: `rates.${name}`, value });
+    }
     if (
       typeof value !== "number" ||
       !Number.isFinite(value) ||
@@ -197,7 +233,22 @@ const validateLocalConfiguration = (options: RoomSessionOptions): void => {
       });
     }
   }
+
+  if (!options.transport && !options.credentialProvider) {
+    fail("RoomSession requires a credentialProvider for WebSocket transport", {
+      option: "credentialProvider",
+    });
+  }
+
+  return {
+    ...options,
+    definitions: snapshotDefinitionBundle(options.definitions),
+    rates: options.rates ? immutableValue(options.rates) : undefined,
+  };
 };
+
+const isRoomSessionStartBoundary = (value: unknown): value is RoomSessionStartBoundary =>
+  value === "connected" || value === "initialized" || value === "presented";
 
 export type RoomSessionStartBoundary = "connected" | "initialized" | "presented";
 
@@ -292,18 +343,7 @@ export class RoomSession {
   };
 
   constructor(options: RoomSessionOptions) {
-    validateLocalConfiguration(options);
-    if (!options.transport && !options.credentialProvider) {
-      throw lifecycleError(
-        "invalid_configuration",
-        "RoomSession requires a credentialProvider for WebSocket transport",
-        { source: "configuration", details: { option: "credentialProvider" } },
-      );
-    }
-    options = {
-      ...options,
-      definitions: immutableValue(options.definitions),
-    };
+    options = prepareRoomSessionOptions(options);
     this.options = options;
     const transport =
       options.transport ??
@@ -350,6 +390,8 @@ export class RoomSession {
     this.roster = new ParticipantRoster({
       projectAvatar: options.projectParticipantAvatar,
       onObserverError: (cause) => this.reportObserverFailure("presence", cause),
+      onProjectionError: (cause) =>
+        this.reportObserverFailure("participantAvatarProjection", cause),
     });
     this.timeline = new ReplicationTimeline({
       sceneRevision: () => this.client.durableRevision.sceneRevision,
@@ -485,8 +527,15 @@ export class RoomSession {
    * The no-argument form retains the original connected/JOIN-sent contract.
    */
   start(options: RoomSessionStartOptions = {}): Promise<void> {
-    const connected = this.connection.start(() => this.client.connect());
     const boundary = options.until ?? "connected";
+    if (!isRoomSessionStartBoundary(boundary)) {
+      return Promise.reject(lifecycleError(
+        "invalid_configuration",
+        `Unknown start boundary '${String(boundary)}'`,
+        { source: "configuration", details: { option: "until", value: boundary } },
+      ));
+    }
+    const connected = this.connection.start(() => this.client.connect());
     if (boundary === "connected") return connected;
     const existing = this.boundedStartPromises.get(boundary);
     if (existing) return existing;
@@ -869,7 +918,12 @@ export class RoomSession {
   }
 
   private sendInput(): void {
-    const intent = this.options.intent?.() ?? NO_INTENT;
+    let intent = NO_INTENT;
+    try {
+      intent = this.options.intent?.() ?? NO_INTENT;
+    } catch (cause) {
+      this.reportObserverFailure("intent", cause);
+    }
     this.inputSequence++;
     const disabled = intent.disabled === true;
     if (this.roster.setActivity(

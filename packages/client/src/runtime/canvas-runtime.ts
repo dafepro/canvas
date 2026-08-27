@@ -31,6 +31,7 @@ import type { SimulationDriver } from "../simulation/driver.js";
 import type { RenderEntity } from "../simulation/messages.js";
 import {
   RoomSession,
+  prepareRoomSessionOptions,
   type InputIntent,
   type ParticipantAvatarProjector,
   type RoomSessionRates,
@@ -151,6 +152,7 @@ export const runtimeDiagnosticsIntervalMs = (requestedHz = 4): number => {
  */
 export class CanvasRuntime {
   readonly session: RoomSession;
+  private readonly options: CanvasRuntimeOptions;
   private scene?: PixiScene;
   private pointer?: AvatarPointerInteraction;
   private pointerCoordinator?: PointerInteractionCoordinator;
@@ -183,24 +185,8 @@ export class CanvasRuntime {
   private readonly internalUnsubscribers: Array<() => void> = [];
   private browserResourcesReleased = false;
 
-  constructor(private readonly options: CanvasRuntimeOptions) {
-    this.errorObservers = new ObserverSet();
-    this.overlayProjections = new OverlayProjectionStore(
-      (cause) => this.reportObserverFailure("overlayProjection", cause),
-    );
-    this.startup = new RuntimeStartupProgressCoordinator(
-      () => Date.now(),
-      (cause) => this.reportObserverFailure("startup", cause),
-    );
-    this.startup.configureAssets(options.assets?.sources ?? []);
-    if (typeof document !== "undefined") {
-      this.fullscreen = new FullscreenController(
-        options.fullscreenElement ?? options.mount,
-        document,
-        (cause) => this.reportObserverFailure("fullscreen", cause),
-      );
-    }
-    this.session = new RoomSession({
+  constructor(options: CanvasRuntimeOptions) {
+    const sessionOptions = prepareRoomSessionOptions({
       roomId: options.roomId,
       serverUrl: options.serverUrl,
       credentialProvider: options.credentialProvider,
@@ -214,6 +200,28 @@ export class CanvasRuntime {
       onJoined: (canvas) => this.mountScene(canvas),
       onError: (error) => this.reportError(error),
     });
+    this.options = {
+      ...options,
+      definitions: sessionOptions.definitions,
+      rates: sessionOptions.rates,
+    };
+    this.errorObservers = new ObserverSet();
+    this.overlayProjections = new OverlayProjectionStore(
+      (cause) => this.reportObserverFailure("overlayProjection", cause),
+    );
+    this.startup = new RuntimeStartupProgressCoordinator(
+      () => Date.now(),
+      (cause) => this.reportObserverFailure("startup", cause),
+    );
+    this.startup.configureAssets(this.options.assets?.sources ?? []);
+    if (typeof document !== "undefined") {
+      this.fullscreen = new FullscreenController(
+        this.options.fullscreenElement ?? this.options.mount,
+        document,
+        (cause) => this.reportObserverFailure("fullscreen", cause),
+      );
+    }
+    this.session = new RoomSession(sessionOptions);
     this.internalUnsubscribers.push(
       this.session.subscribeStartup((snapshot) => this.startup.acceptSession(snapshot)),
       this.session.subscribeEffects((emission) => this.scene?.effects.apply(emission)),
@@ -326,8 +334,19 @@ export class CanvasRuntime {
   }
 
   start(options: CanvasRuntimeStartOptions = {}): Promise<void> {
-    const connected = this.startConnection();
     const boundary = options.until ?? "connected";
+    if (
+      boundary !== "connected" &&
+      boundary !== "initialized" &&
+      boundary !== "presented"
+    ) {
+      return Promise.reject(lifecycleError(
+        "invalid_configuration",
+        `Unknown start boundary '${String(boundary)}'`,
+        { source: "configuration", details: { option: "until", value: boundary } },
+      ));
+    }
+    const connected = this.startConnection();
     if (boundary === "connected") return connected;
     const existing = this.boundedStartPromises.get(boundary);
     if (existing) return existing;

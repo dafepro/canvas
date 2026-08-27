@@ -63,6 +63,9 @@ export class PixiScene {
   private readonly screenPositions = new Map<string, { x: number; y: number }>();
   private lastFrameMs = 0;
   private editState: ItemEditState = {};
+  private destroyRequested = false;
+  private appInitialized = false;
+  private appDestroyed = false;
   debug: boolean;
 
   constructor(
@@ -89,6 +92,11 @@ export class PixiScene {
       resolution: resolveSceneResolution(this.options.resolution),
       preference: "webgl",
     });
+    this.appInitialized = true;
+    if (this.destroyRequested) {
+      this.destroyApplication();
+      return;
+    }
     // Native pan/zoom handling can cancel a drag as it crosses the canvas edge.
     this.app.canvas.style.touchAction = "none";
     element.appendChild(this.app.canvas);
@@ -386,9 +394,17 @@ export class PixiScene {
   }
 
   destroy(): void {
+    if (this.destroyRequested) return;
+    this.destroyRequested = true;
     this.resizeObserver?.disconnect();
     this.resizeObserver = undefined;
     this.effects.destroy();
+    if (this.appInitialized) this.destroyApplication();
+  }
+
+  private destroyApplication(): void {
+    if (this.appDestroyed) return;
+    this.appDestroyed = true;
     this.app.destroy(true, { children: true });
   }
 }

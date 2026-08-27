@@ -33,6 +33,36 @@ const manifest: AssetManifest = {
 };
 
 describe("asset manifest", () => {
+  it("validates runtime configuration before installing document listeners", () => {
+    const addEventListener = vi.fn();
+    vi.stubGlobal("document", { addEventListener });
+    try {
+      expect(() => new CanvasRuntime({
+        roomId: "invalid-runtime",
+        serverUrl: "http://unused.test",
+        mount: {} as HTMLElement,
+        definitions: null as unknown as ItemDefinition[],
+        transport: {
+          connect: vi.fn(async () => undefined),
+          sendReliable: vi.fn(),
+          sendRealtime: vi.fn(),
+          onMessage: () => () => undefined,
+          onStatus: () => () => undefined,
+          status: "idle",
+          traffic: emptyTraffic(),
+          close: vi.fn(),
+        },
+        driver: SimulationDriver.local(),
+      })).toThrow(expect.objectContaining({
+        code: "invalid_configuration",
+        source: "configuration",
+      }));
+      expect(addEventListener).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("rejects ambiguous and invalid manifests before loading", async () => {
     const invalid = {
       ...manifest,
@@ -191,6 +221,48 @@ describe("asset manifest", () => {
     expect(runtime.startupSnapshot.phase).toBe("joining");
     runtime.stop();
     expect(runtime.startupSnapshot.phase).toBe("cancelled");
+  });
+
+  it("composes the CanvasRuntime presentation boundary and rejects typos before connect", async () => {
+    const connect = vi.fn(async () => undefined);
+    const runtime = new CanvasRuntime({
+      roomId: "runtime-boundary",
+      serverUrl: "http://unused.test",
+      mount: {} as HTMLElement,
+      definitions: [],
+      transport: {
+        connect,
+        sendReliable: vi.fn(),
+        sendRealtime: vi.fn(),
+        onMessage: () => () => undefined,
+        onStatus: () => () => undefined,
+        status: "idle",
+        traffic: emptyTraffic(),
+        close: vi.fn(),
+      },
+      driver: SimulationDriver.local(),
+    });
+
+    await expect(runtime.start({ until: "typo" as "connected" })).rejects.toMatchObject({
+      code: "invalid_configuration",
+      details: { option: "until", value: "typo" },
+    });
+    expect(connect).not.toHaveBeenCalled();
+
+    let reveal!: () => void;
+    const presentation = new Promise<void>((resolve) => { reveal = resolve; });
+    vi.spyOn(runtime, "whenStartupReady").mockReturnValue(presentation);
+    let settled = false;
+    const started = runtime.start({ until: "presented" }).then(() => { settled = true; });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(connect).toHaveBeenCalledOnce();
+    expect(settled).toBe(false);
+
+    reveal();
+    await started;
+    expect(settled).toBe(true);
+    runtime.stop();
   });
 
   it("reports required preload failures through the typed consumer error model", async () => {

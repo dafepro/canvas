@@ -97,6 +97,7 @@ const build = (
     spawnPointId?: string;
     definitions?: ItemDefinition[];
     rates?: RoomSessionRates;
+    intent?: () => { direction: { x: number; y: number }; intensity: number; held: boolean };
   } = {},
 ) => {
   const terminate = vi.fn();
@@ -110,6 +111,7 @@ const build = (
     driver,
     spawnPointId: options.spawnPointId,
     rates: options.rates,
+    intent: options.intent,
     onError: options.onError,
     onJoined: options.onJoined,
   });
@@ -136,6 +138,19 @@ describe("RoomSession lifecycle", () => {
     transport.deliver(accepted());
     await initialized;
     expect(session.lifecycleState).toBe("active");
+    session.stop();
+  });
+
+  it("rejects an unknown JavaScript startup boundary before connecting", async () => {
+    const transport = new LifecycleTransport();
+    const { session } = build(transport);
+
+    await expect(session.start({ until: "typo" as "connected" })).rejects.toMatchObject({
+      code: "invalid_configuration",
+      source: "configuration",
+      details: { option: "until", value: "typo" },
+    });
+    expect(transport.connectCalls).toBe(0);
     session.stop();
   });
 
@@ -601,6 +616,43 @@ describe("RoomSession lifecycle", () => {
       .find((message) => message.type === "init");
     expect(init?.definitions).toHaveLength(rocketCanvasDefinitions.length);
     session.stop();
+  });
+
+  it("snapshots rates and isolates a throwing intent provider", async () => {
+    vi.useFakeTimers();
+    try {
+      const transport = new LifecycleTransport();
+      const rates: RoomSessionRates = { inputHz: 20 };
+      const { session, send } = build(transport, {
+        rates,
+        intent: () => {
+          throw new Error("broken input adapter");
+        },
+      });
+      const errors: CanvasConsumerError[] = [];
+      session.subscribeErrors((error) => errors.push(error));
+      rates.inputHz = 0;
+
+      await session.start();
+      transport.deliver(accepted());
+      await session.whenReady();
+      await vi.advanceTimersByTimeAsync(110);
+
+      expect(send.mock.calls.filter(([message]) => message.type === "input")).toHaveLength(2);
+      expect(errors).toEqual([
+        expect.objectContaining({
+          code: "consumer_callback_failed",
+          details: { stream: "intent" },
+        }),
+        expect.objectContaining({
+          code: "consumer_callback_failed",
+          details: { stream: "intent" },
+        }),
+      ]);
+      session.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("uses a requested arrival spawn and rejects an unknown one", async () => {

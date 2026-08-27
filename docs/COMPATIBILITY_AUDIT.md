@@ -1,7 +1,7 @@
 # Layer compatibility audit
 
 Audit date: 2026-08-27  
-Release baseline: 0.2.0  
+Release baseline: 0.3.0
 Wire baseline: protocol v8 / snapshot schema 1
 
 ## Goal and method
@@ -51,21 +51,28 @@ behavior.
 | COMPAT-008 | JavaScript accepted versions protobuf could not represent; Go and TypeScript disagreed on the exact slack boundary and checkpoint canvas version. | Share uint32/safe-integer domains, metadata identity checks, and inclusive boundary semantics. | Closed |
 | COMPAT-009 | Server configuration validation advertised numeric and collection constraints but ignored them, allowing invalid behavior and physics data into durable items. | Enforce every authored constraint and reject unsupported or inconsistent schemas explicitly. | Closed |
 | COMPAT-010 | ID-only catalog lookup made an older room version unavailable as soon as a newer canvas or definition with the same ID was registered. | Add optional exact-version catalog lookup, implement it in the reference stores, and exercise it in the external Store conformance kit. | Closed |
-| COMPAT-009 | Initial credential/constructor failures rejected `connect()` but left a nonterminal transport status. | Make initial rejection transition exactly to `failed`; reserve retry for a previously open connection. | Closed |
-| COMPAT-010 | Malformed protobuf-contained JSON threw through callbacks after mutating lease or revision state. | Decode before state mutation and emit stable malformed-payload errors. | Closed |
-| COMPAT-011 | Duplicate or nested-invalid definitions could initialize maps, renderer, and worker with ambiguous or unsafe data. | Validate the complete definition/canvas bundle and reject duplicate JOIN IDs. | Closed |
-| COMPAT-012 | `definition_mismatch` was documented as host ineligibility but the runtime treated it as a terminal room error. | Report it as a recoverable typed advisory and keep the peer active. | Closed |
-| COMPAT-013 | Corrupt persisted state bypassed live checkpoint validation after room wake; reconciled system items had revision zero. | Apply wake integrity validation and materialize revision-one system items. | Closed |
-| COMPAT-014 | Generated bindings could agree with a silently repurposed v8 proto declaration. | Freeze additive-friendly v8 wire signatures in the release gate. | Closed |
+| COMPAT-011 | Initial credential/constructor failures rejected `connect()` but left a nonterminal transport status. | Make initial rejection transition exactly to `failed`; reserve retry for a previously open connection. | Closed |
+| COMPAT-012 | Malformed protobuf-contained JSON threw through callbacks after mutating lease or revision state. | Decode before state mutation and emit stable malformed-payload errors. | Closed |
+| COMPAT-013 | Duplicate or nested-invalid definitions could initialize maps, renderer, and worker with ambiguous or unsafe data. | Validate the complete definition/canvas bundle and reject duplicate JOIN IDs. | Closed |
+| COMPAT-014 | `definition_mismatch` was documented as host ineligibility but the runtime treated it as a terminal room error. | Report it as a recoverable typed advisory and keep the peer active. | Closed |
+| COMPAT-015 | Corrupt persisted state bypassed live checkpoint validation after room wake; reconciled system items had revision zero. | Apply wake integrity validation and materialize revision-one system items. | Closed |
+| COMPAT-016 | Generated bindings could agree with a silently repurposed v8 proto declaration. | Freeze additive-friendly v8 wire signatures in the release gate. | Closed |
+| COMPAT-017 | Authored configuration schemas advertised numeric and collection constraints that the server did not enforce. | Strictly validate the schema subset and every advertised constraint before accepting item configuration. | Closed |
+| COMPAT-018 | A latest-by-ID catalog could not serve two immutable canvas or definition versions during a rolling deployment. | Add optional exact-version store capability while retaining the legacy adapter contract. | Closed |
+| COMPAT-019 | Throwing consumer observers could corrupt dispatch and unrelated observers, and subscriptions lacked grouped ownership. | Centralize failure-isolated observers, add `AbortSignal` ownership, and expose typed callback failures. | Closed |
+| COMPAT-020 | Consumers had to compose connection, initialization, canonical state, and render gates to know when a room was revealable. | Add compatible semantic `start({ until })` boundaries and retain no-argument timing. | Closed |
+| COMPAT-021 | Invalid local timer rates and late/mutable definitions could allocate resources or diverge after validation. | Validate before allocation and snapshot the accepted definition bundle. | Closed |
 
 ## Compatibility-sensitive behavior
 
-The changes above preserve documented client behavior. They do intentionally
+Most changes above preserve documented client behavior. They do intentionally
 reject values that never met the now-explicit contract: non-finite/out-of-range
 physics values, ambiguous duplicate definition IDs, unsupported snapshot
 schemas, unsafe integer overflow, malformed embedded JSON, and corrupt durable
-state. `docs/MAJOR_VERSION_NOTES.md` records these hardening migrations. No
-backward-incompatible change is currently scheduled for the next major.
+state. Release 0.3.0 also moves malformed local definition/rate failures to
+construction and snapshots definition input; `docs/MAJOR_VERSION_NOTES.md`
+records the client impact and migration. No additional backward-incompatible
+change is currently scheduled for the next major.
 
 ## Residual risks and required discipline
 

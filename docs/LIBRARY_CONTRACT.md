@@ -77,6 +77,12 @@ interpolated entities actually drawn. `projectWorldPoint` handles fixed product
 anchors. Neither exposes Pixi or mutable camera state. See
 `docs/OVERLAY_PROJECTION.md`.
 
+The raw `runtime.client.on(...)` coordination surface is intentionally below
+this runtime observation contract. It exposes transport-rate events for
+advanced adapters and does not add replay, `AbortSignal` ownership, or consumer
+failure isolation; ordinary application UI should use the runtime
+subscriptions above.
+
 `subscribeLifecycle`, `subscribeStartup`, `startupSnapshot`, `start`,
 `whenReady`, `whenPresented`, `whenStartupReady`, `stop`, and `stopGracefully`
 define route ownership, first-presentation progress, backgrounding, reconnect,

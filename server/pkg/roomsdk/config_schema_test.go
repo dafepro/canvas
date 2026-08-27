@@ -86,13 +86,18 @@ func TestConfigSchemaEnforcesAuthoredNumericAndCollectionConstraints(t *testing.
 
 func TestConfigSchemaRejectsInvalidOrUnsupportedSchemas(t *testing.T) {
 	for name, schema := range map[string][]byte{
-		"unknown keyword":       []byte(`{"type":"number","multipleOf":2}`),
-		"unknown nested":        []byte(`{"type":"object","properties":{"x":{"type":"number","default":1}}}`),
-		"reversed number range": []byte(`{"type":"number","minimum":2,"maximum":1}`),
-		"reversed item range":   []byte(`{"type":"array","items":{"type":"string"},"minItems":2,"maxItems":1}`),
-		"negative item bound":   []byte(`{"type":"array","items":{"type":"string"},"minItems":-1}`),
-		"invalid pattern":       []byte(`{"type":"string","pattern":"["}`),
-		"trailing document":     []byte(`{"type":"number"}{"type":"number"}`),
+		"unknown keyword":        []byte(`{"type":"number","multipleOf":2}`),
+		"unknown nested":         []byte(`{"type":"object","properties":{"x":{"type":"number","default":1}}}`),
+		"reversed number range":  []byte(`{"type":"number","minimum":2,"maximum":1}`),
+		"reversed item range":    []byte(`{"type":"array","items":{"type":"string"},"minItems":2,"maxItems":1}`),
+		"negative item bound":    []byte(`{"type":"array","items":{"type":"string"},"minItems":-1}`),
+		"invalid pattern":        []byte(`{"type":"string","pattern":"["}`),
+		"number bound on string": []byte(`{"type":"string","minimum":1}`),
+		"item bound on number":   []byte(`{"type":"number","minItems":1}`),
+		"pattern on boolean":     []byte(`{"type":"boolean","pattern":"x"}`),
+		"properties on array":    []byte(`{"type":"array","items":{"type":"string"},"properties":{}}`),
+		"empty enum":             []byte(`{"type":"string","enum":[]}`),
+		"trailing document":      []byte(`{"type":"number"}{"type":"number"}`),
 	} {
 		t.Run(name, func(t *testing.T) {
 			err := validateConfigJSON(schema, []byte(`0`))
@@ -100,5 +105,12 @@ func TestConfigSchemaRejectsInvalidOrUnsupportedSchemas(t *testing.T) {
 				t.Fatalf("invalid schema returned %v, want an explicit schema error", err)
 			}
 		})
+	}
+}
+
+func TestConfigSchemaUniqueItemsUsesJSONNumericEquality(t *testing.T) {
+	schema := []byte(`{"type":"array","items":{"type":"number"},"uniqueItems":true}`)
+	if err := validateConfigJSON(schema, []byte(`[0,-0]`)); !errors.Is(err, errConfigSchemaMismatch) {
+		t.Fatalf("equivalent JSON numbers returned %v, want schema mismatch", err)
 	}
 }

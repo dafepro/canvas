@@ -91,4 +91,30 @@ describe("ParticipantRoster", () => {
       y: 44,
     });
   });
+
+  it("isolates projection failures and falls back to the ordinary spawn", () => {
+    const errors: unknown[] = [];
+    const roster = new ParticipantRoster({
+      projectAvatar: () => {
+        throw new Error("broken product projection");
+      },
+      onProjectionError: (cause) => errors.push(cause),
+    });
+    roster.updatePresence([peer("c-a", "alice", true)]);
+
+    expect(() => roster.reconcileHostAvatars({
+      canvas: rocketCanvas,
+      hostAvatarIds: new Set(),
+      spawnPosition: () => ({ x: 4, y: 5 }),
+    })).not.toThrow();
+    expect(errors).toHaveLength(1);
+    expect(roster.reconcileHostAvatars({
+      canvas: rocketCanvas,
+      hostAvatarIds: new Set(),
+      spawnPosition: () => ({ x: 4, y: 5 }),
+    })[0]).toMatchObject({
+      type: "addAvatar",
+      spawn: { position: { x: 4, y: 5 } },
+    });
+  });
 });

@@ -11,6 +11,8 @@ func TestMemoryStoreConforms(t *testing.T) {
 	RunStoreConformance(t, storeFixture(func(t *testing.T) roomsdk.Store {
 		t.Helper()
 		store := roomsdk.NewMemoryStore()
+		store.PutCanvas(conformancePreviousCanvas)
+		store.PutItemDefinition(conformancePreviousDefinition)
 		store.PutCanvas(conformanceCanvas)
 		store.PutItemDefinition(conformanceDefinition)
 		return store
@@ -26,6 +28,8 @@ func TestFileStoreConforms(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		store.PutCanvas(conformancePreviousCanvas)
+		store.PutItemDefinition(conformancePreviousDefinition)
 		store.PutCanvas(conformanceCanvas)
 		store.PutItemDefinition(conformanceDefinition)
 		roots.Store(store, root)
@@ -41,6 +45,8 @@ func TestFileStoreConforms(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		store.PutCanvas(conformancePreviousCanvas)
+		store.PutItemDefinition(conformancePreviousDefinition)
 		store.PutCanvas(conformanceCanvas)
 		store.PutItemDefinition(conformanceDefinition)
 		return store
@@ -53,6 +59,8 @@ func storeFixture(newStore func(*testing.T) roomsdk.Store) StoreConformanceFixtu
 		NewStore:                newStore,
 		Canvas:                  conformanceCanvas,
 		ItemDefinition:          conformanceDefinition,
+		PreviousCanvas:          &conformancePreviousCanvas,
+		PreviousItemDefinition:  &conformancePreviousDefinition,
 		MissingCanvasID:         "missing-canvas",
 		MissingItemDefinitionID: "missing-definition",
 		MissingRoomID:           "missing-room",
@@ -71,4 +79,18 @@ var conformanceDefinition = roomsdk.ItemDefinitionRecord{
 	Complexity:    roomsdk.ItemComplexitySimple,
 	ConfigSchema:  []byte(`{"type":"object"}`),
 	DefinitionRaw: []byte(`{"definitionId":"conformance-item","version":2}`),
+}
+
+var conformancePreviousCanvas = roomsdk.CanvasRecord{
+	CanvasID:      "conformance-canvas",
+	Version:       2,
+	DefinitionRaw: []byte(`{"id":"conformance-canvas","version":2}`),
+}
+
+var conformancePreviousDefinition = roomsdk.ItemDefinitionRecord{
+	DefinitionID:  "conformance-item",
+	Version:       1,
+	Complexity:    roomsdk.ItemComplexitySimple,
+	ConfigSchema:  []byte(`{"type":"object"}`),
+	DefinitionRaw: []byte(`{"definitionId":"conformance-item","version":1}`),
 }

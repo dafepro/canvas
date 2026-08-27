@@ -84,6 +84,19 @@ describe("asset rendering", () => {
     expect(resolveSceneResolution(3, 1)).toBe(3);
   });
 
+  it("makes scene destruction idempotent across racing cleanup paths", () => {
+    const scene = new PixiScene({ size: { width: 1, height: 1 } } as CanvasDefinition, []);
+    const effectDestroy = vi.spyOn(scene.effects, "destroy");
+    const appDestroy = vi.spyOn(scene.app, "destroy").mockImplementation(() => undefined);
+    (scene as unknown as { appInitialized: boolean }).appInitialized = true;
+
+    scene.destroy();
+    scene.destroy();
+
+    expect(effectDestroy).toHaveBeenCalledOnce();
+    expect(appDestroy).toHaveBeenCalledOnce();
+  });
+
   it("draws background art while keeping collision geometry debug-only", () => {
     const canvas = {
       size: { width: 100, height: 50 },

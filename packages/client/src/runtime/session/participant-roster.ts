@@ -42,6 +42,7 @@ export interface PresenceSnapshot {
 export interface ParticipantRosterOptions {
   readonly projectAvatar?: ParticipantAvatarProjector;
   readonly onObserverError?: ObserverErrorHandler;
+  readonly onProjectionError?: ObserverErrorHandler;
 }
 
 export interface HostAvatarReconciliationContext {
@@ -184,12 +185,21 @@ export class ParticipantRoster {
     for (const participant of this.participantsById.values()) {
       const entityId = participant.avatarEntityId;
       const previousStatus = this.appliedStatusByAvatar.get(entityId);
-      const projection = previousStatus === participant.status
-        ? undefined
-        : this.options.projectAvatar?.(
+      let projection: ParticipantAvatarProjection | undefined;
+      if (previousStatus !== participant.status) {
+        try {
+          projection = this.options.projectAvatar?.(
             Object.freeze({ ...participant }),
             Object.freeze({ canvas: context.canvas, previousStatus }),
           );
+        } catch (cause) {
+          try {
+            this.options.onProjectionError?.(cause);
+          } catch {
+            // Consumer error reporting must not replace the safe fallback.
+          }
+        }
+      }
       if (!context.hostAvatarIds.has(entityId)) {
         requests.push({
           type: "addAvatar",

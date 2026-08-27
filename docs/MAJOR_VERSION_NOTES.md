@@ -23,6 +23,12 @@ No backward-incompatible changes are currently scheduled.
   after construction no longer affects the runtime. Migration: validate or
   construct configuration inside the application's error boundary, keep rates
   in the published range, and create a new runtime when definitions change.
+- **Versioned store conformance fixtures:** a fixture whose store implements
+  `VersionedCatalogStore` must now provide and preseed `PreviousCanvas` and
+  `PreviousItemDefinition`. Client impact: external adapter conformance tests
+  that only supplied the current generation now fail with an actionable fixture
+  error. Migration: add an older record under each current ID so the suite can
+  prove coexistence rather than only requested-version comparison.
 
 ## Compatibility hardening after 0.1.0
 

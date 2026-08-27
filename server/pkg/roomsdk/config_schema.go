@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"regexp"
 	"unicode/utf8"
 )
@@ -20,10 +21,10 @@ type configSchema struct {
 	Properties           map[string]configSchema `json:"properties,omitempty"`
 	Required             []string                `json:"required,omitempty"`
 	Items                *configSchema           `json:"items,omitempty"`
-	AdditionalProperties bool                    `json:"additionalProperties,omitempty"`
+	AdditionalProperties *bool                   `json:"additionalProperties,omitempty"`
 	Enum                 []string                `json:"enum,omitempty"`
 	Const                *string                 `json:"const,omitempty"`
-	Pattern              string                  `json:"pattern,omitempty"`
+	Pattern              *string                 `json:"pattern,omitempty"`
 	MinLength            *int                    `json:"minLength,omitempty"`
 	MaxLength            *int                    `json:"maxLength,omitempty"`
 	Minimum              *float64                `json:"minimum,omitempty"`
@@ -32,7 +33,7 @@ type configSchema struct {
 	ExclusiveMaximum     *float64                `json:"exclusiveMaximum,omitempty"`
 	MinItems             *int                    `json:"minItems,omitempty"`
 	MaxItems             *int                    `json:"maxItems,omitempty"`
-	UniqueItems          bool                    `json:"uniqueItems,omitempty"`
+	UniqueItems          *bool                   `json:"uniqueItems,omitempty"`
 }
 
 func validateConfigJSON(schemaRaw, configRaw json.RawMessage) error {
@@ -76,7 +77,7 @@ func validateConfigValue(schema configSchema, value any) error {
 		for key, child := range object {
 			property, known := schema.Properties[key]
 			if !known {
-				if schema.AdditionalProperties {
+				if schema.AdditionalProperties != nil && *schema.AdditionalProperties {
 					continue
 				}
 				return errConfigSchemaMismatch
@@ -98,21 +99,18 @@ func validateConfigValue(schema configSchema, value any) error {
 		if schema.MaxItems != nil && len(array) > *schema.MaxItems {
 			return errConfigSchemaMismatch
 		}
-		seen := make(map[string]struct{}, len(array))
+		seen := make([]any, 0, len(array))
 		for _, child := range array {
 			if err := validateConfigValue(*schema.Items, child); err != nil {
 				return err
 			}
-			if schema.UniqueItems {
-				encoded, err := json.Marshal(child)
-				if err != nil {
-					return errConfigSchemaMismatch
+			if schema.UniqueItems != nil && *schema.UniqueItems {
+				for _, previous := range seen {
+					if reflect.DeepEqual(previous, child) {
+						return errConfigSchemaMismatch
+					}
 				}
-				key := string(encoded)
-				if _, duplicate := seen[key]; duplicate {
-					return errConfigSchemaMismatch
-				}
-				seen[key] = struct{}{}
+				seen = append(seen, child)
 			}
 		}
 		return nil
@@ -162,8 +160,8 @@ func validateConfigValue(schema configSchema, value any) error {
 				return errConfigSchemaMismatch
 			}
 		}
-		if schema.Pattern != "" {
-			matched, err := regexp.MatchString(schema.Pattern, text)
+		if schema.Pattern != nil {
+			matched, err := regexp.MatchString(*schema.Pattern, text)
 			if err != nil || !matched {
 				return errConfigSchemaMismatch
 			}
@@ -200,6 +198,9 @@ func validateConfigSchema(
 	path string,
 	visitedRequired map[string]struct{},
 ) error {
+	if err := validateConfigSchemaKeywords(schema, path); err != nil {
+		return err
+	}
 	switch schema.Type {
 	case "object":
 		clear(visitedRequired)
@@ -265,6 +266,9 @@ func validateConfigSchema(
 			return fmt.Errorf("%s.exclusiveMinimum must be less than exclusiveMaximum", path)
 		}
 	case "string":
+		if schema.Enum != nil && len(schema.Enum) == 0 {
+			return fmt.Errorf("%s.enum must contain at least one value", path)
+		}
 		if schema.MinLength != nil && *schema.MinLength < 0 {
 			return fmt.Errorf("%s.minLength must be non-negative", path)
 		}
@@ -275,8 +279,8 @@ func validateConfigSchema(
 			*schema.MinLength > *schema.MaxLength {
 			return fmt.Errorf("%s.minLength must not exceed maxLength", path)
 		}
-		if schema.Pattern != "" {
-			if _, err := regexp.Compile(schema.Pattern); err != nil {
+		if schema.Pattern != nil {
+			if _, err := regexp.Compile(*schema.Pattern); err != nil {
 				return fmt.Errorf("%s.pattern: %w", path, err)
 			}
 		}
@@ -284,6 +288,55 @@ func validateConfigSchema(
 		// These primitive schemas have no additional authored constraints.
 	default:
 		return fmt.Errorf("%s.type %q is unsupported", path, schema.Type)
+	}
+	return nil
+}
+
+func validateConfigSchemaKeywords(schema configSchema, path string) error {
+	allowedByType := map[string]map[string]struct{}{
+		"object": {
+			"properties": {}, "required": {}, "additionalProperties": {},
+		},
+		"array": {
+			"items": {}, "minItems": {}, "maxItems": {}, "uniqueItems": {},
+		},
+		"number": {
+			"minimum": {}, "maximum": {}, "exclusiveMinimum": {}, "exclusiveMaximum": {},
+		},
+		"string": {
+			"enum": {}, "const": {}, "pattern": {}, "minLength": {}, "maxLength": {},
+		},
+		"boolean": {},
+		"null":    {},
+	}
+	allowed, supported := allowedByType[schema.Type]
+	if !supported {
+		return fmt.Errorf("%s.type %q is unsupported", path, schema.Type)
+	}
+	for keyword, present := range map[string]bool{
+		"properties":           schema.Properties != nil,
+		"required":             schema.Required != nil,
+		"items":                schema.Items != nil,
+		"additionalProperties": schema.AdditionalProperties != nil,
+		"enum":                 schema.Enum != nil,
+		"const":                schema.Const != nil,
+		"pattern":              schema.Pattern != nil,
+		"minLength":            schema.MinLength != nil,
+		"maxLength":            schema.MaxLength != nil,
+		"minimum":              schema.Minimum != nil,
+		"maximum":              schema.Maximum != nil,
+		"exclusiveMinimum":     schema.ExclusiveMinimum != nil,
+		"exclusiveMaximum":     schema.ExclusiveMaximum != nil,
+		"minItems":             schema.MinItems != nil,
+		"maxItems":             schema.MaxItems != nil,
+		"uniqueItems":          schema.UniqueItems != nil,
+	} {
+		if !present {
+			continue
+		}
+		if _, ok := allowed[keyword]; !ok {
+			return fmt.Errorf("%s.%s is not supported for type %q", path, keyword, schema.Type)
+		}
 	}
 	return nil
 }

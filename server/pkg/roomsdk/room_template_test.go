@@ -146,6 +146,39 @@ func TestResolvedRoomsCanUseDifferentVersionsOfTheSameCatalogEntries(t *testing.
 	}
 }
 
+type mismatchedCanvasVersionStore struct {
+	*MemoryStore
+}
+
+func (s mismatchedCanvasVersionStore) LoadCanvasVersion(
+	context.Context,
+	string,
+	uint32,
+) (CanvasRecord, error) {
+	return CanvasRecord{
+		CanvasID:      "wrong-canvas",
+		Version:       1,
+		DefinitionRaw: []byte(strings.ReplaceAll(canvasJSON, "test-canvas", "wrong-canvas")),
+	}, nil
+}
+
+func TestRoomTemplateRejectsExactLookupWithWrongCanvasID(t *testing.T) {
+	server, err := New(Config{
+		Store: mismatchedCanvasVersionStore{NewMemoryStore()},
+		Auth:  DevAuthenticator(),
+		RoomTemplates: StaticRoomTemplates{
+			"team-red": {CanvasID: "test-canvas", CanvasVersion: 1},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = server.roomFor(context.Background(), "team-red")
+	if !errors.Is(err, ErrRoomTemplateConflict) {
+		t.Fatalf("roomFor error = %v, want ErrRoomTemplateConflict", err)
+	}
+}
+
 func TestRoomWakeRejectsResolverSelectionThatConflictsWithPersistedTemplate(t *testing.T) {
 	h := newHarness(t, func(config *Config) {
 		config.RoomTemplates = RoomTemplateResolverFunc(func(context.Context, string) (RoomTemplate, error) {

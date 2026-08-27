@@ -98,7 +98,7 @@ func (s *Server) handleGetRoom(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "room not found", http.StatusNotFound)
 		return
 	}
-	if record.Version != template.CanvasVersion {
+	if record.CanvasID != template.CanvasID || record.Version != template.CanvasVersion {
 		http.Error(w, "room template unavailable", http.StatusConflict)
 		return
 	}
@@ -157,7 +157,7 @@ func (s *Server) roomFor(ctx context.Context, roomID string) (*Room, error) {
 	if err != nil {
 		return nil, err
 	}
-	if record.Version != template.CanvasVersion {
+	if record.CanvasID != template.CanvasID || record.Version != template.CanvasVersion {
 		return nil, fmt.Errorf("%w: resolver=%s@%d available=%s@%d",
 			ErrRoomTemplateConflict, template.CanvasID, template.CanvasVersion, record.CanvasID, record.Version)
 	}

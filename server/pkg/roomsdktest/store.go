@@ -23,6 +23,10 @@ type StoreConformanceFixture struct {
 
 	Canvas         roomsdk.CanvasRecord
 	ItemDefinition roomsdk.ItemDefinitionRecord
+	// PreviousCanvas and PreviousItemDefinition use the same IDs at older
+	// versions. They are required when NewStore implements VersionedCatalogStore.
+	PreviousCanvas         *roomsdk.CanvasRecord
+	PreviousItemDefinition *roomsdk.ItemDefinitionRecord
 
 	MissingCanvasID         string
 	MissingItemDefinitionID string
@@ -56,6 +60,9 @@ func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 		}
 
 		if versioned, ok := store.(roomsdk.VersionedCatalogStore); ok {
+			if fixture.PreviousCanvas == nil || fixture.PreviousItemDefinition == nil {
+				t.Fatal("versioned store fixtures must seed previous catalog versions")
+			}
 			exactCanvas, err := versioned.LoadCanvasVersion(
 				ctx,
 				fixture.Canvas.CanvasID,
@@ -71,6 +78,22 @@ func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 			)
 			if err != nil || !equalDefinition(exactDefinition, fixture.ItemDefinition) {
 				t.Fatalf("LoadItemDefinitionVersion returned %#v, %v", exactDefinition, err)
+			}
+			previousCanvas, err := versioned.LoadCanvasVersion(
+				ctx,
+				fixture.PreviousCanvas.CanvasID,
+				fixture.PreviousCanvas.Version,
+			)
+			if err != nil || !equalCanvas(previousCanvas, *fixture.PreviousCanvas) {
+				t.Fatalf("LoadCanvasVersion did not retain previous version: %#v, %v", previousCanvas, err)
+			}
+			previousDefinition, err := versioned.LoadItemDefinitionVersion(
+				ctx,
+				fixture.PreviousItemDefinition.DefinitionID,
+				fixture.PreviousItemDefinition.Version,
+			)
+			if err != nil || !equalDefinition(previousDefinition, *fixture.PreviousItemDefinition) {
+				t.Fatalf("LoadItemDefinitionVersion did not retain previous version: %#v, %v", previousDefinition, err)
 			}
 			missingCanvas, err := versioned.LoadCanvasVersion(
 				ctx,

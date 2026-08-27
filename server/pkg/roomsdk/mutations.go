@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	pb "github.com/dafepro/canvas/server/gen/canvasphysicsv1"
 )
@@ -50,8 +51,10 @@ func (r *Room) validateItemMutation(
 		definition, err := r.itemDefinition(mutation.DefinitionId, mutation.DefinitionVersion)
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
 				if _, latestErr := r.cfg.Store.LoadItemDefinition(
-					context.Background(), mutation.DefinitionId,
+					ctx, mutation.DefinitionId,
 				); latestErr == nil {
 					return false, nil, "definition_version_mismatch"
 				}

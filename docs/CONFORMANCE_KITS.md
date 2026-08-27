@@ -77,14 +77,16 @@ the kit owns only the identity/error boundary visible to Canvas.
 ## Store kit
 
 `RunStoreConformance` accepts a `StoreConformanceFixture` whose `NewStore`
-function returns a fresh adapter preloaded with one canvas and item definition.
+function returns a fresh adapter preloaded with the current canvas and item
+definition.
 The suite verifies semantic JSON equality for catalog records, zero records plus
 `roomsdk.ErrNotFound` for misses, snapshot round trips, room isolation, rejection
 of stale checkpoint revisions, and highest-revision wins under concurrent saves.
-When the returned adapter also implements `VersionedCatalogStore`, the kit
-additionally verifies exact-version catalog lookup and missing-version
-`ErrNotFound` semantics without making that capability mandatory for legacy
-adapters.
+When the returned adapter also implements `VersionedCatalogStore`, the fixture
+must also seed `PreviousCanvas` and `PreviousItemDefinition` with the same IDs
+and older versions. The kit retrieves both generations, proving retention rather
+than only version checking, and verifies missing-version `ErrNotFound`
+semantics. The capability remains optional for legacy adapters.
 
 Production adapters should also supply `ReopenStore`, which constructs a fresh
 adapter over the same backing data. The suite then proves that the latest
@@ -98,6 +100,8 @@ func TestProductStore(t *testing.T) {
         ReopenStore: reopenTestDatabase,
         Canvas: canvasFixture,
         ItemDefinition: definitionFixture,
+        PreviousCanvas: &previousCanvasFixture,
+        PreviousItemDefinition: &previousDefinitionFixture,
         MissingCanvasID: "missing-canvas",
         MissingItemDefinitionID: "missing-definition",
         MissingRoomID: "missing-room",
