@@ -66,23 +66,38 @@ type Config struct {
 	RoomOwnershipTTL time.Duration
 	// RoomOwnershipRenewInterval controls proactive lease renewal.
 	RoomOwnershipRenewInterval time.Duration
+	// TransientActions is the product registry for non-durable behavior actions.
+	// Nil rejects every action without changing existing room behavior.
+	TransientActions TransientActionRegistry
+	// MaxTransientActionPayloadBytes bounds JSON before registry dispatch.
+	MaxTransientActionPayloadBytes int
+	// MaxTransientActionResultsPerRoom bounds the active-room deduplication ledger.
+	MaxTransientActionResultsPerRoom int
+	// MaxTransientActionsPerSecond is a per-authenticated-participant limit.
+	MaxTransientActionsPerSecond int
+	// TransientActionTimeout bounds one registry decision.
+	TransientActionTimeout time.Duration
 }
 
 const (
-	defaultTickRate                      = 60
-	defaultHostLeaseTTL                  = 2500 * time.Millisecond
-	defaultHeartbeatInterval             = 500 * time.Millisecond
-	defaultItemEditLeaseTTL              = 5 * time.Second
-	defaultSleepGrace                    = 2 * time.Second
-	defaultMaxClients                    = 20
-	defaultProtocolVersion               = 8
-	defaultMutationAuthorizationTimeout  = 2 * time.Second
-	defaultMaxMutationAuthorizationBytes = 4096
-	defaultMaxMutationCorrelationBytes   = 256
-	defaultMutationOutcomeRetention      = 24 * time.Hour
-	defaultMaxMutationOutcomesPerRoom    = 1024
-	defaultMutationOutcomeSinkTimeout    = 5 * time.Second
-	defaultRoomOwnershipTTL              = 10 * time.Second
+	defaultTickRate                         = 60
+	defaultHostLeaseTTL                     = 2500 * time.Millisecond
+	defaultHeartbeatInterval                = 500 * time.Millisecond
+	defaultItemEditLeaseTTL                 = 5 * time.Second
+	defaultSleepGrace                       = 2 * time.Second
+	defaultMaxClients                       = 20
+	defaultProtocolVersion                  = 8
+	defaultMutationAuthorizationTimeout     = 2 * time.Second
+	defaultMaxMutationAuthorizationBytes    = 4096
+	defaultMaxMutationCorrelationBytes      = 256
+	defaultMutationOutcomeRetention         = 24 * time.Hour
+	defaultMaxMutationOutcomesPerRoom       = 1024
+	defaultMutationOutcomeSinkTimeout       = 5 * time.Second
+	defaultRoomOwnershipTTL                 = 10 * time.Second
+	defaultMaxTransientActionPayloadBytes   = 4096
+	defaultMaxTransientActionResultsPerRoom = 1024
+	defaultMaxTransientActionsPerSecond     = 20
+	defaultTransientActionTimeout           = 2 * time.Second
 )
 
 func (c *Config) applyDefaults() {
@@ -139,6 +154,18 @@ func (c *Config) applyDefaults() {
 	}
 	if c.RoomOwnershipRenewInterval <= 0 || c.RoomOwnershipRenewInterval >= c.RoomOwnershipTTL {
 		c.RoomOwnershipRenewInterval = c.RoomOwnershipTTL / 3
+	}
+	if c.MaxTransientActionPayloadBytes <= 0 {
+		c.MaxTransientActionPayloadBytes = defaultMaxTransientActionPayloadBytes
+	}
+	if c.MaxTransientActionResultsPerRoom <= 0 {
+		c.MaxTransientActionResultsPerRoom = defaultMaxTransientActionResultsPerRoom
+	}
+	if c.MaxTransientActionsPerSecond <= 0 {
+		c.MaxTransientActionsPerSecond = defaultMaxTransientActionsPerSecond
+	}
+	if c.TransientActionTimeout <= 0 {
+		c.TransientActionTimeout = defaultTransientActionTimeout
 	}
 }
 

@@ -16,6 +16,9 @@ network.
   application behavior.
 - Canvas owns the simulation runtime and generic commands. The application owns
   its domain behavior, definitions, art, and product policy.
+- Authenticated transient actions reach a behavior as `owner.action`. The Go
+  application's `TransientActionRegistry` owns the action allowlist, JSON
+  schema checks, and room-action routing described in `TRANSIENT_ACTIONS.md`.
 
 ## Worker entry
 

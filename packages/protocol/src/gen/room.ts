@@ -66,6 +66,132 @@ export function hostControlKindToJSON(object: HostControlKind): string {
   }
 }
 
+export enum TransientActionTargetKind {
+  TRANSIENT_ACTION_TARGET_UNSPECIFIED = 0,
+  TRANSIENT_ACTION_TARGET_ROOM = 1,
+  TRANSIENT_ACTION_TARGET_ITEM = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function transientActionTargetKindFromJSON(object: any): TransientActionTargetKind {
+  switch (object) {
+    case 0:
+    case "TRANSIENT_ACTION_TARGET_UNSPECIFIED":
+      return TransientActionTargetKind.TRANSIENT_ACTION_TARGET_UNSPECIFIED;
+    case 1:
+    case "TRANSIENT_ACTION_TARGET_ROOM":
+      return TransientActionTargetKind.TRANSIENT_ACTION_TARGET_ROOM;
+    case 2:
+    case "TRANSIENT_ACTION_TARGET_ITEM":
+      return TransientActionTargetKind.TRANSIENT_ACTION_TARGET_ITEM;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TransientActionTargetKind.UNRECOGNIZED;
+  }
+}
+
+export function transientActionTargetKindToJSON(object: TransientActionTargetKind): string {
+  switch (object) {
+    case TransientActionTargetKind.TRANSIENT_ACTION_TARGET_UNSPECIFIED:
+      return "TRANSIENT_ACTION_TARGET_UNSPECIFIED";
+    case TransientActionTargetKind.TRANSIENT_ACTION_TARGET_ROOM:
+      return "TRANSIENT_ACTION_TARGET_ROOM";
+    case TransientActionTargetKind.TRANSIENT_ACTION_TARGET_ITEM:
+      return "TRANSIENT_ACTION_TARGET_ITEM";
+    case TransientActionTargetKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum TransientActionRejectCode {
+  TRANSIENT_ACTION_REJECT_UNSPECIFIED = 0,
+  TRANSIENT_ACTION_REJECT_MALFORMED = 1,
+  TRANSIENT_ACTION_REJECT_NOT_FOUND = 2,
+  TRANSIENT_ACTION_REJECT_NOT_OWNER = 3,
+  TRANSIENT_ACTION_REJECT_UNKNOWN_ACTION = 4,
+  TRANSIENT_ACTION_REJECT_PAYLOAD = 5,
+  TRANSIENT_ACTION_REJECT_UNAUTHORIZED = 6,
+  TRANSIENT_ACTION_REJECT_RATE_LIMITED = 7,
+  TRANSIENT_ACTION_REJECT_STALE = 8,
+  TRANSIENT_ACTION_REJECT_UNAVAILABLE = 9,
+  TRANSIENT_ACTION_REJECT_INTERNAL = 10,
+  UNRECOGNIZED = -1,
+}
+
+export function transientActionRejectCodeFromJSON(object: any): TransientActionRejectCode {
+  switch (object) {
+    case 0:
+    case "TRANSIENT_ACTION_REJECT_UNSPECIFIED":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNSPECIFIED;
+    case 1:
+    case "TRANSIENT_ACTION_REJECT_MALFORMED":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_MALFORMED;
+    case 2:
+    case "TRANSIENT_ACTION_REJECT_NOT_FOUND":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_NOT_FOUND;
+    case 3:
+    case "TRANSIENT_ACTION_REJECT_NOT_OWNER":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_NOT_OWNER;
+    case 4:
+    case "TRANSIENT_ACTION_REJECT_UNKNOWN_ACTION":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNKNOWN_ACTION;
+    case 5:
+    case "TRANSIENT_ACTION_REJECT_PAYLOAD":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_PAYLOAD;
+    case 6:
+    case "TRANSIENT_ACTION_REJECT_UNAUTHORIZED":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNAUTHORIZED;
+    case 7:
+    case "TRANSIENT_ACTION_REJECT_RATE_LIMITED":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_RATE_LIMITED;
+    case 8:
+    case "TRANSIENT_ACTION_REJECT_STALE":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_STALE;
+    case 9:
+    case "TRANSIENT_ACTION_REJECT_UNAVAILABLE":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNAVAILABLE;
+    case 10:
+    case "TRANSIENT_ACTION_REJECT_INTERNAL":
+      return TransientActionRejectCode.TRANSIENT_ACTION_REJECT_INTERNAL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TransientActionRejectCode.UNRECOGNIZED;
+  }
+}
+
+export function transientActionRejectCodeToJSON(object: TransientActionRejectCode): string {
+  switch (object) {
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNSPECIFIED:
+      return "TRANSIENT_ACTION_REJECT_UNSPECIFIED";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_MALFORMED:
+      return "TRANSIENT_ACTION_REJECT_MALFORMED";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_NOT_FOUND:
+      return "TRANSIENT_ACTION_REJECT_NOT_FOUND";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_NOT_OWNER:
+      return "TRANSIENT_ACTION_REJECT_NOT_OWNER";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNKNOWN_ACTION:
+      return "TRANSIENT_ACTION_REJECT_UNKNOWN_ACTION";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_PAYLOAD:
+      return "TRANSIENT_ACTION_REJECT_PAYLOAD";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNAUTHORIZED:
+      return "TRANSIENT_ACTION_REJECT_UNAUTHORIZED";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_RATE_LIMITED:
+      return "TRANSIENT_ACTION_REJECT_RATE_LIMITED";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_STALE:
+      return "TRANSIENT_ACTION_REJECT_STALE";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNAVAILABLE:
+      return "TRANSIENT_ACTION_REJECT_UNAVAILABLE";
+    case TransientActionRejectCode.TRANSIENT_ACTION_REJECT_INTERNAL:
+      return "TRANSIENT_ACTION_REJECT_INTERNAL";
+    case TransientActionRejectCode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /**
  * Disposable presentation is deliberately absent from durable mutations;
  * ItemEditPreview has its own rate-limited realtime stream.
@@ -366,6 +492,8 @@ export interface RoomEnvelope {
   renewItemEdit?: RenewItemEdit | undefined;
   endItemEdit?: EndItemEdit | undefined;
   itemEditPreview?: ItemEditPreview | undefined;
+  transientAction?: TransientAction | undefined;
+  transientActionResult?: TransientActionResult | undefined;
 }
 
 export interface Vec2 {
@@ -542,6 +670,30 @@ export interface EffectEvent {
   paramsJson: Uint8Array;
 }
 
+export interface TransientAction {
+  clientSessionId: string;
+  requestId: number;
+  action: string;
+  targetKind: TransientActionTargetKind;
+  entityId: string;
+  payloadJson: Uint8Array;
+  /** Filled by the server after authentication. Client values are ignored. */
+  participantId: string;
+  /** Filled from the application registry. Room actions use this behavior item. */
+  dispatchEntityId: string;
+}
+
+export interface TransientActionResult {
+  clientSessionId: string;
+  requestId: number;
+  accepted: boolean;
+  rejectCode: TransientActionRejectCode;
+  message: string;
+  action: string;
+  targetKind: TransientActionTargetKind;
+  entityId: string;
+}
+
 export interface ItemMutation {
   clientSessionId: string;
   mutationId: number;
@@ -665,6 +817,8 @@ function createBaseRoomEnvelope(): RoomEnvelope {
     renewItemEdit: undefined,
     endItemEdit: undefined,
     itemEditPreview: undefined,
+    transientAction: undefined,
+    transientActionResult: undefined,
   };
 }
 
@@ -738,6 +892,12 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     }
     if (message.itemEditPreview !== undefined) {
       ItemEditPreview.encode(message.itemEditPreview, writer.uint32(234).fork()).join();
+    }
+    if (message.transientAction !== undefined) {
+      TransientAction.encode(message.transientAction, writer.uint32(242).fork()).join();
+    }
+    if (message.transientActionResult !== undefined) {
+      TransientActionResult.encode(message.transientActionResult, writer.uint32(250).fork()).join();
     }
     return writer;
   },
@@ -939,6 +1099,22 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
             message.itemEditPreview = ItemEditPreview.decode(reader, reader.uint32());
             continue;
           }
+          case 30: {
+            if (tag !== 242) {
+              break;
+            }
+
+            message.transientAction = TransientAction.decode(reader, reader.uint32());
+            continue;
+          }
+          case 31: {
+            if (tag !== 250) {
+              break;
+            }
+
+            message.transientActionResult = TransientActionResult.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1040,6 +1216,16 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
         : isSet(object.item_edit_preview)
         ? ItemEditPreview.fromJSON(object.item_edit_preview)
         : undefined,
+      transientAction: isSet(object.transientAction)
+        ? TransientAction.fromJSON(object.transientAction)
+        : isSet(object.transient_action)
+        ? TransientAction.fromJSON(object.transient_action)
+        : undefined,
+      transientActionResult: isSet(object.transientActionResult)
+        ? TransientActionResult.fromJSON(object.transientActionResult)
+        : isSet(object.transient_action_result)
+        ? TransientActionResult.fromJSON(object.transient_action_result)
+        : undefined,
     };
   },
 
@@ -1114,6 +1300,12 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     if (message.itemEditPreview !== undefined) {
       obj.itemEditPreview = ItemEditPreview.toJSON(message.itemEditPreview);
     }
+    if (message.transientAction !== undefined) {
+      obj.transientAction = TransientAction.toJSON(message.transientAction);
+    }
+    if (message.transientActionResult !== undefined) {
+      obj.transientActionResult = TransientActionResult.toJSON(message.transientActionResult);
+    }
     return obj;
   },
 
@@ -1180,6 +1372,13 @@ export const RoomEnvelope: MessageFns<RoomEnvelope> = {
     message.itemEditPreview = (object.itemEditPreview !== undefined && object.itemEditPreview !== null)
       ? ItemEditPreview.fromPartial(object.itemEditPreview)
       : undefined;
+    message.transientAction = (object.transientAction !== undefined && object.transientAction !== null)
+      ? TransientAction.fromPartial(object.transientAction)
+      : undefined;
+    message.transientActionResult =
+      (object.transientActionResult !== undefined && object.transientActionResult !== null)
+        ? TransientActionResult.fromPartial(object.transientActionResult)
+        : undefined;
     return message;
   },
 };
@@ -3584,6 +3783,434 @@ export const EffectEvent: MessageFns<EffectEvent> = {
     message.effect = object.effect ?? "";
     message.mode = object.mode ?? "";
     message.paramsJson = object.paramsJson ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseTransientAction(): TransientAction {
+  return {
+    clientSessionId: "",
+    requestId: 0,
+    action: "",
+    targetKind: 0,
+    entityId: "",
+    payloadJson: new Uint8Array(0),
+    participantId: "",
+    dispatchEntityId: "",
+  };
+}
+
+export const TransientAction: MessageFns<TransientAction> = {
+  encode(message: TransientAction, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.requestId !== 0) {
+      writer.uint32(16).uint64(message.requestId);
+    }
+    if (message.action !== "") {
+      writer.uint32(26).string(message.action);
+    }
+    if (message.targetKind !== 0) {
+      writer.uint32(32).int32(message.targetKind);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(42).string(message.entityId);
+    }
+    if (message.payloadJson.length !== 0) {
+      writer.uint32(50).bytes(message.payloadJson);
+    }
+    if (message.participantId !== "") {
+      writer.uint32(58).string(message.participantId);
+    }
+    if (message.dispatchEntityId !== "") {
+      writer.uint32(66).string(message.dispatchEntityId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransientAction {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseTransientAction();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.requestId = longToNumber(reader.uint64());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.action = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.targetKind = reader.int32() as any;
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.payloadJson = reader.bytes();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.participantId = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.dispatchEntityId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): TransientAction {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      requestId: isSet(object.requestId)
+        ? globalThis.Number(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.Number(object.request_id)
+        : 0,
+      action: isSet(object.action) ? globalThis.String(object.action) : "",
+      targetKind: isSet(object.targetKind)
+        ? transientActionTargetKindFromJSON(object.targetKind)
+        : isSet(object.target_kind)
+        ? transientActionTargetKindFromJSON(object.target_kind)
+        : 0,
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+      payloadJson: isSet(object.payloadJson)
+        ? bytesFromBase64(object.payloadJson)
+        : isSet(object.payload_json)
+        ? bytesFromBase64(object.payload_json)
+        : new Uint8Array(0),
+      participantId: isSet(object.participantId)
+        ? globalThis.String(object.participantId)
+        : isSet(object.participant_id)
+        ? globalThis.String(object.participant_id)
+        : "",
+      dispatchEntityId: isSet(object.dispatchEntityId)
+        ? globalThis.String(object.dispatchEntityId)
+        : isSet(object.dispatch_entity_id)
+        ? globalThis.String(object.dispatch_entity_id)
+        : "",
+    };
+  },
+
+  toJSON(message: TransientAction): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.requestId !== 0) {
+      obj.requestId = Math.round(message.requestId);
+    }
+    if (message.action !== "") {
+      obj.action = message.action;
+    }
+    if (message.targetKind !== 0) {
+      obj.targetKind = transientActionTargetKindToJSON(message.targetKind);
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    if (message.payloadJson.length !== 0) {
+      obj.payloadJson = base64FromBytes(message.payloadJson);
+    }
+    if (message.participantId !== "") {
+      obj.participantId = message.participantId;
+    }
+    if (message.dispatchEntityId !== "") {
+      obj.dispatchEntityId = message.dispatchEntityId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TransientAction>, I>>(base?: I): TransientAction {
+    return TransientAction.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TransientAction>, I>>(object: I): TransientAction {
+    const message = createBaseTransientAction();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.requestId = object.requestId ?? 0;
+    message.action = object.action ?? "";
+    message.targetKind = object.targetKind ?? 0;
+    message.entityId = object.entityId ?? "";
+    message.payloadJson = object.payloadJson ?? new Uint8Array(0);
+    message.participantId = object.participantId ?? "";
+    message.dispatchEntityId = object.dispatchEntityId ?? "";
+    return message;
+  },
+};
+
+function createBaseTransientActionResult(): TransientActionResult {
+  return {
+    clientSessionId: "",
+    requestId: 0,
+    accepted: false,
+    rejectCode: 0,
+    message: "",
+    action: "",
+    targetKind: 0,
+    entityId: "",
+  };
+}
+
+export const TransientActionResult: MessageFns<TransientActionResult> = {
+  encode(message: TransientActionResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clientSessionId !== "") {
+      writer.uint32(10).string(message.clientSessionId);
+    }
+    if (message.requestId !== 0) {
+      writer.uint32(16).uint64(message.requestId);
+    }
+    if (message.accepted !== false) {
+      writer.uint32(24).bool(message.accepted);
+    }
+    if (message.rejectCode !== 0) {
+      writer.uint32(32).int32(message.rejectCode);
+    }
+    if (message.message !== "") {
+      writer.uint32(42).string(message.message);
+    }
+    if (message.action !== "") {
+      writer.uint32(50).string(message.action);
+    }
+    if (message.targetKind !== 0) {
+      writer.uint32(56).int32(message.targetKind);
+    }
+    if (message.entityId !== "") {
+      writer.uint32(66).string(message.entityId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransientActionResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseTransientActionResult();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clientSessionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.requestId = longToNumber(reader.uint64());
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.accepted = reader.bool();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.rejectCode = reader.int32() as any;
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.message = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.action = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.targetKind = reader.int32() as any;
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.entityId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): TransientActionResult {
+    return {
+      clientSessionId: isSet(object.clientSessionId)
+        ? globalThis.String(object.clientSessionId)
+        : isSet(object.client_session_id)
+        ? globalThis.String(object.client_session_id)
+        : "",
+      requestId: isSet(object.requestId)
+        ? globalThis.Number(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.Number(object.request_id)
+        : 0,
+      accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false,
+      rejectCode: isSet(object.rejectCode)
+        ? transientActionRejectCodeFromJSON(object.rejectCode)
+        : isSet(object.reject_code)
+        ? transientActionRejectCodeFromJSON(object.reject_code)
+        : 0,
+      message: isSet(object.message) ? globalThis.String(object.message) : "",
+      action: isSet(object.action) ? globalThis.String(object.action) : "",
+      targetKind: isSet(object.targetKind)
+        ? transientActionTargetKindFromJSON(object.targetKind)
+        : isSet(object.target_kind)
+        ? transientActionTargetKindFromJSON(object.target_kind)
+        : 0,
+      entityId: isSet(object.entityId)
+        ? globalThis.String(object.entityId)
+        : isSet(object.entity_id)
+        ? globalThis.String(object.entity_id)
+        : "",
+    };
+  },
+
+  toJSON(message: TransientActionResult): unknown {
+    const obj: any = {};
+    if (message.clientSessionId !== "") {
+      obj.clientSessionId = message.clientSessionId;
+    }
+    if (message.requestId !== 0) {
+      obj.requestId = Math.round(message.requestId);
+    }
+    if (message.accepted !== false) {
+      obj.accepted = message.accepted;
+    }
+    if (message.rejectCode !== 0) {
+      obj.rejectCode = transientActionRejectCodeToJSON(message.rejectCode);
+    }
+    if (message.message !== "") {
+      obj.message = message.message;
+    }
+    if (message.action !== "") {
+      obj.action = message.action;
+    }
+    if (message.targetKind !== 0) {
+      obj.targetKind = transientActionTargetKindToJSON(message.targetKind);
+    }
+    if (message.entityId !== "") {
+      obj.entityId = message.entityId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TransientActionResult>, I>>(base?: I): TransientActionResult {
+    return TransientActionResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TransientActionResult>, I>>(object: I): TransientActionResult {
+    const message = createBaseTransientActionResult();
+    message.clientSessionId = object.clientSessionId ?? "";
+    message.requestId = object.requestId ?? 0;
+    message.accepted = object.accepted ?? false;
+    message.rejectCode = object.rejectCode ?? 0;
+    message.message = object.message ?? "";
+    message.action = object.action ?? "";
+    message.targetKind = object.targetKind ?? 0;
+    message.entityId = object.entityId ?? "";
     return message;
   },
 };

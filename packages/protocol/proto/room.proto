@@ -34,6 +34,8 @@ message RoomEnvelope {
     RenewItemEdit renew_item_edit = 27;
     EndItemEdit end_item_edit = 28;
     ItemEditPreview item_edit_preview = 29;
+    TransientAction transient_action = 30;
+    TransientActionResult transient_action_result = 31;
   }
 }
 
@@ -210,6 +212,52 @@ message EffectEvent {
   // "oneShot", "start", or "stop".
   string mode = 3;
   bytes params_json = 4;
+}
+
+// ---------- authenticated transient actions ----------
+
+enum TransientActionTargetKind {
+  TRANSIENT_ACTION_TARGET_UNSPECIFIED = 0;
+  TRANSIENT_ACTION_TARGET_ROOM = 1;
+  TRANSIENT_ACTION_TARGET_ITEM = 2;
+}
+
+enum TransientActionRejectCode {
+  TRANSIENT_ACTION_REJECT_UNSPECIFIED = 0;
+  TRANSIENT_ACTION_REJECT_MALFORMED = 1;
+  TRANSIENT_ACTION_REJECT_NOT_FOUND = 2;
+  TRANSIENT_ACTION_REJECT_NOT_OWNER = 3;
+  TRANSIENT_ACTION_REJECT_UNKNOWN_ACTION = 4;
+  TRANSIENT_ACTION_REJECT_PAYLOAD = 5;
+  TRANSIENT_ACTION_REJECT_UNAUTHORIZED = 6;
+  TRANSIENT_ACTION_REJECT_RATE_LIMITED = 7;
+  TRANSIENT_ACTION_REJECT_STALE = 8;
+  TRANSIENT_ACTION_REJECT_UNAVAILABLE = 9;
+  TRANSIENT_ACTION_REJECT_INTERNAL = 10;
+}
+
+message TransientAction {
+  string client_session_id = 1;
+  uint64 request_id = 2;
+  string action = 3;
+  TransientActionTargetKind target_kind = 4;
+  string entity_id = 5;
+  bytes payload_json = 6;
+  // Filled by the server after authentication. Client values are ignored.
+  string participant_id = 7;
+  // Filled from the application registry. Room actions use this behavior item.
+  string dispatch_entity_id = 8;
+}
+
+message TransientActionResult {
+  string client_session_id = 1;
+  uint64 request_id = 2;
+  bool accepted = 3;
+  TransientActionRejectCode reject_code = 4;
+  string message = 5;
+  string action = 6;
+  TransientActionTargetKind target_kind = 7;
+  string entity_id = 8;
 }
 
 // ---------- durable mutations ----------

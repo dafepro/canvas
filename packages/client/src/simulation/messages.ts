@@ -53,7 +53,13 @@ export type SimulationRequest =
       /** Addendum A1. True while the client asks for a disabled avatar. */
       disabled?: boolean;
     }
-  | { type: "ownerAction"; entityId: string; action: string; userId: string }
+  | {
+      type: "ownerAction";
+      entityId: string;
+      action: string;
+      userId: string;
+      payload?: unknown;
+    }
   | { type: "moveItem"; entityId: string; transform: Transform; preview: boolean }
   | { type: "setItemConfig"; entityId: string; config: unknown }
   | { type: "setItemIsolation"; entityId: string; isolated: boolean }

@@ -183,6 +183,7 @@ export class SimulationKernel {
           self: request.entityId,
           action: request.action,
           userId: request.userId,
+          payload: request.payload,
         });
         break;
 

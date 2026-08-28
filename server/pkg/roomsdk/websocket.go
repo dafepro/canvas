@@ -146,7 +146,11 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		}
 		envelope.SenderClientId = client.ID
 
-		if !enqueueInboundWithRoom(ctx, room, inbound{
+		inbox := room.messages
+		if envelope.GetTransientAction() != nil {
+			inbox = room.actions
+		}
+		if !enqueueInboundWithRoom(ctx, room, inbox, inbound{
 			client: client, envelope: envelope, size: len(data),
 		}) {
 			if ctx.Err() != nil {
@@ -160,10 +164,10 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func enqueueInboundWithRoom(ctx context.Context, room *Room, message inbound) bool {
+func enqueueInboundWithRoom(ctx context.Context, room *Room, inbox chan<- inbound, message inbound) bool {
 	if isRealtimeEnvelope(message.envelope) {
 		select {
-		case room.messages <- message:
+		case inbox <- message:
 			return true
 		case <-room.done:
 			return false
@@ -172,7 +176,7 @@ func enqueueInboundWithRoom(ctx context.Context, room *Room, message inbound) bo
 		}
 	}
 	select {
-	case room.messages <- message:
+	case inbox <- message:
 		return true
 	case <-room.done:
 		return false

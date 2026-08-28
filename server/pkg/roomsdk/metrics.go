@@ -51,3 +51,6 @@ func (m *LogMetrics) RoomOwnershipFenced(roomID, operation string) {
 func (m *LogMetrics) RoomDrainFinished(roomID, result string) {
 	m.log.Info("metric room_drain_finished", "room", roomID, "result", result)
 }
+func (m *LogMetrics) TransientAction(roomID, status, reason string) {
+	m.log.Debug("metric transient_action", "room", roomID, "status", status, "reason", reason)
+}

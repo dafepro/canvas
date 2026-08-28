@@ -4,6 +4,8 @@ import {
   fromJsonBytes,
   toJsonBytes,
   HostControlKind,
+  TransientActionRejectCode,
+  TransientActionTargetKind,
   type BeginItemEdit,
   type EndItemEdit,
   type FullState,
@@ -17,6 +19,8 @@ import {
   type RoomEnvelope,
   type StateDelta,
   type EffectEvent,
+  type TransientAction,
+  type TransientActionResult,
 } from "@canvas-physics/protocol";
 import type { CanvasDefinition, CanvasSnapshot } from "@canvas-physics/core";
 import type {
@@ -60,6 +64,19 @@ export interface RoomPresence {
   readonly peers: readonly Readonly<Peer>[];
 }
 
+export interface TransientActionSubmission {
+  readonly action: string;
+  readonly target: "room" | "item";
+  readonly entityId?: string;
+  readonly payload?: unknown;
+}
+
+export interface TransientActionReceipt {
+  readonly clientSessionId: string;
+  readonly requestId: number;
+  readonly result: Promise<Readonly<TransientActionResult>>;
+}
+
 export interface RoomClientEvents {
   joined(result: RoomJoinResult): void;
   presence(peers: Peer[]): void;
@@ -74,6 +91,8 @@ export interface RoomClientEvents {
   itemEditPreview(preview: ItemEditPreview, fromClientId: string): void;
   itemEditSessionResult(result: ItemEditSessionResult, itemJson?: unknown): void;
   itemMutationResult(result: ItemMutationResult, itemJson?: unknown): void;
+  transientAction(action: TransientAction): void;
+  transientActionResult(result: TransientActionResult): void;
   status(status: TransportStatus, detail?: string): void;
   error(code: string, message: string): void;
 }
@@ -123,6 +142,13 @@ export class RoomClient {
   health = { simulationHz: 0, workerDriftMs: 0, pageVisible: true };
 
   private sequence = 0;
+  private transientRequestId = 0;
+  private readonly transientSessionId =
+    `transient:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`;
+  private readonly pendingTransientActions = new Map<
+    number,
+    (result: Readonly<TransientActionResult>) => void
+  >();
   private readonly definitions: { definitionId: string; version: number }[];
 
   /** Spec 22.1. The realtime counters of the transport in use. */
@@ -194,6 +220,10 @@ export class RoomClient {
 
   private handleTransportStatus(status: TransportStatus, detail?: string): void {
     if (status === "reconnecting" || status === "failed") {
+      this.finishPendingTransientActions(
+        TransientActionRejectCode.TRANSIENT_ACTION_REJECT_STALE,
+        "the connection changed before the transient action result arrived",
+      );
       const heldHostRole = this.leaseValue.isHost;
       this.leaseValue = Object.freeze({
         ...this.leaseValue,
@@ -216,6 +246,10 @@ export class RoomClient {
   close(): void {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.transport.close();
+    this.finishPendingTransientActions(
+      TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNAVAILABLE,
+      "the room client closed before the transient action result arrived",
+    );
   }
 
   private startHeartbeat(): void {
@@ -546,7 +580,92 @@ export class RoomClient {
         result,
         decoded.value,
       );
+      return;
     }
+    if (message.transientActionResult) {
+      const result = Object.freeze({ ...message.transientActionResult });
+      const settle = this.pendingTransientActions.get(result.requestId);
+      if (settle && result.clientSessionId === this.transientSessionId) {
+        this.pendingTransientActions.delete(result.requestId);
+        settle(result);
+      }
+      this.emit("transientActionResult", result);
+      return;
+    }
+    if (message.transientAction) {
+      if (message.hostEpoch !== this.leaseValue.epoch) return;
+      const decoded = this.decodeJson(
+        message.transientAction.payloadJson,
+        "malformed_transient_action",
+        "the server sent malformed transient action JSON",
+      );
+      if (!decoded.ok) return;
+      this.emit("transientAction", message.transientAction);
+    }
+  }
+
+  submitTransientAction(submission: TransientActionSubmission): TransientActionReceipt {
+    const requestId = ++this.transientRequestId;
+    const targetKind = submission.target === "item"
+      ? TransientActionTargetKind.TRANSIENT_ACTION_TARGET_ITEM
+      : TransientActionTargetKind.TRANSIENT_ACTION_TARGET_ROOM;
+    const action: TransientAction = {
+      clientSessionId: this.transientSessionId,
+      requestId,
+      action: submission.action,
+      targetKind,
+      entityId: submission.entityId ?? "",
+      payloadJson: submission.payload === undefined
+        ? new Uint8Array()
+        : toJsonBytes(submission.payload),
+      participantId: "",
+      dispatchEntityId: "",
+    };
+    let settle!: (result: Readonly<TransientActionResult>) => void;
+    const result = new Promise<Readonly<TransientActionResult>>((resolve) => {
+      settle = resolve;
+    });
+    this.pendingTransientActions.set(requestId, settle);
+    const envelope = newEnvelope(this.joinDescriptor.roomId, {
+      hostEpoch: this.leaseValue.epoch,
+      transientAction: action,
+    });
+    const sent = this.transport.sendEphemeralReliable
+      ? this.transport.sendEphemeralReliable(envelope)
+      : false;
+    if (!sent) {
+      this.pendingTransientActions.delete(requestId);
+      settle(Object.freeze({
+        clientSessionId: this.transientSessionId,
+        requestId,
+        accepted: false,
+        rejectCode: TransientActionRejectCode.TRANSIENT_ACTION_REJECT_UNAVAILABLE,
+        message: "the transient action was not sent on an active connection",
+        action: submission.action,
+        targetKind,
+        entityId: submission.entityId ?? "",
+      }));
+    }
+    return Object.freeze({ clientSessionId: this.transientSessionId, requestId, result });
+  }
+
+  private finishPendingTransientActions(
+    code: TransientActionRejectCode,
+    message: string,
+  ): void {
+    for (const [requestId, settle] of this.pendingTransientActions) {
+      settle(Object.freeze({
+        clientSessionId: this.transientSessionId,
+        requestId,
+        accepted: false,
+        rejectCode: code,
+        message,
+        action: "",
+        targetKind: TransientActionTargetKind.TRANSIENT_ACTION_TARGET_UNSPECIFIED,
+        entityId: "",
+      }));
+    }
+    this.pendingTransientActions.clear();
   }
 
   private handleHostControl(message: RoomEnvelope): void {

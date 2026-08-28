@@ -225,6 +225,13 @@ export class WebSocketRoomTransport implements RoomTransport {
     this.pendingReliable.push(bytes);
   }
 
+  /** Sends only on the current socket. It is never queued for reconnect. */
+  sendEphemeralReliable(message: RoomEnvelope): boolean {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
+    if (this.socket.bufferedAmount > 1 << 20) return false;
+    return this.writeBytes(encodeEnvelope(message));
+  }
+
   sendRealtime(message: RoomEnvelope): void {
     // Spec 12.2: an old transform packet is less useful than a newer one, so a
     // full send buffer drops the packet instead of queueing it.

@@ -121,6 +121,9 @@ func (m *CountingMetrics) RoomOwnershipFenced(roomID, operation string) {
 func (m *CountingMetrics) RoomDrainFinished(roomID, result string) {
 	m.add("canvas_room_drains_total", roomID, result, 1)
 }
+func (m *CountingMetrics) TransientAction(roomID, status, reason string) {
+	m.add("canvas_transient_actions_total", roomID, status+":"+reason, 1)
+}
 
 // Value reads one counter. A test uses it; the endpoint below uses WriteTo.
 func (m *CountingMetrics) Value(name, canvas, reason string) float64 {
@@ -270,6 +273,11 @@ func (t TeeMetrics) RoomOwnershipFenced(roomID, operation string) {
 func (t TeeMetrics) RoomDrainFinished(roomID, result string) {
 	for _, m := range t {
 		metricRoomDrainFinished(m, roomID, result)
+	}
+}
+func (t TeeMetrics) TransientAction(roomID, status, reason string) {
+	for _, m := range t {
+		metricTransientAction(m, roomID, status, reason)
 	}
 }
 

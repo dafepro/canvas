@@ -56,5 +56,5 @@ one-shot `pulse` animation and effect, while its color is durable configuration.
 The color tile reuses the color-applying portion without a contact sensor. The
 room-owned gold ball runs the constant-speed behavior. The current overlay does
 not configure animation trigger policy or expose Play/Restart; that follow-up
-requires a public transient owner-action path in addition to the existing
+uses the public transient owner-action path in addition to the existing
 durable `setItemConfig` API.

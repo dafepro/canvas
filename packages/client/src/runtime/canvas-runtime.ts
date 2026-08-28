@@ -831,6 +831,10 @@ export class CanvasRuntime {
     return this.session.spawnItem(definitionId, at, rotation, scale, options);
   }
 
+  submitTransientAction(...args: Parameters<RoomSession["submitTransientAction"]>) {
+    return this.session.submitTransientAction(...args);
+  }
+
   moveItem(entityId: string, transform: Transform, options?: ItemMutationOptions) {
     return this.session.moveItem(entityId, transform, options);
   }

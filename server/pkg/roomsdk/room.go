@@ -50,27 +50,32 @@ type Room struct {
 	// joinOrder keeps election deterministic.
 	joinOrder []string
 
-	snapshot                CanvasSnapshot
-	snapshotRaw             json.RawMessage
-	checkpointNo            uint64
-	items                   map[string]*SnapshotItem
-	avatarPositions         map[string]SnapshotAvatar
-	editSessions            map[string]*itemEditSession
-	editByEntity            map[string]string
-	mutationReceipts        map[string]*storedMutationReceipt
-	mutationReceiptOrder    []string
-	mutationHighWater       map[string]uint64
-	mutationOutcomes        map[string]MutationOutcomeRecord
-	mutationOutcomeOrder    []string
-	mutationOutcomeRevision uint64
-	definitions             map[catalogVersionKey]ItemDefinitionRecord
-	nextEntityNo            uint64
-	ownership               RoomOwnership
-	nextOwnershipRenewal    time.Time
+	snapshot                 CanvasSnapshot
+	snapshotRaw              json.RawMessage
+	checkpointNo             uint64
+	items                    map[string]*SnapshotItem
+	avatarPositions          map[string]SnapshotAvatar
+	editSessions             map[string]*itemEditSession
+	editByEntity             map[string]string
+	mutationReceipts         map[string]*storedMutationReceipt
+	mutationReceiptOrder     []string
+	mutationHighWater        map[string]uint64
+	mutationOutcomes         map[string]MutationOutcomeRecord
+	mutationOutcomeOrder     []string
+	mutationOutcomeRevision  uint64
+	definitions              map[catalogVersionKey]ItemDefinitionRecord
+	nextEntityNo             uint64
+	ownership                RoomOwnership
+	nextOwnershipRenewal     time.Time
+	transientActionResults   map[string]*pb.TransientActionResult
+	transientActionOrder     []string
+	transientActionHighWater map[string]uint64
+	transientActionRates     map[string]transientActionRate
 
 	joins      chan *Client
 	departures chan departure
 	messages   chan inbound
+	actions    chan inbound
 	done       chan struct{}
 	drain      chan struct{}
 	emptyAt    time.Time
@@ -112,31 +117,35 @@ func newRoomWithMode(
 	}
 
 	room := &Room{
-		cfg:               &server.cfg,
-		server:            server,
-		roomID:            roomID,
-		canvasID:          record.CanvasID,
-		canvasShape:       shape,
-		definitionRaw:     record.DefinitionRaw,
-		clients:           make(map[string]*Client),
-		participants:      make(map[string]struct{}),
-		items:             make(map[string]*SnapshotItem),
-		avatarPositions:   make(map[string]SnapshotAvatar),
-		editSessions:      make(map[string]*itemEditSession),
-		editByEntity:      make(map[string]string),
-		mutationReceipts:  make(map[string]*storedMutationReceipt),
-		mutationHighWater: make(map[string]uint64),
-		mutationOutcomes:  make(map[string]MutationOutcomeRecord),
-		definitions:       make(map[catalogVersionKey]ItemDefinitionRecord),
-		joins:             make(chan *Client, 8),
-		departures:        make(chan departure, 8),
-		messages:          make(chan inbound, 512),
-		done:              make(chan struct{}),
-		drain:             make(chan struct{}, 1),
-		persistQueue:      make(chan SnapshotRecord, 1),
-		persistStop:       make(chan struct{}),
-		persistDone:       make(chan struct{}),
-		sleeping:          true,
+		cfg:                      &server.cfg,
+		server:                   server,
+		roomID:                   roomID,
+		canvasID:                 record.CanvasID,
+		canvasShape:              shape,
+		definitionRaw:            record.DefinitionRaw,
+		clients:                  make(map[string]*Client),
+		participants:             make(map[string]struct{}),
+		items:                    make(map[string]*SnapshotItem),
+		avatarPositions:          make(map[string]SnapshotAvatar),
+		editSessions:             make(map[string]*itemEditSession),
+		editByEntity:             make(map[string]string),
+		mutationReceipts:         make(map[string]*storedMutationReceipt),
+		mutationHighWater:        make(map[string]uint64),
+		mutationOutcomes:         make(map[string]MutationOutcomeRecord),
+		definitions:              make(map[catalogVersionKey]ItemDefinitionRecord),
+		joins:                    make(chan *Client, 8),
+		departures:               make(chan departure, 8),
+		messages:                 make(chan inbound, 512),
+		actions:                  make(chan inbound, 64),
+		done:                     make(chan struct{}),
+		drain:                    make(chan struct{}, 1),
+		persistQueue:             make(chan SnapshotRecord, 1),
+		persistStop:              make(chan struct{}),
+		persistDone:              make(chan struct{}),
+		sleeping:                 true,
+		transientActionResults:   make(map[string]*pb.TransientActionResult),
+		transientActionHighWater: make(map[string]uint64),
+		transientActionRates:     make(map[string]transientActionRate),
 	}
 
 	if len(snapshot.SnapshotRaw) > 0 {
@@ -293,6 +302,18 @@ func (r *Room) run() {
 	defer ticker.Stop()
 
 	for {
+		// Reliable state traffic gets a priority opportunity before actions, so
+		// an action flood cannot starve checkpoints or durable mutations.
+		select {
+		case msg := <-r.messages:
+			if requiresRoomOwnership(msg.envelope) && !r.validateOwnership() {
+				r.loseOwnership("validation_failed")
+				return
+			}
+			r.handleMessage(msg)
+			continue
+		default:
+		}
 		select {
 		case client := <-r.joins:
 			r.handleJoin(client)
@@ -307,6 +328,13 @@ func (r *Room) run() {
 				return
 			}
 			r.handleMessage(msg)
+		case msg := <-r.actions:
+			if !r.validateOwnership() {
+				r.loseOwnership("validation_failed")
+				return
+			}
+			r.cfg.Metrics.RelayBytes(r.roomID, msg.size)
+			r.handleTransientAction(msg.client, msg.envelope.GetTransientAction())
 		case <-ticker.C:
 			if !r.renewOwnership() {
 				r.loseOwnership("renewal_failed")
@@ -332,6 +360,8 @@ func requiresRoomOwnership(envelope *pb.RoomEnvelope) bool {
 		*pb.RoomEnvelope_ItemMutation, *pb.RoomEnvelope_BeginItemEdit,
 		*pb.RoomEnvelope_RenewItemEdit, *pb.RoomEnvelope_EndItemEdit,
 		*pb.RoomEnvelope_ItemEditPreview, *pb.RoomEnvelope_Checkpoint:
+		return true
+	case *pb.RoomEnvelope_TransientAction:
 		return true
 	default:
 		return false
@@ -528,6 +558,9 @@ func (r *Room) handleMessage(msg inbound) {
 
 	case *pb.RoomEnvelope_Checkpoint:
 		r.handleCheckpoint(client, envelope.HostEpoch, payload.Checkpoint)
+
+	case *pb.RoomEnvelope_TransientAction:
+		r.handleTransientAction(client, payload.TransientAction)
 
 	default:
 		// Unknown payloads are ignored rather than closing the connection.

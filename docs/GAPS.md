@@ -166,10 +166,11 @@ work below because they determine the public boundary every consumer will use.
   Both operating systems build and test the library, Linux additionally runs Go
   race detection, packed external consumers exercise public artifacts, and a
   separate pinned generation job rejects stale TypeScript or Go protobuf bindings.
-- [ ] Expose an owner-authorized transient item-action path from the public
-  runtime through the relay to the host behavior. This is needed for generic
-  Play, Restart, and named trigger controls that should not masquerade as
-  durable configuration changes.
+- [x] Expose authenticated transient room and owned-item actions from the public
+  runtime through an application registry to the active host behavior. Bounded
+  payloads, stable results, active-room deduplication, rate limits, and
+  current-connection-only delivery keep Play, Restart, and named triggers out
+  of durable configuration and snapshots. See `TRANSIENT_ACTIONS.md`.
 
 ## Consumer-library Priority 3 — optional follow-ups
 

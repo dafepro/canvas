@@ -27,6 +27,8 @@ export type PayloadCase =
   | "renewItemEdit"
   | "endItemEdit"
   | "itemEditPreview"
+  | "transientAction"
+  | "transientActionResult"
   | "checkpoint"
   | "heartbeat"
   | "error";
@@ -47,6 +49,8 @@ const payloadCases: PayloadCase[] = [
   "renewItemEdit",
   "endItemEdit",
   "itemEditPreview",
+  "transientAction",
+  "transientActionResult",
   "checkpoint",
   "heartbeat",
   "error",

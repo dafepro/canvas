@@ -10,6 +10,10 @@ export type {
 } from "./canvas-runtime.js";
 export { RoomSession } from "./room-session.js";
 export type {
+  TransientActionReceipt,
+  TransientActionSubmission,
+} from "../net/room-client.js";
+export type {
   ItemEditEndOutcome,
   ItemEditHandle,
   ItemMutationOutcome,

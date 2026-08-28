@@ -51,6 +51,8 @@ export interface RoomTransport {
    * submitted during a temporary reconnect are retained in order.
    */
   sendReliable(message: RoomEnvelope): void;
+  /** Reliable on the current connection, but never retained for reconnect. */
+  sendEphemeralReliable?(message: RoomEnvelope): boolean;
   /** Newest matters most: input and state deltas. */
   sendRealtime(message: RoomEnvelope): void;
   onMessage(handler: (message: RoomEnvelope) => void): Unsubscribe;

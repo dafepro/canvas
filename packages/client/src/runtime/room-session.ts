@@ -14,7 +14,11 @@ import {
   fromJsonBytes,
   toJsonBytes,
 } from "@canvas-physics/protocol";
-import { RoomClient } from "../net/room-client.js";
+import {
+  RoomClient,
+  type TransientActionReceipt,
+  type TransientActionSubmission,
+} from "../net/room-client.js";
 import type { RoomTransport } from "../net/transport.js";
 import {
   WebSocketRoomTransport,
@@ -725,6 +729,17 @@ export class RoomSession {
       this.mutations.acceptEditSession(result, itemJson as SnapshotItem | undefined);
     });
 
+    this.client.on("transientAction", (action) => {
+      if (!this.hostRole.isHost || !action.dispatchEntityId || !action.participantId) return;
+      this.driver.send({
+        type: "ownerAction",
+        entityId: action.dispatchEntityId,
+        action: action.action,
+        userId: action.participantId,
+        payload: fromJsonBytes(action.payloadJson),
+      });
+    });
+
     this.client.on("error", (code, message) => {
       const recoverable = code === "definition_mismatch";
       const error = lifecycleError(
@@ -1129,6 +1144,11 @@ export class RoomSession {
     options?: ItemMutationOptions,
   ): ItemMutationReceipt {
     return this.mutations.spawnItem(definitionId, at, rotation, scale, options);
+  }
+
+  /** Authenticated, non-durable intent delivered at most once in the active room. */
+  submitTransientAction(submission: TransientActionSubmission): TransientActionReceipt {
+    return this.client.submitTransientAction(submission);
   }
 
   private checkPresentationReady(): void {
