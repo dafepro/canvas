@@ -27,7 +27,7 @@ color picker, freeze, and collisions. Each user can drag, rotate, scale,
 recolor, freeze, make collisionless, and delete their own items. The visitor
 avatar is also a consumer-supplied texture rather than an engine placeholder.
 
-The server keeps ordinary local state under `.data/v0.4.0`. That release scope
+The server keeps ordinary local state under `.data/v0.4.1`. That release scope
 prevents snapshots from an intentionally incompatible library version from
 making the current example unavailable; old data is preserved in place. Set
 `CANVAS_EXAMPLE_DATA_DIR` to exercise a chosen durability or migration fixture.

@@ -1,7 +1,7 @@
 # Layer compatibility audit
 
 Audit date: 2026-08-27  
-Release baseline: 0.4.0
+Release baseline: 0.4.1
 Wire baseline: protocol v8 / snapshot schema 1
 
 ## Goal and method
@@ -64,7 +64,7 @@ behavior.
 | COMPAT-021 | Invalid local timer rates and late/mutable definitions could allocate resources or diverge after validation. | Validate before allocation and snapshot the accepted definition bundle. | Closed |
 | COMPAT-022 | Callback-identity dedup coupled separate subscription owners and made one teardown silently remove another owner's registration. | Give every subscription call independent notification and teardown ownership. | Closed in 0.4.0 |
 | COMPAT-023 | Missing definition IDs and missing exact versions required an extra latest-record lookup and exposed two message strings for one actionable failure. | Collapse both cases to `unknown_definition_version` while preserving the protobuf definition reject category. | Closed in 0.4.0 |
-| COMPAT-024 | Reference examples reused unversioned local snapshots after 0.4.0 strengthened the durable-item contract, so a stale development room failed to open with the generic `room unavailable` rejection. | Scope disposable example data by the root release version, permit an explicit data-directory override, and run every example plus exact client/server definition parity through the release gate. Existing local data remains recoverable but is no longer opened implicitly. | Closed in 0.4.0 |
+| COMPAT-024 | Reference examples reused unversioned local snapshots after 0.4.0 strengthened the durable-item contract, so a stale development room failed to open with the generic `room unavailable` rejection. | Scope disposable example data by the root release version, permit an explicit data-directory override, and run every example plus exact client/server definition parity through the release gate. Existing local data remains recoverable but is no longer opened implicitly. | Closed in 0.4.1 |
 
 ## Compatibility-sensitive behavior
 

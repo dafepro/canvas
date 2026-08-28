@@ -25,7 +25,7 @@ the LAN interface and proxies `/v1` WebSocket traffic to the reference service
 on port 8084. Give simultaneous tabs or devices different `user` values. A
 second connection with the same participant identity intentionally replaces
 the first one instead of creating a duplicate avatar. The server stores
-ordinary local state under `.data/v0.4.0`; set `CANVAS_EXAMPLE_DATA_DIR` to select a durability or
+ordinary local state under `.data/v0.4.1`; set `CANVAS_EXAMPLE_DATA_DIR` to select a durability or
 migration fixture explicitly. Release scoping preserves older snapshots
 without letting an incompatible snapshot prevent the current example opening.
 

@@ -12,7 +12,7 @@ pnpm example:basketball
 
 Open `http://localhost:5177/?autojoin=1&user=baller-one`. Both servers bind to
 the LAN interface; use a distinct `user` value for each simultaneous device.
-The room service stores ordinary local state under `.data/v0.4.0`; set
+The room service stores ordinary local state under `.data/v0.4.1`; set
 `CANVAS_EXAMPLE_DATA_DIR` to select a durability or migration fixture
 explicitly. Release scoping preserves older snapshots without allowing an
 incompatible snapshot to prevent the current arena opening.

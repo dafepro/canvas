@@ -21,7 +21,7 @@ or `?debug=1` to inspect the collision geometry. Add `?kickAnimation=0` (or
 append `&kickAnimation=0` to other flags) to hide the deformation atlas while
 testing the ball's physical rotation. The service listens on port 8082 and
 stores local state under the coordinated release directory
-`examples/soccer-lounge/.data/v0.4.0`. Future library versions use a new
+`examples/soccer-lounge/.data/v0.4.1`. Future library versions use a new
 directory instead of reinterpreting intentionally incompatible demo snapshots.
 Set `CANVAS_EXAMPLE_DATA_DIR` when deliberately testing restart durability or a
 data migration against a specific directory.
