@@ -65,11 +65,14 @@ type Room struct {
 	mutationOutcomeRevision uint64
 	definitions             map[catalogVersionKey]ItemDefinitionRecord
 	nextEntityNo            uint64
+	ownership               RoomOwnership
+	nextOwnershipRenewal    time.Time
 
 	joins      chan *Client
 	departures chan departure
 	messages   chan inbound
 	done       chan struct{}
+	drain      chan struct{}
 	emptyAt    time.Time
 
 	// Persistence is intentionally outside the room loop. Disk flushes must not
@@ -129,6 +132,7 @@ func newRoomWithMode(
 		departures:        make(chan departure, 8),
 		messages:          make(chan inbound, 512),
 		done:              make(chan struct{}),
+		drain:             make(chan struct{}, 1),
 		persistQueue:      make(chan SnapshotRecord, 1),
 		persistStop:       make(chan struct{}),
 		persistDone:       make(chan struct{}),
@@ -298,16 +302,77 @@ func (r *Room) run() {
 				r.emptyAt = r.cfg.Now()
 			}
 		case msg := <-r.messages:
+			if requiresRoomOwnership(msg.envelope) && !r.validateOwnership() {
+				r.loseOwnership("validation_failed")
+				return
+			}
 			r.handleMessage(msg)
 		case <-ticker.C:
+			if !r.renewOwnership() {
+				r.loseOwnership("renewal_failed")
+				return
+			}
 			r.checkHostLease()
 			r.checkItemEditLeases()
 			if len(r.clients) == 0 && r.cfg.Now().Sub(r.emptyAt) >= r.cfg.SleepGrace {
 				r.sleep()
 				return
 			}
+		case <-r.drain:
+			r.drainAndStop()
+			return
 		}
 	}
+}
+
+func requiresRoomOwnership(envelope *pb.RoomEnvelope) bool {
+	switch envelope.Payload.(type) {
+	case *pb.RoomEnvelope_StateDelta, *pb.RoomEnvelope_FullState,
+		*pb.RoomEnvelope_EffectEvent, *pb.RoomEnvelope_HostControl,
+		*pb.RoomEnvelope_ItemMutation, *pb.RoomEnvelope_BeginItemEdit,
+		*pb.RoomEnvelope_RenewItemEdit, *pb.RoomEnvelope_EndItemEdit,
+		*pb.RoomEnvelope_ItemEditPreview, *pb.RoomEnvelope_Checkpoint:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *Room) validateOwnership() bool {
+	if r.cfg.RoomCoordinator == nil {
+		return true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := r.cfg.RoomCoordinator.ValidateRoom(ctx, r.ownership); err != nil {
+		metricRoomOwnershipFenced(r.cfg.Metrics, r.roomID, "validate")
+		return false
+	}
+	return true
+}
+
+func (r *Room) renewOwnership() bool {
+	if r.cfg.RoomCoordinator == nil {
+		return true
+	}
+	now := r.cfg.Now()
+	if r.nextOwnershipRenewal.IsZero() {
+		r.nextOwnershipRenewal = now.Add(r.cfg.RoomOwnershipRenewInterval)
+		return true
+	}
+	if now.Before(r.nextOwnershipRenewal) {
+		return now.Before(r.ownership.LeaseExpiresAt)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	lease, err := r.cfg.RoomCoordinator.RenewRoom(ctx, r.ownership, r.cfg.RoomOwnershipTTL)
+	if err != nil {
+		return false
+	}
+	r.ownership = lease
+	r.nextOwnershipRenewal = now.Add(r.cfg.RoomOwnershipRenewInterval)
+	metricRoomOwnershipRenewed(r.cfg.Metrics, r.roomID, lease.Generation)
+	return true
 }
 
 // ---------- join and leave ----------
@@ -950,6 +1015,7 @@ func (r *Room) withinBounds(t Transform) bool {
 
 func (r *Room) snapshotRecord() SnapshotRecord {
 	record := SnapshotRecord{
+		RoomOwnershipGeneration: r.ownership.Generation,
 		RoomID:                  r.roomID,
 		CanvasID:                r.canvasID,
 		CanvasVersion:           r.snapshot.CanvasVersion,
@@ -1037,6 +1103,9 @@ func (r *Room) saveSnapshot(record SnapshotRecord) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := r.cfg.Store.SaveSnapshot(ctx, record); err != nil {
+		if errors.Is(err, ErrRoomOwnershipFenced) {
+			metricRoomOwnershipFenced(r.cfg.Metrics, r.roomID, "snapshot")
+		}
 		r.cfg.Logger.Error("save snapshot failed", "canvas", r.roomID, "error", err)
 		return err
 	}
@@ -1052,12 +1121,62 @@ func (r *Room) sleep() {
 	// unnormalized instead of making a false claim.
 	close(r.persistStop)
 	<-r.persistDone
-	r.saveSnapshot(r.snapshotRecord())
+	if r.validateOwnership() {
+		r.saveSnapshot(r.snapshotRecord())
+		r.releaseOwnership()
+	}
 	r.sleeping = true
 	r.cfg.Metrics.RoomSlept(r.roomID)
 	r.cfg.Logger.Info("room sleeping", "canvas", r.roomID,
 		"sceneRevision", r.sceneRevision, "items", len(r.snapshot.Items))
 	r.server.removeRoom(r.roomID)
+}
+
+func (r *Room) drainAndStop() {
+	for _, client := range r.clients {
+		r.sendTo(client, &pb.RoomEnvelope{Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
+			Code: "server_draining", Message: "the room owner is draining",
+		}}})
+		r.removeClient(client, "server_draining")
+	}
+	close(r.persistStop)
+	<-r.persistDone
+	result := "complete"
+	if !r.validateOwnership() || r.saveSnapshot(r.snapshotRecord()) != nil {
+		result = "fenced"
+	} else {
+		r.releaseOwnership()
+	}
+	r.sleeping = true
+	r.cfg.Metrics.RoomSlept(r.roomID)
+	metricRoomDrainFinished(r.cfg.Metrics, r.roomID, result)
+	r.server.removeRoom(r.roomID)
+}
+
+func (r *Room) loseOwnership(reason string) {
+	close(r.persistStop)
+	<-r.persistDone
+	for _, client := range r.clients {
+		r.sendTo(client, &pb.RoomEnvelope{Payload: &pb.RoomEnvelope_Error{Error: &pb.ProtocolError{
+			Code: "room_ownership_lost", Message: "this server no longer owns the room",
+		}}})
+		r.removeClient(client, "room_ownership_lost")
+	}
+	r.sleeping = true
+	r.cfg.Metrics.RoomSlept(r.roomID)
+	metricRoomOwnershipLost(r.cfg.Metrics, r.roomID, reason)
+	r.server.removeRoom(r.roomID)
+}
+
+func (r *Room) releaseOwnership() {
+	if r.cfg.RoomCoordinator == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := r.cfg.RoomCoordinator.ReleaseRoom(ctx, r.ownership); err != nil {
+		metricRoomOwnershipFenced(r.cfg.Metrics, r.roomID, "release")
+	}
 }
 
 // ---------- fan-out ----------

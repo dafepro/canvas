@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 )
@@ -19,8 +20,10 @@ import (
 type Server struct {
 	cfg Config
 
-	mu    sync.Mutex
-	rooms map[string]*Room
+	mu       sync.Mutex
+	rooms    map[string]*Room
+	ownerID  string
+	draining atomic.Bool
 }
 
 // New builds a Server. It refuses a Config without storage or authentication.
@@ -35,7 +38,12 @@ func New(cfg Config) (*Server, error) {
 		return nil, ErrRoomTemplateResolverRequired
 	}
 	cfg.applyDefaults()
-	return &Server{cfg: cfg, rooms: make(map[string]*Room)}, nil
+	if cfg.ReplicaID == "" {
+		cfg.ReplicaID = "replica-" + uuid.NewString()[:8]
+	}
+	return &Server{
+		cfg: cfg, rooms: make(map[string]*Room), ownerID: uuid.NewString(),
+	}, nil
 }
 
 // Handler returns the HTTP routes from spec 16.4. Mount it under any prefix.
@@ -144,12 +152,33 @@ func (s *Server) roomFor(ctx context.Context, roomID string) (*Room, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.draining.Load() {
+		return nil, ErrServerDraining
+	}
 	if room, ok := s.rooms[roomID]; ok {
 		if room.canvasID != template.CanvasID || room.canvasShape.Version != template.CanvasVersion {
 			return nil, ErrRoomTemplateConflict
 		}
 		return room, nil
 	}
+
+	var ownership RoomOwnership
+	if s.cfg.RoomCoordinator != nil {
+		ownership, err = s.cfg.RoomCoordinator.AcquireRoom(ctx, RoomOwnershipRequest{
+			RoomID: roomID, ReplicaID: s.cfg.ReplicaID, OwnerID: s.ownerID,
+			TTL: s.cfg.RoomOwnershipTTL,
+		})
+		if err != nil {
+			return nil, err
+		}
+		metricRoomOwnershipAcquired(s.cfg.Metrics, roomID, ownership.Generation)
+	}
+	keepOwnership := false
+	defer func() {
+		if s.cfg.RoomCoordinator != nil && !keepOwnership {
+			_ = s.cfg.RoomCoordinator.ReleaseRoom(context.Background(), ownership)
+		}
+	}()
 
 	record, err := s.cfg.Store.LoadCanvas(ctx, template.CanvasID, template.CanvasVersion)
 	if err != nil {
@@ -173,12 +202,48 @@ func (s *Server) roomFor(ctx context.Context, roomID string) (*Room, error) {
 	if err != nil {
 		return nil, fmt.Errorf("roomsdk: build room %s: %w", roomID, err)
 	}
+	room.ownership = ownership
+	if ownership.Generation > 0 {
+		// Establish the new fence in durable storage before the room can accept
+		// a client or publish authority.
+		if err := s.cfg.Store.SaveSnapshot(ctx, room.snapshotRecord()); err != nil {
+			return nil, fmt.Errorf("roomsdk: establish room ownership fence: %w", err)
+		}
+	}
 	s.rooms[roomID] = room
+	keepOwnership = true
 	s.cfg.Metrics.RoomOpened(roomID)
 	s.cfg.Logger.Info("room opened", "room", roomID, "canvas", template.CanvasID,
 		"sceneRevision", room.sceneRevision, "items", len(room.snapshot.Items))
 	go room.run()
 	return room, nil
+}
+
+// Drain stops new room acquisition, checkpoints owned rooms, releases their
+// leases, and waits for the bounded handoff to finish.
+func (s *Server) Drain(ctx context.Context) error {
+	s.draining.Store(true)
+	s.mu.Lock()
+	rooms := make([]*Room, 0, len(s.rooms))
+	for _, room := range s.rooms {
+		rooms = append(rooms, room)
+	}
+	s.mu.Unlock()
+	for _, room := range rooms {
+		select {
+		case room.drain <- struct{}{}:
+		default:
+		}
+	}
+	for _, room := range rooms {
+		select {
+		case <-room.done:
+		case <-ctx.Done():
+			metricRoomDrainFinished(s.cfg.Metrics, room.roomID, "timeout")
+			return ctx.Err()
+		}
+	}
+	return nil
 }
 
 func (s *Server) removeRoom(roomID string) {

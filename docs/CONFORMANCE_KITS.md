@@ -199,3 +199,14 @@ snapshot metadata, representative custom behavior, listener cleanup, and
 quiet termination. Worker `error` responses become report issues. The soccer
 example's production build remains the packed-artifact proof that Vite can
 discover and emit the application-owned worker entry.
+
+## Room coordinator kit
+
+Go hosts that provide shared room ownership run
+`roomsdktest.RunRoomCoordinatorConformance`. The fixture supplies a fresh
+coordinator, a short TTL, an expiry hook, and optionally a reopened adapter over
+the same backing service. The suite verifies exclusive and concurrent
+acquisition, renewal, release, expiry failover, monotonic fencing, stale-owner
+rejection, cancellation, and adapter restart behavior. Pair it with the store
+kit: coordinator correctness cannot protect durable state unless snapshot
+writes also reject older ownership generations.

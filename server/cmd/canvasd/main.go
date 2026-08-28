@@ -89,6 +89,9 @@ func main() {
 	logger.Info("shutting down")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	if err := server.Drain(shutdownCtx); err != nil {
+		logger.Warn("room drain did not complete", "error", err)
+	}
 	_ = httpServer.Shutdown(shutdownCtx)
 }
 

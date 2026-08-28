@@ -168,6 +168,19 @@ func RunStoreConformance(t *testing.T, fixture StoreConformanceFixture) {
 		)
 	})
 
+	t.Run("snapshot fencing rejects an obsolete owner", func(t *testing.T) {
+		store := fixture.NewStore(t)
+		current := conformanceSnapshot(fixture, "fenced-room", 3)
+		current.RoomOwnershipGeneration = 9
+		saveSnapshot(t, t.Context(), store, current)
+		stale := conformanceSnapshot(fixture, "fenced-room", 99)
+		stale.RoomOwnershipGeneration = 8
+		if err := store.SaveSnapshot(t.Context(), stale); !errors.Is(err, roomsdk.ErrRoomOwnershipFenced) {
+			t.Fatalf("stale generation SaveSnapshot = %v, want ErrRoomOwnershipFenced", err)
+		}
+		assertSnapshot(t, t.Context(), store, current)
+	})
+
 	if fixture.ReopenStore != nil {
 		t.Run("durable checkpoint survives adapter reopen", func(t *testing.T) {
 			store := fixture.NewStore(t)

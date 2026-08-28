@@ -78,6 +78,12 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		} else if errors.Is(err, ErrRoomTemplateConflict) {
 			code = "room_template_conflict"
 			message = "the room template binding conflicts with persisted state"
+		} else if errors.Is(err, ErrRoomOwnershipHeld) {
+			code = "room_owned_elsewhere"
+			message = "the room is currently owned by another server"
+		} else if errors.Is(err, ErrServerDraining) {
+			code = "server_draining"
+			message = "the server is draining"
 		} else {
 			s.cfg.Logger.Error("open room failed", "room", roomID, "error", err)
 		}
@@ -95,10 +101,20 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 	client.hostEligible = !join.PageHidden
 	client.definitions = definitions
 
-	room.joins <- client
+	select {
+	case room.joins <- client:
+	case <-room.done:
+		s.writeNow(ctx, conn, &pb.RoomEnvelope{RoomId: roomID, Payload: &pb.RoomEnvelope_Error{
+			Error: &pb.ProtocolError{Code: "room_unavailable", Message: "the room owner changed"},
+		}})
+		return
+	}
 	reason := "closed"
 	defer func() {
-		room.departures <- departure{client: client, reason: reason}
+		select {
+		case room.departures <- departure{client: client, reason: reason}:
+		case <-room.done:
+		}
 	}()
 
 	go s.writePump(ctx, conn, client)
@@ -130,7 +146,7 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 		}
 		envelope.SenderClientId = client.ID
 
-		if !enqueueInbound(ctx, room.messages, inbound{
+		if !enqueueInboundWithRoom(ctx, room, inbound{
 			client: client, envelope: envelope, size: len(data),
 		}) {
 			if ctx.Err() != nil {
@@ -141,6 +157,27 @@ func (s *Server) handleRealtime(w http.ResponseWriter, r *http.Request) {
 			// accepts it.
 			s.cfg.Logger.Warn("room inbox full, dropped realtime envelope", "room", roomID)
 		}
+	}
+}
+
+func enqueueInboundWithRoom(ctx context.Context, room *Room, message inbound) bool {
+	if isRealtimeEnvelope(message.envelope) {
+		select {
+		case room.messages <- message:
+			return true
+		case <-room.done:
+			return false
+		default:
+			return false
+		}
+	}
+	select {
+	case room.messages <- message:
+		return true
+	case <-room.done:
+		return false
+	case <-ctx.Done():
+		return false
 	}
 }
 

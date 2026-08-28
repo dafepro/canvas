@@ -35,3 +35,19 @@ func (m *LogMetrics) DurableRejected(canvasID, reason string) {
 func (m *LogMetrics) ProtocolMismatch(canvasID string) {
 	m.log.Warn("metric protocol_mismatch", "canvas", canvasID)
 }
+
+func (m *LogMetrics) RoomOwnershipAcquired(roomID string, generation uint64) {
+	m.log.Info("metric room_ownership_acquired", "room", roomID, "generation", generation)
+}
+func (m *LogMetrics) RoomOwnershipRenewed(roomID string, generation uint64) {
+	m.log.Debug("metric room_ownership_renewed", "room", roomID, "generation", generation)
+}
+func (m *LogMetrics) RoomOwnershipLost(roomID, reason string) {
+	m.log.Warn("metric room_ownership_lost", "room", roomID, "reason", reason)
+}
+func (m *LogMetrics) RoomOwnershipFenced(roomID, operation string) {
+	m.log.Warn("metric room_ownership_fenced", "room", roomID, "operation", operation)
+}
+func (m *LogMetrics) RoomDrainFinished(roomID, result string) {
+	m.log.Info("metric room_drain_finished", "room", roomID, "result", result)
+}

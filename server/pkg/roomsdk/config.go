@@ -56,6 +56,16 @@ type Config struct {
 	MutationOutcomeSink MutationOutcomeSink
 	// MutationOutcomeSinkTimeout bounds one best-effort sink delivery.
 	MutationOutcomeSinkTimeout time.Duration
+	// RoomCoordinator provides cross-process room ownership and fencing. Nil
+	// keeps the existing process-local ownership behavior.
+	RoomCoordinator RoomCoordinator
+	// ReplicaID is the stable deployment replica label exposed to coordination
+	// diagnostics. A generated process-local label is used when empty.
+	ReplicaID string
+	// RoomOwnershipTTL is the lease duration in a shared coordinator.
+	RoomOwnershipTTL time.Duration
+	// RoomOwnershipRenewInterval controls proactive lease renewal.
+	RoomOwnershipRenewInterval time.Duration
 }
 
 const (
@@ -72,6 +82,7 @@ const (
 	defaultMutationOutcomeRetention      = 24 * time.Hour
 	defaultMaxMutationOutcomesPerRoom    = 1024
 	defaultMutationOutcomeSinkTimeout    = 5 * time.Second
+	defaultRoomOwnershipTTL              = 10 * time.Second
 )
 
 func (c *Config) applyDefaults() {
@@ -123,6 +134,20 @@ func (c *Config) applyDefaults() {
 	if c.MutationOutcomeSinkTimeout <= 0 {
 		c.MutationOutcomeSinkTimeout = defaultMutationOutcomeSinkTimeout
 	}
+	if c.RoomOwnershipTTL <= 0 {
+		c.RoomOwnershipTTL = defaultRoomOwnershipTTL
+	}
+	if c.RoomOwnershipRenewInterval <= 0 || c.RoomOwnershipRenewInterval >= c.RoomOwnershipTTL {
+		c.RoomOwnershipRenewInterval = c.RoomOwnershipTTL / 3
+	}
+}
+
+type roomOwnershipMetrics interface {
+	RoomOwnershipAcquired(roomID string, generation uint64)
+	RoomOwnershipRenewed(roomID string, generation uint64)
+	RoomOwnershipLost(roomID, reason string)
+	RoomOwnershipFenced(roomID, operation string)
+	RoomDrainFinished(roomID, result string)
 }
 
 // Metrics reports the backend counters from spec 22.2.

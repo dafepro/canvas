@@ -69,8 +69,10 @@ downward. Check an item only after the relevant focused tests pass.
 - [ ] Define an optional product-owned participant-location lease conformance
   adapter for worlds that require one global room per authenticated account.
   Canvas rooms remain independent and do not impose this policy themselves.
-- [ ] Define multi-process room ownership for shared host leases and live avatar
-  position caches before claiming horizontally scaled room coordination.
+- [x] Define multi-process room ownership with an optional shared coordinator,
+  monotonic snapshot fencing, lease renewal/loss, and bounded graceful drain.
+  `ROOM_OWNERSHIP.md` distinguishes routing affinity, coordination, shared
+  storage, and authentication; public adapter conformance covers the boundary.
 - [ ] Add fault injection at every linked-room transaction boundary and a
   configurable retention policy for saved participant positions.
 

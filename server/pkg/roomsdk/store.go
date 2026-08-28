@@ -41,6 +41,7 @@ type ItemDefinitionRecord struct {
 
 // SnapshotRecord is one canonical checkpoint (spec 13.1).
 type SnapshotRecord struct {
+	RoomOwnershipGeneration uint64                    `json:"roomOwnershipGeneration,omitempty"`
 	RoomID                  string                    `json:"roomId"`
 	CanvasID                string                    `json:"canvasId"`
 	CanvasVersion           uint32                    `json:"canvasVersion"`
@@ -96,7 +97,8 @@ type MutationHighWaterRecord struct {
 // Store is the persistence port. Replace MemoryStore with a database-backed
 // implementation without touching the realtime code. Missing records return
 // ErrNotFound and no partial record. Snapshot saves are isolated by RoomID and
-// an older CheckpointRevision must never replace a newer one.
+// an older fencing generation must never replace a newer one. Within one
+// generation, an older CheckpointRevision must never replace a newer one.
 type Store interface {
 	LoadCanvas(ctx context.Context, canvasID string, version uint32) (CanvasRecord, error)
 	LoadItemDefinition(
@@ -206,6 +208,9 @@ func (s *MemoryStore) SaveSnapshot(_ context.Context, snapshot SnapshotRecord) e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	current, ok := s.snapshots[snapshot.RoomID]
+	if ok && snapshot.RoomOwnershipGeneration < current.RoomOwnershipGeneration {
+		return ErrRoomOwnershipFenced
+	}
 	if ok && snapshotOlder(snapshot, current) {
 		return nil
 	}

@@ -70,6 +70,9 @@ func (s *FileStore) SaveSnapshot(ctx context.Context, snapshot SnapshotRecord) e
 	if err != nil {
 		current, err = s.loadNewest(snapshot.RoomID)
 	}
+	if err == nil && snapshot.RoomOwnershipGeneration < current.RoomOwnershipGeneration {
+		return ErrRoomOwnershipFenced
+	}
 	if err == nil && snapshotOlder(snapshot, current) {
 		return nil
 	}
@@ -159,7 +162,8 @@ func (s *FileStore) snapshotDir(roomID string) string {
 
 func snapshotFilename(snapshot SnapshotRecord) string {
 	return fmt.Sprintf(
-		"%020d-%020d-%020d-%020d.json",
+		"%020d-%020d-%020d-%020d-%020d.json",
+		snapshot.RoomOwnershipGeneration,
 		snapshot.CheckpointRevision,
 		snapshot.SceneRevision,
 		snapshot.HostEpoch,
@@ -168,6 +172,9 @@ func snapshotFilename(snapshot SnapshotRecord) string {
 }
 
 func snapshotOlder(candidate, current SnapshotRecord) bool {
+	if candidate.RoomOwnershipGeneration != current.RoomOwnershipGeneration {
+		return candidate.RoomOwnershipGeneration < current.RoomOwnershipGeneration
+	}
 	if candidate.CheckpointRevision != current.CheckpointRevision {
 		return candidate.CheckpointRevision < current.CheckpointRevision
 	}

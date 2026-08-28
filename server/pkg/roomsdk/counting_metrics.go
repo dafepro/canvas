@@ -106,6 +106,22 @@ func (m *CountingMetrics) MutationOutcomeSinkFailed(canvasID string) {
 	m.add("canvas_mutation_outcome_sink_failures_total", canvasID, "", 1)
 }
 
+func (m *CountingMetrics) RoomOwnershipAcquired(roomID string, _ uint64) {
+	m.add("canvas_room_ownership_acquisitions_total", roomID, "", 1)
+}
+func (m *CountingMetrics) RoomOwnershipRenewed(roomID string, _ uint64) {
+	m.add("canvas_room_ownership_renewals_total", roomID, "", 1)
+}
+func (m *CountingMetrics) RoomOwnershipLost(roomID, reason string) {
+	m.add("canvas_room_ownership_losses_total", roomID, reason, 1)
+}
+func (m *CountingMetrics) RoomOwnershipFenced(roomID, operation string) {
+	m.add("canvas_room_ownership_fenced_total", roomID, operation, 1)
+}
+func (m *CountingMetrics) RoomDrainFinished(roomID, result string) {
+	m.add("canvas_room_drains_total", roomID, result, 1)
+}
+
 // Value reads one counter. A test uses it; the endpoint below uses WriteTo.
 func (m *CountingMetrics) Value(name, canvas, reason string) float64 {
 	m.mu.Lock()
@@ -228,6 +244,32 @@ func (t TeeMetrics) MutationOutcomeSinkFailed(canvasID string) {
 		if metrics, ok := m.(mutationOutcomeMetrics); ok {
 			metrics.MutationOutcomeSinkFailed(canvasID)
 		}
+	}
+}
+
+func (t TeeMetrics) RoomOwnershipAcquired(roomID string, generation uint64) {
+	for _, m := range t {
+		metricRoomOwnershipAcquired(m, roomID, generation)
+	}
+}
+func (t TeeMetrics) RoomOwnershipRenewed(roomID string, generation uint64) {
+	for _, m := range t {
+		metricRoomOwnershipRenewed(m, roomID, generation)
+	}
+}
+func (t TeeMetrics) RoomOwnershipLost(roomID, reason string) {
+	for _, m := range t {
+		metricRoomOwnershipLost(m, roomID, reason)
+	}
+}
+func (t TeeMetrics) RoomOwnershipFenced(roomID, operation string) {
+	for _, m := range t {
+		metricRoomOwnershipFenced(m, roomID, operation)
+	}
+}
+func (t TeeMetrics) RoomDrainFinished(roomID, result string) {
+	for _, m := range t {
+		metricRoomDrainFinished(m, roomID, result)
 	}
 }
 
