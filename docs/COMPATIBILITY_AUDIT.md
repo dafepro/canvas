@@ -1,7 +1,7 @@
 # Layer compatibility audit
 
-Audit date: 2026-08-27  
-Release baseline: 0.4.1
+Audit date: 2026-08-28
+Release baseline: 0.6.0
 Wire baseline: protocol v8 / snapshot schema 1
 
 ## Goal and method
@@ -32,7 +32,9 @@ behavior.
 | Realtime input | Direction/intensity/target and heartbeat health have finite bounded domains; invalid peer input is not relayed and invalid adapter input stops safely in physics. | `server/pkg/roomsdk/room_test.go`, `packages/client/test/host-simulation.test.ts`, `packages/client/test/two-client-relay.test.ts` |
 | Client transport | Initial rejection is terminal and observable; reconnect retains bounded ordered reliable sends; realtime remains newest-value delivery. | `packages/client/test/websocket-credentials.test.ts`, `packages/client/test/room-transport-conformance.test.ts`, `packages/client/test/reconnect-join.test.ts` |
 | Server delivery | Reliable traffic is never silently discarded: it displaces realtime backlog, backpressures inbound, or visibly closes a saturated slow connection. | `server/pkg/roomsdk/delivery_test.go` |
+| Multi-process room authority | One shared coordinator owner holds a monotonic fence; stale owners cannot publish authority or replace a newer-generation snapshot; drain stops acquisition and releases owned rooms. | `server/pkg/roomsdk/multi_replica_test.go`, `server/pkg/roomsdktest/room_coordinator.go`, `server/pkg/roomsdktest/store.go` |
 | Durable mutations | Mutations remain pending until a joined connection can send them and reliable transport retains them across reconnect. | `packages/client/test/item-mutation-session.test.ts`, `packages/client/test/reconnect-join.test.ts` |
+| Transient actions | Identity comes from authentication, owned-item checks and the product registry precede dispatch, deduplication is active-room-only, and reconnect/wake cannot replay intent. | `server/pkg/roomsdk/transient_actions_test.go`, `packages/client/test/transient-actions.test.ts` |
 | Restart/reconciliation | Room wake applies live-equivalent integrity checks; explicit template reconciliation alone may bridge declared canvas/version differences; resulting system items carry valid revisions. | `server/pkg/roomsdk/compatibility_test.go`, `server/pkg/roomsdk/room_test.go`, `server/pkg/roomsdk/system_items_test.go` |
 | Runtime/worker lifecycle | Invalid JOIN/definition data fails before simulation initialization; initial/reconnect/terminal states and cleanup remain typed and deterministic. | `packages/client/test/runtime-lifecycle.test.ts`, `packages/client/test/connection-session.test.ts`, `packages/client/test/session-transition-model.test.ts`, `packages/client/test/custom-worker-runtime.test.ts` |
 | Network integration | Host election, direct input, state repair, host migration, graceful restart, packet loss/reordering, and external package use execute through real service/encoded boundaries. Every reference example also opens its declared room against a real `canvasd`, and its client/server definition catalogs must agree exactly. | `packages/client/test/two-client-relay.test.ts`, `packages/client/test/packet-loss.test.ts`, `packages/client/test/graceful-sleep.test.ts`, all four example E2E suites, `test/example-catalog-compatibility.test.ts` |
@@ -65,6 +67,8 @@ behavior.
 | COMPAT-022 | Callback-identity dedup coupled separate subscription owners and made one teardown silently remove another owner's registration. | Give every subscription call independent notification and teardown ownership. | Closed in 0.4.0 |
 | COMPAT-023 | Missing definition IDs and missing exact versions required an extra latest-record lookup and exposed two message strings for one actionable failure. | Collapse both cases to `unknown_definition_version` while preserving the protobuf definition reject category. | Closed in 0.4.0 |
 | COMPAT-024 | Reference examples reused unversioned local snapshots after 0.4.0 strengthened the durable-item contract, so a stale development room failed to open with the generic `room unavailable` rejection. | Scope disposable example data by the root release version, permit an explicit data-directory override, and run every example plus exact client/server definition parity through the release gate. Existing local data remains recoverable but is no longer opened implicitly. | Closed in 0.4.1 |
+| COMPAT-025 | Process-local room maps and sticky routing could not prevent two service replicas from publishing authority or racing snapshot writes. | Add optional shared ownership leases, monotonic snapshot fencing, stale-authority validation, graceful drain, and public coordinator/store conformance. | Closed in 0.6.0 |
+| COMPAT-026 | Momentary product intent had no authenticated non-durable path, encouraging clients to encode Play/Restart actions as persisted configuration. | Add registry-authorized room and owned-item actions with current-connection delivery, stable bounded deduplication, and behavior dispatch. | Closed in 0.6.0 |
 
 ## Compatibility-sensitive behavior
 
