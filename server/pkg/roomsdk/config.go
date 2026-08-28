@@ -38,16 +38,40 @@ type Config struct {
 	AllowedOrigins []string
 	// Metrics receives counters listed in spec 22.2. Optional.
 	Metrics Metrics
+	// MutationAuthorizer lets the host application consume product-owned
+	// authorization evidence at the durable mutation boundary. Optional.
+	MutationAuthorizer MutationAuthorizer
+	// MutationAuthorizationTimeout bounds a product authorization decision.
+	MutationAuthorizationTimeout time.Duration
+	// MaxMutationAuthorizationBytes bounds opaque evidence sent by a client.
+	MaxMutationAuthorizationBytes int
+	// MaxMutationCorrelationBytes bounds an opaque reconciliation identity.
+	MaxMutationCorrelationBytes int
+	// MutationOutcomeRetention is the trusted reconciliation window.
+	MutationOutcomeRetention time.Duration
+	// MaxMutationOutcomesPerRoom bounds the private per-room outcome ledger.
+	MaxMutationOutcomesPerRoom int
+	// MutationOutcomeSink receives best-effort terminal notifications after the
+	// authoritative outcome has been added to durable storage. Optional.
+	MutationOutcomeSink MutationOutcomeSink
+	// MutationOutcomeSinkTimeout bounds one best-effort sink delivery.
+	MutationOutcomeSinkTimeout time.Duration
 }
 
 const (
-	defaultTickRate          = 60
-	defaultHostLeaseTTL      = 2500 * time.Millisecond
-	defaultHeartbeatInterval = 500 * time.Millisecond
-	defaultItemEditLeaseTTL  = 5 * time.Second
-	defaultSleepGrace        = 2 * time.Second
-	defaultMaxClients        = 20
-	defaultProtocolVersion   = 8
+	defaultTickRate                      = 60
+	defaultHostLeaseTTL                  = 2500 * time.Millisecond
+	defaultHeartbeatInterval             = 500 * time.Millisecond
+	defaultItemEditLeaseTTL              = 5 * time.Second
+	defaultSleepGrace                    = 2 * time.Second
+	defaultMaxClients                    = 20
+	defaultProtocolVersion               = 8
+	defaultMutationAuthorizationTimeout  = 2 * time.Second
+	defaultMaxMutationAuthorizationBytes = 4096
+	defaultMaxMutationCorrelationBytes   = 256
+	defaultMutationOutcomeRetention      = 24 * time.Hour
+	defaultMaxMutationOutcomesPerRoom    = 1024
+	defaultMutationOutcomeSinkTimeout    = 5 * time.Second
 )
 
 func (c *Config) applyDefaults() {
@@ -80,6 +104,24 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Metrics == nil {
 		c.Metrics = NopMetrics{}
+	}
+	if c.MutationAuthorizationTimeout <= 0 {
+		c.MutationAuthorizationTimeout = defaultMutationAuthorizationTimeout
+	}
+	if c.MaxMutationAuthorizationBytes <= 0 {
+		c.MaxMutationAuthorizationBytes = defaultMaxMutationAuthorizationBytes
+	}
+	if c.MaxMutationCorrelationBytes <= 0 {
+		c.MaxMutationCorrelationBytes = defaultMaxMutationCorrelationBytes
+	}
+	if c.MutationOutcomeRetention <= 0 {
+		c.MutationOutcomeRetention = defaultMutationOutcomeRetention
+	}
+	if c.MaxMutationOutcomesPerRoom <= 0 {
+		c.MaxMutationOutcomesPerRoom = defaultMaxMutationOutcomesPerRoom
+	}
+	if c.MutationOutcomeSinkTimeout <= 0 {
+		c.MutationOutcomeSinkTimeout = defaultMutationOutcomeSinkTimeout
 	}
 }
 

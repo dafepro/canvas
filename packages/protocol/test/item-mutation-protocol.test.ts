@@ -12,6 +12,35 @@ import {
 } from "../src/index.js";
 
 describe("item mutation protocol", () => {
+  it("round-trips private application mutation metadata", () => {
+    const message = envelope("studio", {
+      itemMutation: {
+        clientSessionId: "browser-session",
+        mutationId: 8,
+        editSessionId: "",
+        expectedItemRevision: 0,
+        kind: ItemMutationKind.ITEM_MUTATION_SPAWN,
+        entityId: "",
+        definitionId: "rocket",
+        definitionVersion: 2,
+        position: { x: 2, y: 3 },
+        rotation: 0,
+        z: 0,
+        scale: 1,
+        configJson: new Uint8Array(),
+        isolated: false,
+        collisionsEnabled: false,
+        authorizationEvidence: new TextEncoder().encode("signed-permit"),
+        applicationCorrelationId: "reservation-123",
+      },
+    });
+
+    expect(decodeEnvelope(encodeEnvelope(message)).itemMutation).toMatchObject({
+      authorizationEvidence: new TextEncoder().encode("signed-permit"),
+      applicationCorrelationId: "reservation-123",
+    });
+  });
+
   it("round-trips a correlated authoritative mutation result", () => {
     const message = envelope("studio", {
       itemMutationResult: {

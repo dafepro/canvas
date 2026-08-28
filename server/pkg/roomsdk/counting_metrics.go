@@ -43,6 +43,12 @@ func (m *CountingMetrics) add(name, canvas, reason string, delta float64) {
 	m.counters[counterKey{name: name, canvas: canvas, reason: reason}] += delta
 }
 
+func (m *CountingMetrics) set(name, canvas, reason string, value float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.counters[counterKey{name: name, canvas: canvas, reason: reason}] = value
+}
+
 func (m *CountingMetrics) RoomOpened(canvasID string) {
 	m.add("canvas_rooms_opened_total", canvasID, "", 1)
 	m.add("canvas_rooms_awake", canvasID, "", 1)
@@ -85,6 +91,19 @@ func (m *CountingMetrics) DurableRejected(canvasID, reason string) {
 
 func (m *CountingMetrics) ProtocolMismatch(canvasID string) {
 	m.add("canvas_protocol_mismatch_total", canvasID, "", 1)
+}
+
+func (m *CountingMetrics) MutationOutcomeRecorded(canvasID, status string, retained int) {
+	m.add("canvas_mutation_outcomes_recorded_total", canvasID, status, 1)
+	m.set("canvas_mutation_outcomes_retained", canvasID, "", float64(retained))
+}
+
+func (m *CountingMetrics) MutationOutcomeReconciled(canvasID, status string) {
+	m.add("canvas_mutation_outcomes_reconciled_total", canvasID, status, 1)
+}
+
+func (m *CountingMetrics) MutationOutcomeSinkFailed(canvasID string) {
+	m.add("canvas_mutation_outcome_sink_failures_total", canvasID, "", 1)
 }
 
 // Value reads one counter. A test uses it; the endpoint below uses WriteTo.
@@ -185,6 +204,30 @@ func (t TeeMetrics) DurableRejected(canvasID, reason string) {
 func (t TeeMetrics) ProtocolMismatch(canvasID string) {
 	for _, m := range t {
 		m.ProtocolMismatch(canvasID)
+	}
+}
+
+func (t TeeMetrics) MutationOutcomeRecorded(canvasID, status string, retained int) {
+	for _, m := range t {
+		if metrics, ok := m.(mutationOutcomeMetrics); ok {
+			metrics.MutationOutcomeRecorded(canvasID, status, retained)
+		}
+	}
+}
+
+func (t TeeMetrics) MutationOutcomeReconciled(canvasID, status string) {
+	for _, m := range t {
+		if metrics, ok := m.(mutationOutcomeMetrics); ok {
+			metrics.MutationOutcomeReconciled(canvasID, status)
+		}
+	}
+}
+
+func (t TeeMetrics) MutationOutcomeSinkFailed(canvasID string) {
+	for _, m := range t {
+		if metrics, ok := m.(mutationOutcomeMetrics); ok {
+			metrics.MutationOutcomeSinkFailed(canvasID)
+		}
 	}
 }
 

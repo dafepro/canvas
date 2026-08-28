@@ -129,7 +129,8 @@ func (s *FileStore) loadNewest(roomID string) (SnapshotRecord, error) {
 	if err != nil {
 		return SnapshotRecord{}, err
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
+	var newest SnapshotRecord
+	found := false
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
@@ -139,9 +140,14 @@ func (s *FileStore) loadNewest(roomID string) (SnapshotRecord, error) {
 			continue
 		}
 		var record SnapshotRecord
-		if json.Unmarshal(raw, &record) == nil && record.RoomID == roomID {
-			return record, nil
+		if json.Unmarshal(raw, &record) == nil && record.RoomID == roomID &&
+			(!found || snapshotOlder(newest, record)) {
+			newest = record
+			found = true
 		}
+	}
+	if found {
+		return newest, nil
 	}
 	return SnapshotRecord{}, ErrNotFound
 }
@@ -153,10 +159,11 @@ func (s *FileStore) snapshotDir(roomID string) string {
 
 func snapshotFilename(snapshot SnapshotRecord) string {
 	return fmt.Sprintf(
-		"%020d-%020d-%020d.json",
+		"%020d-%020d-%020d-%020d.json",
 		snapshot.CheckpointRevision,
 		snapshot.SceneRevision,
 		snapshot.HostEpoch,
+		snapshot.MutationOutcomeRevision,
 	)
 }
 
@@ -167,6 +174,9 @@ func snapshotOlder(candidate, current SnapshotRecord) bool {
 	if candidate.SceneRevision != current.SceneRevision {
 		return candidate.SceneRevision < current.SceneRevision
 	}
+	if candidate.MutationOutcomeRevision != current.MutationOutcomeRevision {
+		return candidate.MutationOutcomeRevision < current.MutationOutcomeRevision
+	}
 	return candidate.HostEpoch < current.HostEpoch
 }
 
@@ -175,18 +185,34 @@ func pruneSnapshots(dir string, keep int) error {
 	if err != nil {
 		return err
 	}
-	var names []string
+	type storedSnapshot struct {
+		name   string
+		record SnapshotRecord
+	}
+	var snapshots []storedSnapshot
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
-			names = append(names, entry.Name())
+			raw, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))
+			var record SnapshotRecord
+			if readErr == nil && json.Unmarshal(raw, &record) == nil {
+				snapshots = append(snapshots, storedSnapshot{name: entry.Name(), record: record})
+			}
 		}
 	}
-	sort.Sort(sort.Reverse(sort.StringSlice(names)))
-	if len(names) <= keep {
+	sort.Slice(snapshots, func(i, j int) bool {
+		if snapshotOlder(snapshots[i].record, snapshots[j].record) {
+			return false
+		}
+		if snapshotOlder(snapshots[j].record, snapshots[i].record) {
+			return true
+		}
+		return snapshots[i].name > snapshots[j].name
+	})
+	if len(snapshots) <= keep {
 		return nil
 	}
-	for _, name := range names[keep:] {
-		if err := os.Remove(filepath.Join(dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+	for _, snapshot := range snapshots[keep:] {
+		if err := os.Remove(filepath.Join(dir, snapshot.name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}

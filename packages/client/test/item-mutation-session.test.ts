@@ -101,6 +101,20 @@ const build = () => {
 };
 
 describe("ItemMutationSession", () => {
+  it("attaches opaque application authorization without changing existing mutation calls", () => {
+    const { session, sentMutations } = build();
+
+    session.moveItem("crate-1", transform(20), {
+      authorizationEvidence: new TextEncoder().encode("signed-permit"),
+      applicationCorrelationId: "reservation-123",
+    });
+
+    expect(sentMutations()[0]).toMatchObject({
+      authorizationEvidence: new TextEncoder().encode("signed-permit"),
+      applicationCorrelationId: "reservation-123",
+    });
+  });
+
   it("returns correlated receipts and serializes writes to one item", async () => {
     const { session, sentMutations } = build();
 

@@ -236,6 +236,23 @@ func conformanceSnapshot(
 			ClientSessionID: "browser-session",
 			MutationID:      revision,
 		}},
+		MutationOutcomeRevision: revision,
+		MutationOutcomes: []roomsdk.MutationOutcomeRecord{{
+			CorrelationID:     fmt.Sprintf("reservation-%d", revision),
+			ParticipantID:     "owner",
+			ClientSessionID:   "browser-session",
+			MutationID:        revision,
+			Kind:              string(roomsdk.MutationKindSpawn),
+			EntityID:          fmt.Sprintf("item-%d", revision),
+			DefinitionID:      fixture.ItemDefinition.DefinitionID,
+			DefinitionVersion: fixture.ItemDefinition.Version,
+			Accepted:          true,
+			SceneRevision:     revision + 10,
+			ItemRevision:      1,
+			RecordedAt:        time.Unix(int64(1_800_000_000+revision), 0).UTC(),
+			ExpiresAt:         time.Unix(int64(1_800_086_400+revision), 0).UTC(),
+			ResultBytes:       []byte{byte(revision), byte(revision + 1)},
+		}},
 	}
 }
 

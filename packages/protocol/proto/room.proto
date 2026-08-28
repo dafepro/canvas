@@ -244,6 +244,9 @@ enum ItemMutationRejectCode {
   ITEM_MUTATION_REJECT_CAPACITY = 12;
   ITEM_MUTATION_REJECT_RECEIPT_EXPIRED = 13;
   ITEM_MUTATION_REJECT_INTERNAL = 14;
+  ITEM_MUTATION_REJECT_APPLICATION_POLICY = 15;
+  ITEM_MUTATION_REJECT_APPLICATION_UNAVAILABLE = 16;
+  ITEM_MUTATION_REJECT_APPLICATION_CORRELATION_CONFLICT = 17;
 }
 
 message ItemMutation {
@@ -262,6 +265,11 @@ message ItemMutation {
   bytes config_json = 13;
   bool isolated = 14;
   bool collisions_enabled = 15;
+  // Opaque, bounded evidence consumed only by the host application authorizer.
+  // Canvas never includes it in snapshots or mutation results.
+  bytes authorization_evidence = 16;
+  // Opaque application identity used by trusted server-side reconciliation.
+  string application_correlation_id = 17;
 }
 
 message ItemMutationResult {

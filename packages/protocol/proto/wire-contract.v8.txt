@@ -138,6 +138,9 @@ E:ItemMutationRejectCode:11:ITEM_MUTATION_REJECT_CONFIG
 E:ItemMutationRejectCode:12:ITEM_MUTATION_REJECT_CAPACITY
 E:ItemMutationRejectCode:13:ITEM_MUTATION_REJECT_RECEIPT_EXPIRED
 E:ItemMutationRejectCode:14:ITEM_MUTATION_REJECT_INTERNAL
+E:ItemMutationRejectCode:15:ITEM_MUTATION_REJECT_APPLICATION_POLICY
+E:ItemMutationRejectCode:16:ITEM_MUTATION_REJECT_APPLICATION_UNAVAILABLE
+E:ItemMutationRejectCode:17:ITEM_MUTATION_REJECT_APPLICATION_CORRELATION_CONFLICT
 M:ItemMutation:1:optional:string:client_session_id
 M:ItemMutation:2:optional:uint64:mutation_id
 M:ItemMutation:3:optional:string:edit_session_id
@@ -153,6 +156,8 @@ M:ItemMutation:12:optional:float:scale
 M:ItemMutation:13:optional:bytes:config_json
 M:ItemMutation:14:optional:bool:isolated
 M:ItemMutation:15:optional:bool:collisions_enabled
+M:ItemMutation:16:optional:bytes:authorization_evidence
+M:ItemMutation:17:optional:string:application_correlation_id
 M:ItemMutationResult:1:optional:string:client_session_id
 M:ItemMutationResult:2:optional:uint64:mutation_id
 M:ItemMutationResult:3:optional:string:edit_session_id

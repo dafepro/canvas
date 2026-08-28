@@ -13,6 +13,7 @@ export type {
   ItemEditEndOutcome,
   ItemEditHandle,
   ItemMutationOutcome,
+  ItemMutationOptions,
   ItemMutationReceipt,
   ItemMutationRejectCode,
   ItemMutationRequest,

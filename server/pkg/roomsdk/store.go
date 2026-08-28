@@ -41,18 +41,40 @@ type ItemDefinitionRecord struct {
 
 // SnapshotRecord is one canonical checkpoint (spec 13.1).
 type SnapshotRecord struct {
-	RoomID             string                    `json:"roomId"`
-	CanvasID           string                    `json:"canvasId"`
-	CanvasVersion      uint32                    `json:"canvasVersion"`
-	SceneRevision      uint64                    `json:"sceneRevision"`
-	CheckpointRevision uint64                    `json:"checkpointRevision"`
-	HostEpoch          uint64                    `json:"hostEpoch"`
-	Tick               uint64                    `json:"tick"`
-	Normalized         bool                      `json:"normalized"`
-	CapturedAt         time.Time                 `json:"capturedAt"`
-	SnapshotRaw        json.RawMessage           `json:"snapshot"`
-	MutationReceipts   []MutationReceiptRecord   `json:"mutationReceipts,omitempty"`
-	MutationHighWater  []MutationHighWaterRecord `json:"mutationHighWater,omitempty"`
+	RoomID                  string                    `json:"roomId"`
+	CanvasID                string                    `json:"canvasId"`
+	CanvasVersion           uint32                    `json:"canvasVersion"`
+	SceneRevision           uint64                    `json:"sceneRevision"`
+	CheckpointRevision      uint64                    `json:"checkpointRevision"`
+	HostEpoch               uint64                    `json:"hostEpoch"`
+	Tick                    uint64                    `json:"tick"`
+	Normalized              bool                      `json:"normalized"`
+	CapturedAt              time.Time                 `json:"capturedAt"`
+	SnapshotRaw             json.RawMessage           `json:"snapshot"`
+	MutationReceipts        []MutationReceiptRecord   `json:"mutationReceipts,omitempty"`
+	MutationHighWater       []MutationHighWaterRecord `json:"mutationHighWater,omitempty"`
+	MutationOutcomeRevision uint64                    `json:"mutationOutcomeRevision,omitempty"`
+	MutationOutcomes        []MutationOutcomeRecord   `json:"mutationOutcomes,omitempty"`
+}
+
+// MutationOutcomeRecord is private trusted reconciliation state. It is never
+// included in SnapshotRaw or sent on the room protocol.
+type MutationOutcomeRecord struct {
+	CorrelationID     string    `json:"correlationId"`
+	ParticipantID     string    `json:"participantId"`
+	ClientSessionID   string    `json:"clientSessionId"`
+	MutationID        uint64    `json:"mutationId"`
+	Kind              string    `json:"kind"`
+	EntityID          string    `json:"entityId,omitempty"`
+	DefinitionID      string    `json:"definitionId,omitempty"`
+	DefinitionVersion uint32    `json:"definitionVersion,omitempty"`
+	Accepted          bool      `json:"accepted"`
+	RejectCode        string    `json:"rejectCode,omitempty"`
+	SceneRevision     uint64    `json:"sceneRevision"`
+	ItemRevision      uint64    `json:"itemRevision"`
+	RecordedAt        time.Time `json:"recordedAt"`
+	ExpiresAt         time.Time `json:"expiresAt"`
+	ResultBytes       []byte    `json:"result"`
 }
 
 // MutationReceiptRecord is the bounded persisted idempotency window for one
@@ -173,7 +195,7 @@ func (s *MemoryStore) LoadSnapshot(_ context.Context, roomID string) (SnapshotRe
 	if !ok {
 		return SnapshotRecord{}, ErrNotFound
 	}
-	return record, nil
+	return cloneSnapshotRecord(record), nil
 }
 
 // SaveSnapshot ignores a checkpoint older than the stored one.
@@ -184,11 +206,25 @@ func (s *MemoryStore) SaveSnapshot(_ context.Context, snapshot SnapshotRecord) e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	current, ok := s.snapshots[snapshot.RoomID]
-	if ok && snapshot.CheckpointRevision < current.CheckpointRevision {
+	if ok && snapshotOlder(snapshot, current) {
 		return nil
 	}
-	s.snapshots[snapshot.RoomID] = snapshot
+	s.snapshots[snapshot.RoomID] = cloneSnapshotRecord(snapshot)
 	return nil
+}
+
+func cloneSnapshotRecord(record SnapshotRecord) SnapshotRecord {
+	record.SnapshotRaw = bytes.Clone(record.SnapshotRaw)
+	record.MutationReceipts = append([]MutationReceiptRecord(nil), record.MutationReceipts...)
+	for index := range record.MutationReceipts {
+		record.MutationReceipts[index].ResultBytes = bytes.Clone(record.MutationReceipts[index].ResultBytes)
+	}
+	record.MutationHighWater = append([]MutationHighWaterRecord(nil), record.MutationHighWater...)
+	record.MutationOutcomes = append([]MutationOutcomeRecord(nil), record.MutationOutcomes...)
+	for index := range record.MutationOutcomes {
+		record.MutationOutcomes[index].ResultBytes = bytes.Clone(record.MutationOutcomes[index].ResultBytes)
+	}
+	return record
 }
 
 // CanvasIDs lists every registered canvas in no particular order.

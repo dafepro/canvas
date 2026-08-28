@@ -130,6 +130,34 @@ func (r *Room) handleItemMutation(client *Client, mutation *pb.ItemMutation) {
 		})
 		return
 	}
+	if len(mutation.AuthorizationEvidence) > r.cfg.MaxMutationAuthorizationBytes ||
+		len(mutation.ApplicationCorrelationId) > r.cfg.MaxMutationCorrelationBytes {
+		r.sendItemMutationRejection(client, mutation,
+			pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_MALFORMED,
+			errOversizedMutationMetadata.Error(), nil)
+		return
+	}
+	if outcome, exists := r.retainedMutationOutcome(mutation); exists {
+		if outcome.ParticipantID == client.UserID &&
+			outcome.ClientSessionID == mutation.ClientSessionId && outcome.MutationID == mutation.MutationId {
+			if r.cfg.Now().Before(outcome.ExpiresAt) {
+				result := &pb.ItemMutationResult{}
+				if proto.Unmarshal(outcome.ResultBytes, result) == nil {
+					r.sendTo(client, &pb.RoomEnvelope{RoomId: r.roomID, HostEpoch: r.hostEpoch,
+						Payload: &pb.RoomEnvelope_ItemMutationResult{ItemMutationResult: result}})
+					return
+				}
+			}
+			r.sendItemMutationRejectionWithoutOutcome(client, mutation,
+				pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_RECEIPT_EXPIRED,
+				"the retained application correlation has expired", nil)
+			return
+		}
+		r.sendItemMutationRejectionWithoutOutcome(client, mutation,
+			pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_APPLICATION_CORRELATION_CONFLICT,
+			"application correlation is already bound to another mutation", nil)
+		return
+	}
 	if mutation.MutationId <= r.mutationHighWater[clientSessionKey(client.UserID, mutation.ClientSessionId)] {
 		r.sendItemMutationRejection(client, mutation,
 			pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_RECEIPT_EXPIRED,
@@ -157,6 +185,10 @@ func (r *Room) handleItemMutation(client *Client, mutation *pb.ItemMutation) {
 				"edit_expired", item)
 			return
 		}
+	}
+	if authorized, code, message := r.authorizeItemMutation(client, mutation, item); !authorized {
+		r.sendItemMutationRejection(client, mutation, code, message, item)
+		return
 	}
 
 	r.applyItemMutation(mutation, item, client)
@@ -201,6 +233,7 @@ func (r *Room) handleItemMutation(client *Client, mutation *pb.ItemMutation) {
 		EntityId:         mutation.EntityId,
 	}
 	r.recordMutationReceipt(client.UserID, result)
+	r.recordMutationOutcome(client, mutation, result, item)
 	r.broadcast(&pb.RoomEnvelope{
 		RoomId:         r.roomID,
 		HostEpoch:      r.hostEpoch,
@@ -218,6 +251,27 @@ func (r *Room) sendItemMutationRejection(
 	code pb.ItemMutationRejectCode,
 	message string,
 	item *SnapshotItem,
+) {
+	r.sendItemMutationRejectionWithOutcome(client, mutation, code, message, item, true)
+}
+
+func (r *Room) sendItemMutationRejectionWithoutOutcome(
+	client *Client,
+	mutation *pb.ItemMutation,
+	code pb.ItemMutationRejectCode,
+	message string,
+	item *SnapshotItem,
+) {
+	r.sendItemMutationRejectionWithOutcome(client, mutation, code, message, item, false)
+}
+
+func (r *Room) sendItemMutationRejectionWithOutcome(
+	client *Client,
+	mutation *pb.ItemMutation,
+	code pb.ItemMutationRejectCode,
+	message string,
+	item *SnapshotItem,
+	recordOutcome bool,
 ) {
 	result := &pb.ItemMutationResult{
 		Accepted:      false,
@@ -239,6 +293,9 @@ func (r *Room) sendItemMutationRejection(
 	if mutation != nil && mutation.ClientSessionId != "" && mutation.MutationId != 0 &&
 		code != pb.ItemMutationRejectCode_ITEM_MUTATION_REJECT_RECEIPT_EXPIRED {
 		r.recordMutationReceipt(client.UserID, result)
+	}
+	if recordOutcome {
+		r.recordMutationOutcome(client, mutation, result, item)
 	}
 	r.cfg.Metrics.DurableRejected(r.roomID, code.String())
 	r.sendTo(client, &pb.RoomEnvelope{

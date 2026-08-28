@@ -11,6 +11,7 @@ authenticator, store, transport, or worker bundle honors the public contract.
   sleep normalization, and durable migration coverage.
 - [x] Host `Authenticator` implementations.
 - [x] Host `Store` implementations.
+- [x] Application durable-mutation authorizers.
 - [x] Custom `RoomTransport` implementations.
 - [x] Application-owned simulation worker bundles.
 
@@ -74,6 +75,33 @@ func TestProductAuthenticator(t *testing.T) {
 The host owns ticket issuance, expiration, origin policy, and replay semantics;
 the kit owns only the identity/error boundary visible to Canvas.
 
+## Mutation authorizer kit
+
+Go hosts call `RunMutationAuthorizerConformance` with their configured
+`roomsdk.MutationAuthorizer` and six opaque requests: approved, denied,
+expired, wrong-room, wrong-participant, and replayed. The approved request runs
+first so a one-use reservation can be consumed before the replay case. Every
+fixture request must carry authenticated context, a mutation kind, stable
+idempotency key, and evidence.
+
+```go
+roomsdktest.RunMutationAuthorizerConformance(t,
+    roomsdktest.MutationAuthorizerConformanceFixture{
+        Authorizer: productAuthorizer,
+        Approved: approvedRequest,
+        Denied: deniedRequest,
+        Expired: expiredRequest,
+        WrongRoom: wrongRoomRequest,
+        WrongParticipant: wrongParticipantRequest,
+        Replayed: replayedRequest,
+    })
+```
+
+The application suite proves the meanings encoded in product-owned evidence.
+Canvas's WebSocket room suite proves that its structural checks run first,
+duplicates do not invoke the authorizer twice, and timeouts, errors, and panics
+fail closed with stable codes.
+
 ## Store kit
 
 `RunStoreConformance` accepts a `StoreConformanceFixture` whose `NewStore`
@@ -82,6 +110,8 @@ definition.
 The suite verifies semantic JSON equality for catalog records, zero records plus
 `roomsdk.ErrNotFound` for misses, snapshot round trips, room isolation, rejection
 of stale checkpoint revisions, and highest-revision wins under concurrent saves.
+Snapshot round trips include mutation receipts, high-water marks, and the
+server-private correlated outcome ledger used by trusted reconciliation.
 The fixture must also seed `PreviousCanvas` and `PreviousItemDefinition` with
 the same IDs and older versions. The kit retrieves both generations, proving
 retention rather than only version checking, and verifies missing-version

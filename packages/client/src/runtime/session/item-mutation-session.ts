@@ -74,7 +74,16 @@ export type ItemMutationRejectCode =
   | "config"
   | "capacity"
   | "receipt_expired"
-  | "internal";
+  | "internal"
+  | "application_policy"
+  | "application_unavailable"
+  | "application_correlation_conflict";
+
+/** Private product metadata consumed only at the server mutation boundary. */
+export interface ItemMutationOptions {
+  readonly authorizationEvidence?: Uint8Array;
+  readonly applicationCorrelationId?: string;
+}
 
 export type ItemMutationRequest =
   | { readonly kind: "spawn"; readonly definitionId: string; readonly transform: Transform }
@@ -140,7 +149,7 @@ export interface ItemEditHandle {
   readonly state: "opening" | "active" | "ending" | "ended";
   readonly ended: Promise<ItemEditEndOutcome>;
   preview(transform: Transform): void;
-  mutate(request: ItemMutationRequest): ItemMutationReceipt;
+  mutate(request: ItemMutationRequest, options?: ItemMutationOptions): ItemMutationReceipt;
   end(): void;
   cancel(): void;
 }
@@ -149,6 +158,7 @@ interface PendingMutation {
   readonly mutationId: number;
   readonly request: ItemMutationRequest;
   readonly editSessionId?: string;
+  readonly options?: ItemMutationOptions;
   readonly queueKey: string;
   readonly receipt: ItemMutationReceipt;
   readonly resolve: (outcome: ItemMutationOutcome) => void;
@@ -292,52 +302,112 @@ export class ItemMutationSession {
     this.mutationObservers.clear();
   }
 
-  spawnItem(definitionId: string, at: Vec2, rotation = 0, scale = 1): ItemMutationReceipt {
+  spawnItem(
+    definitionId: string,
+    at: Vec2,
+    rotation = 0,
+    scale = 1,
+    options?: ItemMutationOptions,
+  ): ItemMutationReceipt {
     return this.enqueue({
       kind: "spawn",
       definitionId,
       transform: { x: at.x, y: at.y, rotation, scale },
-    });
+    }, undefined, options);
   }
 
   moveItem(
     entityId: string,
     transform: Transform,
-    editSessionId?: string,
+    editSessionOrOptions?: string | ItemMutationOptions,
+    options?: ItemMutationOptions,
   ): ItemMutationReceipt {
-    return this.enqueue({ kind: "transform", entityId, transform: { ...transform } }, editSessionId);
+    const editSessionId = typeof editSessionOrOptions === "string" ? editSessionOrOptions : undefined;
+    const mutationOptions = typeof editSessionOrOptions === "string"
+      ? options
+      : editSessionOrOptions;
+    return this.enqueue(
+      { kind: "transform", entityId, transform: { ...transform } },
+      editSessionId,
+      mutationOptions,
+    );
   }
 
-  rotateItem(entityId: string, rotation: number, editSessionId?: string): ItemMutationReceipt {
-    return this.enqueue({ kind: "rotation", entityId, rotation }, editSessionId);
+  rotateItem(
+    entityId: string,
+    rotation: number,
+    editSessionOrOptions?: string | ItemMutationOptions,
+    options?: ItemMutationOptions,
+  ): ItemMutationReceipt {
+    return this.enqueue(
+      { kind: "rotation", entityId, rotation },
+      typeof editSessionOrOptions === "string" ? editSessionOrOptions : undefined,
+      typeof editSessionOrOptions === "string" ? options : editSessionOrOptions,
+    );
   }
 
-  scaleItem(entityId: string, scale: number, editSessionId?: string): ItemMutationReceipt {
-    return this.enqueue({ kind: "scale", entityId, scale }, editSessionId);
+  scaleItem(
+    entityId: string,
+    scale: number,
+    editSessionOrOptions?: string | ItemMutationOptions,
+    options?: ItemMutationOptions,
+  ): ItemMutationReceipt {
+    return this.enqueue(
+      { kind: "scale", entityId, scale },
+      typeof editSessionOrOptions === "string" ? editSessionOrOptions : undefined,
+      typeof editSessionOrOptions === "string" ? options : editSessionOrOptions,
+    );
   }
 
-  setItemConfig(entityId: string, config: unknown, editSessionId?: string): ItemMutationReceipt {
-    return this.enqueue({ kind: "config", entityId, config }, editSessionId);
+  setItemConfig(
+    entityId: string,
+    config: unknown,
+    editSessionOrOptions?: string | ItemMutationOptions,
+    options?: ItemMutationOptions,
+  ): ItemMutationReceipt {
+    return this.enqueue(
+      { kind: "config", entityId, config },
+      typeof editSessionOrOptions === "string" ? editSessionOrOptions : undefined,
+      typeof editSessionOrOptions === "string" ? options : editSessionOrOptions,
+    );
   }
 
   setItemIsolation(
     entityId: string,
     isolated: boolean,
-    editSessionId?: string,
+    editSessionOrOptions?: string | ItemMutationOptions,
+    options?: ItemMutationOptions,
   ): ItemMutationReceipt {
-    return this.enqueue({ kind: "isolation", entityId, isolated }, editSessionId);
+    return this.enqueue(
+      { kind: "isolation", entityId, isolated },
+      typeof editSessionOrOptions === "string" ? editSessionOrOptions : undefined,
+      typeof editSessionOrOptions === "string" ? options : editSessionOrOptions,
+    );
   }
 
   setItemCollisionsEnabled(
     entityId: string,
     enabled: boolean,
-    editSessionId?: string,
+    editSessionOrOptions?: string | ItemMutationOptions,
+    options?: ItemMutationOptions,
   ): ItemMutationReceipt {
-    return this.enqueue({ kind: "collisions", entityId, enabled }, editSessionId);
+    return this.enqueue(
+      { kind: "collisions", entityId, enabled },
+      typeof editSessionOrOptions === "string" ? editSessionOrOptions : undefined,
+      typeof editSessionOrOptions === "string" ? options : editSessionOrOptions,
+    );
   }
 
-  deleteItem(entityId: string, editSessionId?: string): ItemMutationReceipt {
-    return this.enqueue({ kind: "delete", entityId }, editSessionId);
+  deleteItem(
+    entityId: string,
+    editSessionOrOptions?: string | ItemMutationOptions,
+    options?: ItemMutationOptions,
+  ): ItemMutationReceipt {
+    return this.enqueue(
+      { kind: "delete", entityId },
+      typeof editSessionOrOptions === "string" ? editSessionOrOptions : undefined,
+      typeof editSessionOrOptions === "string" ? options : editSessionOrOptions,
+    );
   }
 
   beginItemEdit(entityId: string): ItemEditHandle {
@@ -354,14 +424,14 @@ export class ItemMutationSession {
       get state() { return record.state; },
       ended,
       preview: (transform: Transform) => this.previewEdit(record, transform),
-      mutate: (request: ItemMutationRequest) => {
+      mutate: (request: ItemMutationRequest, options?: ItemMutationOptions) => {
         const target = entityIdOf(request);
         if (!target || target !== entityId) {
           return this.localRejection(request, editSessionId, "malformed",
             "an edit handle can mutate only its selected item");
         }
         this.clearPendingPreview(record);
-        const receipt = this.enqueue(request, editSessionId);
+        const receipt = this.enqueue(request, editSessionId, options);
         if (request.kind === "transform") {
           this.presentation.commit(
             editSessionId,
@@ -493,7 +563,11 @@ export class ItemMutationSession {
     this.metadataById.set(item.entityId, freezeItem(item)!);
   }
 
-  private enqueue(request: ItemMutationRequest, editSessionId?: string): ItemMutationReceipt {
+  private enqueue(
+    request: ItemMutationRequest,
+    editSessionId?: string,
+    options?: ItemMutationOptions,
+  ): ItemMutationReceipt {
     const mutationId = ++this.mutationCounter;
     let resolve!: (outcome: ItemMutationOutcome) => void;
     const settled = new Promise<ItemMutationOutcome>((complete) => { resolve = complete; });
@@ -509,6 +583,7 @@ export class ItemMutationSession {
         mutationId,
         request,
         editSessionId,
+        options,
         queueKey: request.entityId,
         receipt,
         resolve,
@@ -532,6 +607,7 @@ export class ItemMutationSession {
           mutationId,
           request,
           editSessionId,
+          options,
           queueKey: `spawn-${mutationId}`,
           receipt,
           resolve,
@@ -553,6 +629,7 @@ export class ItemMutationSession {
       mutationId,
       request,
       editSessionId,
+      options,
       queueKey,
       receipt,
       resolve,
@@ -616,6 +693,10 @@ export class ItemMutationSession {
       configJson: new Uint8Array(),
       isolated: false,
       collisionsEnabled: false,
+      authorizationEvidence: pending.options?.authorizationEvidence
+        ? new Uint8Array(pending.options.authorizationEvidence)
+        : new Uint8Array(),
+      applicationCorrelationId: pending.options?.applicationCorrelationId ?? "",
     };
     switch (request.kind) {
       case "spawn": {
@@ -895,6 +976,10 @@ const rejectCode = (code: WireRejectCode): ItemMutationRejectCode => {
     case WireRejectCode.ITEM_MUTATION_REJECT_CAPACITY: return "capacity";
     case WireRejectCode.ITEM_MUTATION_REJECT_RECEIPT_EXPIRED: return "receipt_expired";
     case WireRejectCode.ITEM_MUTATION_REJECT_INTERNAL: return "internal";
+    case WireRejectCode.ITEM_MUTATION_REJECT_APPLICATION_POLICY: return "application_policy";
+    case WireRejectCode.ITEM_MUTATION_REJECT_APPLICATION_UNAVAILABLE: return "application_unavailable";
+    case WireRejectCode.ITEM_MUTATION_REJECT_APPLICATION_CORRELATION_CONFLICT:
+      return "application_correlation_conflict";
     default: return "malformed";
   }
 };

@@ -33,6 +33,7 @@ import {
   type ItemMutationEffect,
   type ItemEditHandle,
   type ItemMutationReceipt,
+  type ItemMutationOptions,
   type ItemMutationSnapshot,
 } from "./session/item-mutation-session.js";
 import {
@@ -1125,8 +1126,9 @@ export class RoomSession {
     at: Vec2,
     rotation = 0,
     scale = 1,
+    options?: ItemMutationOptions,
   ): ItemMutationReceipt {
-    return this.mutations.spawnItem(definitionId, at, rotation, scale);
+    return this.mutations.spawnItem(definitionId, at, rotation, scale, options);
   }
 
   private checkPresentationReady(): void {
@@ -1180,32 +1182,32 @@ export class RoomSession {
     return this.mutations.beginItemEdit(entityId);
   }
 
-  moveItem(entityId: string, transform: Transform): ItemMutationReceipt {
-    return this.mutations.moveItem(entityId, transform);
+  moveItem(entityId: string, transform: Transform, options?: ItemMutationOptions): ItemMutationReceipt {
+    return this.mutations.moveItem(entityId, transform, options);
   }
 
-  rotateItem(entityId: string, rotation: number): ItemMutationReceipt {
-    return this.mutations.rotateItem(entityId, rotation);
+  rotateItem(entityId: string, rotation: number, options?: ItemMutationOptions): ItemMutationReceipt {
+    return this.mutations.rotateItem(entityId, rotation, options);
   }
 
-  scaleItem(entityId: string, scale: number): ItemMutationReceipt {
-    return this.mutations.scaleItem(entityId, scale);
+  scaleItem(entityId: string, scale: number, options?: ItemMutationOptions): ItemMutationReceipt {
+    return this.mutations.scaleItem(entityId, scale, options);
   }
 
-  setItemConfig(entityId: string, config: unknown): ItemMutationReceipt {
-    return this.mutations.setItemConfig(entityId, config);
+  setItemConfig(entityId: string, config: unknown, options?: ItemMutationOptions): ItemMutationReceipt {
+    return this.mutations.setItemConfig(entityId, config, options);
   }
 
-  setItemIsolation(entityId: string, isolated: boolean): ItemMutationReceipt {
-    return this.mutations.setItemIsolation(entityId, isolated);
+  setItemIsolation(entityId: string, isolated: boolean, options?: ItemMutationOptions): ItemMutationReceipt {
+    return this.mutations.setItemIsolation(entityId, isolated, options);
   }
 
-  setItemCollisionsEnabled(entityId: string, enabled: boolean): ItemMutationReceipt {
-    return this.mutations.setItemCollisionsEnabled(entityId, enabled);
+  setItemCollisionsEnabled(entityId: string, enabled: boolean, options?: ItemMutationOptions): ItemMutationReceipt {
+    return this.mutations.setItemCollisionsEnabled(entityId, enabled, options);
   }
 
-  deleteItem(entityId: string): ItemMutationReceipt {
-    return this.mutations.deleteItem(entityId);
+  deleteItem(entityId: string, options?: ItemMutationOptions): ItemMutationReceipt {
+    return this.mutations.deleteItem(entityId, options);
   }
 
   private applyItemMutationEffect(effect: ItemMutationEffect): void {

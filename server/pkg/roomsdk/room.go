@@ -50,18 +50,21 @@ type Room struct {
 	// joinOrder keeps election deterministic.
 	joinOrder []string
 
-	snapshot             CanvasSnapshot
-	snapshotRaw          json.RawMessage
-	checkpointNo         uint64
-	items                map[string]*SnapshotItem
-	avatarPositions      map[string]SnapshotAvatar
-	editSessions         map[string]*itemEditSession
-	editByEntity         map[string]string
-	mutationReceipts     map[string]*storedMutationReceipt
-	mutationReceiptOrder []string
-	mutationHighWater    map[string]uint64
-	definitions          map[catalogVersionKey]ItemDefinitionRecord
-	nextEntityNo         uint64
+	snapshot                CanvasSnapshot
+	snapshotRaw             json.RawMessage
+	checkpointNo            uint64
+	items                   map[string]*SnapshotItem
+	avatarPositions         map[string]SnapshotAvatar
+	editSessions            map[string]*itemEditSession
+	editByEntity            map[string]string
+	mutationReceipts        map[string]*storedMutationReceipt
+	mutationReceiptOrder    []string
+	mutationHighWater       map[string]uint64
+	mutationOutcomes        map[string]MutationOutcomeRecord
+	mutationOutcomeOrder    []string
+	mutationOutcomeRevision uint64
+	definitions             map[catalogVersionKey]ItemDefinitionRecord
+	nextEntityNo            uint64
 
 	joins      chan *Client
 	departures chan departure
@@ -120,6 +123,7 @@ func newRoomWithMode(
 		editByEntity:      make(map[string]string),
 		mutationReceipts:  make(map[string]*storedMutationReceipt),
 		mutationHighWater: make(map[string]uint64),
+		mutationOutcomes:  make(map[string]MutationOutcomeRecord),
 		definitions:       make(map[catalogVersionKey]ItemDefinitionRecord),
 		joins:             make(chan *Client, 8),
 		departures:        make(chan departure, 8),
@@ -155,6 +159,7 @@ func newRoomWithMode(
 		if err := room.loadMutationReceipts(snapshot); err != nil {
 			return nil, err
 		}
+		room.loadMutationOutcomes(snapshot)
 	} else {
 		room.snapshot = emptySnapshot(record.CanvasID, shape.Version, server.cfg.Now())
 		if err := room.bootstrapSystemItems(); err != nil {
@@ -945,16 +950,22 @@ func (r *Room) withinBounds(t Transform) bool {
 
 func (r *Room) snapshotRecord() SnapshotRecord {
 	record := SnapshotRecord{
-		RoomID:             r.roomID,
-		CanvasID:           r.canvasID,
-		CanvasVersion:      r.snapshot.CanvasVersion,
-		SceneRevision:      r.sceneRevision,
-		CheckpointRevision: r.checkpointNo,
-		HostEpoch:          r.hostEpoch,
-		Tick:               r.snapshot.Tick,
-		Normalized:         r.snapshot.Normalized,
-		CapturedAt:         r.cfg.Now().UTC(),
-		SnapshotRaw:        append(json.RawMessage(nil), r.snapshotRaw...),
+		RoomID:                  r.roomID,
+		CanvasID:                r.canvasID,
+		CanvasVersion:           r.snapshot.CanvasVersion,
+		SceneRevision:           r.sceneRevision,
+		CheckpointRevision:      r.checkpointNo,
+		HostEpoch:               r.hostEpoch,
+		Tick:                    r.snapshot.Tick,
+		Normalized:              r.snapshot.Normalized,
+		CapturedAt:              r.cfg.Now().UTC(),
+		SnapshotRaw:             append(json.RawMessage(nil), r.snapshotRaw...),
+		MutationOutcomeRevision: r.mutationOutcomeRevision,
+	}
+	for _, correlationID := range r.mutationOutcomeOrder {
+		if outcome, ok := r.mutationOutcomes[correlationID]; ok {
+			record.MutationOutcomes = append(record.MutationOutcomes, cloneMutationOutcomeRecord(outcome))
+		}
 	}
 	for _, key := range r.mutationReceiptOrder {
 		receipt := r.mutationReceipts[key]
@@ -1022,12 +1033,14 @@ func (r *Room) persistenceLoop() {
 	}
 }
 
-func (r *Room) saveSnapshot(record SnapshotRecord) {
+func (r *Room) saveSnapshot(record SnapshotRecord) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := r.cfg.Store.SaveSnapshot(ctx, record); err != nil {
 		r.cfg.Logger.Error("save snapshot failed", "canvas", r.roomID, "error", err)
+		return err
 	}
+	return nil
 }
 
 // ---------- room sleep (spec 13.3) ----------
