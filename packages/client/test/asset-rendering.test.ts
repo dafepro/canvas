@@ -245,6 +245,51 @@ describe("asset rendering", () => {
     expect(display.zIndex).toBe(10);
   });
 
+  it("projects participant-specific avatar art without changing simulation state", () => {
+    const avatarDefinition = {
+      ...definition,
+      definitionId: "avatar",
+      displayName: "Player avatar",
+      visual: {
+        spriteId: "ball.idle",
+        size: { width: 5, height: 6 },
+        variants: { alice: { spriteId: "ball.hot" } },
+      },
+    } satisfies ItemDefinition;
+    const entity = {
+      id: "avatar:alice",
+      kind: "avatar" as const,
+      definitionId: "avatar",
+      x: 0,
+      y: 0,
+      rotation: 0,
+      vx: 0,
+      vy: 0,
+      angularVelocity: 0,
+      userId: "alice",
+    };
+    const scene = new PixiScene(
+      { size: { width: 100, height: 50 } } as CanvasDefinition,
+      [avatarDefinition],
+      {
+        projectEntityVisual: (candidate) =>
+          candidate.kind === "avatar"
+            ? { variant: candidate.userId }
+            : undefined,
+      },
+      assets,
+    );
+
+    const record = (
+      scene as unknown as {
+        ensureSprite(candidate: typeof entity): { display: { children: unknown[] } };
+      }
+    ).ensureSprite(entity);
+
+    expect((record.display.children[0] as Sprite).texture).toBe(Texture.EMPTY);
+    expect(entity).not.toHaveProperty("variant");
+  });
+
   it("keeps the fallback avatar above ordinary item sprites", () => {
     const display = buildEntityDisplay(
       {

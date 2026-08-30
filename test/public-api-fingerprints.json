@@ -28,5 +28,10 @@
     "core": "2165fa39f2f2dbaf575baf17a018f76726a002336ad541d254496f3bbd26ae00",
     "protocol": "75fc6f05ff0f7c25150d7cac4adeb4deada47943eb1c2d1f6da5a90c3ce099c7",
     "client": "2de62c772d58169309c2066db2830b8fac3979dc28589d2f22cb35a351443c9a"
+  },
+  "0.6.1": {
+    "core": "2165fa39f2f2dbaf575baf17a018f76726a002336ad541d254496f3bbd26ae00",
+    "protocol": "75fc6f05ff0f7c25150d7cac4adeb4deada47943eb1c2d1f6da5a90c3ce099c7",
+    "client": "977f9f1543e9b548cc4a608ce8ea83eee1a6cd357f25dab8c1bfa020a3fe9c8c"
   }
 }

@@ -21,7 +21,21 @@ export interface SceneOptions {
   resolution?: number;
   /** Renderer-local, speed-scaled trails derived from interpolated entities. */
   motionTrails?: readonly MotionTrailOptions[];
+  /**
+   * Consumer-owned, renderer-local visual identity. The projection never enters
+   * simulation, snapshots, or the wire protocol.
+   */
+  projectEntityVisual?: EntityVisualProjector;
 }
+
+export interface EntityVisualProjection {
+  readonly variant?: string;
+  readonly tint?: number;
+}
+
+export type EntityVisualProjector = (
+  entity: Readonly<RenderEntity>,
+) => EntityVisualProjection | undefined;
 
 export const resolveSceneResolution = (
   requested: number | undefined,
@@ -316,12 +330,15 @@ export class PixiScene {
   }
 
   private ensureSprite(entity: RenderEntity): SpriteRecord {
+    const projection = this.options.projectEntityVisual?.(entity);
+    const variant = projection?.variant ?? entity.variant;
+    const tint = projection?.tint ?? entity.tint;
     const existing = this.sprites.get(entity.id);
     if (
       existing &&
       existing.definitionId === entity.definitionId &&
-      existing.variant === entity.variant &&
-      existing.tint === entity.tint &&
+      existing.variant === variant &&
+      existing.tint === tint &&
       existing.animation === entity.animation &&
       existing.animationEpoch === entity.animationEpoch
     ) {
@@ -332,12 +349,16 @@ export class PixiScene {
       existing.display.destroy({ children: true });
     }
 
-    const display = this.buildDisplay(entity);
+    const display = this.buildDisplay(
+      variant === entity.variant && tint === entity.tint
+        ? entity
+        : { ...entity, variant, tint },
+    );
     const record: SpriteRecord = {
       display,
       definitionId: entity.definitionId,
-      variant: entity.variant,
-      tint: entity.tint,
+      variant,
+      tint,
       animation: entity.animation,
       animationEpoch: entity.animationEpoch,
     };
