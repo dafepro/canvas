@@ -88,6 +88,15 @@ describe("asset manifest", () => {
     );
   });
 
+  it("leaves embedded asset URLs intact so their payload remains decodable", () => {
+    expect(
+      versionAssetUrl("data:image/svg+xml,%3Csvg%2F%3E", manifest.revision),
+    ).toBe("data:image/svg+xml,%3Csvg%2F%3E");
+    expect(
+      versionAssetUrl("blob:https://example.test/texture-id", manifest.revision),
+    ).toBe("blob:https://example.test/texture-id");
+  });
+
   it("loads each source once, creates atlas frames, and reports progress", async () => {
     const adapter = fakeAdapter();
     const progress = vi.fn();
