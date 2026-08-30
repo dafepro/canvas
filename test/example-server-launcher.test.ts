@@ -34,7 +34,7 @@ describe("example server launcher", () => {
       expect(config).toMatchObject({
         example,
         address: `:${port}`,
-        releaseVersion: "0.6.1",
+        releaseVersion: "0.6.2",
       });
       expect(config.canvasesDir.replaceAll("\\", "/").endsWith(
         `/examples/${example}/server/canvases`,
@@ -43,7 +43,7 @@ describe("example server launcher", () => {
         `/examples/${example}/server/definitions`,
       )).toBe(true);
       expect(config.dataDir.replaceAll("\\", "/").endsWith(
-        `/examples/${example}/.data/v0.6.1`,
+        `/examples/${example}/.data/v0.6.2`,
       )).toBe(true);
     }
   });

@@ -73,6 +73,7 @@ export class LoadedAssetBundle<Texture> {
 }
 
 export function versionAssetUrl(src: string, revision: string): string {
+  if (src.startsWith("data:") || src.startsWith("blob:")) return src;
   const hashIndex = src.indexOf("#");
   const hash = hashIndex >= 0 ? src.slice(hashIndex) : "";
   const withoutHash = hashIndex >= 0 ? src.slice(0, hashIndex) : src;
